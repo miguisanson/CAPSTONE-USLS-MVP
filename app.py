@@ -1734,6 +1734,8 @@ def ensure_practicum_program_policy() -> int:
     if legacy_guidance and not msgc:
         legacy_guidance.code = PRACTICUM_MSGC_CODE
         legacy_guidance.name = "Master of Science in Guidance and Counseling"
+        if legacy_guidance.college in (None, "", "Imported"):
+            legacy_guidance.college = "Education"
         msgc = legacy_guidance
         changed += 1
         for course in Course.query.filter_by(program_id=legacy_guidance.id).all():
@@ -1896,6 +1898,17 @@ def generate_semester_calendar(from_year: int = 2023, to_year: int = 2030) -> li
         rows.append((academic_semester_label(year, 0), date(year, 8, 1)))
         rows.append((academic_semester_label(year, 1), date(year + 1, 1, 10)))
     return rows
+
+
+def seed_semester_years(today: date | None = None) -> tuple[int, int]:
+    """First and last academic-year start for the seeded semesters: the current year plus or minus two.
+
+    The first semester of a year starts in August, so before August the current academic year
+    began the year before. More semesters are added from the admin screen when they are needed.
+    """
+    today = today or date.today()
+    current = today.year if today.month >= 8 else today.year - 1
+    return current - 2, current + 2
 
 
 def upcoming_semester_labels(count: int = 5, reference: date | None = None) -> list[str]:
@@ -2414,7 +2427,7 @@ def comprehensive_exam_eligibility(student: Student) -> dict:
         categories = [
             {
                 "category": category,
-                "completed": completed.get(category, 0),
+                "completed": min(completed.get(category, 0), required),
                 "required": required,
                 "complete": completed.get(category, 0) >= required,
             }
@@ -35137,6 +35150,24 @@ def ensure_panel_matching_demo_data() -> dict[str, int]:
     return changes
 
 
+def demo_adviser_name(student: Student) -> str:
+    """The seeded research adviser of a workflow demo student (spread so nobody exceeds the advisee limit)."""
+    from panel_demo_data import DEMO_ADVISER_FALLBACK, DEMO_STUDENT_ADVISERS
+
+    return DEMO_STUDENT_ADVISERS.get(student.student_number, DEMO_ADVISER_FALLBACK)
+
+
+def demo_panel_replacement(student: Student, panel_spec) -> str:
+    """Who sits in the seat of a panel member who is the student's adviser."""
+    from panel_demo_data import DEMO_ADVISER_FALLBACK, DEMO_PANEL_REPLACEMENT
+
+    taken = {name for name, _role in panel_spec} | {student.adviser_name}
+    for name in (DEMO_PANEL_REPLACEMENT, DEMO_ADVISER_FALLBACK):
+        if name not in taken:
+            return name
+    return DEMO_ADVISER_FALLBACK
+
+
 def seed_maed_personas() -> None:
     """Create the policy-valid MAED workflow cohort from the monitoring sheet.
 
@@ -35217,7 +35248,7 @@ def seed_maed_personas() -> None:
         if not presentation or presentation["source_type"] != "student_upload":
             return
         required_count = presentation["required_file_count"]
-        adviser = Faculty.query.filter_by(name=student.adviser_name or "Dr. Liwayway Bautista").first()
+        adviser = Faculty.query.filter_by(name=student.adviser_name or demo_adviser_name(student)).first()
         gate_slug = re.sub(r"[^a-z0-9]+", "-", document.gate.lower()).strip("-")[:28]
         item_slug = re.sub(r"[^a-z0-9]+", "-", document.item_name.lower()).strip("-")[:42]
         for file_number in range(1, required_count + 1):
@@ -35321,6 +35352,9 @@ def seed_maed_personas() -> None:
 
         assignments = []
         for faculty_name, role in panel_spec:
+            if faculty_name == student.adviser_name:
+                # An adviser never sits on their own advisee's panel (Research Protocol).
+                faculty_name = demo_panel_replacement(student, panel_spec)
             faculty = Faculty.query.filter_by(name=faculty_name).first()
             if not faculty:
                 continue
@@ -35398,7 +35432,7 @@ def seed_maed_personas() -> None:
 
     def seed_completed_research(student: Student, title: str) -> None:
         student.comprehensive_exam_status = "Passed"
-        student.adviser_name = "Dr. Liwayway Bautista"
+        student.adviser_name = demo_adviser_name(student)
         if not Form1Endorsement.query.filter_by(student_id=student.id).first():
             db.session.add(Form1Endorsement(
                 student_id=student.id,
@@ -35523,7 +35557,7 @@ def seed_maed_personas() -> None:
         miguel.enrollment_tag = "Enrolled"
         miguel.comprehensive_exam_status = "Passed"
         miguel.risk_level = "On Track"
-        miguel.adviser_name = "Dr. Liwayway Bautista"
+        miguel.adviser_name = demo_adviser_name(miguel)
         set_term_status(miguel, "Confirmed")
         title = "Learning Analytics for Graduate Student Engagement"
         if not Form1Endorsement.query.filter_by(student_id=miguel.id).first():
@@ -35876,7 +35910,7 @@ def seed_database() -> None:
     ensure_authoritative_curricula()
 
     terms = []
-    for label, start in generate_semester_calendar(2023, 2030):
+    for label, start in generate_semester_calendar(*seed_semester_years()):
         term = AcademicTerm(label=label, start_date=start, end_date=start + timedelta(days=120))
         db.session.add(term)
         terms.append(term)
@@ -35908,6 +35942,486 @@ def seed_database() -> None:
     ensure_demo_accounts()
     sync_automatic_awol_statuses(commit=False)
     db.session.commit()
+
+
+# Cases that wait for (or already have) a Dean decision, so the Dean's screens are not empty on a
+# fresh seed (I-062). Students come from the monitoring sheets and belong to no other demo.
+DEAN_DEMO_STUDENTS = {
+    "leave-of-absence": "2360074",      # Lorenzo Reyes, MSN: LOA with the Dean
+    "readmission": "2360031",           # Hazel Castillo, MIT: on leave, readmission with the Dean
+    "awol-return": "2560085",           # Noel Navarro, MAN: AWOL, return declaration with the Dean
+    "withdrawal": "2360087",            # Hazel Flores, MAN: subject withdrawal with the Dean
+    "practicum": "2360101",             # Isabel Mendoza, MAPSY: practicum report sent to the Dean
+    "graduation": "2360008",            # Hector Ong, MAED: graduation endorsement ready for the Dean
+    "leave-of-absence-decided": "2460017",   # Olivia Cabrera, MSCS: LOA the Dean approved
+    "withdrawal-decided": "2460068",    # Gian Lacson, MSN: withdrawal the Dean denied
+}
+DEAN_DEMO_PLANS = (("MIT", "Submitted"), ("MSN", "Returned"))
+
+
+def seed_dean_review_cases() -> int:
+    """One case waiting in each Dean queue plus a few decided ones (I-062). Returns the cases made.
+
+    LOA and readmission go through the real leave workflow (leave_case_apply) so their history,
+    tasks and notices are the ones a live case would have; the others are written the way the
+    persona fixtures write theirs. Dates are spread afterwards by spread_seed_history().
+    """
+    staff = UserAccount.query.filter_by(role="staff").order_by(UserAccount.id).first()
+    dean = UserAccount.query.filter_by(role="dean").order_by(UserAccount.id).first()
+    active_term = get_active_term()
+    upcoming = future_semester_labels(1)
+    if not (staff and dean and active_term and upcoming):
+        return 0
+    next_term = leave_term(upcoming[0])
+    made = 0
+
+    def student_for(key: str) -> Student | None:
+        return Student.query.filter_by(student_number=DEAN_DEMO_STUDENTS[key]).first()
+
+    def portal_account(student: Student) -> UserAccount | None:
+        return UserAccount.query.filter_by(student_id=student.id, role="student").order_by(UserAccount.id).first()
+
+    def with_dean(student: Student, kind: str) -> LeaveCase:
+        if kind == KIND_LOA:
+            case = LeaveCase(
+                student_id=student.id, kind=KIND_LOA, source="demo",
+                start_term_id=next_term.id, end_term_id=next_term.id,
+                start_label=next_term.label, end_label=next_term.label,
+                reason_category="Family emergency",
+                reason_text="Caring for a family member during the coming semester.",
+                prior_stage=student.current_stage, prior_enrollment_tag=student.enrollment_tag,
+            )
+        else:
+            on_leave = ensure_demo_leave_case(student, None)
+            case = LeaveCase(
+                student_id=student.id, kind=KIND_READMISSION, source="demo",
+                linked_case_id=on_leave.id, start_term_id=on_leave.start_term_id, end_term_id=on_leave.end_term_id,
+                start_label=on_leave.start_label, end_label=on_leave.end_label,
+                target_term_id=next_term.id, target_label=next_term.label,
+                return_intent="I am ready to resume my graduate studies.",
+                checklist_json=json.dumps({item: True for item in readmission_requirements()}),
+            )
+        leave_submit_new(case, portal_account(student))
+        leave_case_apply(case, "start_review", staff)
+        data = {"confirmed_items": readmission_requirements()} if kind == KIND_READMISSION else {}
+        leave_case_apply(case, "forward", staff, data=data)
+        return case
+
+    def active_subject(student: Student) -> SubjectEnrollment | None:
+        """A subject the student is taking this semester (the withdrawal needs one to point at)."""
+        taken = {
+            record.course_id: record.status
+            for record in CourseRecord.query.filter_by(student_id=student.id).all()
+        }
+        course = next(
+            (item for item in monitoring_curriculum_courses(student.program)
+             if taken.get(item.id) not in ("Completed", "Withdrawn")),
+            None,
+        )
+        if course is None:
+            return None
+        record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
+        if record is None:
+            record = CourseRecord(student_id=student.id, course_id=course.id, status="Current")
+            db.session.add(record)
+        record.status, record.term_label = "Current", active_term.label
+        enrollment = SubjectEnrollment.query.filter_by(
+            student_id=student.id, course_id=course.id, term_id=active_term.id,
+        ).first()
+        if enrollment is None:
+            enrollment = SubjectEnrollment(
+                student_id=student.id, course_id=course.id, term_id=active_term.id,
+                status="Enrolled", source_reference="Dean queue demo",
+            )
+            db.session.add(enrollment)
+        db.session.flush()
+        return enrollment
+
+    # LOA with the Dean
+    student = student_for("leave-of-absence")
+    if student and not LeaveCase.query.filter_by(student_id=student.id).first():
+        with_dean(student, KIND_LOA)
+        ensure_term_enrollment(student, active_term, "LOA Pending", "Dean queue demo")
+        made += 1
+
+    # LOA the Dean already approved (starts next semester, so the student is still active)
+    student = student_for("leave-of-absence-decided")
+    if student and not LeaveCase.query.filter_by(student_id=student.id).first():
+        case = with_dean(student, KIND_LOA)
+        leave_case_apply(case, "approve", dean, comment="Approved. The leave starts next semester.")
+        made += 1
+
+    # Readmission with the Dean (the student is on an approved leave)
+    student = student_for("readmission")
+    if student and not LeaveCase.query.filter_by(student_id=student.id, kind=KIND_READMISSION).first():
+        with_dean(student, KIND_READMISSION)
+        made += 1
+
+    # AWOL return declaration with the Dean
+    student = student_for("awol-return")
+    if student and not AwolCase.query.filter_by(student_id=student.id).first():
+        student.current_stage, student.standing, student.enrollment_tag, student.risk_level = "AWOL", "AWOL", "AWOL", "Delayed"
+        ensure_term_enrollment(student, active_term, "AWOL", "Dean queue demo")
+        db.session.add(AwolCase(
+            student_id=student.id, status="Dean Review", dean_decision="Pending",
+            awol_effective_date=date.today() - timedelta(days=150),
+            last_enrolled_term="AY 2025-2026 2nd Semester",
+            return_requested_at=now_utc(), target_return_term=upcoming[0],
+            return_intent="I intend to resume enrollment in the selected semester.",
+            return_reason="My circumstances have stabilized and I am ready to continue the program.",
+            detection_source="Imported AWOL standing", automatically_flagged_at=now_utc(),
+            years_in_program=2, normal_residence_years=5, absolute_residence_years=7,
+            policy_classification="Within Maximum Residence",
+            staff_notes="Return declaration checked against the residence limits; forwarded to the Dean.",
+        ))
+        add_task(student.id, "Decide structured AWOL return declaration", "Dean", 3, 70)
+        add_log(
+            "awol", student.id, "Graduate School Staff", "AWOL return review",
+            "AWOL return declaration forwarded to Dean", "Dean",
+            "Policy classification: Within Maximum Residence.",
+            previous_status="Return Submitted", new_status="Dean Review",
+        )
+        made += 1
+
+    # Subject withdrawal with the Dean, and one the Dean denied
+    for key, status, decision in (
+        ("withdrawal", "Dean Review", "Pending"),
+        ("withdrawal-decided", "Denied", "Denied"),
+    ):
+        student = student_for(key)
+        if not student or WithdrawalApplication.query.filter_by(student_id=student.id).first():
+            continue
+        subject = active_subject(student)
+        if subject is None:
+            continue
+        ensure_term_enrollment(student, active_term, "Enrolled", "Dean queue demo")
+        application = WithdrawalApplication(
+            student_id=student.id, reason="The workload clashes with my full-time job.",
+            effective_term=active_term.label, subject_enrollment_id=subject.id, withdrawal_scope="Subject",
+            fee_status="Pending", requirement_status="Pending", dean_decision=decision, status=status,
+            decided_at=now_utc() if decision != "Pending" else None,
+            staff_remarks=None if decision == "Pending" else "Dean: Denied. The withdrawal window had closed.",
+        )
+        db.session.add(application)
+        db.session.flush()
+        if decision == "Pending":
+            add_task(student.id, "Review withdrawal request", "Dean", 3, 60)
+        add_log(
+            "withdrawal", student.id, "Graduate School Staff" if decision == "Pending" else "Dean",
+            "Withdrawal request",
+            "Withdrawal request recorded and forwarded to the Dean" if decision == "Pending"
+            else "Withdrawal denied by Dean; student informed and remains Active",
+            "Dean" if decision == "Pending" else "Student",
+            f"Subject: {subject.course.code}. Effective semester: {active_term.label}.",
+            previous_status="Submitted to GS Staff" if decision == "Pending" else "Dean Review",
+            new_status=status,
+        )
+        made += 1
+
+    # Practicum status report sent to the Dean
+    student = student_for("practicum")
+    if student and not PracticumRecord.query.filter_by(student_id=student.id).first():
+        db.session.add(PracticumRecord(
+            student_id=student.id, moa_status="Approved", moa_uploaded=True,
+            practicum_site="USLS Partner Institution", supervisor_name="Demo Practicum Supervisor",
+            required_hours=practicum_required_hours(), completed_hours=practicum_required_hours(),
+            document_status="Verified", certificate_count=0, completion_status="Completed and accepted",
+            status="Report Sent to Dean", report_sent_at=now_utc(),
+        ))
+        add_task(student.id, "Review practicum status report", "Dean", 5, 35)
+        add_log(
+            "practicum", student.id, "Academic Coordinator", "Practicum workflow",
+            "Practicum status updated: Report Sent to Dean", "Dean",
+            "Required hours are met and the documents are verified.",
+            previous_status="Documents Received", new_status="Report Sent to Dean",
+        )
+        made += 1
+
+    # Graduation endorsement ready for the Dean (a student whose coursework and research are complete)
+    student = student_for("graduation")
+    if student and not GraduationEndorsement.query.filter_by(student_id=student.id).first():
+        endorsement = GraduationEndorsement(
+            student_id=student.id, review_window="Current review window", batch_name="Batch 2 October 2026",
+            endorsement_status="Ready for Dean Review", registrar_status="Pending", submitted_at=now_utc(),
+        )
+        db.session.add(endorsement)
+        db.session.flush()
+        apply_graduation_eligibility(endorsement, graduation_eligibility(student))
+        endorsement.endorsement_status = "Ready for Dean Review"
+        add_task(student.id, "Review graduation endorsement", "Dean", 5, 50)
+        add_log(
+            "graduation", student.id, "Graduate School Staff", "Graduation endorsement list",
+            "Graduation endorsement sent to the Dean", "Dean",
+            "Coursework, research and post-defense evidence are complete.",
+            previous_status="For Review", new_status="Ready for Dean Review",
+        )
+        made += 1
+
+    # Course offering plans: one waiting for the Dean, one the Dean approved
+    for program_code, status in DEAN_DEMO_PLANS:
+        program = Program.query.filter_by(code=program_code).first()
+        if not program or not next_term or CourseOfferingPlan.query.filter_by(
+            program_id=program.id, term_label=next_term.label,
+        ).first():
+            continue
+        plan = CourseOfferingPlan(
+            program_id=program.id, term_label=next_term.label, status=status,
+            notes=(
+                "Proposed offerings from the subject demand of the current students."
+                if status == "Submitted" else "Please add a second section for the high-demand subjects."
+            ),
+            target_term_id=next_term.id, reference_term_id=active_term.id, submitted_at=now_utc(),
+        )
+        db.session.add(plan)
+        db.session.flush()
+        faculty_ids = [row.id for row in Faculty.query.filter_by(active=True).order_by(Faculty.id).limit(4).all()]
+        for index, course in enumerate(monitoring_curriculum_courses(program)[:4]):
+            db.session.add(CourseOffering(
+                plan_id=plan.id, course_id=course.id, demand_count=6 - index, section_count=1,
+                availability_count=len(faculty_ids), status="Offered",
+                assigned_faculty_id=faculty_ids[index % len(faculty_ids)] if faculty_ids else None,
+                assignment_status="Proposed",
+            ))
+        add_log(
+            "course-adjustments", None, "Academic Coordinator", "Course Adjustments",
+            f"Offering plan sent to the Dean: {program.code} {next_term.label}" if status == "Submitted"
+            else f"Offering plan returned by Dean for revision: {program.code} {next_term.label}",
+            "Dean" if status == "Submitted" else "Academic Coordinator", plan.notes or "",
+        )
+        made += 1
+
+    db.session.flush()
+    return made
+
+
+SEED_RESEARCH_STAGES = ("Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense", "Completed")
+
+
+def seed_subject_titles() -> int:
+    """Give the sheet's subject columns real titles and suggested semesters (I-061, F-07).
+
+    The registrar sheets name a column only by its code, so the import stored the code as the
+    title and "Year 1" as the term for every subject. Only subjects that still carry the code
+    as their title are touched; MBA and DPSY already have their real curriculum.
+    """
+    from seed_curriculum_data import SUGGESTED_TERMS, subject_title
+
+    changed = 0
+    for course in Course.query.all():
+        program = db.session.get(Program, course.program_id)
+        match = re.fullmatch(r"([A-Z]+)-([A-Z]+\d*)", course.code or "")
+        if not program or not match:
+            continue
+        title = (course.title or "").strip()
+        if title.upper() != course.code.upper() and not title.upper().startswith("MAGC"):
+            continue  # a title somebody gave it
+        new_title = subject_title(program.code, match.group(2))
+        if not new_title:
+            continue
+        course.title = new_title
+        course.recommended_term = SUGGESTED_TERMS.get(match.group(2), course.recommended_term)
+        changed += 1
+    db.session.flush()
+    return changed
+
+
+def map_sheet_subjects_to_authoritative_curricula() -> int:
+    """Carry what the monitoring sheet says a student finished over to the real MBA curriculum.
+
+    The MBA sheet's columns (MBA-STAT, MBA-MAJ1 ...) are not the MBA subjects of the supplied
+    curriculum (MBA201 ... MBA220), so a student who finished everything on the sheet showed 0
+    completed units. The i-th sheet column of a category is the i-th curriculum subject of that
+    category; the sheet columns and their records stay as imported (a re-import still matches).
+    """
+    changed = 0
+    for program_code in AUTHORITATIVE_CURRICULA:
+        program = Program.query.filter_by(code=program_code).first()
+        if not program:
+            continue
+        pattern = re.compile(rf"{re.escape(program_code)}-(?:STAT|MOR|FED|MAJ\d+|COG\d+)")
+        sheet_courses = [
+            course for course in Course.query.filter_by(program_id=program.id).order_by(Course.id).all()
+            if pattern.fullmatch(course.code or "")
+        ]
+        if not sheet_courses:
+            continue
+        pairs = []
+        for category in ("Basic", "Major", "Cognate"):
+            sheet = [course for course in sheet_courses if course.category == category]
+            curriculum = [course for course in monitoring_curriculum_courses(program) if course.category == category]
+            pairs.extend(zip(sheet, curriculum))
+        for sheet_course, course in pairs:
+            # the sheet column is the same subject, so it reads like it
+            if (sheet_course.title or "").strip().upper() == sheet_course.code.upper():
+                sheet_course.title, sheet_course.recommended_term = course.title, course.recommended_term
+                changed += 1
+        for student in Student.query.filter_by(program_id=program.id).all():
+            records = {record.course_id: record for record in CourseRecord.query.filter_by(student_id=student.id).all()}
+            for sheet_course, course in pairs:
+                finished = records.get(sheet_course.id)
+                if not finished or finished.status != "Completed":
+                    continue
+                record = records.get(course.id)
+                if record is None:
+                    record = CourseRecord(student_id=student.id, course_id=course.id, status="Missing")
+                    db.session.add(record)
+                if record.status == "Completed":
+                    continue
+                record.status, record.grade_status, record.term_label = "Completed", "No Grade", ""
+                record.evidence_reference, record.source = "AC Student Monitoring import", "Imported"
+                record.updated_at = now_utc()
+                changed += 1
+    db.session.flush()
+    return changed
+
+
+def complete_coursework_of_research_students() -> int:
+    """A student who is writing a proposal or later has finished the coursework and passed the compre.
+
+    The research rules open only then (Handbook), so the seed may not show such a student with
+    unfinished subjects or an exam that was not taken.
+    """
+    changed = 0
+    touched = []
+    for student in Student.query.filter(Student.current_stage.in_(SEED_RESEARCH_STAGES)).order_by(Student.id).all():
+        records = {record.course_id: record for record in CourseRecord.query.filter_by(student_id=student.id).all()}
+        student_changed = False
+        for course in monitoring_curriculum_courses(student.program):
+            record = records.get(course.id)
+            if record is None:
+                record = CourseRecord(student_id=student.id, course_id=course.id, status="Missing")
+                db.session.add(record)
+            if record.status != "Completed":
+                record.status, record.grade_status, record.term_label = "Completed", "No Grade", ""
+                record.evidence_reference = "Demo seed: coursework complete"
+                record.updated_at = now_utc()
+                student_changed = True
+                changed += 1
+        if student.comprehensive_exam_status != "Passed":
+            student.comprehensive_exam_status = "Passed"
+            student_changed = True
+            changed += 1
+        if student_changed:
+            touched.append(student)
+    db.session.flush()
+    for student in touched:
+        recompute_risk(student)
+    return changed
+
+
+def normalize_seed_curricula() -> dict:
+    """Titles, sheet-to-curriculum mapping and research prerequisites, in that order (I-061)."""
+    result = {
+        "titles": seed_subject_titles(),
+        "mapped": map_sheet_subjects_to_authoritative_curricula(),
+        "research_students": complete_coursework_of_research_students(),
+    }
+    ensure_delay_status_consistency()
+    return result
+
+
+# Rows whose timestamps the seed spreads over the previous weeks (I-070). Per table: the column that
+# names the student (or an SQL expression for it), then the timestamp columns in the order they
+# happen; columns in one inner tuple happen together. Nothing here reads the clock's time of day.
+SEED_HISTORY_TABLES = (
+    ("transaction_log", "student_id", (("created_at",),)),
+    ("adviser_appointment", "student_id", (("created_at", "applied_at"), ("adviser_responded_at",), ("updated_at",))),
+    ("adviser_assignment", "student_id", (("assigned_at",),)),
+    ("panel_assignment", "student_id", (("assigned_at",),)),
+    ("panel_invitation", "student_id", (("invited_at",), ("responded_at",))),
+    ("research_evidence_file", "student_id", (("uploaded_at",),)),
+    ("document_check", "student_id", (("updated_at",),)),
+    ("leave_case", "student_id", (
+        ("created_at",), ("submitted_at",), ("forwarded_at",), ("decided_at",), ("started_at",), ("updated_at",),
+    )),
+    ("leave_case_event", "(SELECT student_id FROM leave_case WHERE leave_case.id = leave_case_event.case_id)",
+     (("created_at",),)),
+    ("workflow_message", "student_id", (("created_at",), ("read_at",))),
+    ("awol_case", "student_id", (
+        ("created_at", "automatically_flagged_at"), ("return_requested_at",), ("decided_at",), ("updated_at",),
+    )),
+    ("practicum_record", "student_id", (
+        ("created_at",), ("report_sent_at",), ("dean_reviewed_at",), ("updated_at",),
+    )),
+    ("withdrawal_application", "student_id", (("created_at",), ("decided_at",), ("updated_at",))),
+    ("graduation_endorsement", "student_id", (
+        ("created_at",), ("submitted_at",), ("dean_decision_at",), ("updated_at",),
+    )),
+    ("course_offering_plan", "id", (("created_at",), ("submitted_at",), ("approved_at",), ("updated_at",))),
+    ("term_enrollment", "student_id", (("confirmed_at",),)),
+    ("subject_enrollment", "student_id", (("enrolled_at",), ("updated_at",))),
+)
+
+
+def spread_seed_history(today: date | None = None) -> int:
+    """Move the seed-day timestamps of the demo history to 1-12 weeks before the seed day (I-070).
+
+    Every seeder stamps its rows "now", so on a fresh seed all appointments, activity, tasks and
+    verdicts fell on one day and one second. Each student gets a fixed offset of 7 to 84 days from
+    the seed day (arithmetic on the student's id, no randomness), their rows keep their order a few
+    hours apart, and task due dates and verdict clock times are varied too. Only values stamped on
+    the seed day move; dates the seeders chose (a defense in April, a leave from August) stay, and
+    nothing else is touched. Raw SQL, so no "updated_at" is stamped by the write. Returns the
+    number of values moved.
+    """
+    today = today or date.today()
+    day = today.isoformat()
+    connection = db.session.connection()
+    step_hours = 8.0
+    moved = 0
+    for table, key_expression, groups in SEED_HISTORY_TABLES:
+        columns = [column for group in groups for column in group]
+        rank = {column: position for position, group in enumerate(groups) for column in group}
+        rows = connection.execute(text(
+            f"SELECT id, COALESCE({key_expression}, id) AS history_key, {', '.join(columns)} FROM {table} ORDER BY id"
+        )).fetchall()
+        slots: dict[int, int] = {}
+        for row in rows:
+            key = int(row[1])
+            stamped = [(column, row[2 + index]) for index, column in enumerate(columns)]
+            on_seed_day = [(column, value) for column, value in stamped if value and str(value)[:10] == day]
+            if not on_seed_day:
+                continue
+            slot = slots.get(key, 0)
+            slots[key] = slot + 1
+            offset_days = 7 + (key * 29) % 78  # 7..84 days, i.e. 1 to 12 weeks
+            span_hours = offset_days * 24 - 24
+            anchor = datetime.combine(today - timedelta(days=offset_days), time(8, 0)) + timedelta(minutes=(key * 47) % 600)
+            # a row that already has dates the seeder chose (a leave filed in August) keeps its own
+            # timeline: its seed-day columns sit at the start or the end of those dates
+            chosen = sorted(str(value) for column, value in stamped if value and str(value)[:10] != day)
+            values = {}
+            for column, _value in on_seed_day:
+                if chosen:
+                    values[column] = (chosen[0] if rank[column] == 0 else chosen[-1])
+                    continue
+                position = slot * len(groups) + rank[column]
+                hours = min(position * step_hours, span_hours)
+                values[column] = (anchor + timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S.%f")
+            assignments = ", ".join(f"{column} = :{column}" for column in values)
+            connection.execute(text(f"UPDATE {table} SET {assignments} WHERE id = :row_id"), {**values, "row_id": row[0]})
+            moved += len(values)
+
+    # Tasks: due dates 1 to 12 days ahead instead of all within three days (none becomes overdue).
+    for task_id, due in connection.execute(text("SELECT id, due_at FROM task ORDER BY id")).fetchall():
+        if due and today <= date.fromisoformat(str(due)[:10]) <= today + timedelta(days=3):
+            new_due = today + timedelta(days=1 + (task_id * 5) % 12)
+            connection.execute(text("UPDATE task SET due_at = :due WHERE id = :id"), {"due": new_due.isoformat(), "id": task_id})
+            moved += 1
+
+    # Defense verdicts are dated in the past already; give each its own clock time (office hours).
+    for verdict_id, submitted in connection.execute(text("SELECT id, submitted_at FROM defense_verdict ORDER BY id")).fetchall():
+        if submitted:
+            minutes = 9 * 60 + (verdict_id * 53) % 480
+            stamped = datetime.fromisoformat(str(submitted)).replace(hour=minutes // 60, minute=minutes % 60, second=0, microsecond=0)
+            connection.execute(
+                text("UPDATE defense_verdict SET submitted_at = :value WHERE id = :id"),
+                {"value": stamped.strftime("%Y-%m-%d %H:%M:%S.%f"), "id": verdict_id},
+            )
+            moved += 1
+    db.session.commit()
+    db.session.expire_all()
+    return moved
 
 
 def seed_bianca_mendoza_enrollment() -> None:
@@ -36442,7 +36956,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     )
     student.comprehensive_exam_status = "Not Taken" if (is_withdrawal_demo or is_enrollment_demo or is_adjustments_demo or is_loa_demo) else "Passed"
     student.risk_level = "Not Yet Assessed"
-    student.adviser_name = student.adviser_name or "Dr. Liwayway Bautista"
+    student.adviser_name = student.adviser_name or demo_adviser_name(student)
     student.updated_at = now_utc()
     if has_leave_case:
         student.standing, student.enrollment_tag, student.current_stage, student.risk_level = leave_snapshot
@@ -36522,7 +37036,9 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             elif is_loa_demo or is_readmission_demo:
                 completed_count = min(3, len(demo_courses))
             elif is_awol_demo:
-                completed_count = min(4, len(demo_courses))
+                # the residency demo is a research-stage student, so every subject is finished
+                residency = (demo_config or {}).get("scenario") == "residency"
+                completed_count = len(demo_courses) if residency else min(4, len(demo_courses))
             completed = course_index < completed_count
             record.status = "Completed" if completed else "Not Started"
             record.grade_status = "Passed" if completed else "No Grade"
@@ -37283,12 +37799,15 @@ def build_demo_database() -> dict:
         ensure_operations_manual_policy_document()  # the draft manual is searchable as a Draft
         ensure_upcoming_defense_demo()
         sync_all_panel_invitations()  # seats the seeders placed directly get their invitations (no page view makes them)
+        seed_dean_review_cases()  # a case waiting in every Dean queue, and a few decided ones
+        normalize_seed_curricula()  # real subject titles; a research student has finished the coursework
         db.session.commit()
         # 5. Last syncs, once everything above exists.
         sync_result = sync_all_curricula()
         sync_automatic_awol_statuses(commit=False)
         db.session.commit()
         sync_leave_cases(commit=True)  # dates move leave cases along
+        spread_seed_history()  # last, so nothing is stamped after it: history over the previous weeks
         return sync_result
 
 

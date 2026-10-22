@@ -524,7 +524,8 @@ class PersonalAnswerTests(AssistantBase):
     def test_a_role_with_nothing_waiting_is_told_so_without_calling_gemini(self):
         generate = MagicMock(return_value="invented")
         with self.with_key(), patch.object(appmod, "_gemini_generate", generate):
-            payload = self.ask("dean@usls.edu.ph", "What is waiting on me?")
+            # The seeded Dean has decisions waiting (I-062); the Research Coordinator has no queue of their own.
+            payload = self.ask("research@usls.edu.ph", "What is waiting on me?")
         generate.assert_not_called()
         self.assertTrue(payload["personal"])
         self.assertRegex(payload["answer"], r"(?i)nothing is waiting|no .*waiting")

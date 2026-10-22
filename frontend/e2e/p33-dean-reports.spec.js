@@ -43,6 +43,17 @@ const WINDOW = "AY 2026-2027";
 
 /** Walk Isabel's graduation batch through every role until it is "Ready for Dean Review". */
 async function putBatchInFrontOfTheDean(playwright) {
+  // The seed already has a graduation endorsement waiting for the Dean (Hector Ong, I-062). These tests are about
+  // Isabel's batch alone, so the Dean sends the seeded one back first.
+  const dean = await apiAs(playwright, "dean@usls.edu.ph");
+  const queue = await okJson(await dean.get("/api/approvals"), "the Dean's queue");
+  for (const item of queue.workflow_pending.filter((entry) => entry.type === "graduation" && entry.student.id !== STUDENT_ID)) {
+    await okJson(
+      await dean.post(`/api/approvals/workflow/graduation/${item.id}/decide`, { data: { decision: "return", note: "Held back so this test sees one batch." } }),
+      `return ${item.student.name}`,
+    );
+  }
+  await dean.dispose();
   const steps = [
     ["staff@usls.edu.ph", "compile_to_ac"],
     ["academic@usls.edu.ph", "check_coursework"],
@@ -372,7 +383,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(filter.locator("option")).toHaveCount(1 + 7);
     await expect(filter.locator("option").first()).toHaveText("All processes");
     await filter.selectOption({ label: "Graduation Endorsement" });
-    await expect(main.getByText("1 entry", { exact: true })).toBeVisible();
+    await expect(main.getByText("2 entries", { exact: true })).toBeVisible(); // Isabel approved + the seeded Hector Ong endorsement the Dean sent back in setup
     await expect(link).toBeVisible();
     await shot(page, "history-filtered-1366.png");
     for (const label of ["Leave of Absence", "Readmission", "AWOL & Residency", "Subject Withdrawal", "Practicum Reports", "Course Adjustments"]) {
