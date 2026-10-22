@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   BookOpenCheck,
+  CalendarCheck2,
   CalendarClock,
   CalendarDays,
   Clock3,
@@ -20,7 +21,6 @@ import { formatDate } from "../../lib/format";
 import FacultyResearchWorkspace from "../../components/FacultyResearchWorkspace";
 import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
 import { FacultyAdviserPanel } from "./FacultyAdviserPanel";
-import { FacultyCalendarConnection } from "./FacultyCalendar";
 import { FacultyClasses } from "./FacultyClasses";
 
 function CalendarNotice() {
@@ -35,6 +35,18 @@ function CalendarNotice() {
           ? "Google Calendar connection was cancelled."
           : "Google Calendar could not be connected. Please try again."}
     </InlineNotice>
+  );
+}
+
+// I-085: Google OAuth cannot be completed in a demo, so the home only points to the connection card, which lives
+// on My Availability. A small line, never the biggest element on the page.
+function CalendarLink({ calendar }) {
+  return (
+    <p className="meta flex flex-wrap items-center gap-x-2 gap-y-1">
+      <CalendarCheck2 className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+      <span>Google Calendar {calendar?.connected ? "connected" : "not connected"}.</span>
+      <Link to="/faculty-portal/availability" className="font-semibold text-brand-700 hover:underline">Calendar connection</Link>
+    </p>
   );
 }
 
@@ -83,7 +95,7 @@ export function FacultyDashboard() {
           all: waiting.total > MAX_WAITING ? { to: "/faculty-portal/advisees", label: "View all" } : undefined,
         }}
         stats={stats}
-        extra={<FacultyCalendarConnection calendar={faculty?.calendar} />}
+        extra={<CalendarLink calendar={faculty?.calendar} />}
         activityTitle="Upcoming defenses"
         activity={upcoming}
         activityAll={{ to: "/faculty-portal/defenses", label: "View schedule" }}
