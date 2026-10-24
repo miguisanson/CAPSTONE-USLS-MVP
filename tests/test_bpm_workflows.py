@@ -4040,6 +4040,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             "GOOGLE_CALENDAR_CLIENT_ID": "client-id.apps.googleusercontent.com",
             "GOOGLE_CALENDAR_CLIENT_SECRET": "client-secret",
             "GOOGLE_CALENDAR_REDIRECT_URI": "http://localhost/api/faculty-portal/google-calendar/callback",
+            "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY": "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=",
         }):
             response = client.get("/api/faculty-portal/google-calendar/authorization")
 
