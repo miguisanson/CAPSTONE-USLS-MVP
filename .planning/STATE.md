@@ -1,5 +1,13 @@
 # State
 
+## ACTIVE RUN (2026-10-24) — Google Calendar integration adjustment
+
+- **Branch:** `v5.3-migui_test` at `02ff818`; owner resumed work and asked for the Google Calendar integration to be completed against v5.3.
+- **Scope:** faculty-owned link/reconnect/unlink from the Faculty Portal; minimum free/busy OAuth permission; encrypted stored tokens; connection/sync status and internal audit entries; Defense Scheduling must intersect entered working hours and manual exceptions with Google busy periods (Google never invents working hours or exposes event details).
+- **Finding:** v5.3 already has a partial OAuth/free-busy path, but it requests `calendar.readonly`, stores callback tokens as plaintext, has no unlink endpoint/UI, records no calendar audit event or last successful sync, retains a legacy shared-token path, and can assume 08:00–18:00 when a connected faculty member entered no working hours. Filed as I-132; regression contract R-015.
+- **Execution:** main session writes and proves the failing tests first. Implementation then goes to one Sonnet packet in its own worktree because `app.py` is touched. No other `app.py` packet may run concurrently.
+- **Exact next action:** add the backend unittest and Playwright contract, run the targeted red checks, then hand the fixed contract to `pkt/google-calendar-v53` for implementation.
+
 ## PAUSED BY THE OWNER (2026-10-22 night) — read this first
 
 Owner: "put a pause on things and wrap up". All helpers were stopped. `v5.3-migui_test` is pushed; last full Python
