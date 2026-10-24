@@ -15520,8 +15520,13 @@ def register_routes(app: Flask) -> None:
             return redirect("/faculty-portal?calendar=connection-failed")
 
         try:
-            prior_refresh_token = google_calendar_decrypt_token(faculty.google_calendar_refresh_token)
-            refresh_token = (token_payload.get("refresh_token") or "").strip() or prior_refresh_token
+            refresh_token = (token_payload.get("refresh_token") or "").strip()
+            if (
+                not refresh_token
+                and faculty.google_calendar_subject
+                and faculty.google_calendar_subject == google_subject
+            ):
+                refresh_token = google_calendar_decrypt_token(faculty.google_calendar_refresh_token)
             encrypted_access_token = google_calendar_encrypt_token(access_token)
             encrypted_refresh_token = google_calendar_encrypt_token(refresh_token) if refresh_token else None
         except ValueError:
