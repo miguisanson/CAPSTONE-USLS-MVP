@@ -370,6 +370,9 @@ export const api = {
   studentAssistantSuggestions: () => request("/student-portal/assistant/suggestions"),
   facultyPortalContext: () => request("/faculty-portal/context"),
   googleCalendarAuthorization: () => request("/faculty-portal/google-calendar/authorization"),
+  syncGoogleCalendar: () =>
+    request("/faculty-portal/google-calendar/sync", { method: "POST", body: JSON.stringify({}) }),
+  disconnectGoogleCalendar: () => request("/faculty-portal/google-calendar", { method: "DELETE" }),
   signAdviserPaper: (evidenceId, payload) =>
     request(`/faculty-portal/adviser-approvals/${evidenceId}`, { method: "POST", body: JSON.stringify(payload) }),
   submitDefenseVerdict: (scheduleId, payload) =>

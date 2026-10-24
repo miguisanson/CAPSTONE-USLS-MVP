@@ -382,7 +382,7 @@ export default function FacultyAvailabilityEditor() {
           <Requests data={data} onSaved={refreshAll} />
         </div>
         <div className="space-y-5 lg:col-span-4">
-          <FacultyCalendarConnection calendar={portal?.faculty?.calendar} />
+          <FacultyCalendarConnection calendar={portal?.faculty?.calendar} onChanged={refetchPortal} />
           {otherWindows.length > 0 && (
             <Card>
               <SectionTitle title="Other open windows" subtitle="Read only. Times the Graduate School has on record." icon={Clock3} />
