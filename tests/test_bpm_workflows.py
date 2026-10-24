@@ -4070,6 +4070,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 specialization="Research methods",
                 email="oauth-callback@example.test",
                 active=True,
+                google_calendar_subject="previous-google-account",
+                google_calendar_refresh_token="previous-account-refresh-token",
             )
             db.session.add(faculty)
             db.session.flush()
@@ -4098,7 +4100,6 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY": token_key,
         }), patch("app.google_token_request", return_value={
             "access_token": "faculty-access-token",
-            "refresh_token": "faculty-refresh-token",
             "expires_in": 3600,
         }), patch("app.urlopen", return_value=userinfo_response):
             response = client.get(
@@ -4114,7 +4115,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(stored.google_calendar_email, "real-owned-calendar@gmail.com")
             self.assertEqual(stored.google_calendar_subject, "google-account-subject-123")
             self.assertNotIn("faculty-access-token", stored.google_calendar_access_token)
-            self.assertNotIn("faculty-refresh-token", stored.google_calendar_refresh_token)
+            self.assertIsNone(stored.google_calendar_refresh_token)
             token, error = faculty_google_calendar_token(stored)
             self.assertIsNone(error)
             self.assertEqual(token, "faculty-access-token")
