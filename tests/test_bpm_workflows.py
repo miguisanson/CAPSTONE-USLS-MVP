@@ -7,6 +7,7 @@ import zipfile
 from datetime import date, datetime, time, timedelta, timezone
 from io import BytesIO
 from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlparse
 from openpyxl import load_workbook
 
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
@@ -96,6 +97,7 @@ from app import (  # noqa: E402
     ensure_authoritative_curricula,
     ensure_panel_matching_demo_data,
     google_calendar_free_window_count,
+    faculty_google_calendar_token,
     get_active_term,
     ensure_workflow_demo_students,
     student_current_course_year,
@@ -3684,7 +3686,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(available_count, 4)
             self.assertFalse(any(slot["start"] == "13:00" for slot in partial["possible_slots"]))
 
-    def test_connected_google_calendar_replaces_dummy_profile_schedule(self):
+    def test_connected_google_calendar_narrows_entered_hours_instead_of_replacing_them(self):
         target_day = date(2026, 7, 28)  # Tuesday
         with app.app_context():
             connected = Faculty(
@@ -3705,14 +3707,19 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             )
             db.session.add_all([connected, fallback])
             db.session.flush()
-            # This disabled profile row would make the connected faculty
-            # unavailable if local dummy hours were still being consulted.
             db.session.add(FacultyWorkingHour(
                 faculty_id=connected.id,
                 weekday=1,
+                start_time=time(9, 0),
+                end_time=time(15, 0),
+                enabled=True,
+                source="faculty",
+            ))
+            db.session.add(FacultyAvailability(
+                faculty_id=fallback.id,
+                available_date=target_day,
                 start_time=time(8, 0),
                 end_time=time(17, 0),
-                enabled=False,
             ))
             db.session.flush()
             db.session.expire(connected, ["working_hours"])
@@ -3741,13 +3748,47 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 if item["faculty_id"] == connected.id
             )
             self.assertEqual(connected_payload["availability_source"], "google_calendar")
-            self.assertEqual(connected_payload["working_hours"], [])
+            self.assertEqual(
+                [
+                    (row["start"], row["end"])
+                    for row in connected_payload["working_hours"]
+                    if row["enabled"]
+                ],
+                [("09:00", "15:00")],
+            )
             self.assertEqual(
                 [(slot["start"], slot["end"], slot["source"]) for slot in connected_payload["slots"]],
-                [("08:00", "18:00", "google_calendar")],
+                [("09:00", "15:00", "working_hours")],
             )
             self.assertFalse(any(slot["start"] == "10:00" for slot in availability["possible_slots"]))
             self.assertTrue(any(slot["start"] == "12:00" for slot in availability["possible_slots"]))
+
+    def test_connected_google_calendar_never_invents_working_hours(self):
+        target_day = date(2026, 7, 28)
+        with app.app_context():
+            faculty = Faculty(
+                name="Calendar Without Entered Hours",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Research methods",
+                active=True,
+                google_calendar_id="primary",
+                google_calendar_access_token="faculty-access-token",
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            participants = [{"faculty": faculty, "role": "Panel Member"}]
+            google_status = {
+                faculty.id: {"configured": True, "busy": [], "error": None},
+            }
+
+            with patch("app.google_busy_by_faculty", return_value=google_status):
+                availability = defense_availability_context(participants, target_day, target_day)
+
+            self.assertEqual(availability["possible_slots"], [])
+            self.assertEqual(availability["participants"][0]["slots"], [])
+            self.assertFalse(availability["participants"][0]["availability_entered"])
+            self.assertEqual(availability["missing_availability"], [faculty.name])
 
     def test_connected_google_calendar_fails_closed_when_freebusy_is_unavailable(self):
         target_day = date(2026, 7, 28)
@@ -3789,15 +3830,41 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "end": datetime.combine(start_day, time(18, 0)).replace(tzinfo=local_tz),
             }],
         }
-        self.assertEqual(
-            google_calendar_free_window_count(result, start_day, start_day + timedelta(days=2)),
-            2,
-        )
-        result["error"] = "Google Calendar unavailable"
-        self.assertEqual(
-            google_calendar_free_window_count(result, start_day, start_day + timedelta(days=2)),
-            0,
-        )
+        with app.app_context():
+            faculty = Faculty(
+                name="Panel Matching Calendar Faculty",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Research methods",
+                active=True,
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            for weekday in range(3):
+                db.session.add(FacultyWorkingHour(
+                    faculty_id=faculty.id,
+                    weekday=weekday,
+                    start_time=time(8, 0),
+                    end_time=time(18, 0),
+                    enabled=True,
+                    source="faculty",
+                ))
+            db.session.flush()
+            db.session.expire(faculty, ["working_hours"])
+
+            self.assertEqual(
+                google_calendar_free_window_count(
+                    faculty, result, start_day, start_day + timedelta(days=2)
+                ),
+                2,
+            )
+            result["error"] = "Google Calendar unavailable"
+            self.assertEqual(
+                google_calendar_free_window_count(
+                    faculty, result, start_day, start_day + timedelta(days=2)
+                ),
+                0,
+            )
 
     def test_panel_matching_demo_populates_every_faculty_profile_idempotently(self):
         with app.app_context():
@@ -3995,17 +4062,29 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             faculty_id = faculty.id
 
         client = self._role_client(account_id, "faculty")
+        redirect_uri = "http://localhost/api/integrations/google-calendar/callback"
         with patch.dict(os.environ, {
             "GOOGLE_CALENDAR_CLIENT_ID": "client-id.apps.googleusercontent.com",
             "GOOGLE_CALENDAR_CLIENT_SECRET": "client-secret",
-            "GOOGLE_CALENDAR_REDIRECT_URI": "http://localhost/api/faculty-portal/google-calendar/callback",
+            "GOOGLE_CALENDAR_REDIRECT_URI": redirect_uri,
+            "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY": "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=",
         }):
             response = client.get("/api/faculty-portal/google-calendar/authorization")
 
         self.assertEqual(response.status_code, 200, response.get_json())
         authorization_url = response.get_json()["authorization_url"]
         self.assertIn("accounts.google.com/o/oauth2/v2/auth", authorization_url)
-        self.assertIn("calendar.readonly", authorization_url)
+        query = parse_qs(urlparse(authorization_url).query)
+        scopes = set(query["scope"][0].split())
+        self.assertEqual(scopes, {
+            "openid",
+            "email",
+            "https://www.googleapis.com/auth/calendar.freebusy",
+        })
+        self.assertNotIn("https://www.googleapis.com/auth/calendar.readonly", scopes)
+        self.assertEqual(query["access_type"], ["offline"])
+        self.assertEqual(query["prompt"], ["consent"])
+        self.assertEqual(query["redirect_uri"], [redirect_uri])
         with client.session_transaction() as oauth_session:
             self.assertEqual(oauth_session["google_calendar_oauth_faculty_id"], faculty_id)
             self.assertTrue(oauth_session["google_calendar_oauth_state"])
@@ -4019,6 +4098,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 specialization="Research methods",
                 email="oauth-callback@example.test",
                 active=True,
+                google_calendar_subject="previous-google-account",
+                google_calendar_refresh_token="previous-account-refresh-token",
             )
             db.session.add(faculty)
             db.session.flush()
@@ -4032,23 +4113,25 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         with client.session_transaction() as oauth_session:
             oauth_session["google_calendar_oauth_state"] = "expected-state"
             oauth_session["google_calendar_oauth_faculty_id"] = faculty_id
-        calendar_response = MagicMock()
-        calendar_response.__enter__.return_value = calendar_response
-        calendar_response.read.return_value = json.dumps({
-            "id": "oauth-callback@gmail.com",
-            "primary": True,
+        userinfo_response = MagicMock()
+        userinfo_response.__enter__.return_value = userinfo_response
+        userinfo_response.read.return_value = json.dumps({
+            "sub": "google-account-subject-123",
+            "email": "real-owned-calendar@gmail.com",
+            "email_verified": True,
         }).encode("utf-8")
+        token_key = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
         with patch.dict(os.environ, {
             "GOOGLE_CALENDAR_CLIENT_ID": "client-id.apps.googleusercontent.com",
             "GOOGLE_CALENDAR_CLIENT_SECRET": "client-secret",
-            "GOOGLE_CALENDAR_REDIRECT_URI": "http://localhost/api/faculty-portal/google-calendar/callback",
+            "GOOGLE_CALENDAR_REDIRECT_URI": "http://localhost/api/integrations/google-calendar/callback",
+            "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY": token_key,
         }), patch("app.google_token_request", return_value={
             "access_token": "faculty-access-token",
-            "refresh_token": "faculty-refresh-token",
             "expires_in": 3600,
-        }), patch("app.urlopen", return_value=calendar_response):
+        }), patch("app.urlopen", return_value=userinfo_response):
             response = client.get(
-                "/api/faculty-portal/google-calendar/callback"
+                "/api/integrations/google-calendar/callback"
                 "?state=expected-state&code=authorization-code"
             )
 
@@ -4056,11 +4139,90 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         self.assertTrue(response.headers["Location"].endswith("/faculty-portal?calendar=connected"))
         with app.app_context():
             stored = db.session.get(Faculty, faculty_id)
-            self.assertEqual(stored.google_calendar_id, "oauth-callback@gmail.com")
-            self.assertEqual(stored.google_calendar_email, "oauth-callback@gmail.com")
-            self.assertEqual(stored.google_calendar_access_token, "faculty-access-token")
-            self.assertEqual(stored.google_calendar_refresh_token, "faculty-refresh-token")
+            self.assertEqual(stored.google_calendar_id, "primary")
+            self.assertEqual(stored.google_calendar_email, "real-owned-calendar@gmail.com")
+            self.assertEqual(stored.google_calendar_subject, "google-account-subject-123")
+            self.assertNotIn("faculty-access-token", stored.google_calendar_access_token)
+            self.assertIsNone(stored.google_calendar_refresh_token)
+            token, error = faculty_google_calendar_token(stored)
+            self.assertIsNone(error)
+            self.assertEqual(token, "faculty-access-token")
             self.assertIsNotNone(stored.google_calendar_connected_at)
+            audit = TransactionLog.query.filter_by(
+                transaction_slug="google-calendar",
+                actor_user_id=account_id,
+                result="Google Calendar connected",
+            ).one()
+            self.assertEqual(audit.visibility, "internal")
+            self.assertIn("real-owned-calendar@gmail.com", audit.notes)
+
+    def test_faculty_can_sync_and_disconnect_google_calendar_even_when_google_revoke_fails(self):
+        with app.app_context():
+            faculty = Faculty(
+                name="Disconnect Calendar Faculty",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Research methods",
+                email="dummy-faculty@usls.edu.ph",
+                active=True,
+                google_calendar_id="primary",
+                google_calendar_email="real-owned-calendar@gmail.com",
+                google_calendar_access_token="faculty-access-token",
+                google_calendar_refresh_token="faculty-refresh-token",
+                google_calendar_connected_at=datetime(2026, 10, 24, 8, 0),
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            account = self._account("faculty", "dummy-faculty@usls.edu.ph")
+            account.faculty_id = faculty.id
+            db.session.commit()
+            account_id = account.id
+            faculty_id = faculty.id
+
+        client = self._role_client(account_id, "faculty")
+        with patch("app.google_freebusy_lookup", return_value={
+            "configured": True,
+            "calendar_id": "primary",
+            "busy": [],
+            "error": None,
+        }):
+            sync_response = client.post("/api/faculty-portal/google-calendar/sync", json={})
+
+        self.assertEqual(sync_response.status_code, 200, sync_response.get_json())
+        self.assertEqual(sync_response.get_json()["status"], "Connected")
+        self.assertIsNotNone(sync_response.get_json()["last_synced_at"])
+        with app.app_context():
+            stored = db.session.get(Faculty, faculty_id)
+            self.assertIsNotNone(stored.google_calendar_last_synced_at)
+            self.assertIsNone(stored.google_calendar_last_error)
+            self.assertIsNotNone(TransactionLog.query.filter_by(
+                transaction_slug="google-calendar",
+                actor_user_id=account_id,
+                result="Google Calendar availability checked",
+            ).one_or_none())
+
+        with patch("app.urlopen", side_effect=OSError("Google revoke unavailable")):
+            disconnect_response = client.delete("/api/faculty-portal/google-calendar")
+
+        self.assertEqual(disconnect_response.status_code, 200, disconnect_response.get_json())
+        self.assertFalse(disconnect_response.get_json()["connected"])
+        self.assertFalse(disconnect_response.get_json()["revoked_at_google"])
+        with app.app_context():
+            stored = db.session.get(Faculty, faculty_id)
+            self.assertIsNone(stored.google_calendar_id)
+            self.assertIsNone(stored.google_calendar_email)
+            self.assertIsNone(stored.google_calendar_subject)
+            self.assertIsNone(stored.google_calendar_access_token)
+            self.assertIsNone(stored.google_calendar_refresh_token)
+            self.assertIsNone(stored.google_calendar_token_expires_at)
+            self.assertIsNone(stored.google_calendar_connected_at)
+            self.assertIsNone(stored.google_calendar_last_synced_at)
+            audit = TransactionLog.query.filter_by(
+                transaction_slug="google-calendar",
+                actor_user_id=account_id,
+                result="Google Calendar disconnected",
+            ).one()
+            self.assertEqual(audit.visibility, "internal")
 
     def test_defense_suggestions_start_after_required_lead_time(self):
         reference = date(2026, 7, 23)

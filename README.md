@@ -269,21 +269,26 @@ same day always agree. To see which tables differ between two database files run
 ## Google Calendar availability
 
 Faculty members connect their own Google Calendar from the Faculty Portal. After
-connection, Defense Scheduling uses Google Calendar FreeBusy data as that
-faculty member's schedule source and stops using the local demo/profile
-schedule. Configure a Google OAuth 2.0 Web application in `.env`:
+connection, the faculty member's entered working hours and dated exceptions
+remain the source of possible defense times. Google Calendar FreeBusy data only
+removes conflicts from those times; it never invents working hours and never
+exposes event titles or descriptions. Configure a Google OAuth 2.0 Web
+application in `.env`:
 
 ```env
 GOOGLE_CALENDAR_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_CALENDAR_CLIENT_SECRET=your-client-secret
-GOOGLE_CALENDAR_REDIRECT_URI=http://localhost:5000/api/faculty-portal/google-calendar/callback
+GOOGLE_CALENDAR_REDIRECT_URI=http://localhost:5000/api/integrations/google-calendar/callback
+GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY=your-fernet-key
 GOOGLE_CALENDAR_TIMEZONE=Asia/Manila
 ```
 
 Add the same redirect URI to the Google Cloud OAuth client's authorized redirect
-URIs and enable the Google Calendar API. The current availability integration
-requests read-only calendar access and uses FreeBusy periods, so GS Staff can
-see that a time is blocked without seeing private event titles or descriptions.
+URIs and enable the Google Calendar API. Generate the Fernet key once (for
+example with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`),
+keep it private, and keep the same value while stored connections exist. The
+integration requests only `openid`, `email`, and `calendar.freebusy`; GS Staff
+can see that a time is blocked without seeing private event details.
 The planned defense-event sync will request the additional permission needed to
 create, update, or remove only defense events scheduled through this system;
 unrelated classes, appointments, and personal events will remain unchanged.
@@ -293,10 +298,6 @@ clearly labeled integration preview. Faculty can review how the calendar will
 be used and open Google Calendar in a separate tab, but the preview stores
 no token, does not mark the account connected, and leaves Panel Matching and
 Defense Scheduling on the existing profile schedule.
-
-The legacy `GOOGLE_CALENDAR_ACCESS_TOKEN` and `GOOGLE_CALENDAR_IDS_JSON`
-configuration remains supported for existing deployments. Faculty-owned OAuth
-credentials take precedence.
 
 ## Project Structure
 

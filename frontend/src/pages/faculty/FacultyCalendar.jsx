@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { CalendarCheck2, CalendarDays, Eye, ExternalLink, ShieldCheck } from "lucide-react";
+import { CalendarCheck2, CalendarDays, CalendarX2, Eye, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
 import { api } from "../../api";
 import { Button, InlineNotice, Modal, StatusChip } from "../../components/ui/index.js";
+import { formatDateTime } from "../../lib/format";
 
-export function FacultyCalendarConnection({ calendar }) {
-  const [busy, setBusy] = useState(false);
+export function FacultyCalendarConnection({ calendar, onChanged }) {
+  const [operation, setOperation] = useState("");
   const [error, setError] = useState("");
   const [preview, setPreview] = useState(null);
   const [previewOpened, setPreviewOpened] = useState(false);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
   const connected = Boolean(calendar?.connected);
   const sectionRef = useRef(null);
   const wasOpen = useRef(false);
@@ -24,19 +26,46 @@ export function FacultyCalendarConnection({ calendar }) {
   }, [preview]);
 
   async function connectCalendar() {
-    setBusy(true);
+    setOperation("connect");
     setError("");
     try {
       const result = await api.googleCalendarAuthorization();
       if (result.mode === "preview") {
         setPreview(result);
-        setBusy(false);
+        setOperation("");
         return;
       }
       window.location.assign(result.authorization_url);
     } catch (err) {
       setError(err.message || "Could not start the Google Calendar connection.");
-      setBusy(false);
+      setOperation("");
+    }
+  }
+
+  async function syncCalendar() {
+    setOperation("sync");
+    setError("");
+    try {
+      await api.syncGoogleCalendar();
+      await onChanged?.();
+    } catch (err) {
+      setError(err.message || "Could not check Google Calendar.");
+    } finally {
+      setOperation("");
+    }
+  }
+
+  async function disconnectCalendar() {
+    setOperation("disconnect");
+    setError("");
+    try {
+      await api.disconnectGoogleCalendar();
+      await onChanged?.();
+      setDisconnectOpen(false);
+    } catch (err) {
+      setError(err.message || "Could not disconnect Google Calendar.");
+    } finally {
+      setOperation("");
     }
   }
 
@@ -54,16 +83,38 @@ export function FacultyCalendarConnection({ calendar }) {
           {connected && calendar?.connected_email && (
             <p className="meta mt-0.5 truncate" title={calendar.connected_email}>{calendar.connected_email}</p>
           )}
+          {connected && (
+            <p className="meta mt-0.5">
+              Last checked: {calendar?.last_synced_at ? formatDateTime(calendar.last_synced_at) : "Not checked yet"}
+            </p>
+          )}
         </div>
       </div>
       <p className="mt-2 text-xs leading-relaxed text-slate-600">
         {connected
-          ? "Busy classes, appointments, and personal events automatically block defense times."
-          : "Connect once so staff checks your real busy times instead of the profile schedule."}
+          ? "Your entered working hours and exceptions create possible defense times. Google busy periods remove conflicts from those times."
+          : "Connect once so Google busy periods can remove conflicts from your entered working hours and availability exceptions."}
       </p>
-      <Button data-connect="" icon={CalendarCheck2} loading={busy} onClick={connectCalendar} className="mt-3 w-full">
-        {busy ? "Opening Google..." : connected ? "Reconnect calendar" : "Connect Google Calendar"}
-      </Button>
+      {connected ? (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+          <Button data-connect="" icon={CalendarCheck2} loading={operation === "connect"} disabled={Boolean(operation)} onClick={connectCalendar}>
+            Reconnect calendar
+          </Button>
+          <Button variant="secondary" icon={RefreshCw} loading={operation === "sync"} disabled={Boolean(operation)} onClick={syncCalendar}>
+            Check calendar now
+          </Button>
+          <Button variant="danger" icon={CalendarX2} disabled={Boolean(operation)} onClick={() => setDisconnectOpen(true)} className="sm:col-span-2 lg:col-span-1 xl:col-span-2">
+            Disconnect calendar
+          </Button>
+        </div>
+      ) : (
+        <Button data-connect="" icon={CalendarCheck2} loading={operation === "connect"} onClick={connectCalendar} className="mt-3 w-full">
+          Connect Google Calendar
+        </Button>
+      )}
+      {connected && calendar?.last_error && (
+        <InlineNotice tone="warning" className="mt-2">Last check failed: {calendar.last_error}</InlineNotice>
+      )}
       {error && <InlineNotice tone="danger" className="mt-2">{error}</InlineNotice>}
       {preview && (
         <GoogleCalendarPreviewDialog
@@ -72,6 +123,28 @@ export function FacultyCalendarConnection({ calendar }) {
           onOpened={() => setPreviewOpened(true)}
           onClose={() => setPreview(null)}
         />
+      )}
+      {disconnectOpen && (
+        <Modal
+          title="Disconnect Google Calendar?"
+          subtitle="The system will stop checking this Google account for busy periods."
+          icon={CalendarX2}
+          tone="danger"
+          size="sm"
+          dismissible={operation !== "disconnect"}
+          closeLabel="Close disconnect confirmation"
+          onClose={() => setDisconnectOpen(false)}
+          footer={
+            <>
+              <Button variant="secondary" disabled={operation === "disconnect"} onClick={() => setDisconnectOpen(false)}>Keep connected</Button>
+              <Button data-autofocus="" variant="danger" loading={operation === "disconnect"} onClick={disconnectCalendar}>Disconnect calendar</Button>
+            </>
+          }
+        >
+          <p className="text-sm leading-relaxed text-slate-700">
+            Your entered working hours and availability exceptions will stay in place.
+          </p>
+        </Modal>
       )}
     </section>
   );
@@ -122,7 +195,7 @@ export function GoogleCalendarPreviewDialog({ preview, opened, onOpened, onClose
 
         <InlineNotice tone="warning" role="note" title="Demo-safe preview">
           <span className="text-xs leading-relaxed">
-            Opening Google Calendar does not mark this account as connected and does not change Panel Matching or Defense Scheduling. The existing profile schedule remains active.
+            Opening Google Calendar does not mark this account as connected. Your entered working hours and availability exceptions remain the source of possible defense times.
           </span>
         </InlineNotice>
 

@@ -376,14 +376,16 @@ export default function FacultyAvailabilityEditor() {
       )}
       <ErrorLine message={error} />
       <div className="grid gap-5 lg:grid-cols-12">
-        <div className="space-y-5 lg:col-span-8">
+        <div className="order-2 space-y-5 lg:order-1 lg:col-span-8 lg:row-span-2">
           <WeeklyHours data={data} onSaved={refreshAll} />
           <SpecificDates data={data} onSaved={refreshAll} />
           <Requests data={data} onSaved={refreshAll} />
         </div>
-        <div className="space-y-5 lg:col-span-4">
-          <FacultyCalendarConnection calendar={portal?.faculty?.calendar} />
-          {otherWindows.length > 0 && (
+        <div className="order-1 lg:order-2 lg:col-span-4 lg:col-start-9">
+          <FacultyCalendarConnection calendar={portal?.faculty?.calendar} onChanged={refetchPortal} />
+        </div>
+        {otherWindows.length > 0 && (
+          <div className="order-3 lg:col-span-4 lg:col-start-9">
             <Card>
               <SectionTitle title="Other open windows" subtitle="Read only. Times the Graduate School has on record." icon={Clock3} />
               <ul className="space-y-1.5">
@@ -395,8 +397,8 @@ export default function FacultyAvailabilityEditor() {
                 ))}
               </ul>
             </Card>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

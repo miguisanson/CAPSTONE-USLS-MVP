@@ -1,12 +1,22 @@
 # State
 
+## ACTIVE RUN UPDATE (2026-10-26) — Google Calendar implementation ready to merge
+
+- **Branch/worktree:** `pkt/google-calendar-v53` in `C:/Users/mendo/AppData/Local/Temp/CAPSTONE-USLS-MVP-wt-google-calendar`, based on `v5.3-migui_test`. The owner completed the Google Cloud console setup and gave the implementation go-ahead.
+- **Scope complete in packet:** each faculty member owns their link/reconnect/sync/unlink lifecycle; OAuth requests only OpenID identity, e-mail, and `calendar.freebusy`; callback tokens are Fernet-encrypted; Google identity cannot be reused by another faculty profile; account changes cannot inherit the previous account's refresh token; connect/sync/disconnect are audited; the legacy shared token path is removed; and Google busy periods only subtract from faculty-entered hours and date exceptions.
+- **Integrator review corrections:** the default redirect URI now exactly matches the owner's registered URI (`http://localhost:5000/api/integrations/google-calendar/callback`, with the old route retained as a compatibility alias); the scope matches the Google Auth Platform configuration (`calendar.freebusy`); the callback rejects an identity whose e-mail Google did not verify; and the calendar count helper can no longer be called without a faculty availability record.
+- **Test-first evidence:** the backend contract was checked on the test-only commit and failed for the intended five reasons, then the reviewed implementation passed all eight targeted Google Calendar tests. A new mobile-order Playwright assertion failed with the Calendar card at y=2627 below Weekly hours at y=328; the responsive layout was corrected and the same walkthrough then passed.
+- **Verification so far:** targeted backend **8/8 PASS**; `p96-google-calendar.spec.js` plus all seven role sign-ins **8/8 PASS**; production frontend build PASS; `check:ui:strict` PASS with every metric zero; screenshots at 1366, 1920, and 390 px opened and reviewed with no overflow or layout defect. No real Google credentials were read or written.
+- **Exact next action:** commit this integrator review, merge the packet into `v5.3-migui_test`, rerun the merged targeted checks and gates, update I-132/R-015 with the merged commit, and remove the packet worktree.
+
 ## ACTIVE RUN (2026-10-24) — Google Calendar integration adjustment
 
 - **Branch:** `v5.3-migui_test` at `02ff818`; owner resumed work and asked for the Google Calendar integration to be completed against v5.3.
 - **Scope:** faculty-owned link/reconnect/unlink from the Faculty Portal; minimum free/busy OAuth permission; encrypted stored tokens; connection/sync status and internal audit entries; Defense Scheduling must intersect entered working hours and manual exceptions with Google busy periods (Google never invents working hours or exposes event details).
 - **Finding:** v5.3 already has a partial OAuth/free-busy path, but it requests `calendar.readonly`, stores callback tokens as plaintext, has no unlink endpoint/UI, records no calendar audit event or last successful sync, retains a legacy shared-token path, and can assume 08:00–18:00 when a connected faculty member entered no working hours. Filed as I-132; regression contract R-015.
 - **Execution:** main session writes and proves the failing tests first. Implementation then goes to one Sonnet packet in its own worktree because `app.py` is touched. No other `app.py` packet may run concurrently.
-- **Exact next action:** add the backend unittest and Playwright contract, run the targeted red checks, then hand the fixed contract to `pkt/google-calendar-v53` for implementation.
+- **Red contract landed in packet worktree:** five targeted backend checks fail for the intended reasons (invented 08:00-18:00 availability, hidden entered hours, broad `calendar.readonly`, selected real Google identity not stored/encrypted/audited, and missing sync/disconnect routes). `frontend/e2e/p96-google-calendar.spec.js` also reaches the faculty screen and fails because v5.3 has no last-checked status or sync/disconnect controls. Playwright Chromium was installed; its first attempted run was infrastructure-red before installation, then the feature-red run reached the assertion.
+- **Exact next action:** commit the red tests and hand the fixed contract to the Sonnet implementer in this worktree; then main reviews, reruns the targeted tests, checks screenshots at 1366/1920/390, and runs the required gates.
 
 ## PAUSED BY THE OWNER (2026-10-22 night) — read this first
 
