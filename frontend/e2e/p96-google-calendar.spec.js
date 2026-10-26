@@ -1,4 +1,4 @@
-// R-015 / I-132. Faculty link status and unlinking live on My Availability.
+// R-015/R-016. Faculty link status and controls live only on My Calendar.
 // Google itself is not contacted: the browser test fixes the API contract and the real OAuth flow is covered by unittest.
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
@@ -73,6 +73,10 @@ test("faculty sees the real linked account, checks it, then unlinks it without l
 
   await page.goto("/faculty-portal/availability");
   await expect(page.getByRole("heading", { level: 1, name: "My Availability" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Google Calendar connection" })).toHaveCount(0);
+
+  await page.goto("/faculty-portal/calendar");
+  await expect(page.getByRole("heading", { level: 1, name: "My Calendar" })).toBeVisible();
   const card = page.getByRole("region", { name: "Google Calendar connection" });
   await expect(card).toContainText("Connected");
   await expect(card).toContainText("real-owned-calendar@gmail.com");
@@ -84,8 +88,8 @@ test("faculty sees the real linked account, checks it, then unlinks it without l
 
   await page.setViewportSize({ width: 390, height: 844 });
   const calendarBox = await card.boundingBox();
-  const weeklyHoursBox = await page.getByRole("heading", { name: "Weekly hours" }).boundingBox();
-  expect(calendarBox?.y, "the Calendar connection must precede the long availability forms on mobile").toBeLessThan(weeklyHoursBox?.y);
+  const busyLayerBox = await page.getByText("Google busy times", { exact: true }).boundingBox();
+  expect(calendarBox?.y, "the connection controls must precede the calendar layers on mobile").toBeLessThan(busyLayerBox?.y);
   await page.setViewportSize({ width: 1366, height: 768 });
 
   await card.getByRole("button", { name: "Check calendar now" }).click();

@@ -272,7 +272,10 @@ Faculty members connect their own Google Calendar from the Faculty Portal. After
 connection, the faculty member's entered working hours and dated exceptions
 remain the source of possible defense times. Google Calendar FreeBusy data only
 removes conflicts from those times; it never invents working hours and never
-exposes event titles or descriptions. Configure a Google OAuth 2.0 Web
+exposes event titles or descriptions. When a defense is scheduled, rescheduled,
+re-confirmed, or cancelled, the system creates, updates, or removes the matching
+system-owned event in each connected panelist's and adviser's primary Google
+Calendar. It never lists or modifies unrelated personal events. Configure a Google OAuth 2.0 Web
 application in `.env`:
 
 ```env
@@ -287,11 +290,11 @@ Add the same redirect URI to the Google Cloud OAuth client's authorized redirect
 URIs and enable the Google Calendar API. Generate the Fernet key once (for
 example with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`),
 keep it private, and keep the same value while stored connections exist. The
-integration requests only `openid`, `email`, and `calendar.freebusy`; GS Staff
-can see that a time is blocked without seeing private event details.
-The planned defense-event sync will request the additional permission needed to
-create, update, or remove only defense events scheduled through this system;
-unrelated classes, appointments, and personal events will remain unchanged.
+integration requests `openid`, `email`, `calendar.freebusy`, and
+`calendar.events.owned`. Add both Calendar scopes in Google Auth Platform's
+Data Access page. Existing connections must reconnect once to grant the added
+event permission. GS Staff can see that a time is blocked without seeing private
+event details; unrelated classes, appointments, and personal events remain unchanged.
 
 When OAuth credentials are not configured, the Faculty Portal presents a
 clearly labeled integration preview. Faculty can review how the calendar will

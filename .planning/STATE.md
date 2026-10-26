@@ -1,5 +1,18 @@
 # State
 
+## ACTIVE RUN UPDATE (2026-10-26) — two-way Google Calendar follow-up
+
+- **Branch/worktree:** `pkt/google-calendar-two-way` in `C:/Users/mendo/AppData/Local/Temp/CAPSTONE-USLS-MVP-wt-google-calendar-two-way`, based on `v5.3-migui_test` at `15d6d7f`.
+- **Owner request:** keep Google personal events private but use their busy periods during defense scheduling; create/update/delete system-owned defense events on each connected faculty member's primary Google Calendar; put all Google Calendar connection controls only on faculty **My Calendar**, not **My Availability**.
+- **Contract:** retain `calendar.freebusy` for conflict checks and add only `calendar.events.owned` for events the system creates on the user's owned primary calendar. Never list or import personal event details. Tag and store every system-created event ID so reschedules/cancellations cannot alter unrelated events.
+- **Red evidence:** five targeted backend tests failed for the intended missing scope/helpers and the faculty Playwright walkthrough failed because the connection card was still on My Availability.
+- **Implementation in progress:** `ScheduleRequest` now stores only the event IDs created by this system; booking/rescheduling/re-confirming/cancelling invokes best-effort create/update/delete lifecycle hooks; the OAuth scope adds `calendar.events.owned`; manual sync retries future defense events; disconnect removes stored system-owned events before credentials are revoked; and the connection card now renders only on faculty My Calendar.
+- **Verification so far:** targeted backend **13/13 PASS**; p96 faculty Playwright checks **8/8 PASS** (the harness later needed Ctrl+C after its completed output because Windows teardown did not exit); production frontend build PASS; strict UI check PASS with every metric zero; 1366/1920/390 screenshots opened and reviewed with no overflow or layout defect. A fresh deterministic demo seed also completed with fingerprint `a1bb81bd4344de5416e397c9536f4cdb945c554b075678d30705165bdbf269aa`.
+- **Repository note:** the main checkout branch label changed to `v6.0-natalie`, but it and `v5.3-migui_test` still point to the exact same base commit `15d6d7f`; no newer code diverges from this packet.
+- **Full-gate correction:** the first repository-wide run stayed green through the new Google tests, then exposed one obsolete assertion in `ExistingDataTests` that still required the superseded read-only consent copy. The owner explicitly requested two-way event writes, so that test was renamed/replaced with the new narrow two-way permission contract and passed targeted. The interrupted run is not counted as a gate result.
+- **Full repository gate:** PASS on 2026-10-27: **684 tests in 9304.119s, OK (1 skipped)**.
+- **Exact next action:** commit this verified packet, merge it into the active `v6.0-natalie` branch, rebuild the disposable demo database, and rerun post-merge checks.
+
 ## ACTIVE RUN UPDATE (2026-10-26) — Google Calendar implementation merged
 
 - **Branch:** `v5.3-migui_test` at merge commit `cf2ce7d`; reviewed packet `pkt/google-calendar-v53` is merged. The owner completed the Google Cloud console setup and gave the implementation go-ahead.

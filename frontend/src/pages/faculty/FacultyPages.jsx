@@ -24,14 +24,14 @@ import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
 import { FacultyAdviserPanel } from "./FacultyAdviserPanel";
 import { FacultyClasses } from "./FacultyClasses";
 
-function CalendarNotice() {
+export function CalendarNotice() {
   const [searchParams] = useSearchParams();
   const calendarNotice = searchParams.get("calendar");
   if (!calendarNotice) return null;
   return (
     <InlineNotice tone={calendarNotice === "connected" ? "success" : "warning"}>
       {calendarNotice === "connected"
-        ? "Google Calendar connected. Its busy periods are now used for defense scheduling."
+        ? "Google Calendar connected. Busy periods now prevent conflicts, and system-scheduled defenses will be kept on this calendar."
         : calendarNotice === "cancelled"
           ? "Google Calendar connection was cancelled."
           : "Google Calendar could not be connected. Please try again."}
@@ -39,14 +39,13 @@ function CalendarNotice() {
   );
 }
 
-// I-085: Google OAuth cannot be completed in a demo, so the home only points to the connection card, which lives
-// on My Availability. A small line, never the biggest element on the page.
+// The dashboard only links to the single connection-management surface on My Calendar.
 function CalendarLink({ calendar }) {
   return (
     <p className="meta flex flex-wrap items-center gap-x-2 gap-y-1">
       <CalendarCheck2 className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
       <span>Google Calendar {calendar?.connected ? "connected" : "not connected"}.</span>
-      <Link to="/faculty-portal/availability" className="font-semibold text-brand-700 hover:underline">Calendar connection</Link>
+      <Link to="/faculty-portal/calendar" className="font-semibold text-brand-700 hover:underline">Calendar connection</Link>
     </p>
   );
 }

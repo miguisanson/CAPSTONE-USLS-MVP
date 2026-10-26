@@ -8,7 +8,6 @@ import { RadioRow } from "../../components/ui/RadioRow.jsx";
 import { useConfirm } from "../../components/confirm";
 import { formatDateTime } from "../../lib/format";
 import { isoDay } from "../../components/calendar/CalendarView";
-import { FacultyCalendarConnection } from "./FacultyCalendar";
 import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
 
 // An error line from a message string; nothing when there is no message.
@@ -331,7 +330,7 @@ function Requests({ data, onSaved }) {
 }
 
 export default function FacultyAvailabilityEditor() {
-  const { data: portal, refetch: refetchPortal } = useFaculty();
+  const { refetch: refetchPortal } = useFaculty();
   const { data, loading, error, refetch } = useApi(() => api.facultyAvailability(), []);
 
   const refreshAll = async () => {
@@ -376,16 +375,13 @@ export default function FacultyAvailabilityEditor() {
       )}
       <ErrorLine message={error} />
       <div className="grid gap-5 lg:grid-cols-12">
-        <div className="order-2 space-y-5 lg:order-1 lg:col-span-8 lg:row-span-2">
+        <div className="space-y-5 lg:col-span-8">
           <WeeklyHours data={data} onSaved={refreshAll} />
           <SpecificDates data={data} onSaved={refreshAll} />
           <Requests data={data} onSaved={refreshAll} />
         </div>
-        <div className="order-1 lg:order-2 lg:col-span-4 lg:col-start-9">
-          <FacultyCalendarConnection calendar={portal?.faculty?.calendar} onChanged={refetchPortal} />
-        </div>
         {otherWindows.length > 0 && (
-          <div className="order-3 lg:col-span-4 lg:col-start-9">
+          <div className="lg:col-span-4 lg:col-start-9">
             <Card>
               <SectionTitle title="Other open windows" subtitle="Read only. Times the Graduate School has on record." icon={Clock3} />
               <ul className="space-y-1.5">

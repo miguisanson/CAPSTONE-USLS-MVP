@@ -17,6 +17,8 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="policy-uploads-"))
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 
+import app as app_module  # noqa: E402
+
 from app import (  # noqa: E402
     AcademicTerm,
     AdviserDocumentApproval,
@@ -4080,6 +4082,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             "openid",
             "email",
             "https://www.googleapis.com/auth/calendar.freebusy",
+            "https://www.googleapis.com/auth/calendar.events.owned",
         })
         self.assertNotIn("https://www.googleapis.com/auth/calendar.readonly", scopes)
         self.assertEqual(query["access_type"], ["offline"])
@@ -4136,7 +4139,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(response.headers["Location"].endswith("/faculty-portal?calendar=connected"))
+        self.assertTrue(response.headers["Location"].endswith("/faculty-portal/calendar?calendar=connected"))
         with app.app_context():
             stored = db.session.get(Faculty, faculty_id)
             self.assertEqual(stored.google_calendar_id, "primary")
@@ -4155,6 +4158,119 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             ).one()
             self.assertEqual(audit.visibility, "internal")
             self.assertIn("real-owned-calendar@gmail.com", audit.notes)
+
+    def test_system_owned_defense_events_are_created_and_removed_without_reading_personal_events(self):
+        with app.app_context():
+            connected = Faculty(
+                name="Connected Panelist",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Research methods",
+                email="connected-panelist@example.test",
+                active=True,
+                google_calendar_id="primary",
+                google_calendar_email="connected-calendar@gmail.com",
+                google_calendar_access_token="connected-access-token",
+                google_calendar_token_expires_at=datetime.now() + timedelta(days=1),
+                google_calendar_connected_at=datetime.now(),
+            )
+            not_connected = Faculty(
+                name="Unconnected Panelist",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Research methods",
+                email="unconnected-panelist@example.test",
+                active=True,
+            )
+            db.session.add_all([connected, not_connected])
+            db.session.flush()
+            db.session.add_all([
+                PanelAssignment(
+                    student_id=self.student_id,
+                    faculty_id=connected.id,
+                    gate="Final Defense",
+                    panel_role="Panel Chair",
+                ),
+                PanelAssignment(
+                    student_id=self.student_id,
+                    faculty_id=not_connected.id,
+                    gate="Final Defense",
+                    panel_role="Content Specialist",
+                ),
+            ])
+            schedule = ScheduleRequest(
+                student_id=self.student_id,
+                preferred_date=date(2026, 11, 20),
+                start_time=time(9, 0),
+                end_time=time(11, 0),
+                defense_type="Final Defense",
+                mode="On campus",
+                venue="Graduate School Conference Room",
+                status="Scheduled",
+            )
+            db.session.add(schedule)
+            db.session.flush()
+            schedule_id = schedule.id
+            connected_id = connected.id
+            student_name = db.session.get(Student, self.student_id).name
+
+            requests = []
+
+            def google_response(req, timeout=0):
+                body = json.loads(req.data.decode("utf-8")) if req.data else None
+                requests.append({"method": req.method, "url": req.full_url, "body": body})
+                response = MagicMock()
+                response.__enter__.return_value = response
+                response.read.return_value = (
+                    json.dumps({"id": "usls-defense-event-123"}).encode("utf-8")
+                    if req.method == "POST"
+                    else b"{}"
+                )
+                return response
+
+            with patch("app.urlopen", side_effect=google_response):
+                result = app_module.sync_defense_google_events(schedule)
+                db.session.flush()
+
+            self.assertEqual(result["created"], 1)
+            self.assertEqual(len(requests), 1)
+            create = requests[0]
+            self.assertEqual(create["method"], "POST")
+            self.assertIn("/calendars/primary/events", create["url"])
+            self.assertIn("sendUpdates=none", create["url"])
+            self.assertIn(student_name, create["body"]["summary"])
+            self.assertEqual(create["body"]["location"], "Graduate School Conference Room")
+            self.assertEqual(create["body"]["transparency"], "opaque")
+            self.assertEqual(
+                create["body"]["extendedProperties"]["private"],
+                {"source": "usls-gs-defense", "schedule_id": str(schedule_id)},
+            )
+            self.assertNotIn("attendees", create["body"])
+            self.assertEqual(
+                json.loads(schedule.google_calendar_event_ids),
+                {str(connected_id): "usls-defense-event-123"},
+            )
+
+            requests.clear()
+            with patch("app.urlopen", side_effect=google_response):
+                updated = app_module.sync_defense_google_events(schedule)
+                db.session.flush()
+
+            self.assertEqual(updated["updated"], 1)
+            self.assertEqual(len(requests), 1)
+            self.assertEqual(requests[0]["method"], "PATCH")
+            self.assertIn("/events/usls-defense-event-123", requests[0]["url"])
+
+            requests.clear()
+            with patch("app.urlopen", side_effect=google_response):
+                removed = app_module.remove_defense_google_events(schedule)
+                db.session.flush()
+
+            self.assertEqual(removed["removed"], 1)
+            self.assertEqual(len(requests), 1)
+            self.assertEqual(requests[0]["method"], "DELETE")
+            self.assertIn("/events/usls-defense-event-123", requests[0]["url"])
+            self.assertIsNone(schedule.google_calendar_event_ids)
 
     def test_faculty_can_sync_and_disconnect_google_calendar_even_when_google_revoke_fails(self):
         with app.app_context():
