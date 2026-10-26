@@ -23,7 +23,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from urllib.parse import quote_plus, urlencode
+from urllib.parse import quote, quote_plus, urlencode
 from time import monotonic as _monotonic, sleep as _sleep
 from uuid import uuid4
 
@@ -1445,6 +1445,9 @@ class ScheduleRequest(db.Model):
     status = db.Column(db.String(40), nullable=False)
     matched_count = db.Column(db.Integer, default=0)
     panel_snapshot = db.Column(db.Text)
+    # JSON map of faculty ID to the Google event ID created by this system.
+    # Only IDs recorded here may be updated or deleted by the integration.
+    google_calendar_event_ids = db.Column(db.Text)
     required_forms_status = db.Column(db.String(40))
     conflict_reason = db.Column(db.Text)
     notes = db.Column(db.String(260))
@@ -15461,12 +15464,12 @@ def register_routes(app: Flask) -> None:
                     "This preview does not connect an account or change scheduling data."
                 ),
                 "permissions": [
-                    "View free and busy times for defense scheduling",
-                    "Keep event names, descriptions, and guests private",
+                    "Check unrelated calendar items only as free and busy time for defense scheduling",
                     (
-                        "Read-only: this system never creates, changes or deletes events in your Google "
-                        "Calendar. To see defenses there, subscribe to your private calendar link"
+                        "Create, update and remove only defense events scheduled through this system; "
+                        "unrelated Google Calendar events stay unchanged"
                     ),
+                    "Do not import or display titles, descriptions, or guests from unrelated events",
                 ],
                 "schedule_source": "profile_schedule",
             })
@@ -15489,12 +15492,12 @@ def register_routes(app: Flask) -> None:
         expected_faculty_id = session.pop("google_calendar_oauth_faculty_id", None)
         supplied_state = request.args.get("state")
         if not faculty or expected_faculty_id != faculty.id or not expected_state or supplied_state != expected_state:
-            return redirect("/faculty-portal?calendar=invalid-state")
+            return redirect("/faculty-portal/calendar?calendar=invalid-state")
         if request.args.get("error"):
-            return redirect("/faculty-portal?calendar=cancelled")
+            return redirect("/faculty-portal/calendar?calendar=cancelled")
         code = (request.args.get("code") or "").strip()
         if not code:
-            return redirect("/faculty-portal?calendar=missing-code")
+            return redirect("/faculty-portal/calendar?calendar=missing-code")
         try:
             token_payload = google_token_request({
                 "client_id": os.getenv("GOOGLE_CALENDAR_CLIENT_ID", "").strip(),
@@ -15518,7 +15521,7 @@ def register_routes(app: Flask) -> None:
             if not google_subject or not google_email or userinfo_payload.get("email_verified") is not True:
                 raise ValueError("Google returned no account identity")
         except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
-            return redirect("/faculty-portal?calendar=connection-failed")
+            return redirect("/faculty-portal/calendar?calendar=connection-failed")
 
         try:
             refresh_token = (token_payload.get("refresh_token") or "").strip()
@@ -15531,13 +15534,13 @@ def register_routes(app: Flask) -> None:
             encrypted_access_token = google_calendar_encrypt_token(access_token)
             encrypted_refresh_token = google_calendar_encrypt_token(refresh_token) if refresh_token else None
         except ValueError:
-            return redirect("/faculty-portal?calendar=connection-failed")
+            return redirect("/faculty-portal/calendar?calendar=connection-failed")
         linked_elsewhere = Faculty.query.filter(
             Faculty.google_calendar_subject == google_subject,
             Faculty.id != faculty.id,
         ).first()
         if linked_elsewhere:
-            return redirect("/faculty-portal?calendar=already-connected")
+            return redirect("/faculty-portal/calendar?calendar=already-connected")
 
         faculty.google_calendar_access_token = encrypted_access_token
         faculty.google_calendar_refresh_token = encrypted_refresh_token
@@ -15561,7 +15564,7 @@ def register_routes(app: Flask) -> None:
             visibility="internal",
         )
         db.session.commit()
-        return redirect("/faculty-portal?calendar=connected")
+        return redirect("/faculty-portal/calendar?calendar=connected")
 
     @app.route("/api/faculty-portal/google-calendar/sync", methods=["POST"])
     @require_api_login("faculty")
@@ -15575,8 +15578,11 @@ def register_routes(app: Flask) -> None:
 
         today = date.today()
         result = google_freebusy_lookup(faculty, today, today + timedelta(days=35))
-        if result.get("error"):
-            faculty.google_calendar_last_error = result["error"]
+        event_result = sync_faculty_defense_events(faculty) if not result.get("error") else {"errors": []}
+        event_error = event_result.get("errors", [{}])[0].get("error") if event_result.get("errors") else None
+        sync_error = result.get("error") or event_error
+        if sync_error:
+            faculty.google_calendar_last_error = sync_error
         else:
             faculty.google_calendar_last_synced_at = now_utc()
             faculty.google_calendar_last_error = None
@@ -15589,14 +15595,15 @@ def register_routes(app: Flask) -> None:
             "Faculty",
             (
                 f"Checked {faculty.google_calendar_email or 'the connected account'} for busy periods; "
-                f"result: {result.get('error') or 'available'}."
+                f"result: {sync_error or 'available'}; defense events reconciled: "
+                f"{event_result.get('created', 0)} created, {event_result.get('updated', 0)} updated."
             ),
             visibility="internal",
         )
         db.session.commit()
         payload = faculty_google_calendar_dict(faculty)
-        if result.get("error"):
-            return jsonify({**payload, "error": result["error"]}), 503
+        if sync_error:
+            return jsonify({**payload, "error": sync_error}), 503
         return jsonify(payload)
 
     @app.route("/api/faculty-portal/google-calendar", methods=["DELETE"])
@@ -15607,6 +15614,7 @@ def register_routes(app: Flask) -> None:
         if not faculty:
             return jsonify({"error": "This faculty account is not linked to a faculty record yet."}), 400
 
+        event_cleanup = remove_faculty_defense_events(faculty)
         try:
             revoke_token = google_calendar_decrypt_token(
                 faculty.google_calendar_access_token or faculty.google_calendar_refresh_token
@@ -15646,6 +15654,7 @@ def register_routes(app: Flask) -> None:
             "Faculty",
             (
                 f"Disconnected Google account: {disconnected_email or 'account not recorded'}. "
+                f"Removed {event_cleanup['removed']} system-owned defense event(s); "
                 f"Google revocation {'succeeded' if revoked_at_google else 'could not be confirmed'}; "
                 "local credentials were cleared."
             ),
@@ -19560,6 +19569,7 @@ def register_routes(app: Flask) -> None:
             f"{defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)} with the new panel.",
             f"defense_reconfirmed:{now_utc().strftime('%Y%m%d%H%M%S')}",
         )
+        sync_defense_google_events(schedule)
         db.session.commit()
         return jsonify({"ok": True, "message": "Schedule re-confirmed."})
 
@@ -27940,6 +27950,9 @@ def book_defense_schedule(
     )
     close_research_tasks(student.id, prefix=f"Reschedule {defense_type}:")
     notify_defense_booked(schedule, replaces, change_reason, requested_by)
+    if replaces:
+        remove_defense_google_events(replaces)
+    sync_defense_google_events(schedule)
     sync_research_progress(student)
     return schedule
 
@@ -27958,6 +27971,7 @@ def cancel_defense_schedule(schedule: ScheduleRequest, account: UserAccount, rea
         f"Requested by {requested_by or 'not recorded'}. Reason: {reason}",
     )
     notify_defense_cancelled(schedule, reason, requested_by)
+    remove_defense_google_events(schedule)
 
 
 # ===========================================================================
@@ -31969,7 +31983,7 @@ def faculty_google_calendar_dict(faculty: Faculty) -> dict:
         "connected": connected,
         "status": "Connected" if connected else "Not connected",
         "sync_status": (
-            "Entered availability is used; Google busy periods subtract conflicting times."
+            "Google busy periods subtract conflicts; system-scheduled defenses are kept on this Google Calendar."
             if connected
             else "Entered working hours and availability exceptions are used until a calendar is connected."
         ),
@@ -32006,6 +32020,7 @@ def google_calendar_authorization_url(state: str) -> str:
             "openid",
             "email",
             "https://www.googleapis.com/auth/calendar.freebusy",
+            "https://www.googleapis.com/auth/calendar.events.owned",
         ]),
         "access_type": "offline",
         "include_granted_scopes": "true",
@@ -32128,6 +32143,217 @@ def google_freebusy_lookup(faculty: Faculty, start_day: date, end_day: date) -> 
             continue
         busy.append({"start": start, "end": end})
     return {"configured": True, "calendar_id": calendar_id, "busy": busy, "error": None}
+
+
+def defense_google_event_ids(schedule: ScheduleRequest) -> dict[str, str]:
+    """Return the system-owned Google event IDs stored for a defense."""
+    if not schedule.google_calendar_event_ids:
+        return {}
+    try:
+        value = json.loads(schedule.google_calendar_event_ids)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(faculty_id): str(event_id)
+        for faculty_id, event_id in value.items()
+        if str(faculty_id).isdigit() and event_id
+    }
+
+
+def defense_google_event_payload(schedule: ScheduleRequest) -> dict:
+    """Build the event owned by this system without copying private Google data."""
+    local_tz = timezone(timedelta(hours=8))
+    start_dt = datetime.combine(schedule.preferred_date, schedule.start_time).replace(tzinfo=local_tz)
+    end_dt = datetime.combine(schedule.preferred_date, schedule.end_time).replace(tzinfo=local_tz)
+    return {
+        "summary": f"{schedule.defense_type}: {schedule.student.name}",
+        "description": (
+            "Defense scheduled through the USLS Graduate School system. "
+            "Changes and cancellations made in the system are reflected here."
+        ),
+        "location": schedule.venue or "",
+        "transparency": "opaque",
+        "start": {"dateTime": start_dt.isoformat(), "timeZone": CALENDAR_TIMEZONE},
+        "end": {"dateTime": end_dt.isoformat(), "timeZone": CALENDAR_TIMEZONE},
+        "extendedProperties": {
+            "private": {"source": "usls-gs-defense", "schedule_id": str(schedule.id)},
+        },
+    }
+
+
+def google_calendar_event_request(
+    faculty: Faculty,
+    method: str,
+    event_id: str | None = None,
+    payload: dict | None = None,
+) -> tuple[dict | None, str | None]:
+    """Call the Events API only for a stored system-owned event."""
+    calendar_id = faculty_calendar_id(faculty)
+    if not calendar_id:
+        return None, "Google Calendar ID is missing"
+    token, token_error = faculty_google_calendar_token(faculty)
+    if not token:
+        return None, token_error
+    url = f"https://www.googleapis.com/calendar/v3/calendars/{quote(calendar_id, safe='')}/events"
+    if event_id:
+        url += f"/{quote(event_id, safe='')}"
+    url += "?sendUpdates=none"
+    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    req = Request(
+        url,
+        data=body,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method=method,
+    )
+    try:
+        with urlopen(req, timeout=8) as response:
+            raw = response.read()
+            return (json.loads(raw.decode("utf-8")) if raw else {}), None
+    except HTTPError as exc:
+        if method == "DELETE" and exc.code in {404, 410}:
+            return {}, None
+        return None, f"Google Calendar event HTTP {exc.code}"
+    except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        return None, f"Google Calendar event sync unavailable: {exc}"
+
+
+def defense_google_faculty(schedule: ScheduleRequest) -> list[Faculty]:
+    gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(schedule.defense_type or "")
+    assignments = active_panel_assignments(schedule.student, gate)
+    return [item["faculty"] for item in defense_participants(schedule.student, assignments)]
+
+
+def sync_defense_google_events(
+    schedule: ScheduleRequest,
+    faculty_ids: set[int] | None = None,
+) -> dict:
+    """Create or update defense events in each connected participant's calendar."""
+    if schedule.status not in SLOT_HOLDING_DEFENSE_STATUSES:
+        return remove_defense_google_events(schedule, faculty_ids)
+    if not schedule.start_time or not schedule.end_time:
+        return {
+            "created": 0,
+            "updated": 0,
+            "removed": 0,
+            "errors": [{"faculty_id": None, "error": "Defense time is incomplete"}],
+        }
+
+    stored = defense_google_event_ids(schedule)
+    participants = {
+        faculty.id: faculty
+        for faculty in defense_google_faculty(schedule)
+        if faculty_ids is None or faculty.id in faculty_ids
+    }
+    eligible = {
+        faculty_id: faculty
+        for faculty_id, faculty in participants.items()
+        if google_calendar_configured(faculty)
+    }
+    result = {"created": 0, "updated": 0, "removed": 0, "errors": []}
+    payload = defense_google_event_payload(schedule)
+
+    for faculty_id, faculty in eligible.items():
+        key = str(faculty_id)
+        event_id = stored.get(key)
+        method = "PATCH" if event_id else "POST"
+        response, error = google_calendar_event_request(faculty, method, event_id, payload)
+        if error:
+            faculty.google_calendar_last_error = error
+            result["errors"].append({"faculty_id": faculty_id, "error": error})
+            continue
+        if method == "POST":
+            new_event_id = (response or {}).get("id")
+            if not new_event_id:
+                error = "Google Calendar created no event ID"
+                faculty.google_calendar_last_error = error
+                result["errors"].append({"faculty_id": faculty_id, "error": error})
+                continue
+            stored[key] = str(new_event_id)
+            result["created"] += 1
+        else:
+            result["updated"] += 1
+        faculty.google_calendar_last_synced_at = now_utc()
+        faculty.google_calendar_last_error = None
+
+    current_ids = {str(faculty_id) for faculty_id in participants}
+    obsolete = [
+        key for key in stored
+        if key not in current_ids and (faculty_ids is None or int(key) in faculty_ids)
+    ]
+    for key in obsolete:
+        faculty = db.session.get(Faculty, int(key))
+        if not faculty or not google_calendar_configured(faculty):
+            continue
+        _response, error = google_calendar_event_request(faculty, "DELETE", stored[key])
+        if error:
+            faculty.google_calendar_last_error = error
+            result["errors"].append({"faculty_id": faculty.id, "error": error})
+            continue
+        stored.pop(key, None)
+        result["removed"] += 1
+        faculty.google_calendar_last_synced_at = now_utc()
+        faculty.google_calendar_last_error = None
+
+    schedule.google_calendar_event_ids = json.dumps(stored, sort_keys=True) if stored else None
+    return result
+
+
+def remove_defense_google_events(
+    schedule: ScheduleRequest,
+    faculty_ids: set[int] | None = None,
+) -> dict:
+    """Delete only defense events whose IDs this system stored when creating them."""
+    stored = defense_google_event_ids(schedule)
+    result = {"created": 0, "updated": 0, "removed": 0, "errors": []}
+    for key, event_id in list(stored.items()):
+        faculty_id = int(key)
+        if faculty_ids is not None and faculty_id not in faculty_ids:
+            continue
+        faculty = db.session.get(Faculty, faculty_id)
+        if not faculty or not google_calendar_configured(faculty):
+            continue
+        _response, error = google_calendar_event_request(faculty, "DELETE", event_id)
+        if error:
+            faculty.google_calendar_last_error = error
+            result["errors"].append({"faculty_id": faculty_id, "error": error})
+            continue
+        stored.pop(key, None)
+        result["removed"] += 1
+        faculty.google_calendar_last_synced_at = now_utc()
+        faculty.google_calendar_last_error = None
+    schedule.google_calendar_event_ids = json.dumps(stored, sort_keys=True) if stored else None
+    return result
+
+
+def sync_faculty_defense_events(faculty: Faculty) -> dict:
+    """Retry future active defense-event sync for one faculty member."""
+    totals = {"created": 0, "updated": 0, "removed": 0, "errors": []}
+    schedules = ScheduleRequest.query.filter(
+        ScheduleRequest.preferred_date >= date.today(),
+        ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+    ).all()
+    for schedule in schedules:
+        if faculty.id not in {item.id for item in defense_google_faculty(schedule)}:
+            continue
+        outcome = sync_defense_google_events(schedule, {faculty.id})
+        for key in ("created", "updated", "removed"):
+            totals[key] += outcome[key]
+        totals["errors"].extend(outcome["errors"])
+    return totals
+
+
+def remove_faculty_defense_events(faculty: Faculty) -> dict:
+    """Remove this faculty member's system-owned events before disconnecting."""
+    totals = {"created": 0, "updated": 0, "removed": 0, "errors": []}
+    for schedule in ScheduleRequest.query.filter(ScheduleRequest.google_calendar_event_ids.isnot(None)).all():
+        if str(faculty.id) not in defense_google_event_ids(schedule):
+            continue
+        outcome = remove_defense_google_events(schedule, {faculty.id})
+        totals["removed"] += outcome["removed"]
+        totals["errors"].extend(outcome["errors"])
+    return totals
 
 
 def google_busy_by_faculty(participants: list[dict], start_day: date, end_day: date) -> dict[int, dict]:

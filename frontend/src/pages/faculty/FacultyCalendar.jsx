@@ -92,8 +92,8 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
       </div>
       <p className="mt-2 text-xs leading-relaxed text-slate-600">
         {connected
-          ? "Your entered working hours and exceptions create possible defense times. Google busy periods remove conflicts from those times."
-          : "Connect once so Google busy periods can remove conflicts from your entered working hours and availability exceptions."}
+          ? "Google busy periods remove conflicts from your entered hours. Defenses scheduled in the system are also kept blocked on this Google Calendar."
+          : "Connect once to block Google conflicts in defense scheduling and add system-scheduled defenses to this Google Calendar."}
       </p>
       {connected ? (
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -127,7 +127,7 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
       {disconnectOpen && (
         <Modal
           title="Disconnect Google Calendar?"
-          subtitle="The system will stop checking this Google account for busy periods."
+          subtitle="The system will stop checking busy periods and remove its defense events from this Google Calendar."
           icon={CalendarX2}
           tone="danger"
           size="sm"
@@ -142,7 +142,7 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
           }
         >
           <p className="text-sm leading-relaxed text-slate-700">
-            Your entered working hours and availability exceptions will stay in place.
+            Your entered working hours and availability exceptions will stay in place. Unrelated Google Calendar events will not be changed.
           </p>
         </Modal>
       )}

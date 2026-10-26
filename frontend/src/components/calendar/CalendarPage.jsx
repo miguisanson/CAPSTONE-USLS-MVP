@@ -183,7 +183,7 @@ function DetailPanel({ selected, scope, onClose, onChanged }) {
 }
 
 // `embedded` drops the big page header (used as a tab inside Defense Scheduling).
-export default function CalendarPage({ scope = "staff", title, description, embedded = false }) {
+export default function CalendarPage({ scope = "staff", title, description, embedded = false, connectionPanel = null }) {
   const isFaculty = scope === "faculty";
   const [anchor, setAnchor] = useState(() => new Date());
   const [view, setView] = useState(isFaculty ? "week" : "month");
@@ -234,6 +234,7 @@ export default function CalendarPage({ scope = "staff", title, description, embe
         />
       )}
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+      {connectionPanel}
       {!isFaculty && <Card><FilterBar filters={filters} options={payload?.filters || {}} onChange={setFilters} /></Card>}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-600">
         <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={showDeadlines} onChange={(e) => setShowDeadlines(e.target.checked)} />Deadlines</label>

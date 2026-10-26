@@ -721,6 +721,18 @@ class SchedulingRuleTests(ResearchCoreBase):
         self.assertEqual(again.status_code, 400)
         self.assertIn("reschedule", again.get_json()["error"].lower())
 
+    def test_booking_pushes_the_defense_to_connected_faculty_calendars(self):
+        self.ready_for_proposal()
+        synced_statuses = []
+        with patch(
+            "app.sync_defense_google_events",
+            side_effect=lambda schedule: synced_statuses.append(schedule.status),
+        ) as sync_events:
+            response = self.book()
+        self.assertEqual(response.status_code, 200, response.get_json())
+        sync_events.assert_called_once()
+        self.assertEqual(synced_statuses, ["Scheduled"])
+
     def test_reschedule_needs_a_reason_and_links_the_old_record(self):
         self.ready_for_proposal()
         old_id = self.booked()
@@ -730,8 +742,11 @@ class SchedulingRuleTests(ResearchCoreBase):
                 "mode": "Online", "venue": "Zoom room B"}
         no_reason = self.staff().post(url, json=body)
         self.assertEqual(no_reason.status_code, 400, no_reason.get_json())
-        ok = self.staff().post(url, json={**body, "reason": "External panelist is travelling", "requested_by": "Panel member"})
+        with patch("app.remove_defense_google_events") as remove_events, patch("app.sync_defense_google_events") as sync_events:
+            ok = self.staff().post(url, json={**body, "reason": "External panelist is travelling", "requested_by": "Panel member"})
         self.assertEqual(ok.status_code, 200, ok.get_json())
+        remove_events.assert_called_once()
+        sync_events.assert_called_once()
         with app.app_context():
             rows = self.schedules()
             old, new = rows[-2], rows[-1]
@@ -757,9 +772,11 @@ class SchedulingRuleTests(ResearchCoreBase):
         schedule_id = self.booked()
         no_reason = self.staff().post(f"/api/defense-schedules/{schedule_id}/cancel", json={})
         self.assertEqual(no_reason.status_code, 400)
-        ok = self.research().post(f"/api/defense-schedules/{schedule_id}/cancel",
-                                  json={"reason": "Venue unavailable", "requested_by": "GS Office"})
+        with patch("app.remove_defense_google_events") as remove_events:
+            ok = self.research().post(f"/api/defense-schedules/{schedule_id}/cancel",
+                                      json={"reason": "Venue unavailable", "requested_by": "GS Office"})
         self.assertEqual(ok.status_code, 200, ok.get_json())
+        remove_events.assert_called_once()
         with app.app_context():
             row = db.session.get(ScheduleRequest, schedule_id)
             self.assertEqual(row.status, "Cancelled")
@@ -788,8 +805,10 @@ class SchedulingRuleTests(ResearchCoreBase):
         verdict = self.faculty_client("Chair Person").post(
             f"/api/faculty-portal/defense-verdicts/{schedule_id}", json={"result": "Passed"})
         self.assertEqual(verdict.status_code, 400)
-        ok = self.staff().post(f"/api/defense-schedules/{schedule_id}/reconfirm", json={})
+        with patch("app.sync_defense_google_events") as sync_events:
+            ok = self.staff().post(f"/api/defense-schedules/{schedule_id}/reconfirm", json={})
         self.assertEqual(ok.status_code, 200, ok.get_json())
+        sync_events.assert_called_once()
         with app.app_context():
             self.assertEqual(db.session.get(ScheduleRequest, schedule_id).status, "Scheduled")
 

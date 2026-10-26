@@ -1365,11 +1365,12 @@ class ExistingDataTests(CalendarBase):
             self.assertEqual(app_module.FacultyWorkingHour.query.filter_by(faculty_id=demo.id).count(), 5)
             self.assertFalse(app_module.faculty_availability_entered(db.session.get(Faculty, other.id)))
 
-    def test_the_google_consent_text_no_longer_promises_to_write_events(self):
+    def test_google_consent_text_explains_narrow_two_way_access(self):
         body = self.faculty_client("Chair Person").get("/api/faculty-portal/google-calendar/authorization").get_json()
         text_body = " ".join(body.get("permissions", []))
-        self.assertNotIn("Create, update, or remove", text_body)
-        self.assertIn("Read-only", text_body)
+        self.assertIn("free and busy", text_body)
+        self.assertIn("Create, update and remove only defense events", text_body)
+        self.assertIn("Do not import or display titles, descriptions, or guests", text_body)
 
     def test_the_staff_scheduling_context_lists_invitations_and_availability_requests(self):
         self.ready_for_title()
