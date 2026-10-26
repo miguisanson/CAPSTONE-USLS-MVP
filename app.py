@@ -15479,6 +15479,7 @@ def register_routes(app: Flask) -> None:
             "authorization_url": google_calendar_authorization_url(state),
         })
 
+    @app.route("/api/integrations/google-calendar/callback")
     @app.route("/api/faculty-portal/google-calendar/callback")
     @require_api_login("faculty")
     def faculty_google_calendar_callback():
@@ -15514,7 +15515,7 @@ def register_routes(app: Flask) -> None:
                 userinfo_payload = json.loads(response.read().decode("utf-8"))
             google_subject = (userinfo_payload.get("sub") or "").strip()
             google_email = (userinfo_payload.get("email") or "").strip().lower()
-            if not google_subject or not google_email:
+            if not google_subject or not google_email or userinfo_payload.get("email_verified") is not True:
                 raise ValueError("Google returned no account identity")
         except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
             return redirect("/faculty-portal?calendar=connection-failed")
@@ -31993,7 +31994,7 @@ def google_calendar_redirect_uri() -> str:
     configured = os.getenv("GOOGLE_CALENDAR_REDIRECT_URI", "").strip()
     if configured:
         return configured
-    return f"{request.url_root.rstrip('/')}/api/faculty-portal/google-calendar/callback"
+    return f"{request.url_root.rstrip('/')}/api/integrations/google-calendar/callback"
 
 
 def google_calendar_authorization_url(state: str) -> str:
@@ -32004,7 +32005,7 @@ def google_calendar_authorization_url(state: str) -> str:
         "scope": " ".join([
             "openid",
             "email",
-            "https://www.googleapis.com/auth/calendar.events.freebusy",
+            "https://www.googleapis.com/auth/calendar.freebusy",
         ]),
         "access_type": "offline",
         "include_granted_scopes": "true",
@@ -32164,30 +32165,21 @@ def candidate_conflicts_google_busy(day: date, start_minutes: int, end_minutes: 
 
 
 def google_calendar_free_window_count(
+    faculty: Faculty,
     calendar_result: dict,
     start_day: date,
     end_day: date,
     duration_minutes: int = 120,
     limit: int = 5,
-    faculty: Faculty | None = None,
 ) -> int:
-    """Count free candidate windows for panel-matching availability scoring.
-
-    When a faculty record is supplied, only that person's entered availability
-    creates candidates and Google busy periods subtract from it. The no-faculty
-    form is retained for callers that are explicitly scoring a raw calendar range.
-    """
+    """Count free entered windows after subtracting Google busy periods."""
     if not calendar_result.get("configured") or calendar_result.get("error"):
         return 0
     count = 0
     current_day = start_day
-    bundle = faculty_availability_bundle(faculty) if faculty else None
+    bundle = faculty_availability_bundle(faculty)
     while current_day <= end_day and count < limit:
-        windows = (
-            faculty_day_availability(faculty, current_day, bundle)["windows"]
-            if faculty
-            else [(time(8, 0), time(18, 0))] if current_day.weekday() < 5 else []
-        )
+        windows = faculty_day_availability(faculty, current_day, bundle)["windows"]
         found_window = False
         for window_start, window_end in windows:
             first_minute = window_start.hour * 60 + window_start.minute
@@ -34416,7 +34408,7 @@ def panel_matching_result(student: Student, profile: dict | None = None) -> dict
             window_end = today + timedelta(days=28)
             calendar_result = google_freebusy_lookup(faculty, today, window_end)
             availability_count = google_calendar_free_window_count(
-                calendar_result, today, window_end, faculty=faculty
+                faculty, calendar_result, today, window_end
             )
             calendar_error = calendar_result.get("error")
             recurring_days = sum(1 for day in faculty_working_hours(faculty) if day["enabled"])

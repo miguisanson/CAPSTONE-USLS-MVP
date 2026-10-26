@@ -1,5 +1,14 @@
 # State
 
+## ACTIVE RUN UPDATE (2026-10-26) — Google Calendar implementation ready to merge
+
+- **Branch/worktree:** `pkt/google-calendar-v53` in `C:/Users/mendo/AppData/Local/Temp/CAPSTONE-USLS-MVP-wt-google-calendar`, based on `v5.3-migui_test`. The owner completed the Google Cloud console setup and gave the implementation go-ahead.
+- **Scope complete in packet:** each faculty member owns their link/reconnect/sync/unlink lifecycle; OAuth requests only OpenID identity, e-mail, and `calendar.freebusy`; callback tokens are Fernet-encrypted; Google identity cannot be reused by another faculty profile; account changes cannot inherit the previous account's refresh token; connect/sync/disconnect are audited; the legacy shared token path is removed; and Google busy periods only subtract from faculty-entered hours and date exceptions.
+- **Integrator review corrections:** the default redirect URI now exactly matches the owner's registered URI (`http://localhost:5000/api/integrations/google-calendar/callback`, with the old route retained as a compatibility alias); the scope matches the Google Auth Platform configuration (`calendar.freebusy`); the callback rejects an identity whose e-mail Google did not verify; and the calendar count helper can no longer be called without a faculty availability record.
+- **Test-first evidence:** the backend contract was checked on the test-only commit and failed for the intended five reasons, then the reviewed implementation passed all eight targeted Google Calendar tests. A new mobile-order Playwright assertion failed with the Calendar card at y=2627 below Weekly hours at y=328; the responsive layout was corrected and the same walkthrough then passed.
+- **Verification so far:** targeted backend **8/8 PASS**; `p96-google-calendar.spec.js` plus all seven role sign-ins **8/8 PASS**; production frontend build PASS; `check:ui:strict` PASS with every metric zero; screenshots at 1366, 1920, and 390 px opened and reviewed with no overflow or layout defect. No real Google credentials were read or written.
+- **Exact next action:** commit this integrator review, merge the packet into `v5.3-migui_test`, rerun the merged targeted checks and gates, update I-132/R-015 with the merged commit, and remove the packet worktree.
+
 ## ACTIVE RUN (2026-10-24) — Google Calendar integration adjustment
 
 - **Branch:** `v5.3-migui_test` at `02ff818`; owner resumed work and asked for the Google Calendar integration to be completed against v5.3.

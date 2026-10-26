@@ -3830,15 +3830,41 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "end": datetime.combine(start_day, time(18, 0)).replace(tzinfo=local_tz),
             }],
         }
-        self.assertEqual(
-            google_calendar_free_window_count(result, start_day, start_day + timedelta(days=2)),
-            2,
-        )
-        result["error"] = "Google Calendar unavailable"
-        self.assertEqual(
-            google_calendar_free_window_count(result, start_day, start_day + timedelta(days=2)),
-            0,
-        )
+        with app.app_context():
+            faculty = Faculty(
+                name="Panel Matching Calendar Faculty",
+                college="Graduate School",
+                role="Panel Member",
+                specialization="Research methods",
+                active=True,
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            for weekday in range(3):
+                db.session.add(FacultyWorkingHour(
+                    faculty_id=faculty.id,
+                    weekday=weekday,
+                    start_time=time(8, 0),
+                    end_time=time(18, 0),
+                    enabled=True,
+                    source="faculty",
+                ))
+            db.session.flush()
+            db.session.expire(faculty, ["working_hours"])
+
+            self.assertEqual(
+                google_calendar_free_window_count(
+                    faculty, result, start_day, start_day + timedelta(days=2)
+                ),
+                2,
+            )
+            result["error"] = "Google Calendar unavailable"
+            self.assertEqual(
+                google_calendar_free_window_count(
+                    faculty, result, start_day, start_day + timedelta(days=2)
+                ),
+                0,
+            )
 
     def test_panel_matching_demo_populates_every_faculty_profile_idempotently(self):
         with app.app_context():
@@ -4036,10 +4062,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             faculty_id = faculty.id
 
         client = self._role_client(account_id, "faculty")
+        redirect_uri = "http://localhost/api/integrations/google-calendar/callback"
         with patch.dict(os.environ, {
             "GOOGLE_CALENDAR_CLIENT_ID": "client-id.apps.googleusercontent.com",
             "GOOGLE_CALENDAR_CLIENT_SECRET": "client-secret",
-            "GOOGLE_CALENDAR_REDIRECT_URI": "http://localhost/api/faculty-portal/google-calendar/callback",
+            "GOOGLE_CALENDAR_REDIRECT_URI": redirect_uri,
             "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY": "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=",
         }):
             response = client.get("/api/faculty-portal/google-calendar/authorization")
@@ -4052,11 +4079,12 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         self.assertEqual(scopes, {
             "openid",
             "email",
-            "https://www.googleapis.com/auth/calendar.events.freebusy",
+            "https://www.googleapis.com/auth/calendar.freebusy",
         })
         self.assertNotIn("https://www.googleapis.com/auth/calendar.readonly", scopes)
         self.assertEqual(query["access_type"], ["offline"])
         self.assertEqual(query["prompt"], ["consent"])
+        self.assertEqual(query["redirect_uri"], [redirect_uri])
         with client.session_transaction() as oauth_session:
             self.assertEqual(oauth_session["google_calendar_oauth_faculty_id"], faculty_id)
             self.assertTrue(oauth_session["google_calendar_oauth_state"])
@@ -4096,14 +4124,14 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         with patch.dict(os.environ, {
             "GOOGLE_CALENDAR_CLIENT_ID": "client-id.apps.googleusercontent.com",
             "GOOGLE_CALENDAR_CLIENT_SECRET": "client-secret",
-            "GOOGLE_CALENDAR_REDIRECT_URI": "http://localhost/api/faculty-portal/google-calendar/callback",
+            "GOOGLE_CALENDAR_REDIRECT_URI": "http://localhost/api/integrations/google-calendar/callback",
             "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY": token_key,
         }), patch("app.google_token_request", return_value={
             "access_token": "faculty-access-token",
             "expires_in": 3600,
         }), patch("app.urlopen", return_value=userinfo_response):
             response = client.get(
-                "/api/faculty-portal/google-calendar/callback"
+                "/api/integrations/google-calendar/callback"
                 "?state=expected-state&code=authorization-code"
             )
 

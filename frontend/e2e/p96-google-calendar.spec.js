@@ -82,6 +82,12 @@ test("faculty sees the real linked account, checks it, then unlinks it without l
   await expect(card.getByRole("button", { name: "Disconnect calendar" })).toBeVisible();
   await screenshots(page, "connected");
 
+  await page.setViewportSize({ width: 390, height: 844 });
+  const calendarBox = await card.boundingBox();
+  const weeklyHoursBox = await page.getByRole("heading", { name: "Weekly hours" }).boundingBox();
+  expect(calendarBox?.y, "the Calendar connection must precede the long availability forms on mobile").toBeLessThan(weeklyHoursBox?.y);
+  await page.setViewportSize({ width: 1366, height: 768 });
+
   await card.getByRole("button", { name: "Check calendar now" }).click();
   await expect(card).toContainText(/Last checked/i);
   expect(calls).toContain("POST");
