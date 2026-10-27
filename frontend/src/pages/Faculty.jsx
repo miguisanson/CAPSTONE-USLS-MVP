@@ -557,10 +557,10 @@ const HOUR_HEIGHT = 52;
 
 function WeeklyCalendar({ faculty }) {
   const calendarConnected = Boolean(faculty.calendar?.connected);
-  const events = useMemo(() => [
-    ...(faculty.upcoming_availability || []).map((event) => ({ ...event, title: "Available for defense", status: "available" })),
-    ...(faculty.calendar_events || []).filter((event) => event.source === "google_calendar"),
-  ], [faculty]);
+  const events = useMemo(
+    () => (faculty.calendar_events || []).filter((event) => event.source === "google_calendar"),
+    [faculty.calendar_events],
+  );
   const hasHours = (faculty.working_hours || []).some((item) => item.enabled);
   const hasAnything = hasHours || events.length > 0;
   const firstEventDate = events.length ? dateFromIso([...events].sort((a, b) => a.date.localeCompare(b.date))[0].date) : new Date();
@@ -583,7 +583,7 @@ function WeeklyCalendar({ faculty }) {
           <p className="meta mt-1">
             {calendarConnected
               ? "Weekly hours the faculty member entered, plus live Google Calendar busy periods."
-              : "Weekly hours and available dates the faculty member entered. Nothing is assumed."}
+              : "Weekly hours the faculty member entered. Nothing is assumed."}
           </p>
         </div>
         {hasAnything && <div className="flex items-center gap-1.5">
@@ -605,7 +605,6 @@ function WeeklyCalendar({ faculty }) {
         <p className="text-sm font-semibold text-slate-700">{formatWeekRange(weekStart, weekEnd)}</p>
         <div className="flex flex-wrap gap-3 text-2xs font-medium text-slate-500">
           <Legend color="border-brand-300 bg-brand-50" label="Weekly hours entered" />
-          <Legend color="border-brand-600 bg-brand-500" label="Available slot" />
           <Legend color="border-blue-600 bg-blue-500" label="Blocked / busy" />
         </div>
       </div>
@@ -654,8 +653,7 @@ function CalendarBlock({ event, index = 0 }) {
   const top = ((visibleStart - CALENDAR_START_HOUR * 60) / 60) * HOUR_HEIGHT;
   const height = Math.max(22, ((visibleEnd - visibleStart) / 60) * HOUR_HEIGHT);
   const isWorking = event.status === "working";
-  const isAvailable = event.status === "available";
-  const color = isWorking ? "border-brand-300 bg-brand-50/70 text-brand-800" : isAvailable ? "border-brand-600 bg-brand-500 text-white" : "border-blue-600 bg-blue-500 text-white";
+  const color = isWorking ? "border-brand-300 bg-brand-50/70 text-brand-800" : "border-blue-600 bg-blue-500 text-white";
   return (
     <div className={`absolute overflow-hidden rounded-md border px-1.5 py-1 text-2xs ${isWorking ? "z-0" : "z-10"} ${color}`} style={{ top, height, left: isWorking ? 4 : 7 + (index % 2) * 4, right: isWorking ? 4 : 7 }} title={`${event.title}: ${event.start}–${event.end}`}>
       <p className="truncate font-semibold">{event.title}</p>

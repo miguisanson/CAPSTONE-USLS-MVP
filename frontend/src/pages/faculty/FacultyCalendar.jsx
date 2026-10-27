@@ -69,46 +69,51 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
     }
   }
 
+  const connectionStatus = connected ? "Connected" : previewOpened ? "Integration preview opened" : "Not connected";
+
   return (
-    <section ref={sectionRef} className="rounded-xl border border-brand-200 bg-brand-50 p-3" aria-label="Google Calendar connection">
-      <div className="flex items-start gap-2.5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-brand-700 ring-1 ring-brand-100">
-          <CalendarCheck2 className="h-5 w-5" aria-hidden="true" />
+    <section ref={sectionRef} className="card p-3" aria-label="Google Calendar connection">
+      <div className="flex items-start gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+          <CalendarCheck2 className="h-4 w-4" aria-hidden="true" />
         </span>
-        <div className="min-w-0">
-          <p className="card-title">Google Calendar</p>
-          <p className={`mt-0.5 text-xs font-semibold ${connected || previewOpened ? "text-brand-700" : "text-slate-500"}`}>
-            {connected ? "Connected" : previewOpened ? "Integration preview opened" : "Not connected"}
-          </p>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="card-title">Google Calendar</p>
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-2xs font-semibold ${connected || previewOpened ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-600"}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${connected || previewOpened ? "bg-brand-500" : "bg-slate-400"}`} aria-hidden="true" />
+              {connectionStatus}
+            </span>
+          </div>
           {connected && calendar?.connected_email && (
-            <p className="meta mt-0.5 truncate" title={calendar.connected_email}>{calendar.connected_email}</p>
+            <p className="mt-1 truncate text-xs font-medium text-slate-700" title={calendar.connected_email}>{calendar.connected_email}</p>
           )}
           {connected && (
-            <p className="meta mt-0.5">
+            <p className="mt-0.5 text-2xs text-slate-500">
               Last checked: {calendar?.last_synced_at ? formatDateTime(calendar.last_synced_at) : "Not checked yet"}
             </p>
           )}
         </div>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-slate-600">
+      <p className="mt-3 text-xs leading-relaxed text-slate-600">
         {connected
-          ? "Google busy periods remove conflicts from your entered hours. Defenses scheduled in the system are also kept blocked on this Google Calendar."
-          : "Connect once to block Google conflicts in defense scheduling and add system-scheduled defenses to this Google Calendar."}
+          ? "Busy times prevent scheduling conflicts. New defense schedules are added to this calendar automatically."
+          : "Connect once to check busy times and add new defense schedules automatically."}
       </p>
       {connected ? (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-          <Button data-connect="" icon={CalendarCheck2} loading={operation === "connect"} disabled={Boolean(operation)} onClick={connectCalendar}>
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+          <Button data-connect="" variant="secondary" size="sm" icon={CalendarCheck2} loading={operation === "connect"} disabled={Boolean(operation)} onClick={connectCalendar}>
             Reconnect calendar
           </Button>
-          <Button variant="secondary" icon={RefreshCw} loading={operation === "sync"} disabled={Boolean(operation)} onClick={syncCalendar}>
+          <Button size="sm" icon={RefreshCw} loading={operation === "sync"} disabled={Boolean(operation)} onClick={syncCalendar}>
             Check calendar now
           </Button>
-          <Button variant="danger" icon={CalendarX2} disabled={Boolean(operation)} onClick={() => setDisconnectOpen(true)} className="sm:col-span-2 lg:col-span-1 xl:col-span-2">
+          <Button variant="danger" size="sm" icon={CalendarX2} disabled={Boolean(operation)} onClick={() => setDisconnectOpen(true)} className="sm:col-span-2 xl:col-span-1 2xl:col-span-2">
             Disconnect calendar
           </Button>
         </div>
       ) : (
-        <Button data-connect="" icon={CalendarCheck2} loading={operation === "connect"} onClick={connectCalendar} className="mt-3 w-full">
+        <Button data-connect="" size="sm" icon={CalendarCheck2} loading={operation === "connect"} onClick={connectCalendar} className="mt-3 w-full">
           Connect Google Calendar
         </Button>
       )}

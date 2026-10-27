@@ -234,17 +234,16 @@ export default function CalendarPage({ scope = "staff", title, description, embe
         />
       )}
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
-      {connectionPanel}
       {!isFaculty && <Card><FilterBar filters={filters} options={payload?.filters || {}} onChange={setFilters} /></Card>}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-600">
-        <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={showDeadlines} onChange={(e) => setShowDeadlines(e.target.checked)} />Deadlines</label>
-        {isFaculty && <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={showAvailability} onChange={(e) => setShowAvailability(e.target.checked)} />My availability</label>}
-        {isFaculty && <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={showBusy} onChange={(e) => setShowBusy(e.target.checked)} />Google busy times</label>}
-        {payload?.busy_status && <span className="font-normal text-slate-500">{payload.busy_status}</span>}
-      </div>
-      <CalendarLegend showAvailability={isFaculty && showAvailability} showBusy={isFaculty && showBusy} />
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-8">
+        <div className="order-2 min-w-0 space-y-3 xl:order-1 xl:col-span-8">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-600">
+            <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={showDeadlines} onChange={(e) => setShowDeadlines(e.target.checked)} />Deadlines</label>
+            {isFaculty && <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={showAvailability} onChange={(e) => setShowAvailability(e.target.checked)} />My availability</label>}
+            {isFaculty && <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={showBusy} onChange={(e) => setShowBusy(e.target.checked)} />Google busy times</label>}
+            {payload?.busy_status && <span className="font-normal text-slate-500">{payload.busy_status}</span>}
+          </div>
+          <CalendarLegend showAvailability={isFaculty && showAvailability} showBusy={isFaculty && showBusy} />
           <CalendarView
             events={events}
             deadlines={deadlines}
@@ -261,7 +260,9 @@ export default function CalendarPage({ scope = "staff", title, description, embe
             loading={loading}
           />
         </div>
-        <div className="space-y-5 xl:col-span-4">
+        <div className="contents xl:order-2 xl:col-span-4 xl:block">
+          {isFaculty && connectionPanel && <div className="order-1 xl:mb-5">{connectionPanel}</div>}
+          <div className="order-3 space-y-5">
           <DetailPanel selected={selected} scope={scope} onClose={() => setSelected(null)} onChanged={() => { setSelected(null); setReload((n) => n + 1); }} />
           {attention.length > 0 && (
             <Card>
@@ -280,7 +281,8 @@ export default function CalendarPage({ scope = "staff", title, description, embe
               </ul>
             </Card>
           )}
-          <CalendarFeedCard />
+            {!isFaculty && <CalendarFeedCard />}
+          </div>
         </div>
       </div>
     </div>
