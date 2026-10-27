@@ -712,9 +712,8 @@ test.describe("Calendar page", () => {
   test.describe("faculty: My Calendar", () => {
     test.use({ storageState: authFile("faculty"), viewport: { width: 1366, height: 768 } });
 
-    test("own layers, 'I cannot attend' opens a reason form, and the private link can be renewed or turned off (asks first)", async ({ page }) => {
+    test("own layers, 'I cannot attend' opens a reason form, and the private subscription card is replaced", async ({ page }) => {
       await mockGet(page, /\/api\/calendar(\?|$)/, { ...CALENDAR, events: [{ ...EVENT, status: "Scheduled", attention: [] }], busy_status: "Google Calendar is not connected." });
-      await mockGet(page, /\/api\/calendar-feed/, { feed: { absolute_url: "http://127.0.0.1/feed/spec-token.ics", last_used_at: null } });
       await page.goto("/faculty-portal/calendar");
       await expect(page.getByRole("heading", { level: 1, name: "My Calendar" })).toBeVisible();
       await expect(main(page).getByRole("checkbox", { name: "My availability" })).toBeChecked();
@@ -738,21 +737,9 @@ test.describe("Calendar page", () => {
       await details.getByRole("button", { name: "Cancel" }).click();
       await expect(details.getByRole("button", { name: "I cannot attend this defense" })).toBeVisible();
 
-      // the private link: shown, copyable; both actions ask first
-      const feed = main(page).locator(".card", { has: page.getByRole("heading", { name: "Subscribe to this calendar" }) });
-      await expect(feed.getByLabel("Your private link")).toHaveValue("http://127.0.0.1/feed/spec-token.ics");
-      await expect(feed).toContainText("Not read yet.");
-      await expect(feed.getByRole("button", { name: "Copy link" })).toBeVisible();
-      await feed.getByRole("button", { name: /New link/ }).click();
-      const dialog = page.getByRole("dialog");
-      await expect(dialog.getByRole("heading", { name: "Make a new private link?" })).toBeVisible();
-      await expect(dialog).toContainText("The current link stops working.");
-      await dialog.getByRole("button", { name: "Cancel" }).click();
-      await expect(page.getByRole("dialog")).toHaveCount(0);
-      await feed.getByRole("button", { name: /Turn off/ }).click();
-      await expect(page.getByRole("dialog").getByRole("heading", { name: "Turn off the private link?" })).toBeVisible();
-      await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
-      await expect(page.getByRole("dialog")).toHaveCount(0);
+      // Faculty use the Google Calendar connection card here; private subscription links remain on other calendar pages.
+      await expect(main(page).getByRole("region", { name: "Google Calendar connection" })).toBeVisible();
+      await expect(main(page).getByRole("heading", { name: "Subscribe to this calendar" })).toHaveCount(0);
       await shotAll(page, "calendar-faculty");
     });
   });

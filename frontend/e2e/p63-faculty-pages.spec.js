@@ -196,6 +196,10 @@ test.describe("Faculty profiles (GS staff)", () => {
     await dialog.getByRole("button", { name: "Previous week" }).click();
     await expect(range).toHaveText(before);
     await shotBoth(page, "faculty-profile-calendar", { full: false });
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: join(SHOTS, "faculty-profile-calendar-1920.png"), fullPage: false });
+    await page.setViewportSize({ width: 1366, height: 768 });
 
     await dialog.getByRole("button", { name: "Close faculty profile" }).click();
     await expect(dialog).toBeHidden();
