@@ -84,6 +84,10 @@ test("faculty sees the real linked account, checks it, then unlinks it without l
   await expect(card.getByRole("button", { name: "Reconnect calendar" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Check calendar now" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Disconnect calendar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Subscribe to this calendar" })).toHaveCount(0);
+  const desktopCardBox = await card.boundingBox();
+  expect(desktopCardBox?.x, "the connection card replaces the right-side subscription card").toBeGreaterThan(900);
+  expect(desktopCardBox?.width, "the connection card stays compact in the sidebar").toBeLessThan(450);
   await screenshots(page, "connected");
 
   await page.setViewportSize({ width: 390, height: 844 });

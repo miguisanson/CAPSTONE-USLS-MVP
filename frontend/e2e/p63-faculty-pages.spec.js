@@ -187,7 +187,9 @@ test.describe("Faculty profiles (GS staff)", () => {
     // The weekly calendar: week buttons move the week range.
     const range = dialog.getByText(/^[A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+, \d{4}$/);
     await expect(range).toBeVisible();
-    for (const legend of ["Weekly hours entered", "Available slot", "Blocked / busy"]) await expect(dialog.getByText(legend)).toBeVisible();
+    for (const legend of ["Weekly hours entered", "Blocked / busy"]) await expect(dialog.getByText(legend)).toBeVisible();
+    await expect(dialog.getByText("Available slot", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText("Available for defense", { exact: true })).toHaveCount(0);
     const before = await range.innerText();
     await dialog.getByRole("button", { name: "Next week" }).click();
     await expect(range).not.toHaveText(before);
