@@ -5,7 +5,8 @@
 - **Branch:** `v6.0-natalie`; version 5.3 is explicitly out of scope.
 - **Owner request:** remove the redundant dark-green "Available for defense" blocks from the GS staff faculty-profile calendar; keep entered weekly-hours shading and Google busy blocks. Move the faculty Google Calendar connection UI into the My Calendar sidebar, make it compact and readable, and replace the faculty-only "Subscribe to this calendar" card.
 - **Test-first evidence:** updated `p63-faculty-pages.spec.js` to require no "Available slot" legend or "Available for defense" blocks, and `p96-google-calendar.spec.js` to require the connection card in the compact right sidebar with no subscription card. The targeted browser run reached both intended failures (`p63` profile case and `p96` connection case); its cases completed before the known Windows teardown hang was stopped.
-- **Exact next action:** hand the fixed tests to one frontend implementer packet; review the diff, rerun the targeted Playwright checks, inspect 1366/1920/390 screenshots, then run the frontend build and strict UI gate.
+- **Implementation packet:** one frontend implementer is working on branch `pkt/v6-calendar-ui` in `C:/Users/mendo/AppData/Local/Temp/CAPSTONE-USLS-MVP-wt-v6-calendar-ui`; allowed implementation files are `Faculty.jsx`, `CalendarPage.jsx`, and `FacultyCalendar.jsx`, and the fixed tests may not be changed.
+- **Exact next action:** review the packet diff, rerun the targeted Playwright checks, inspect 1366/1920/390 screenshots, then run the frontend build and strict UI gate.
 
 ## ACTIVE RUN UPDATE (2026-10-27) — two-way Google Calendar complete
 
