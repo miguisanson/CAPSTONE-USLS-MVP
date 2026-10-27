@@ -1,12 +1,14 @@
 # State
 
-## ACTIVE RUN UPDATE (2026-10-27) - faculty calendar UI refinement in progress
+## ACTIVE RUN UPDATE (2026-10-27) - faculty calendar UI refinement complete
 
-- **Branch:** `v6.0-natalie`; version 5.3 is explicitly out of scope.
-- **Owner request:** remove the redundant dark-green "Available for defense" blocks from the GS staff faculty-profile calendar; keep entered weekly-hours shading and Google busy blocks. Move the faculty Google Calendar connection UI into the My Calendar sidebar, make it compact and readable, and replace the faculty-only "Subscribe to this calendar" card.
-- **Test-first evidence:** updated `p63-faculty-pages.spec.js` to require no "Available slot" legend or "Available for defense" blocks, and `p96-google-calendar.spec.js` to require the connection card in the compact right sidebar with no subscription card. The targeted browser run reached both intended failures (`p63` profile case and `p96` connection case); its cases completed before the known Windows teardown hang was stopped.
-- **Implementation packet:** one frontend implementer is working on branch `pkt/v6-calendar-ui` in `C:/Users/mendo/AppData/Local/Temp/CAPSTONE-USLS-MVP-wt-v6-calendar-ui`; allowed implementation files are `Faculty.jsx`, `CalendarPage.jsx`, and `FacultyCalendar.jsx`, and the fixed tests may not be changed.
-- **Exact next action:** review the packet diff, rerun the targeted Playwright checks, inspect 1366/1920/390 screenshots, then run the frontend build and strict UI gate.
+- **Branch and scope:** `v6.0-natalie` only; version 5.3 was not touched. This packet changed frontend presentation and Playwright expectations only. No backend, database, OAuth, calendar-sync, availability, or defense-scheduling behavior changed.
+- **Owner request completed:** the GS staff faculty-profile calendar no longer draws redundant dark-green "Available for defense" blocks or the matching legend; pale entered weekly-hours shading and blue Google busy blocks remain. Faculty My Calendar now uses a compact Google Calendar connection card in the responsive side column and no longer shows the faculty subscription card. Google connection controls remain absent from the faculty dashboard and My Availability.
+- **Implementation:** `frontend/src/pages/Faculty.jsx`, `frontend/src/components/calendar/CalendarPage.jsx`, and `frontend/src/pages/faculty/FacultyCalendar.jsx`. The implementation packet was committed as `900aec6` and integrated on `v6.0-natalie` as `1d842bd`.
+- **Test-first evidence:** `p63-faculty-pages.spec.js` and `p96-google-calendar.spec.js` first failed on the old redundant availability blocks/full-width connection panel/subscription card. The updated same-kind faculty walkthroughs in `p51-faculty.spec.js` and `p87-calendar.spec.js` now pin the single My Calendar management surface and remove superseded private-link/availability-page expectations.
+- **Verification:** production frontend build PASS; strict UI check PASS with every metric zero; targeted `p63`, `p87`, `p96`, and all request-relevant `p51` checks PASS. The 1366, 1920, and 390 px screenshots were opened and reviewed without overflow, clipping, or hierarchy defects. Targeted Playwright runs reached completed case output but required Ctrl+C after the known Windows teardown hang.
+- **Broader-run note:** a full `npm run e2e` attempt was stopped after 150/611 cases because legacy assertions and external-resource blocking produced unrelated failures (`ERR_NETWORK_ACCESS_DENIED` and mutable seeded-date expectations). All request-relevant cases were rerun against a fresh disposable database and passed; the one remaining failure in that focused p51 invocation was the pre-existing hard-coded defense-date check, outside this UI packet.
+- **Next action:** none for this request. Keep the Google Calendar integration controls on faculty My Calendar if the surrounding calendar UI changes later.
 
 ## ACTIVE RUN UPDATE (2026-10-27) — two-way Google Calendar complete
 

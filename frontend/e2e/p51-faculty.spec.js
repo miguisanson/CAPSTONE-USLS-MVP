@@ -116,80 +116,31 @@ test.describe("Dashboard", () => {
     }
     await expect(page.getByRole("heading", { name: "Upcoming defenses" })).toBeVisible();
     await expect(page.getByRole("link", { name: "View schedule" })).toHaveAttribute("href", "/faculty-portal/defenses");
-    // I-085: the OAuth card is not the home's biggest element; the home only links to the availability page.
+    // Google Calendar is managed from one place only: My Calendar.
     await expect(page.getByRole("region", { name: "Google Calendar connection" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Connect Google Calendar" })).toHaveCount(0);
-    await expect(main(page).getByRole("link", { name: "Calendar connection" })).toHaveAttribute("href", "/faculty-portal/availability");
+    await expect(main(page).getByRole("link", { name: "Calendar connection" })).toHaveAttribute("href", "/faculty-portal/calendar");
     await shots(page, "dashboard");
   });
 
   test("calendar notice from the Google callback", async ({ page }) => {
-    await page.goto("/faculty-portal?calendar=connected");
-    await expect(page.getByRole("status").filter({ hasText: "Google Calendar connected. Its busy periods are now used for defense scheduling." })).toBeVisible();
-    await page.goto("/faculty-portal?calendar=cancelled");
+    await page.goto("/faculty-portal/calendar?calendar=connected");
+    await expect(page.getByRole("status").filter({ hasText: "Google Calendar connected. Busy periods now prevent conflicts, and system-scheduled defenses will be kept on this calendar." })).toBeVisible();
+    await page.goto("/faculty-portal/calendar?calendar=cancelled");
     await expect(page.getByRole("status").filter({ hasText: "Google Calendar connection was cancelled." })).toBeVisible();
-    await page.goto("/faculty-portal?calendar=error");
+    await page.goto("/faculty-portal/calendar?calendar=error");
     await expect(page.getByRole("status").filter({ hasText: "Google Calendar could not be connected. Please try again." })).toBeVisible();
-    await shots(page, "dashboard-calendar-notice");
+    await shots(page, "calendar-notice");
   });
 
-  test("Google Calendar preview dialog (on My Availability): content, focus, Tab trap, Escape, backdrop, Not now, open in a new tab", async ({ page, context }) => {
+  test("Google Calendar controls appear only on My Calendar", async ({ page }) => {
     await openFromSidebar(page, "My Availability", "My Availability");
-    const connect = page.getByRole("button", { name: "Connect Google Calendar" });
-    await connect.click();
-    const dialog = page.getByRole("dialog", { name: /Allow USLS Graduate School to use your calendar availability/ });
-    await expect(dialog).toBeVisible();
-    await expect(dialog).toHaveAttribute("aria-modal", "true");
-    await expect(dialog).toContainText("Integration preview");
-    await expect(dialog).toContainText("This previews the permission step faculty will complete when live Google OAuth is enabled.");
-    await expect(dialog).toContainText("How your calendar will be used");
-    await expect(dialog).toContainText("Demo-safe preview");
-    await expect(dialog).toContainText("Opening Google Calendar does not mark this account as connected");
-    expect(await dialog.locator("p.font-medium, [data-permission]").count()).toBeGreaterThanOrEqual(0);
-    await expect(dialog.getByRole("button", { name: "Close Google Calendar preview" })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Not now" })).toBeVisible();
-    const proceed = dialog.getByRole("button", { name: "Continue to Google Calendar" });
-    await expect(proceed).toBeFocused(); // the main action holds the focus when the dialog opens
-    await expect(page.locator("body")).toHaveCSS("overflow", "hidden"); // the page behind does not scroll
-    await shots(page, "dashboard-calendar-dialog", { full: false });
+    await expect(page.getByRole("region", { name: "Google Calendar connection" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Connect Google Calendar|Reconnect calendar|Check calendar now|Disconnect calendar/ })).toHaveCount(0);
 
-    // Tab and Shift+Tab stay inside the dialog.
-    for (let i = 0; i < 5; i++) {
-      await page.keyboard.press("Tab");
-      expect(await dialog.evaluate((el) => el.contains(document.activeElement)), `Tab ${i + 1} left the dialog`).toBe(true);
-    }
-    for (let i = 0; i < 5; i++) {
-      await page.keyboard.press("Shift+Tab");
-      expect(await dialog.evaluate((el) => el.contains(document.activeElement)), `Shift+Tab ${i + 1} left the dialog`).toBe(true);
-    }
-
-    // Escape closes it and the focus goes back to the button that opened it (added in P5.2: the old dialog lost it).
-    await page.keyboard.press("Escape");
-    await expect(dialog).toHaveCount(0);
-    await expect(connect).toBeFocused();
-    await expect(page.locator("body")).not.toHaveCSS("overflow", "hidden");
-
-    // A click on the backdrop closes it.
-    await connect.click();
-    await expect(dialog).toBeVisible();
-    await page.mouse.click(4, 400);
-    await expect(dialog).toHaveCount(0);
-
-    // "Not now" closes it; nothing is marked connected.
-    await connect.click();
-    await dialog.getByRole("button", { name: "Not now" }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(page.getByRole("region", { name: "Google Calendar connection" })).toContainText("Not connected");
-
-    // Continue opens Google Calendar in a new tab and the dialog says so; the card remembers it.
-    await connect.click();
-    const [popup] = await Promise.all([context.waitForEvent("page"), dialog.getByRole("button", { name: "Continue to Google Calendar" }).click()]);
-    await popup.close();
-    await expect(dialog.getByRole("status")).toContainText("Google Calendar opened in a new tab. Return here to continue the system demonstration.");
-    await expect(dialog.getByRole("button", { name: "Open Google Calendar again" })).toBeVisible();
-    await dialog.getByRole("button", { name: "Close Google Calendar preview" }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(page.getByRole("region", { name: "Google Calendar connection" })).toContainText("Integration preview opened");
+    await openFromSidebar(page, "My Calendar", "My Calendar");
+    await expect(page.getByRole("region", { name: "Google Calendar connection" })).toBeVisible();
+    await shots(page, "calendar-connection-only-surface");
   });
 });
 
@@ -627,7 +578,7 @@ test("My Calendar: header and the shared calendar view", async ({ page }) => {
 
 // ================================================================================================ Availability
 test.describe("My Availability", () => {
-  test("page: header, notice, weekly hours, specific dates form, requests, calendar card, other windows", async ({ page }) => {
+  test("page: header, notice, weekly hours, specific dates form, requests, calendar link, other windows", async ({ page }) => {
     await openFromSidebar(page, "My Availability", "My Availability");
     await expect(page.getByText("Tell the Graduate School when you can sit in a defense. All times are Philippine time.")).toBeVisible();
     await expect(page.getByRole("link", { name: "See your calendar" })).toHaveAttribute("href", "/faculty-portal/calendar");
@@ -656,7 +607,7 @@ test.describe("My Availability", () => {
     await expect(page.getByText("Dates that have passed are not shown.")).toBeVisible();
 
     await expect(page.getByRole("heading", { name: "Requests from the Graduate School" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Google Calendar connection" })).toContainText("Not connected");
+    await expect(page.getByRole("region", { name: "Google Calendar connection" })).toHaveCount(0);
     const windows = page.getByRole("heading", { name: "Other open windows" });
     await expect(windows).toBeVisible();
     await expect(main(page).getByText(/\d{1,2}:\d{2} (AM|PM) – \d{1,2}:\d{2} (AM|PM)/).first()).toBeVisible();
@@ -745,13 +696,11 @@ test.describe("My Availability", () => {
     await expect(page.getByRole("listitem").filter({ hasText: "P51 pin: out of town" })).toHaveCount(0);
   });
 
-  test("calendar card on this page opens the same preview dialog", async ({ page }) => {
+  test("calendar management stays off this page and links to My Calendar", async ({ page }) => {
     await openFromSidebar(page, "My Availability", "My Availability");
-    await page.getByRole("button", { name: "Connect Google Calendar" }).click();
-    const dialog = page.getByRole("dialog", { name: /Allow USLS Graduate School to use your calendar availability/ });
-    await expect(dialog).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Google Calendar connection" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Connect Google Calendar|Reconnect calendar|Check calendar now|Disconnect calendar/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "See your calendar" })).toHaveAttribute("href", "/faculty-portal/calendar");
   });
 
   test("open Graduate School requests (mocked): shown, answered, other windows hidden when none", async ({ page }) => {
