@@ -11850,7 +11850,7 @@ ASSISTANT_OFFLINE_MODES = {
 }
 
 
-def _assistant_source(mode: str, intent_ai_used: bool = False) -> dict:
+def _assistant_source(mode: str, intent_ai_used: bool = False, role: str = "") -> dict:
     sources = {
         "database-rules": (
             "Live record · Verified rules",
@@ -11907,7 +11907,11 @@ def _assistant_source(mode: str, intent_ai_used: bool = False) -> dict:
     ai_configured = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY"))
     note = None
     if not ai_configured and mode in {"document-rag-local", "policy-not-found", "student-document-rag-local"}:
-        note = "No AI key is set, so answers are quoted straight from the documents. Add a Gemini key for fuller, reworded answers."
+        if role == "admin":  # only the administrator can add the key (I-179)
+            note = "No AI key is set, so answers are quoted straight from the documents. Add a Gemini key for fuller, reworded answers."
+        else:
+            note = "The assistant is answering from the policy documents without AI right now."
+            detail = detail.replace("; add a Gemini key for fuller, reworded answers.", ".")
     offline = mode in ASSISTANT_OFFLINE_MODES
     return {
         "label": label, "detail": detail, "ai_used": ai_used, "ai_configured": ai_configured, "note": note,
@@ -12278,7 +12282,7 @@ def personal_queue_response(question: str, account: UserAccount) -> dict:
     answer, mode = personal_answer(
         question, ROLE_LABELS.get(account.role, "user").lower(), queue_text(queue), queue_answer(queue), has_data,
     )
-    source = _assistant_source(mode)
+    source = _assistant_source(mode, role=account.role)
     if not has_data:  # nothing to explain, so this is not a fallback
         source.update({"offline": False, "badge": None})
     return {
@@ -12383,7 +12387,7 @@ def generate_answer(
         "answer": answer,
         "structured": structured,
         "mode": mode,
-        "source": _assistant_source(mode, intent_ai_used),
+        "source": _assistant_source(mode, intent_ai_used, role or (account.role if account else "")),
         "citations": rag_citations or (
             policy_citations if mode not in {"database-rules", "policy-not-found"} else []
         ),
@@ -12496,7 +12500,7 @@ def generate_student_answer(question: str, student: Student) -> dict:
             "student-document-not-found": "policy-not-found",
             "student-record-ai": "record-ai",
             "student-fast": "record-offline",
-        }.get(mode, mode)),
+        }.get(mode, mode), role="student"),
         "personal": personal,
         "citations": rag_citations or (
             [
@@ -32141,6 +32145,11 @@ PANEL_MATCHING_SOURCE_ITEMS = {
 }
 
 
+def panel_no_paper_message(gate: str) -> str:
+    noun = {"Form 4 - Proposal Defense Readiness": "proposal manuscript", "Final Defense": "final manuscript"}.get(gate, "concept paper")
+    return f"No paper on file yet — upload the {noun} to rank the panel."
+
+
 def panel_matching_body_text(text: str, research_title: str = "") -> str:
     title_key = identity_text(research_title)
     kept = []
@@ -32246,7 +32255,9 @@ def research_matching_profile(student: Student) -> dict:
     keywords = rag_payload.get("keywords") or extract_research_phrases(paper_text, 16)
     ready = len(analyzed_files) >= required_count and len(readable_files) >= required_count and ethics_ready
     blocked_reason = ""
-    if len(analyzed_files) < required_count:
+    if not analyzed_files:
+        blocked_reason = panel_no_paper_message(gate)
+    elif len(analyzed_files) < required_count:
         blocked_reason = f"Upload the required panel-matching source first: {', '.join(source_items)}."
     elif len(readable_files) < required_count:
         blocked_reason = "Panel matching requires readable PDF body text from the uploaded manuscript source."
@@ -35359,6 +35370,14 @@ def panel_matching_result(student: Student, profile: dict | None = None) -> dict
     """Score and rank faculty for this student's paper and explain every score."""
     profile = profile or research_matching_profile(student)
     paper_text = (profile.get("query_text") or "").strip()
+    if not paper_text:
+        # Availability and workload alone would give every student without a paper the same ranking (I-145).
+        message = profile.get("blocked_reason") or panel_no_paper_message(profile.get("gate"))
+        return {
+            "rows": [], "excluded": [], "method": "tfidf", "method_label": PANEL_MATCH_METHOD_LABELS["tfidf"],
+            "method_note": message, "weights": dict(PANEL_MATCH_WEIGHTS), "suggested_panel": [], "composition": None,
+            "no_paper": True, "message": message,
+        }
     advisers = student_advisers(student)
     profiles = {item["id"]: item for item in faculty_matching_profiles()}
     tfidf = panel_tfidf_similarities(paper_text, {fid: item["evidence"] for fid, item in profiles.items()})
@@ -36257,6 +36276,52 @@ def _create_panel_demo_student(spec: dict, program: Program, adviser: Faculty) -
     _seed_panel_demo_research(student, spec, adviser)
     sync_research_progress(student)
     return student
+
+
+def seed_roster_research_papers() -> int:
+    """Give every roster student in a research stage a research title and three concept papers of their own (I-145).
+
+    Without them every such student had the same Panel Matching ranking (the panel's "all 4 are 72/100"). A
+    student takes the topic at their position in their program's list and the next two as the other two papers;
+    the Form 1 endorsement is on file, as for the Panel Matching demo students. Students who already have a
+    research case (the personas and the demo students) keep theirs. Returns the number of students given papers.
+    """
+    from panel_demo_data import ROSTER_RESEARCH_TOPICS
+
+    title_gate = "Form 1 - Title Defense"
+    taken: Counter = Counter()
+    made = 0
+    students = (
+        Student.query.filter(Student.current_stage.in_(SEED_RESEARCH_STAGES[:-1]))
+        .order_by(Student.student_number).all()
+    )
+    for student in students:
+        topics = ROSTER_RESEARCH_TOPICS.get(student.program.code)
+        if not topics or ResearchCase.query.filter_by(student_id=student.id).first():
+            continue
+        position = taken[student.program.code]
+        taken[student.program.code] += 1
+        papers = [topics[(position + offset) % len(topics)] for offset in range(3)]
+        db.session.add(ResearchCase(
+            student_id=student.id, case_type=research_case_type(student), title=papers[0][0],
+            current_gate=title_gate, status="Missing Requirements", adviser_name=student.adviser_name,
+        ))
+        db.session.flush()
+        complete = student.current_stage != "Proposal Development"  # past the title stage: the papers are accepted
+        _panel_demo_evidence(
+            student, title_gate, "Form 1 - Application for Title Defense", 1, "Form 1 Application for Title Defense",
+            f"Application for Title Defense submitted by {student.name} ({student.program.code}) with three concept "
+            "papers. Demonstration document.", complete,
+        )
+        for number, (paper_title, paper_body) in enumerate(papers, start=1):
+            _panel_demo_evidence(student, title_gate, "Three concept papers", number, paper_title, paper_body, complete)
+        db.session.add(Form1Endorsement(
+            student_id=student.id, coordinator_name="Academic Coordinator (demo seed)", signature_data="demo-seed",
+            status="Endorsed", endorsed_at=now_utc() - timedelta(days=30),
+        ))
+        made += 1
+    db.session.flush()
+    return made
 
 
 def ensure_upcoming_defense_demo() -> int:
@@ -39243,6 +39308,7 @@ def build_demo_database() -> dict:
         sync_automatic_awol_statuses(commit=False)
         db.session.commit()
         sync_leave_cases(commit=True)  # dates move leave cases along
+        seed_roster_research_papers()  # every research-stage student has a paper of their own (I-145)
         ensure_onboarding_reviews()
         generate_reminders()  # the reminders that are due today (a page view no longer makes them)
         db.session.commit()

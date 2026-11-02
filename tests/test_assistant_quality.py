@@ -275,10 +275,58 @@ class SearchAndAnswerTests(EvalBase):
                 self.assertEqual(payload["citations"], [])
 
     def test_badge_says_keyword_search_and_notes_the_missing_key(self):
-        source = self.ask("Until when can a student withdraw a subject?")["source"]
+        # I-179: only the administrator can add the key, so only the administrator is told about it.
+        with app.app_context():
+            source = appmod.generate_answer("Until when can a student withdraw a subject?", policy_only=True, role="admin")["source"]
         self.assertEqual(source["label"], "Answered from the documents (keyword search)")
         self.assertFalse(source["ai_used"])
         self.assertIn("No AI key", source["note"])
+        self.assertIn("Gemini key", source["detail"])
+
+    def test_non_admin_roles_never_read_the_developer_key_text(self):
+        plain = "The assistant is answering from the policy documents without AI right now."
+        for role in ("dean", "faculty", "academic_coordinator", "research_coordinator", "staff"):
+            with self.subTest(role=role), app.app_context():
+                source = appmod.generate_answer("Until when can a student withdraw a subject?", policy_only=True, role=role)["source"]
+                self.assertEqual(source["note"], plain)
+                self.assertNotRegex(source["note"] + source["detail"], r"(?i)gemini key|api key|No AI key")
+
+    def test_the_student_assistant_never_reads_the_developer_key_text(self):
+        with app.app_context():
+            program = appmod.Program(code="MAED", name="Master of Arts in Education", college="Education")
+            db.session.add(program)
+            db.session.flush()
+            student = appmod.Student(
+                student_number="9900001", first_name="Test", last_name="Student", email="t@student.test",
+                program_id=program.id, entry_year=2025, academic_year_entry="2025-2026", year_level="Year 1",
+                current_stage="Coursework", standing="Active", enrollment_tag="Enrolled",
+                comprehensive_exam_status="Not Taken", risk_level="On Track",
+            )
+            db.session.add(student)
+            db.session.commit()
+            source = appmod.generate_student_answer("Until when can a student withdraw a subject?", student)["source"]
+        self.assertEqual(source["note"], "The assistant is answering from the policy documents without AI right now.")
+        self.assertNotRegex(source["note"] + source["detail"], r"(?i)gemini key|api key|No AI key")
+
+    def test_withdraw_a_subject_wording_finds_the_withdrawal_rule(self):
+        # I-175: "drop" is what students say; the Handbook calls it withdrawal (p. 49).
+        with app.app_context():
+            for question in ("Can I drop a subject?", "How do I drop a subject?", "Until when can I drop a course?"):
+                with self.subTest(question=question):
+                    pages = {chunk.get("page") for chunk in appmod.search_policy_passages(question, 3)}
+                    self.assertIn(49, pages, pages)
+                    payload = appmod.generate_answer(question, policy_only=True, role="dean")
+                    self.assertTrue(any(c.get("page") == 49 for c in payload["citations"]), payload["citations"])
+
+    def test_stop_coming_to_class_finds_the_awol_rule(self):
+        # I-175: this question used to be answered "not covered" although the Handbook has an AWOL rule.
+        with app.app_context():
+            for question in ("What happens if I stop coming to class?", "What if I stop showing up to my classes?"):
+                with self.subTest(question=question):
+                    payload = appmod.generate_answer(question, policy_only=True, role="dean")
+                    self.assertNotEqual(payload["mode"], "policy-not-found", payload["answer"])
+                    cited = " ".join(f"{c.get('section', '')} {c.get('quote', '')}" for c in payload["citations"]).lower()
+                    self.assertTrue("awol" in cited or "absent without" in cited or "without leave" in cited, cited)
 
     def test_a_draft_document_never_outranks_the_handbook_for_the_same_rule(self):
         rule = "The leave may be approved for a period of one (1) year but may be renewed for at most another year."

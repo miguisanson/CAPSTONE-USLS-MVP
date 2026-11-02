@@ -587,7 +587,7 @@ _PHRASE_SYNONYMS: list[tuple[re.Pattern, list[str]]] = [
     (re.compile(r"\bgood standing\b|\bremain(?:ing)? in\b.*\b(?:program|school)\b"), ["retention", "weighted", "average"]),
     (re.compile(r"\bpass(?:ing)? (?:score|mark)\b|\bto pass\b|\bscore\b.*\bpass\b"), ["minimum", "score", "7.00"]),
     (re.compile(r"\b(?:come|coming|go|going) back\b|\breturning\b"), ["return", "intention", "enroll", "registrar"]),
-    (re.compile(r"\bstop(?:s|ped)? (?:attending|going)\b|\bnot (?:attending|enrolled)\b"), ["absence", "without", "leave", "awol"]),
+    (re.compile(r"\bstop(?:s|ped)? (?:attending|going|coming|showing up)\b|\bnot (?:attending|enrolled)\b"), ["absence", "without", "leave", "awol"]),
     (re.compile(r"\bwho (?:can|may|needs?|has) to enroll\b|\bwho needs\b"), ["finished", "coursework", "residence", "enroll"]),
     (re.compile(r"\bhow early\b|\bhow soon\b|\bhow far\b"), ["least", "before", "weeks", "days"]),
     (re.compile(r"\bhow many panel\b|\bpanel (?:members|composition|size)\b"), ["chair", "members", "specialist", "external"]),
@@ -601,13 +601,18 @@ _NUMBER_WORDS = {
 }
 
 
+# Students say "drop a subject"; the Handbook calls that withdrawal (3.1 Registration, p. 49), while its "dropped"
+# is the automatic 20%-absence rule. Asking for the withdrawal wording keeps the absence rule from taking the answer.
+_DROP_A_SUBJECT = re.compile(r"\bdrop(?:ping)?\s+(?:a|an|my|the|this|that|one)?\s*(subjects?|courses?)\b")
+
+
 class QueryTerms:
     """The question as weighted stems: its own words count fully, domain synonyms count half."""
 
     def __init__(self, question: str):
         self.question = question or ""
         lowered = self.question.lower()
-        sequence = terms(self.question)
+        sequence = terms(_DROP_A_SUBJECT.sub(r"withdraw \1", lowered))
         seen: set[str] = set()
         self.base = [t for t in sequence if not (t in seen or seen.add(t))]
         self.expanded: dict[str, float] = {}
