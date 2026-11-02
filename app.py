@@ -530,6 +530,7 @@ class Student(db.Model):
     withdrawal_applications = db.relationship("WithdrawalApplication", backref="student", lazy=True, cascade="all, delete-orphan")
     graduation_endorsements = db.relationship("GraduationEndorsement", backref="student", lazy=True, cascade="all, delete-orphan")
     workflow_messages = db.relationship("WorkflowMessage", backref="student", lazy=True, cascade="all, delete-orphan")
+    stage_events = db.relationship("StudentStageEvent", backref="student", lazy=True, cascade="all, delete-orphan")
 
     @property
     def name(self) -> str:
@@ -1699,6 +1700,41 @@ class TransactionLog(db.Model):
     reflected_in_aims = db.Column(db.Boolean, nullable=False, default=False)
     reflected_at = db.Column(db.DateTime)
     reflected_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+
+
+class StudentStageEvent(db.Model):
+    """One row each time a student's lifecycle stage really changes (reports spec B1, AD10).
+
+    The stage clock ("days in stage") is the days since the latest event into the current stage, so an
+    unrelated edit of the student never resets it. Written only by the two hooks below.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False, index=True)
+    from_stage = db.Column(db.String(60))  # None for the first event of a student
+    to_stage = db.Column(db.String(60), nullable=False)
+    changed_at = db.Column(db.DateTime, nullable=False, default=now_utc)
+
+
+@event.listens_for(Student, "after_insert")
+def _student_first_stage_event(mapper, connection, student):
+    connection.execute(StudentStageEvent.__table__.insert().values(
+        student_id=student.id, from_stage=None, to_stage=student.current_stage or "Admission", changed_at=now_utc(),
+    ))
+
+
+@event.listens_for(Student, "before_update")
+def _student_stage_change_event(mapper, connection, student):
+    """The one place the stage clock is written: any assignment to current_stage, wherever it happens."""
+    if not _sa_get_history(student, "current_stage").has_changes():
+        return
+    # An attribute expired by an earlier commit has no old value in memory, so ask the table (the UPDATE has not run yet).
+    old = connection.execute(
+        db.select(Student.__table__.c.current_stage).where(Student.__table__.c.id == student.id)
+    ).scalar()
+    if old != student.current_stage:
+        connection.execute(StudentStageEvent.__table__.insert().values(
+            student_id=student.id, from_stage=old, to_stage=student.current_stage, changed_at=now_utc(),
+        ))
 
 
 # ---------------------------------------------------------------------------
@@ -5127,6 +5163,32 @@ def workflow_actor_label(account: UserAccount) -> str:
 STALL_WARN_DAYS = 120
 STALL_HIGH_DAYS = 210
 
+def stage_entered_map(student_ids=None) -> dict:
+    """{(student_id, stage): when the student last moved into that stage}, from the stage events, in one query."""
+    query = StudentStageEvent.query.order_by(StudentStageEvent.changed_at, StudentStageEvent.id)
+    if student_ids is not None:
+        query = query.filter(StudentStageEvent.student_id.in_(list(student_ids)))
+    return {(e.student_id, e.to_stage): e.changed_at for e in query.all()}
+
+
+def stage_entered_at(student: Student, entered=None):
+    """When the student entered the stage they are in now. `entered` is an optional stage_entered_map()."""
+    if entered is None:
+        event_row = (
+            StudentStageEvent.query.filter_by(student_id=student.id, to_stage=student.current_stage)
+            .order_by(StudentStageEvent.changed_at.desc(), StudentStageEvent.id.desc()).first()
+        )
+        moment = event_row.changed_at if event_row else None
+    else:
+        moment = entered.get((student.id, student.current_stage))
+    return moment or student.created_at or now_utc()  # no event on record: the record's own start
+
+
+def stage_days(student: Student, entered=None) -> int:
+    """Days in the current stage: since the latest event into it, never reset by an unrelated edit."""
+    return max((now_utc() - stage_entered_at(student, entered)).days, 0)
+
+
 def student_indicators(student: Student) -> dict:
     """Computed indicators for one student (Table 13 in the proposal)."""
     audit = compute_course_audit(student)
@@ -5151,8 +5213,7 @@ def student_indicators(student: Student) -> dict:
     last_log = (
         TransactionLog.query.filter_by(student_id=student.id).order_by(TransactionLog.created_at.desc()).first()
     )
-    anchor = student.updated_at or student.created_at or now_utc()
-    days_in_stage = max((now_utc() - anchor).days, 0)
+    days_in_stage = stage_days(student)
     next_owner = (last_log.next_owner if last_log else None) or (open_tasks[0].owner_role if open_tasks else None)
     return {
         "stage": student.current_stage,
@@ -24418,7 +24479,7 @@ def report_at_risk(args) -> dict:
             .order_by(Task.due_at.asc())
             .first()
         )
-        last_update = (student.updated_at or student.created_at or now_utc()).date()
+        last_update = stage_entered_at(student).date()
         started = [overdue.due_at] if overdue else []
         if indicators["days_in_stage"] >= STALL_WARN_DAYS and student.current_stage != "Completed":
             started.append(last_update)
@@ -37914,6 +37975,33 @@ def spread_seed_history(today: date | None = None) -> int:
     return moved
 
 
+def seed_stage_events(today: date | None = None) -> int:
+    """Give every demo student one stage event, so the stage clock has something to count from (B1).
+
+    The seeders assign stages directly, so the hook wrote events stamped "now"; they are replaced here.
+    TransactionLog carries workflow statuses, not stages, so it cannot date a stage entry. Instead each
+    student gets a fixed dwell time (arithmetic on the id, no randomness): 5-104 days for most, 121-200
+    (yellow) for about one in twelve and over 210 (red) for about one in forty, so the stage reports
+    show every zone. Returns the number of events written.
+    """
+    today = today or date.today()
+    StudentStageEvent.query.delete()
+    count = 0
+    for student in Student.query.order_by(Student.id).all():
+        if student.id % 41 == 7:
+            dwell = 211 + student.id % 30
+        elif student.id % 12 == 5:
+            dwell = 121 + (student.id * 7) % 80
+        else:
+            dwell = 5 + (student.id * 37) % 100
+        moment = datetime.combine(today - timedelta(days=dwell), time(8, 0)) + timedelta(minutes=(student.id * 47) % 600)
+        db.session.add(StudentStageEvent(student_id=student.id, from_stage=None, to_stage=student.current_stage, changed_at=moment))
+        count += 1
+    db.session.commit()
+    ensure_delay_status_consistency()  # the stage clock feeds the risk level
+    return count
+
+
 def seed_bianca_mendoza_enrollment() -> None:
     """Give the official DBA roster student her current semester/account fixture."""
     student = Student.query.filter_by(student_number="2560052").first()
@@ -39312,7 +39400,8 @@ def build_demo_database() -> dict:
         ensure_onboarding_reviews()
         generate_reminders()  # the reminders that are due today (a page view no longer makes them)
         db.session.commit()
-        spread_seed_history()  # last, so nothing is stamped after it: history over the previous weeks
+        spread_seed_history()  # history over the previous weeks
+        seed_stage_events()  # last: the stage clock, and the risk levels that read it
         return sync_result
 
 
