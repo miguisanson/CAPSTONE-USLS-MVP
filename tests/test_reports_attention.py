@@ -3,11 +3,14 @@
 GET /api/reports/attention, /api/reports/stages, /api/reports/records-to-fix. Expected counts are worked out from the
 rows built here; the stage clock is set by the test (days in the current stage), never read back from the endpoint.
 """
+import io
 import unittest
 from datetime import timedelta
 
 from tests import reports_support  # noqa: F401  (sets the environment before app is imported)
 from tests.reports_support import TODAY, ReportsV2Base, db, make_student, set_stage_clock
+
+from openpyxl import load_workbook  # noqa: E402
 
 from app import (  # noqa: E402
     AdviserAppointment, Faculty, Program, ResearchCase, Task,
@@ -89,6 +92,30 @@ class AttentionTests(AttentionBase):
         self.assertEqual(sorted(r["student_id"] for r in payload["rows"]), self.ids_of("b3", "b7"))
 
 
+class ExportTests(AttentionBase):
+    """Excel and PDF carry exactly the rows on the screen (same helper as the five IM20 reports)."""
+
+    def sheet_rows(self, path, **params):
+        response = self.client().get(path, query_string={**params, "format": "xlsx"})
+        self.assertEqual(response.status_code, 200, response.data[:200])
+        sheet = load_workbook(io.BytesIO(response.data)).active
+        return sheet.max_row - 3  # title, filter note and header row come first
+
+    def test_excel_rows_equal_the_screen_rows(self):
+        for path, key in (("/api/reports/attention", "rows"), ("/api/reports/stages", "students")):
+            self.assertEqual(self.sheet_rows(path), len(self.get(path)[key]), path)
+        self.assertEqual(self.sheet_rows("/api/reports/attention", cause="overdue_tasks"), 2)
+        self.assertEqual(self.sheet_rows("/api/reports/summary/active", term="T-None"), len(self.get("/api/reports/summary/active", term="T-None")["rows"]))
+
+    def test_pdf_is_a_pdf(self):
+        response = self.client().get("/api/reports/attention", query_string={"format": "pdf"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data.startswith(b"%PDF"))
+
+    def test_an_unknown_format_is_refused(self):
+        self.assertEqual(self.client().get("/api/reports/attention", query_string={"format": "doc"}).status_code, 400)
+
+
 class StagesTests(AttentionBase):
     def test_per_stage_median_and_zones(self):
         payload = self.get("/api/reports/stages")
@@ -168,6 +195,11 @@ class RecordsToFixTests(ReportsV2Base):
     def test_a_missing_filter_lists_one_bar(self):
         rows = self.get("/api/reports/records-to-fix", missing="adviser")["rows"]
         self.assertEqual(sorted(r["student_id"] for r in rows), sorted(self.ids[n] for n in ("r3", "r4")))
+
+    def test_excel_rows_equal_the_screen_rows(self):
+        response = self.client().get("/api/reports/records-to-fix", query_string={"format": "xlsx"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(load_workbook(io.BytesIO(response.data)).active.max_row - 3, 3)
 
     def test_who_may_open_the_three_lists(self):
         for path in ("/api/reports/attention", "/api/reports/stages", "/api/reports/records-to-fix"):

@@ -14807,17 +14807,35 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/reports/attention")
     @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def reports_attention():
-        return jsonify(report_attention(request.args))
+        payload = report_attention(request.args)
+        return v2_list_response(payload, "Students who need attention", [
+            ("student", "Student"), ("program", "Program"), ("stage", "Stage"), ("level", "Risk"), ("detail", "Main reason"),
+            ("days_in_stage", "Days in stage"), ("owner", "Next owner")], payload["rows"], request.args)
 
     @app.route("/api/reports/stages")
     @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def reports_stages():
-        return jsonify(report_stages(request.args))
+        payload = report_stages(request.args)
+        return v2_list_response(payload, "Where students get stuck", [
+            ("student", "Student"), ("program", "Program"), ("stage", "Stage"), ("days_in_stage", "Days in stage"),
+            ("zone", "Zone")], payload["students"], request.args)
 
     @app.route("/api/reports/records-to-fix")
     @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def reports_records_to_fix():
-        return jsonify(report_records_to_fix(request.args))
+        payload = report_records_to_fix(request.args)
+        return v2_list_response(payload, "Records to fix", [
+            ("student", "Student"), ("program", "Program"), ("stage", "Stage"), ("detail", "What is missing")], payload["rows"], request.args)
+
+    @app.route("/api/reports/decisions")
+    @require_api_login("staff", "academic_coordinator", "dean")
+    def reports_decisions():
+        return jsonify(report_decisions(request.args))
+
+    @app.route("/api/reports/cycle-times")
+    @require_api_login("staff", "academic_coordinator")
+    def reports_cycle_times():
+        return jsonify(report_cycle_times(request.args))
 
     @app.route("/api/reports/summary/<key>")
     @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
@@ -14825,7 +14843,7 @@ def register_routes(app: Flask) -> None:
         listing = report_summary_list(key, request.args)
         if listing is None:
             return jsonify({"error": "There is no such summary number."}), 404
-        return jsonify(listing)
+        return v2_list_response(listing, listing["title"], [(c["key"], c["label"]) for c in listing["columns"]], listing["rows"], request.args)
 
     # ---- BPMN 1 Admission: Dean onboarding gate --------------------------
     @app.route("/api/onboarding/reviews")
@@ -24906,6 +24924,24 @@ def report_response(name: str, args):
     return Response(data, mimetype=mime, headers={"Content-Disposition": f'attachment; filename="{stem}.{fmt}"'})
 
 
+def v2_list_response(payload: dict, title: str, columns: list, rows: list, args):
+    """JSON for the screen; ?format=xlsx|pdf downloads the same rows with the helper the five IM20 reports use."""
+    fmt = (args.get("format") or "json").strip().lower()
+    if fmt not in REPORT_FORMATS:
+        return jsonify({"error": "Choose xlsx or pdf for an export."}), 400
+    if fmt == "json":
+        return jsonify(payload)
+    result = {
+        "title": title, "columns": [{"key": key, "label": label} for key, label in columns], "rows": rows, "count": len(rows),
+        "filters": {key: value for key, value in payload["filters"].items() if value},
+        "options": {"programs": [{"id": p.id, "code": p.code} for p in Program.query.all()]},
+        "empty": "Nothing to list for these filters.",
+    }
+    stem = f"usls-gs-report-{re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')}-{date.today().isoformat()}"
+    data, mime = (report_workbook_bytes(result), REPORT_XLSX_MIME) if fmt == "xlsx" else (report_pdf_bytes(result), "application/pdf")
+    return Response(data, mimetype=mime, headers={"Content-Disposition": f'attachment; filename="{stem}.{fmt}"'})
+
+
 # ---------------------------------------------------------------------------
 # Reports v2 (I-141, AD10, spec research/REPORTS-SPEC-2026-11-02.md; payloads in research/REPORTS-API-2026-11-02.md)
 # One question per report, every number with a comparison, every count opens the list behind it. Reads only.
@@ -25341,6 +25377,138 @@ def report_records_to_fix(args) -> dict:
     if wanted:
         rows = [r for r in rows if wanted in r["missing"]]
     return {"filters": scope["filters"], "count": len(rows), "counts": counts, "rows": rows}
+
+
+# ---- B5: D1-D3 Dean decisions, S4 office cycle times -----------------------------------------------------------
+# GET /api/reports/decisions -> {filters, term, previous_term,
+#     waiting:{bands:[four labels], total, rows:[{process, label, total, oldest_days, bands:{label:n}}]},
+#     speed:{rows:[{process, label, this_term:S, last_term:S|null, change_days}], overall:{this_term:S, last_term:S|null}},
+#     outcomes:{rows:[{process, label, approved, returned, denied, total}], totals:{...}},
+#     cases:[{process, label, student_id|null, student, title, state:"waiting"|"decided", days, band?, outcome?, decided_at?}]}
+#     with S = {count, median_days, p90_days} (days are null for no cases). Every process of DECISION_PROCESSES is a row.
+#     Only decisions made in the term are in `speed` and `outcomes`; `waiting` is the situation now.
+# GET /api/reports/cycle-times -> {filters, count, rows:[{slug, process_area, open_cases, bucket_0_7, bucket_8_14,
+#     bucket_15_30, bucket_over_30, median_age_days, oldest_age_days, closed_cases, median_cycle_days, p90_cycle_days}],
+#     scheduling:{rows, columns} (scheduling_cycle_report), cases:[open cases {slug, process_area, student_id, student,
+#     days, next_owner}]}. A cycle is first log entry to the entry that closed the case; with an explicit ?term= only
+#     cycles that closed in it count.
+def _age_band(days: int) -> str:
+    return next(label for low, high, label in DEAN_AGE_BANDS if days >= low and (high is None or days <= high))
+
+
+def _time_stats(values: list[float]) -> dict:
+    return {
+        "count": len(values),
+        "median_days": round(_median(values), 1) if values else None,
+        "p90_days": _percentile(values, 90),
+    }
+
+
+def report_decisions(args) -> dict:
+    scope = report_scope(args)
+    term, previous = scope["term"], scope["previous"]
+    cases = [c for c in decision_cases() if case_in_scope(c, scope)]
+    # Like the Dean's own lists, a graduation endorsement only waits while the student is eligible.
+    cases = [
+        c for c in cases
+        if not (c["process"] == "graduation" and c["decided_at"] is None and not graduation_eligibility(db.session.get(Student, c["student_id"]))["eligible"])
+    ]
+    band_labels = [label for _, _, label in DEAN_AGE_BANDS]
+
+    def who(case):
+        student = scope["by_id"].get(case["student_id"])
+        return (student.name, student.student_number) if student else (case["title"], "")
+
+    waiting = [dict(c, days=_days_since(c["started_at"])) for c in cases if c["decided_at"] is None]
+    decided_now = [dict(c, days=_days_between(c["started_at"], c["decided_at"])) for c in cases if c["decided_at"] is not None and _moment_in(c["decided_at"], term)]
+    decided_before = [dict(c, days=_days_between(c["started_at"], c["decided_at"])) for c in cases if c["decided_at"] is not None and previous and _moment_in(c["decided_at"], previous)]
+
+    waiting_rows, speed_rows, outcome_rows = [], [], []
+    for process, label in DECISION_PROCESSES:
+        mine = [c for c in waiting if c["process"] == process]
+        waiting_rows.append({
+            "process": process, "label": label, "total": len(mine), "oldest_days": max((c["days"] for c in mine), default=None),
+            "bands": {band: sum(1 for c in mine if _age_band(c["days"]) == band) for band in band_labels},
+        })
+        now_days = [c["days"] for c in decided_now if c["process"] == process]
+        before_days = [c["days"] for c in decided_before if c["process"] == process]
+        this_term, last_term = _time_stats(now_days), (_time_stats(before_days) if before_days else None)
+        speed_rows.append({
+            "process": process, "label": label, "this_term": this_term, "last_term": last_term,
+            "change_days": round(this_term["median_days"] - last_term["median_days"], 1) if last_term and this_term["median_days"] is not None else None,
+        })
+        done = [c for c in decided_now if c["process"] == process]
+        counts = {outcome: sum(1 for c in done if c["outcome"] == outcome) for outcome in ("approved", "returned", "denied")}
+        outcome_rows.append({"process": process, "label": label, **counts, "total": len(done)})
+    totals = {key: sum(row[key] for row in outcome_rows) for key in ("approved", "returned", "denied", "total")}
+    listed = []
+    for c in sorted(waiting, key=lambda c: -c["days"]):
+        name, _number = who(c)
+        listed.append({
+            "process": c["process"], "label": DECISION_PROCESS_LABELS[c["process"]], "student_id": c["student_id"], "student": name,
+            "title": c["title"], "state": "waiting", "days": c["days"], "band": _age_band(c["days"]), "outcome": None,
+        })
+    for c in sorted(decided_now, key=lambda c: c["decided_at"], reverse=True):
+        name, _number = who(c)
+        listed.append({
+            "process": c["process"], "label": DECISION_PROCESS_LABELS[c["process"]], "student_id": c["student_id"], "student": name,
+            "title": c["title"], "state": "decided", "days": round(c["days"], 1), "outcome": c["outcome"], "decided_at": c["decided_at"].isoformat(),
+        })
+    overall_before = [c["days"] for c in decided_before]
+    return {
+        "filters": scope["filters"], "term": _term_json(term), "previous_term": _term_json(previous),
+        "waiting": {"bands": band_labels, "total": len(waiting), "rows": waiting_rows},
+        "speed": {"rows": speed_rows, "overall": {
+            "this_term": _time_stats([c["days"] for c in decided_now]),
+            "last_term": _time_stats(overall_before) if overall_before else None,
+        }},
+        "outcomes": {"rows": outcome_rows, "totals": totals},
+        "cases": listed,
+    }
+
+
+def report_cycle_times(args) -> dict:
+    scope = report_scope(args)
+    ids = sorted(scope["ids"])
+    chosen = AcademicTerm.query.filter_by(label=_filter_value(args, "term")).first() if _filter_value(args, "term") else None
+    aging = {row["process_area"]: row for row in queue_aging_report(ids)["rows"]} if ids else {}
+    open_cases = queue_open_cases(ids) if ids else []
+    rows = []
+    for slug, label in QUEUE_PROCESS_AREAS:
+        # shortcut: one case per student and process (the log has no case id); a student's second case of the same
+        # kind extends the first. Upgrade when the log carries a case reference.
+        history: dict[int, list[TransactionLog]] = {}
+        if ids:
+            for entry in TransactionLog.query.filter(TransactionLog.transaction_slug == slug, TransactionLog.student_id.in_(ids)).order_by(
+                    TransactionLog.created_at.asc(), TransactionLog.id.asc()).all():
+                history.setdefault(entry.student_id, []).append(entry)
+        cycles = [
+            _days_between(entries[0].created_at, entries[-1].created_at)
+            for student_id, entries in history.items()
+            if len(entries) >= 2 and workflow_case_is_closed(slug, student_id, entries[-1])
+            and (chosen is None or _moment_in(entries[-1].created_at, chosen))
+        ]
+        base = aging.get(label)
+        if base is None and not cycles:
+            continue
+        rows.append({
+            "slug": slug, "process_area": label,
+            "open_cases": base["open_cases"] if base else 0,
+            "bucket_0_7": base["bucket_0_7"] if base else 0, "bucket_8_14": base["bucket_8_14"] if base else 0,
+            "bucket_15_30": base["bucket_15_30"] if base else 0, "bucket_over_30": base["bucket_over_30"] if base else 0,
+            "median_age_days": base["median_age_days"] if base else None, "oldest_age_days": base["oldest_age_days"] if base else None,
+            "closed_cases": len(cycles),
+            "median_cycle_days": round(_median(cycles), 1) if cycles else None, "p90_cycle_days": _percentile(cycles, 90),
+        })
+    cases = [
+        {"slug": c["slug"], "process_area": c["label"], "student_id": c["student_id"], "student": scope["by_id"][c["student_id"]].name,
+         "student_number": scope["by_id"][c["student_id"]].student_number, "days": c["age_days"], "next_owner": c["next_owner"]}
+        for c in sorted(open_cases, key=lambda c: -c["age_days"])
+    ]
+    return {
+        "filters": scope["filters"], "count": len(rows), "rows": rows,
+        "scheduling": scheduling_cycle_report(ids), "cases": cases,
+    }
 
 
 # ---------------------------------------------------------------------------
