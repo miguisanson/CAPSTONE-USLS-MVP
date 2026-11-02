@@ -6,7 +6,9 @@ import { BarChart3, Table2 } from "lucide-react";
 import { Button, DataTable, EmptyState } from "../../components/ui/index.js";
 
 const AXIS_TICK = { fontSize: 12, fill: "#334155" };
-const tooltipStyle = { borderRadius: 12, border: "1px solid #e2e8f0", boxShadow: "0 6px 24px rgba(15,23,42,0.10)", fontSize: 13 };
+// A long label wraps instead of making the tooltip wider than a phone-width chart (the page must never scroll sideways).
+const tooltipStyle = { borderRadius: 12, border: "1px solid #e2e8f0", boxShadow: "0 6px 24px rgba(15,23,42,0.10)", fontSize: 13, whiteSpace: "normal" };
+const tooltipWrapper = { maxWidth: "100%" };
 const LABEL_MIN = 110;
 const LABEL_MAX = 300;
 const CHAR_PX = 7; // average width of a 12px label character
@@ -52,12 +54,12 @@ export function BarsChart({ data, categoryKey, series, stacked = true, onSelect,
   const height = data.length * (stacked ? rowHeight : rowHeight * series.length * 0.75) + (series.length > 1 ? 64 : 24);
   const together = stacked && series.length > 1;
   return (
-    <div role="img" aria-label={ariaLabel}>
+    <div role="img" aria-label={ariaLabel} className="overflow-hidden">
       <ResponsiveContainer width="100%" height={Math.max(height, 90)} onResize={(w) => setWidth(w)}>
         <BarChart data={data} layout="vertical" margin={{ left: 0, right: 28, top: 8, bottom: 4 }} barCategoryGap={6}>
           <XAxis type="number" allowDecimals={false} hide={!target} tick={AXIS_TICK} domain={[0, (max) => Math.max(max, target || 0)]} unit={unit} />
           <YAxis type="category" dataKey={categoryKey} width={labelWidth} interval={0} tick={<CategoryTick labelWidth={labelWidth} />} tickLine={false} axisLine={false} />
-          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f1f5f9" }} />
+          <Tooltip contentStyle={tooltipStyle} wrapperStyle={tooltipWrapper} cursor={{ fill: "#f1f5f9" }} />
           {series.length > 1 && <Legend iconType="square" wrapperStyle={{ fontSize: 12 }} />}
           {target != null && <ReferenceLine x={target} stroke="#334155" strokeDasharray="5 4" label={{ value: targetLabel, position: "insideTopRight", fontSize: 11, fill: "#334155" }} />}
           {series.map((item, index) => (
