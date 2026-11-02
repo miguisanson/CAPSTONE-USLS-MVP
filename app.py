@@ -39025,7 +39025,7 @@ def seed_report_history(today: date | None = None) -> int:
                     ))
                 elif process == "readmission":
                     db.session.add(LeaveCase(
-                        student_id=student.id, kind=KIND_READMISSION, source="demo", status="Closed" if approved else "Denied",
+                        student_id=student.id, kind=KIND_READMISSION, source="demo", status="Approved" if approved else "Denied",
                         target_term_id=term.id, target_label=term.label,
                         return_intent="Seeded history: ready to resume studies.",
                         submitted_at=submitted, forwarded_at=forwarded, decided_at=decided,
@@ -39057,7 +39057,7 @@ def seed_report_history(today: date | None = None) -> int:
                         reason="Seeded history: work schedule clash.", fee_status="Settled", requirement_status="Complete",
                         dean_decision="Approved" if approved else "Denied",
                         registrar_status="Confirmed" if approved else "Not Applicable",
-                        status="Completed" if approved else "Denied", created_at=forwarded, decided_at=decided,
+                        status="Withdrawn Confirmed" if approved else "Denied", created_at=forwarded, decided_at=decided,
                         completed_at=decided + timedelta(days=3), updated_at=decided,
                     ))
                 elif process == "practicum":
