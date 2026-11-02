@@ -7,7 +7,7 @@
 //     says a comment or reason is needed;
 //   - with a comment it opens a confirmation window titled "Confirm: Return for revision" that shows the comment;
 //     Escape closes it and decides nothing; confirming returns the case to the process list with the server's message;
-//   - the returned case leaves the Dean's lists (it is back with the Coordinator, AD11), so its card says "Case not found";
+//   - the returned case is back with the Coordinator (AD11) but stays visible to the Dean read-only with its history (I-187);
 //   - after "Mark reviewed" the case history ("View logs") holds both decisions, with the return comment;
 //   - "Mark reviewed" needs no comment, asks to confirm in a window titled after the button, and its history entry shows.
 // Setup (the practicum report reaching the Dean) goes through each role's own API login, like section-j.spec.js.
@@ -169,11 +169,14 @@ test.describe("P3.1 Dean decisions on a case card", () => {
     expect(decideCalls).toHaveLength(1);
     expect(decideCalls[0]).toMatchObject({ decision: "return", note: comment });
 
-    // 5. AD11 (141bb8d): the return sends the case back to the Coordinator, so it leaves the Dean's lists. Its history
-    //    (the return entry with the comment) is checked on the same card after step 6, once the Dean has reviewed it.
+    // 5. AD11 sends the case back to the Coordinator; the Dean still sees it read-only with its history (I-187, like
+    //    every other process).
     await page.goto(`/dean/case/practicum/${caseId}`);
-    await expect(page.getByRole("heading", { name: "Case not found" })).toBeVisible();
+    await expect(page.getByText("No Dean decision is due at this stage.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Return for revision" })).toHaveCount(0);
+    await page.getByRole("button", { name: /View logs/ }).click();
+    await expect(page.getByText("Practicum status report returned by Dean").first()).toBeVisible();
+    await expect(page.getByText(comment).first()).toBeVisible();
 
     // 6. Send the report to the Dean again and mark it reviewed: no comment needed, a window titled after the button.
     await setup.resend();
