@@ -4,6 +4,11 @@ import { StatusChip, InlineNotice } from "./ui/index.js";
 // Shared by the staff, dean, faculty and student assistant screens: where an answer came from, which documents
 // it used, and the calm "the documents do not cover this" state.
 
+// The server explains a missing AI key for developers ("No AI key is set ... Add a Gemini key"). Nobody who uses the assistant
+// can act on that, so the app shows one plain line instead and drops the "add a key" advice from the tooltip text (I-176).
+const WITHOUT_AI_LINE = "The assistant is answering from the policy documents without AI right now.";
+const withoutKeyAdvice = (text) => (text || "").replace(/[;,]?\s*add a Gemini key[^.]*\./i, ".").replace(/\.\./g, ".");
+
 /**
  * The label under an answer. One chip says how the answer was made, so it is never a guess:
  * "Answered by Gemini" (from the policy excerpts or from your own record), "Offline answer" (no Gemini was used:
@@ -19,7 +24,7 @@ export function AnswerBadge({ source, personal = false }) {
       : { status: source.label, tone: "neutral" };
   return (
     <div className="space-y-1" data-testid="answer-badge" data-offline={offline ? "true" : "false"}>
-      <div className="flex flex-wrap items-center gap-1.5" title={source.detail}>
+      <div className="flex flex-wrap items-center gap-1.5" title={withoutKeyAdvice(source.detail)}>
         <StatusChip status={chip.status} tone={chip.tone} dot={false} />
         {personal && (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600">
@@ -38,8 +43,8 @@ export function AnswerBadge({ source, personal = false }) {
           </span>
         )}
       </div>
-      {!offline && !source.ai_used && source.label && <p className="meta">{source.detail}</p>}
-      {source.note && <p className="meta">{source.note}</p>}
+      {!offline && !source.ai_used && source.label && <p className="meta">{withoutKeyAdvice(source.detail)}</p>}
+      {source.note && <p className="meta">{WITHOUT_AI_LINE}</p>}
     </div>
   );
 }

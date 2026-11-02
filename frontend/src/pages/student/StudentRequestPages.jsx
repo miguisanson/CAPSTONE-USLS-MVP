@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -5,6 +6,7 @@ import {
   Briefcase,
   CalendarCheck,
   CalendarOff,
+  CheckCircle2,
   FileCheck,
   GraduationCap,
   LogOut,
@@ -15,7 +17,7 @@ import {
 } from "lucide-react";
 import { Button, Card, InlineNotice, PageHeader, StatusChip } from "../../components/ui/index.js";
 import { useStudentPortal } from "./StudentPortalContext";
-import { STUDENT_MESSAGE_SLUG_BY_VIEW, StudentClarificationPanel, StudentSchedulePanel, isLiveSchedule } from "./shared";
+import { RequestSentContext, STUDENT_MESSAGE_SLUG_BY_VIEW, StudentClarificationPanel, StudentSchedulePanel, isLiveSchedule } from "./shared";
 import { BOOKABLE_DEFENSES, ResearchRequestForm, ScheduleRequestForm } from "./ResearchForms";
 import PolicyRules from "../../components/PolicyRules";
 import AdviserPanelCard from "./AdviserPanelCard";
@@ -132,14 +134,34 @@ function requestStatus(id, data) {
   }
 }
 
+// Requests a student cannot take back from the portal (Leave of Absence and Readmission have their own Withdraw button).
+const CANNOT_WITHDRAW = new Set(["awol", "withdrawal", "practicum", "graduation"]);
+
+// "Request sent" stays at the top of the page while the form below turns into its read-only view (I-149).
+function RequestSentNotice({ message }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ block: "nearest" });
+  }, [message]);
+  return (
+    <div ref={ref} className="scroll-mt-24">
+      <InlineNotice tone="success" icon={CheckCircle2} title="Request sent">{message}</InlineNotice>
+    </div>
+  );
+}
+
 export function StudentRequestPage({ id, aside = null }) {
   const { data, refetch } = useStudentPortal();
+  const [sent, setSent] = useState("");
+  useEffect(() => setSent(""), [id]);
   const page = REQUEST_PAGES[id];
   const item = findRequestItem(id);
   const locked = item?.lockedWhen?.(data);
   const messageSlug = STUDENT_MESSAGE_SLUG_BY_VIEW[id];
   const Icon = page.icon;
+  const submitted = requestStateLabel(requestStatus(id, data)) !== NOT_SUBMITTED;
   return (
+    <RequestSentContext.Provider value={setSent}>
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={page.title}
@@ -152,8 +174,15 @@ export function StudentRequestPage({ id, aside = null }) {
           </Button>
         }
       />
+      {sent && <RequestSentNotice message={sent} />}
       {aside}
       <Card pad="lg">
+        {CANNOT_WITHDRAW.has(id) && submitted && !locked && (
+          <InlineNotice tone="neutral" className="mb-4">
+            You cannot cancel this request yourself. To change or cancel it, contact the Graduate School office.{" "}
+            <Link to="/student/messages" className="font-semibold underline">Open your Messages</Link>
+          </InlineNotice>
+        )}
         {messageSlug && <StudentClarificationPanel slug={messageSlug} data={data} onSaved={refetch} />}
         {STUDENT_RULE_PROCESS_BY_VIEW[id] && <PolicyRules process={STUDENT_RULE_PROCESS_BY_VIEW[id]} className="mb-4" />}
         {locked ? (
@@ -163,6 +192,7 @@ export function StudentRequestPage({ id, aside = null }) {
         )}
       </Card>
     </div>
+    </RequestSentContext.Provider>
   );
 }
 

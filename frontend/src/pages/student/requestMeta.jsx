@@ -26,7 +26,7 @@ export const REQUEST_GROUPS = [
     ],
   },
   {
-    title: "Leave & Return",
+    title: "Requests", // the sidebar's heading for these four pages (I-178)
     description: "Submit a standalone standing-change or subject-withdrawal request.",
     items: [
       { id: "loa", label: PAGE.leaveOfAbsence, icon: CalendarOff },

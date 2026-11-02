@@ -64,10 +64,14 @@ export function PracticumRequestForm({ data, onSaved }) {
       return;
     }
     clear();
-    submit({
-      student_id: data.student.id,
-      ...form,
-    });
+    submit(
+      { student_id: data.student.id, ...form },
+      {
+        lines: moaEditable
+          ? ["Practicum: MOA submission", `Site: ${form.practicum_site}`]
+          : ["Practicum: completion documents", `Hours completed: ${form.completed_hours} of ${form.required_hours}`],
+      },
+    );
   }
 
   return (
@@ -156,7 +160,7 @@ export function GraduationRequestForm({ data, onSaved }) {
       return;
     }
     clear();
-    submit({ student_id: data.student.id, ...form });
+    submit({ student_id: data.student.id, ...form }, { lines: ["Graduation endorsement application", `School year: ${form.review_window}`] });
   }
 
   useEffect(() => setForm({ attachment_id: existing?.request_attachment?.id || null, review_window: defaultReviewWindow, remarks: "" }), [data.student.id, existing?.id, existing?.updated_at, defaultReviewWindow]);

@@ -10,11 +10,14 @@
 // Read-only and order-independent (see e2e/DATA-OWNERSHIP.md): every state is the REAL portal context plus the state under
 // test (page.route), and EVERY write is answered by the browser, so nothing reaches the database.
 import { test, expect } from "@playwright/test";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { AUTH_DIR, BASE_URL } from "./support/paths.mjs";
+import { AUTH_DIR, BASE_URL, SCREENS_DIR } from "./support/paths.mjs";
 import { PASSWORD } from "./support/accounts.js";
 
 const EMAIL = "student@usls.edu.ph";
+const SHOTS = process.env.P99_SHOTS || join(SCREENS_DIR, "..", "p99-student-requests");
+mkdirSync(SHOTS, { recursive: true });
 const PDF = { name: "spec.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 spec") };
 
 /**
@@ -64,6 +67,15 @@ function ctl(page, label) {
 }
 const submitButton = (page, name) => page.getByRole("button", { name, exact: true });
 const dialog = (page) => page.getByRole("dialog", { name: "Send this request?" });
+/** Screenshot at 1366 and at 390, then back to 1366. */
+async function snap(page, name) {
+  for (const [width, height] of [[1366, 768], [390, 844]]) {
+    await page.setViewportSize({ width, height });
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: join(SHOTS, `${name}-${width}.png`), fullPage: true });
+  }
+  await page.setViewportSize({ width: 1366, height: 768 });
+}
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 const sentNote = (page) => page.getByRole("status").filter({ hasText: "Spec: request saved." });
 /** The one line that says who to contact (I-151). */
@@ -94,6 +106,7 @@ test.describe("P99 student requests behave alike", () => {
       await expect(dialog(page)).toContainText("SPEC-101");
       await expect(dialog(page)).toContainText("AY 2026-2027 1st Semester");
       await expect(dialog(page)).toContainText("Spec fee: 10% of the term's total is charged.");
+      await snap(page, "withdrawal-confirm");
       await dialog(page).getByRole("button", { name: "Cancel" }).click();
       await expect(dialog(page)).toHaveCount(0);
       await page.waitForTimeout(300);
@@ -107,6 +120,7 @@ test.describe("P99 student requests behave alike", () => {
       await expect(sentNote(page)).toBeVisible();
       await expect(contactLine(page)).toBeVisible();
       await expect(main.getByRole("link", { name: "Open your Messages" })).toHaveAttribute("href", "/student/messages");
+      await snap(page, "withdrawal-sent");
     } finally {
       await context.close();
     }
@@ -136,6 +150,7 @@ test.describe("P99 student requests behave alike", () => {
       await expect(submitButton(page, "Submit return declaration")).toHaveCount(0);
       await expect(sentNote(page)).toBeVisible();
       await expect(contactLine(page)).toBeVisible();
+      await snap(page, "awol-sent");
     } finally {
       await context.close();
     }
@@ -265,6 +280,7 @@ test.describe("P99 student requests behave alike", () => {
       await expect(notice.getByRole("link", { name: "Open your Messages" })).toHaveAttribute("href", "/student/messages");
       await expect(submitButton(page, "Submit withdrawal request")).toHaveCount(0);
       await expect(page.getByText("Reason for withdrawing from this subject")).toHaveCount(0);
+      await snap(page, "withdrawal-closed");
       await page.setViewportSize({ width: 390, height: 844 });
       expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
 

@@ -1,4 +1,4 @@
-import { Component, useEffect, useId, useState } from "react";
+import { Component, createContext, useContext, useEffect, useId, useState } from "react";
 import {
   CalendarClock,
   CalendarPlus,
@@ -13,6 +13,7 @@ import { Button, Card, EmptyState, Field, InlineNotice, SectionTitle, StatusChip
 import { formatDate } from "../../lib/format";
 import { parseDay } from "../../components/calendar/CalendarView";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
+import { useConfirm } from "../../components/confirm";
 
 export const RESEARCH_GATE_KEYS = new Set(["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"]);
 
@@ -221,18 +222,38 @@ export function ErrorSummary({ errors }) {
   );
 }
 
+// The "Request sent" notice belongs to the request PAGE, not to the form: after a send the form often turns into its read-only
+// view, and a notice kept inside the form would vanish with it (I-149). StudentRequestPage provides this setter.
+export const RequestSentContext = createContext(null);
+
+/**
+ * Sends one student request. `submit(payload, { lines })` first asks "Send this request?" (the lines are the short summary
+ * shown in the dialog, I-150), so no student form can forget to confirm. Under a StudentRequestPage the success message goes
+ * to the page; elsewhere it comes back as `message`.
+ */
 export function useSubmitRequest(type, onSaved) {
+  const confirm = useConfirm();
+  const showSent = useContext(RequestSentContext);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  async function submit(payload) {
+  async function submit(payload, summary = {}) {
+    const lines = (summary.lines || []).filter(Boolean);
+    const sure = await confirm({
+      title: "Send this request?",
+      message: [...lines, "Check these details before you send."].join("\n"),
+      confirmLabel: "Send request",
+    });
+    if (!sure) return;
     setBusy(true);
     setError("");
     setMessage("");
+    showSent?.("");
     try {
       const res = await api.submitStudentRequest(type, payload);
-      setMessage(res.message || "Submitted.");
+      if (showSent) showSent(res.message || "Submitted.");
+      else setMessage(res.message || "Submitted.");
       onSaved();
     } catch (err) {
       setError(err.message || "Could not submit the request.");
