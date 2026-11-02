@@ -16,12 +16,16 @@ import io
 import json
 import os
 import sqlite3
+import atexit
 import tempfile
 import unittest
 from datetime import date, datetime, timedelta
 
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
+# Seven test classes share this file: delete it once at exit, not in the first class's tearDownClass
+# (macOS allowed that delete and the next class failed with "unable to open database file").
+atexit.register(lambda: os.path.exists(_DB_FILE.name) and os.unlink(_DB_FILE.name))
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 os.environ.setdefault("USLS_UPLOAD_DIR", tempfile.mkdtemp(prefix="usls-uploads-"))
 os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="policy-uploads-"))
@@ -192,10 +196,6 @@ class ReportsIm20Base(unittest.TestCase):
         with app.app_context():
             db.session.remove()
             db.engine.dispose()
-        try:
-            os.unlink(_DB_FILE.name)
-        except (FileNotFoundError, PermissionError):
-            pass
 
     def client(self, role="staff"):
         client = app.test_client()
