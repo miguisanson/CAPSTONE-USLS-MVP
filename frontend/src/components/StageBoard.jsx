@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Inbox, Lock, Move } from "lucide-react";
+import { ChevronLeft, ChevronRight, Inbox, Loader2, Lock, Move } from "lucide-react";
 import { EmptyState, InlineNotice } from "./ui/index.js";
 
 /**
@@ -59,7 +59,12 @@ export default function StageBoard({
   const [hoverColumn, setHoverColumn] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [notice, setNotice] = useState(null); // { tone, text }
+  const [pending, setPending] = useState(null); // { id, label }: a move that is under way or waits on its confirm dialog
+  const [settledId, setSettledId] = useState(null); // the card that has just arrived in its column (1 s ring)
   const noticeTimer = useRef(null);
+  const settleTimer = useRef(null);
+  const moveRef = useRef(null); // { id, toKey, at }: the move to look for in the next items
+  const watchRef = useRef(null); // { observer, timer }: waits for the confirm dialog to close
   const regionRef = useRef(null);
   const [hidden, setHidden] = useState({ left: 0, right: 0 }); // stages not fully in view on each side
 
@@ -71,7 +76,61 @@ export default function StageBoard({
     window.clearTimeout(noticeTimer.current);
     noticeTimer.current = window.setTimeout(() => setNotice(null), tone === "error" ? 9000 : 6000);
   }, []);
-  useEffect(() => () => window.clearTimeout(noticeTimer.current), []);
+  useEffect(
+    () => () => {
+      window.clearTimeout(noticeTimer.current);
+      window.clearTimeout(settleTimer.current);
+      stopWatching();
+    },
+    [],
+  );
+
+  // After a move that succeeded the card is in its new column: ring it for a second and bring it into view.
+  useEffect(() => {
+    const move = moveRef.current;
+    if (!move) return;
+    if (Date.now() - move.at > 8000) {
+      moveRef.current = null;
+      return;
+    }
+    const item = itemById.get(move.id);
+    if (!item || getColumnKey(item) !== move.toKey) return;
+    moveRef.current = null;
+    setPending(null);
+    setSettledId(move.id);
+    window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => setSettledId(null), 1000);
+    regionRef.current?.querySelector(`[data-card-id="${CSS.escape(move.id)}"]`)?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+  }, [items, itemById, getColumnKey]);
+
+  function stopWatching() {
+    const watch = watchRef.current;
+    if (!watch) return;
+    watch.observer.disconnect();
+    window.clearTimeout(watch.timer);
+    watchRef.current = null;
+  }
+
+  // A step that needs a confirm dialog opens it after onMove returns. The card keeps "Moving to ..." until that dialog
+  // (a [data-modal-backdrop] in <body>) has appeared and gone again, i.e. until the person confirmed or cancelled.
+  // A move that opens no dialog is done after a short grace.
+  function watchDialog() {
+    stopWatching();
+    let seen = false;
+    const done = () => {
+      stopWatching();
+      setPending(null);
+    };
+    const check = () => {
+      const open = Boolean(document.querySelector("[data-modal-backdrop]"));
+      if (open) seen = true;
+      else if (seen) done();
+    };
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, { childList: true, subtree: true });
+    watchRef.current = { observer, timer: window.setTimeout(() => (seen ? undefined : done()), 400) };
+    check();
+  }
 
   // Count the stages that are cut off (or out of sight) on each side of the scrolling box.
   const measureHidden = useCallback(() => {
@@ -140,14 +199,24 @@ export default function StageBoard({
         show("error", check.reason || `This item cannot move to "${target.label}".`);
         return;
       }
-      setBusyId(String(getItemId(item)));
+      const id = String(getItemId(item));
+      setBusyId(id);
+      setPending({ id, label: target.label });
+      moveRef.current = { id, toKey, at: Date.now() };
+      let failed = false;
       try {
         const result = await onMove(item, target, columnByKey[fromKey]);
         if (result && result.message) show("success", result.message);
       } catch (error) {
+        failed = true;
         show("error", error?.message || "That move was refused.");
       } finally {
         setBusyId(null);
+        if (failed) {
+          moveRef.current = null;
+          stopWatching();
+          setPending(null);
+        } else watchDialog();
       }
     },
     [canDrag, columnByKey, getColumnKey, getItemId, lockText, onMove, readOnly, show, verdict],
@@ -189,14 +258,8 @@ export default function StageBoard({
   const hoverVerdict = draggedItem && hoverColumn ? verdict(draggedItem, hoverColumn) : null;
 
   return (
-    <div>
-      <div aria-live="polite" className="mb-3 min-h-[1px]">
-        {notice && (
-          <InlineNotice tone={notice.tone === "error" ? "danger" : "success"} icon onDismiss={() => setNotice(null)}>
-            {notice.text}
-          </InlineNotice>
-        )}
-      </div>
+    <div data-testid="stage-board">
+      <BoardNotice notice={notice} onDismiss={() => setNotice(null)} />
       {(hidden.left > 0 || hidden.right > 0) && (
         <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
           <p data-testid="board-scroll-hint" className="meta font-medium text-slate-600">
@@ -231,7 +294,7 @@ export default function StageBoard({
                 onDragOver={readOnly ? undefined : (event) => onDragOver(event, column)}
                 onDragLeave={readOnly ? undefined : () => hoverColumn === column.key && setHoverColumn(null)}
                 onDrop={readOnly ? undefined : (event) => onDrop(event, column)}
-                className={`${columnClassName} flex shrink-0 flex-col rounded-2xl border bg-slate-50/70 p-3 transition-colors ${
+                className={`${columnClassName} flex shrink-0 flex-col rounded-2xl border bg-slate-50/70 p-3 transition-colors duration-150 ${
                   allowedHere
                     ? "border-brand-400 bg-brand-50/60 ring-2 ring-brand-200"
                     : refusedHere
@@ -266,13 +329,20 @@ export default function StageBoard({
                           draggable={draggable}
                           onDragStart={draggable ? (event) => onDragStart(event, item) : undefined}
                           onDragEnd={onDragEnd}
+                          data-card-id={id}
                           aria-busy={busyId === id}
                           data-locked={!readOnly && !draggable ? "true" : undefined}
-                          className={`rounded-xl transition-opacity ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
-                            dragging?.id === id ? "opacity-50" : busyId === id ? "opacity-60" : ""
-                          }`}
+                          className={`rounded-xl transition-[opacity,transform] duration-150 ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
+                            dragging?.id === id ? "scale-95 opacity-60" : busyId === id ? "opacity-60" : ""
+                          } ${pending?.id === id ? "ring-2 ring-brand-400" : ""} ${settledId === id ? "animate-card-settle" : ""}`}
                         >
                           {renderCard(item)}
+                          {pending?.id === id && (
+                            <p data-testid="card-moving" className="mt-1.5 flex items-center justify-end gap-1.5 px-2 text-xs font-semibold text-brand-700">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                              <span>{`Moving to ${pending.label}`}</span>
+                            </p>
+                          )}
                           {!readOnly && !draggable ? (
                             <LockedNote reason={lockText(item)} />
                           ) : !readOnly && showMoveMenu(item) && (
@@ -281,7 +351,7 @@ export default function StageBoard({
                               columns={columns}
                               fromKey={column.key}
                               verdict={verdict}
-                              disabled={busyId === id}
+                              busy={busyId === id}
                               onPick={(toKey) => attemptMove(item, toKey)}
                             />
                           )}
@@ -311,6 +381,29 @@ export default function StageBoard({
         <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-10 rounded-l-xl bg-gradient-to-r from-canvas to-transparent" />
       )}
       </div>
+    </div>
+  );
+}
+
+function reducedMotion() {
+  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+}
+
+// The one place a board says what happened to a move (done, or refused and why). At the top of the board, role="status",
+// and brought into view when it appears, so it is not lost off-screen on a long page. StageBoard's own API is unchanged.
+export function BoardNotice({ notice, onDismiss }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    // scroll-mt-20 on the wrapper keeps it clear of the sticky page header
+    if (notice) ref.current?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+  }, [notice]);
+  return (
+    <div ref={ref} className="mb-3 min-h-[1px] scroll-mt-20">
+      {notice && (
+        <InlineNotice role="status" data-testid="board-notice" tone={notice.tone === "error" ? "danger" : "success"} icon onDismiss={onDismiss}>
+          {notice.text}
+        </InlineNotice>
+      )}
     </div>
   );
 }
@@ -368,15 +461,23 @@ function LockedNote({ reason }) {
 
 // "Move to..." - the keyboard and touch alternative to dragging. It lists every other
 // column and says why a move is not possible, instead of hiding it.
-function MoveMenu({ item, columns, fromKey, verdict, onPick, disabled }) {
+function MoveMenu({ item, columns, fromKey, verdict, onPick, busy }) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const wrapRef = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const menuItems = () => Array.from(menuRef.current?.querySelectorAll('[role="menuitem"]') || []);
 
   useEffect(() => {
     if (!open) return undefined;
+    menuItems()[0]?.focus(); // the focus moves into the menu
     function onKey(event) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        buttonRef.current?.focus();
+      }
     }
     function onClick(event) {
       if (wrapRef.current && !wrapRef.current.contains(event.target)) setOpen(false);
@@ -389,24 +490,46 @@ function MoveMenu({ item, columns, fromKey, verdict, onPick, disabled }) {
     };
   }, [open]);
 
+  // ArrowUp/ArrowDown (wrapping), Home and End move between the items; Tab leaves the menu. Enter and Space press the
+  // focused item, as they do on any button.
+  function onMenuKeyDown(event) {
+    const entries = menuItems();
+    const at = entries.indexOf(document.activeElement);
+    let next;
+    if (event.key === "ArrowDown") next = entries[(at + 1) % entries.length];
+    else if (event.key === "ArrowUp") next = entries[(at - 1 + entries.length) % entries.length];
+    else if (event.key === "Home") next = entries[0];
+    else if (event.key === "End") next = entries[entries.length - 1];
+    else if (event.key === "Tab") {
+      setOpen(false);
+      buttonRef.current?.focus();
+      return;
+    } else return;
+    event.preventDefault();
+    next?.focus();
+  }
+
   return (
     <div ref={wrapRef} className="relative mt-1.5 flex justify-end">
       <button
+        ref={buttonRef}
         type="button"
-        disabled={disabled}
+        disabled={busy}
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 transition-colors duration-200 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-11"
       >
-        <Move className="h-3.5 w-3.5" /> Move to…
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Move className="h-3.5 w-3.5" />} Move to…
       </button>
       {open && (
         <ul
+          ref={menuRef}
           id={menuId}
           role="menu"
-          className="absolute right-0 top-full z-header mt-1 w-72 max-w-[85vw] rounded-xl border border-slate-200 bg-white p-1 shadow-lift"
+          onKeyDown={onMenuKeyDown}
+          className="absolute right-0 top-full z-header mt-1 w-72 max-w-[85vw] animate-notice-in rounded-xl border border-slate-200 bg-white p-1 shadow-lift"
         >
           {columns
             .filter((column) => column.key !== fromKey)
@@ -417,9 +540,11 @@ function MoveMenu({ item, columns, fromKey, verdict, onPick, disabled }) {
                   <button
                     type="button"
                     role="menuitem"
+                    tabIndex={-1}
                     aria-disabled={!check.allowed}
                     onClick={() => {
                       setOpen(false);
+                      buttonRef.current?.focus(); // a dialog opened by the move hands the focus back here
                       onPick(column.key);
                     }}
                     className={`flex w-full cursor-pointer flex-col rounded-lg px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${

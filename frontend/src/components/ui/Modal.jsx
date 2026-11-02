@@ -179,7 +179,7 @@ export function Modal({
   return createPortal(
     <div
       data-modal-backdrop=""
-      className={`fixed inset-0 m-0 ${layerClass} flex items-center justify-center bg-ink/50 p-3 backdrop-blur-sm sm:p-6`}
+      className={`fixed inset-0 m-0 ${layerClass} flex items-center justify-center bg-ink/50 p-3 backdrop-blur-sm animate-backdrop-in sm:p-6`}
       role="presentation"
       onMouseDown={(event) => {
         if (event.target !== event.currentTarget || !dismissible) return;
@@ -194,7 +194,7 @@ export function Modal({
         aria-labelledby={titleId}
         aria-describedby={subtitle ? subtitleId : describedBy}
         tabIndex={-1}
-        className={`flex max-h-[90dvh] w-full ${SIZE_CLASS[size] || SIZE_CLASS.md} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift animate-fade-up focus:outline-none ${className}`}
+        className={`flex max-h-[90dvh] w-full ${SIZE_CLASS[size] || SIZE_CLASS.md} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift animate-dialog-panel focus:outline-none ${className}`}
       >
         <header data-modal-header="" className="flex shrink-0 items-start gap-3 border-b border-slate-200 px-4 py-4 sm:px-6">
           {icon && (
@@ -261,7 +261,7 @@ export function Drawer({ side = "right", label, onClose, width, dismissible = tr
   return createPortal(
     <div
       data-modal-backdrop=""
-      className="fixed inset-0 m-0 z-drawer bg-ink/40"
+      className="fixed inset-0 m-0 z-drawer animate-backdrop-in bg-ink/40"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target !== event.currentTarget || !dismissible) return;
@@ -275,7 +275,7 @@ export function Drawer({ side = "right", label, onClose, width, dismissible = tr
         aria-modal="true"
         aria-label={label}
         tabIndex={-1}
-        className={`absolute inset-y-0 ${edge} flex flex-col overflow-y-auto bg-white shadow-lift animate-fade-up focus:outline-none ${size} ${className}`}
+        className={`absolute inset-y-0 ${edge} flex flex-col overflow-y-auto bg-white shadow-lift ${side === "left" ? "animate-drawer-left" : "animate-drawer-right"} focus:outline-none ${size} ${className}`}
       >
         {children}
       </aside>

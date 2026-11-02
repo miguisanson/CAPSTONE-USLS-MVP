@@ -1,4 +1,4 @@
-// Feedback components (UI-SPEC sections 3, 4, 5, 6): EmptyState, Spinner, Skeleton / SkeletonTable, InlineNotice,
+// Feedback components (UI-SPEC sections 3, 4, 5, 6): EmptyState, Spinner, Skeleton / SkeletonTable / SkeletonBoard, InlineNotice,
 // SearchInput and Pagination. `components/ui.jsx` re-exports Spinner, EmptyState and InlineNotice so old imports work.
 import { useId } from "react";
 import { AlertCircle, AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, Search, X } from "lucide-react";
@@ -86,6 +86,27 @@ export function SkeletonTable({ rows = 5, className = "" }) {
   );
 }
 
+/**
+ * Placeholder for a stage board while it loads: `columns` columns, each a header bar and two card bars, laid out like the
+ * real board (248px columns) so the page does not jump when the board arrives. Not wired into pages yet.
+ */
+export function SkeletonBoard({ columns = 4, label = "Loading board", className = "" }) {
+  return (
+    <div role="status" aria-busy="true" aria-label={label} data-testid="skeleton-board" className={cx("flex w-max max-w-full gap-3 overflow-hidden", className)}>
+      {Array.from({ length: columns }, (_, c) => (
+        <div key={c} data-skeleton-column="" aria-hidden="true" className="w-[248px] shrink-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+          <div className="mb-3 h-5 w-1/2 animate-pulse rounded-lg bg-slate-200/70" />
+          <div className="space-y-3">
+            {[0, 1].map((n) => (
+              <div key={n} data-skeleton-card="" className="h-28 animate-pulse rounded-xl bg-slate-200/70" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------------------------------- InlineNotice */
 
 const TONE_ICON = { success: CheckCircle2, warning: AlertTriangle, danger: AlertCircle, info: Info, neutral: Info };
@@ -104,7 +125,7 @@ export function InlineNotice({ tone = "info", title, onDismiss, icon, children, 
   return (
     <div
       role={t.label === "danger" ? "alert" : "status"}
-      className={cx("flex items-start gap-3 rounded-xl border px-4 py-3 text-sm", t.notice, className)}
+      className={cx("flex animate-notice-in items-start gap-3 rounded-xl border px-4 py-3 text-sm", t.notice, className)}
       {...rest}
     >
       {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
