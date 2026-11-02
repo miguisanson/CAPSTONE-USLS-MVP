@@ -361,7 +361,7 @@ test.describe("I-116: staff home, Work Queue", () => {
     await patchJson(page, "**/api/tasks**", addTasks);
     await homeReady(page);
     const row = main(page).locator("li", { hasText: "Record and forward withdrawal request" });
-    await expect(row.getByRole("link", { name: "Open Subject Withdrawal" })).toHaveAttribute("href", "/workflow/withdrawal");
+    await expect(row.getByRole("link", { name: "Open Subject Withdrawal" })).toHaveAttribute("href", "/workflow/withdrawal?show=open") // I-198 (pkt/staffux): staff task links open the open requests;
     await expect(main(page)).not.toContainText("Open Withdrawal");
     const awol = main(page).locator("li", { hasText: "Review automatic AWOL policy alert" }).first();
     await expect(awol.getByRole("link", { name: "Open AWOL & Residency" })).toBeVisible();
