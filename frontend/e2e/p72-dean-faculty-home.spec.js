@@ -297,7 +297,8 @@ test.describe("Faculty home", () => {
     if (data.upcoming_defenses.length) await expect(upcoming.locator("li").first()).toContainText(data.upcoming_defenses[0].student.name);
     else await expect(upcoming.getByText("No defenses scheduled")).toBeVisible();
     await expect(page.getByRole("region", { name: "Google Calendar connection" })).toHaveCount(0);
-    await expect(main(page).getByRole("link", { name: "Calendar connection" })).toHaveAttribute("href", "/faculty-portal/availability");
+    // v6.0 (Natalie): the Google Calendar connection lives only on My Calendar.
+    await expect(main(page).getByRole("link", { name: "Calendar connection" })).toHaveAttribute("href", "/faculty-portal/calendar");
     // the OAuth callback lands here with ?calendar=connected
     await openHome(page, "?calendar=connected");
     await expect(page.getByRole("status").filter({ hasText: "Google Calendar connected." })).toBeVisible();
