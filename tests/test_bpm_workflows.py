@@ -4272,6 +4272,265 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertIn("/events/usls-defense-event-123", requests[0]["url"])
             self.assertIsNone(schedule.google_calendar_event_ids)
 
+    # ---- Google Calendar hardening (pkt/cal review items 2-8) ----------------
+    GOOGLE_TOKEN_ENV = {
+        "GOOGLE_CALENDAR_CLIENT_ID": "client-id.apps.googleusercontent.com",
+        "GOOGLE_CALENDAR_CLIENT_SECRET": "client-secret",
+        "GOOGLE_CALENDAR_REDIRECT_URI": "http://localhost/api/integrations/google-calendar/callback",
+        "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY": "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=",
+    }
+
+    def _google_defense_fixture(self, event_ids=None):
+        """A connected panelist on a booked Final Defense; call inside app.app_context()."""
+        connected = Faculty(
+            name="Hardening Panelist", college="Graduate School", role="Panel Member",
+            specialization="Research methods", email="hardening-panelist@example.test", active=True,
+            google_calendar_id="primary", google_calendar_email="hardening@gmail.com",
+            google_calendar_access_token="connected-access-token",
+            google_calendar_token_expires_at=datetime.now() + timedelta(days=1),
+            google_calendar_connected_at=datetime.now(),
+        )
+        db.session.add(connected)
+        db.session.flush()
+        db.session.add(PanelAssignment(
+            student_id=self.student_id, faculty_id=connected.id, gate="Final Defense", panel_role="Panel Chair",
+        ))
+        schedule = ScheduleRequest(
+            student_id=self.student_id, preferred_date=date(2026, 11, 20), start_time=time(9, 0),
+            end_time=time(11, 0), defense_type="Final Defense", mode="On campus", venue="Room 1",
+            status="Scheduled",
+            google_calendar_event_ids=json.dumps({str(connected.id): event_ids}) if event_ids else None,
+        )
+        db.session.add(schedule)
+        db.session.flush()
+        return connected, schedule
+
+    @staticmethod
+    def _google_ok(payload):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = json.dumps(payload).encode("utf-8")
+        return response
+
+    @staticmethod
+    def _http_error(code, body=b"{}"):
+        from urllib.error import HTTPError
+        return HTTPError("https://www.googleapis.com/x", code, "err", {}, BytesIO(body))
+
+    def test_google_patch_404_or_410_clears_the_event_id_and_creates_a_new_event(self):
+        for code in (404, 410):
+            with self.subTest(code=code), app.app_context():
+                db.session.rollback()
+                ScheduleRequest.query.delete()
+                connected, schedule = self._google_defense_fixture(event_ids="gone-event-id")
+                calls = []
+
+                def google_response(req, timeout=0):
+                    calls.append((req.method, req.full_url))
+                    if req.method == "PATCH":
+                        raise self._http_error(code)
+                    return self._google_ok({"id": "fresh-event-id"})
+
+                with patch("app.urlopen", side_effect=google_response):
+                    result = app_module.sync_defense_google_events(schedule)
+                self.assertEqual([method for method, _url in calls], ["PATCH", "POST"])
+                self.assertEqual(result["errors"], [])
+                self.assertEqual(result["created"], 1)
+                self.assertNotEqual(
+                    json.loads(schedule.google_calendar_event_ids)[str(connected.id)], "gone-event-id",
+                )
+                db.session.rollback()
+
+    def test_google_invalid_grant_marks_the_connection_as_needing_reconnect(self):
+        with app.app_context(), patch.dict(os.environ, self.GOOGLE_TOKEN_ENV):
+            faculty = Faculty(
+                name="Expired Grant Faculty", college="Graduate School", role="Panel Member",
+                specialization="Research methods", email="expired-grant@example.test", active=True,
+                google_calendar_id="primary", google_calendar_email="expired@gmail.com",
+                google_calendar_access_token="old-access-token",
+                google_calendar_refresh_token="revoked-refresh-token",
+                google_calendar_token_expires_at=datetime.now() - timedelta(hours=1),
+                google_calendar_connected_at=datetime.now() - timedelta(days=8),
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            body = json.dumps({"error": "invalid_grant", "error_description": "Token has been expired or revoked."})
+            with patch("app.google_token_request", side_effect=self._http_error(400, body.encode("utf-8"))):
+                token, error = faculty_google_calendar_token(faculty)
+            self.assertIsNone(token)
+            self.assertIn("reconnect", error.lower())
+            self.assertNotIn("HTTP 400", error)
+            payload = app_module.faculty_google_calendar_dict(faculty)
+            self.assertTrue(payload["connected"])
+            self.assertTrue(payload["needs_reconnect"])
+            self.assertEqual(payload["status"], "Reconnect your Google Calendar")
+            self.assertIn("reconnect", faculty.google_calendar_last_error.lower())
+            # A later call does not hit Google again for a refresh token already known to be dead.
+            with patch("app.google_token_request", side_effect=AssertionError("must not call Google")):
+                token, error = faculty_google_calendar_token(faculty)
+            self.assertIsNone(token)
+            self.assertIn("reconnect", error.lower())
+
+    def test_google_sync_route_reports_reconnect_needed_and_keeps_it(self):
+        with app.app_context():
+            faculty = Faculty(
+                name="Sync Reconnect Faculty", college="Graduate School", role="Panel Member",
+                specialization="Research methods", email="sync-reconnect@example.test", active=True,
+                google_calendar_id="primary", google_calendar_email="sync-reconnect@gmail.com",
+                google_calendar_refresh_token="revoked-refresh-token",
+                google_calendar_connected_at=datetime.now() - timedelta(days=8),
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            account = self._account("faculty", "sync-reconnect-login@example.test")
+            account.faculty_id = faculty.id
+            db.session.commit()
+            account_id, faculty_id = account.id, faculty.id
+        client = self._role_client(account_id, "faculty")
+        body = json.dumps({"error": "invalid_grant"}).encode("utf-8")
+        with patch.dict(os.environ, self.GOOGLE_TOKEN_ENV), \
+                patch("app.google_token_request", side_effect=self._http_error(400, body)):
+            response = client.post("/api/faculty-portal/google-calendar/sync", json={})
+        self.assertEqual(response.status_code, 503)
+        self.assertTrue(response.get_json()["needs_reconnect"])
+        with app.app_context():
+            stored = db.session.get(Faculty, faculty_id)
+            self.assertTrue(app_module.faculty_google_calendar_dict(stored)["needs_reconnect"])
+
+    def test_google_freebusy_failures_are_recorded_as_last_error(self):
+        with app.app_context():
+            connected, _schedule = self._google_defense_fixture()
+            with patch("app.urlopen", side_effect=self._http_error(500)):
+                result = app_module.google_freebusy_lookup(connected, date(2026, 11, 20), date(2026, 11, 21))
+            self.assertIn("HTTP 500", result["error"])
+            self.assertIn("HTTP 500", connected.google_calendar_last_error)
+
+    def test_google_refreshed_access_token_is_saved_encrypted_with_expiry(self):
+        with app.app_context(), patch.dict(os.environ, self.GOOGLE_TOKEN_ENV):
+            faculty = Faculty(
+                name="Refresh Save Faculty", college="Graduate School", role="Panel Member",
+                specialization="Research methods", email="refresh-save@example.test", active=True,
+                google_calendar_id="primary", google_calendar_email="refresh-save@gmail.com",
+                google_calendar_access_token="stale-access-token",
+                google_calendar_refresh_token=app_module.google_calendar_encrypt_token("good-refresh-token"),
+                google_calendar_token_expires_at=datetime.now() - timedelta(minutes=5),
+                google_calendar_connected_at=datetime.now(),
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            with patch("app.google_token_request", return_value={"access_token": "new-access-token", "expires_in": 3600}) as refresh:
+                token, error = faculty_google_calendar_token(faculty)
+                self.assertEqual((token, error), ("new-access-token", None))
+                self.assertNotIn("new-access-token", faculty.google_calendar_access_token)
+                self.assertEqual(app_module.google_calendar_decrypt_token(faculty.google_calendar_access_token), "new-access-token")
+                self.assertGreater(faculty.google_calendar_token_expires_at, datetime.now() + timedelta(minutes=30))
+                again, _error = faculty_google_calendar_token(faculty)
+                self.assertEqual(again, "new-access-token")
+                self.assertEqual(refresh.call_count, 1)
+
+    def test_google_transport_errors_never_raise_out_of_event_and_freebusy_calls(self):
+        import http.client
+        with app.app_context():
+            connected, _schedule = self._google_defense_fixture(event_ids="evt")
+            with patch("app.urlopen", side_effect=http.client.IncompleteRead(b"")):
+                response, error = app_module.google_calendar_event_request(connected, "PATCH", "evt", {})
+                self.assertIsNone(response)
+                self.assertTrue(error)
+                lookup = app_module.google_freebusy_lookup(connected, date(2026, 11, 20), date(2026, 11, 20))
+                self.assertTrue(lookup["error"])
+
+    def test_google_event_is_private_and_sent_with_a_deterministic_valid_id(self):
+        with app.app_context():
+            connected, schedule = self._google_defense_fixture()
+            bodies = []
+
+            def first_attempt_times_out(req, timeout=0):
+                bodies.append(json.loads(req.data.decode("utf-8")))
+                raise TimeoutError("network down")
+
+            with patch("app.urlopen", side_effect=first_attempt_times_out):
+                failed = app_module.sync_defense_google_events(schedule)
+            self.assertEqual(len(failed["errors"]), 1)
+
+            def second_attempt(req, timeout=0):
+                bodies.append(json.loads(req.data.decode("utf-8")))
+                return self._google_ok({"id": bodies[-1]["id"]})
+
+            with patch("app.urlopen", side_effect=second_attempt):
+                done = app_module.sync_defense_google_events(schedule)
+            self.assertEqual(done["created"], 1)
+            first_id, second_id = bodies[0]["id"], bodies[1]["id"]
+            self.assertEqual(first_id, second_id)
+            self.assertRegex(first_id, r"^[a-v0-9]{5,1024}$")
+            self.assertEqual(bodies[0]["visibility"], "private")
+            self.assertEqual(json.loads(schedule.google_calendar_event_ids), {str(connected.id): first_id})
+
+    def test_google_post_409_is_treated_as_already_created_and_patched(self):
+        with app.app_context():
+            connected, schedule = self._google_defense_fixture()
+            calls = []
+
+            def google_response(req, timeout=0):
+                calls.append((req.method, req.full_url, json.loads(req.data.decode("utf-8")) if req.data else None))
+                if req.method == "POST":
+                    raise self._http_error(409)
+                return self._google_ok({"id": "ignored"})
+
+            with patch("app.urlopen", side_effect=google_response):
+                result = app_module.sync_defense_google_events(schedule)
+            self.assertEqual([method for method, _u, _b in calls], ["POST", "PATCH"])
+            self.assertEqual(result["errors"], [])
+            event_id = calls[0][2]["id"]
+            self.assertIn(f"/events/{event_id}", calls[1][1])
+            self.assertEqual(json.loads(schedule.google_calendar_event_ids), {str(connected.id): event_id})
+
+    def _google_callback(self, token_payload):
+        with app.app_context():
+            faculty = Faculty(
+                name="Scope Faculty", college="Graduate School", role="Panel Member",
+                specialization="Research methods", email="scope-faculty@example.test", active=True,
+            )
+            db.session.add(faculty)
+            db.session.flush()
+            account = self._account("faculty", f"scope-{faculty.id}@example.test")
+            account.faculty_id = faculty.id
+            db.session.commit()
+            account_id, faculty_id = account.id, faculty.id
+        client = self._role_client(account_id, "faculty")
+        with client.session_transaction() as oauth_session:
+            oauth_session["google_calendar_oauth_state"] = "expected-state"
+            oauth_session["google_calendar_oauth_faculty_id"] = faculty_id
+        userinfo = self._google_ok({"sub": "scope-subject", "email": "scope@gmail.com", "email_verified": True})
+        with patch.dict(os.environ, self.GOOGLE_TOKEN_ENV), \
+                patch("app.google_token_request", return_value=token_payload), \
+                patch("app.urlopen", return_value=userinfo):
+            response = client.get("/api/integrations/google-calendar/callback?state=expected-state&code=abc")
+        return response, faculty_id
+
+    def test_google_callback_refuses_to_connect_when_a_calendar_permission_was_not_granted(self):
+        base = "https://www.googleapis.com/auth/"
+        for scope in (f"openid email {base}calendar.freebusy", f"openid email {base}calendar.events.owned", "openid email"):
+            with self.subTest(scope=scope):
+                response, faculty_id = self._google_callback(
+                    {"access_token": "tok", "expires_in": 3600, "scope": scope}
+                )
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response.headers["Location"].endswith("/faculty-portal/calendar?calendar=missing-scope"))
+                with app.app_context():
+                    stored = db.session.get(Faculty, faculty_id)
+                    self.assertIsNone(stored.google_calendar_id)
+                    self.assertIsNone(stored.google_calendar_access_token)
+
+    def test_google_callback_connects_when_both_calendar_permissions_were_granted(self):
+        base = "https://www.googleapis.com/auth/"
+        response, faculty_id = self._google_callback({
+            "access_token": "tok", "expires_in": 3600,
+            "scope": f"openid email {base}calendar.freebusy {base}calendar.events.owned",
+        })
+        self.assertTrue(response.headers["Location"].endswith("/faculty-portal/calendar?calendar=connected"))
+        with app.app_context():
+            self.assertEqual(db.session.get(Faculty, faculty_id).google_calendar_id, "primary")
+
     def test_faculty_can_sync_and_disconnect_google_calendar_even_when_google_revoke_fails(self):
         with app.app_context():
             faculty = Faculty(

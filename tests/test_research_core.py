@@ -759,6 +759,115 @@ class SchedulingRuleTests(ResearchCoreBase):
             self.assertEqual(new.start_time, time(13, 0))
             self.assertTrue(TransactionLog.query.filter(TransactionLog.result.like("%rescheduled%")).count() >= 1)
 
+    # ---- Google Calendar lifecycle (pkt/cal review items 1 and 6) -------------
+    def connect_google(self, name):
+        from app import Faculty
+        with app.app_context():
+            faculty = db.session.get(Faculty, self.faculty_ids[name])
+            faculty.google_calendar_id = "primary"
+            faculty.google_calendar_email = f"{name.split()[0].lower()}@gmail.com"
+            faculty.google_calendar_access_token = "access-token"
+            faculty.google_calendar_token_expires_at = datetime.now() + timedelta(days=1)
+            faculty.google_calendar_connected_at = datetime.now()
+            db.session.commit()
+
+    def opaque_own_event_lookup(self, name, schedule_id):
+        """Free/busy as Google answers it: the system's own opaque defense event shows as busy."""
+        from datetime import timezone
+        faculty_id = self.faculty_ids[name]
+
+        def lookup(faculty, start_day, end_day):
+            if faculty.id != faculty_id:
+                return {"configured": False, "calendar_id": None, "busy": [], "error": None}
+            schedule = db.session.get(ScheduleRequest, schedule_id)
+            tz = timezone(timedelta(hours=8))
+            return {
+                "configured": True, "calendar_id": "primary", "error": None,
+                "busy": [{
+                    "start": datetime.combine(schedule.preferred_date, schedule.start_time, tz),
+                    "end": datetime.combine(schedule.preferred_date, schedule.end_time, tz),
+                }],
+            }
+        return lookup
+
+    def store_own_event(self, name, schedule_id):
+        import json
+        with app.app_context():
+            row = db.session.get(ScheduleRequest, schedule_id)
+            row.google_calendar_event_ids = json.dumps({str(self.faculty_ids[name]): "ownevent"})
+            db.session.commit()
+
+    def test_reschedule_is_not_blocked_by_the_defenses_own_google_event(self):
+        self.ready_for_proposal()
+        old_id = self.booked()
+        self.connect_google("Chair Person")
+        self.store_own_event("Chair Person", old_id)
+        with patch("app.google_freebusy_lookup", side_effect=self.opaque_own_event_lookup("Chair Person", old_id)), \
+                patch("app.google_calendar_event_request", return_value=({"id": "ownevent"}, None)):
+            response = self.staff().post(f"/api/defense-schedules/{old_id}/reschedule", json={
+                "preferred_date": future_weekday(21).isoformat(), "selected_start": "09:30", "selected_end": "11:30",
+                "mode": "Online", "venue": "Zoom room A", "reason": "Shift by half an hour", "requested_by": "Student"})
+        self.assertEqual(response.status_code, 200, response.get_json())
+
+    def test_reconfirmation_is_not_blocked_by_the_defenses_own_google_event(self):
+        self.ready_for_proposal()
+        schedule_id = self.booked()
+        self.connect_google("Chair Person")
+        self.store_own_event("Chair Person", schedule_id)
+        ids = [self.faculty_ids[n] for n in ["Chair Person", "Content Person", "Method Person", "Spare Person"]]
+        self.book(panel_faculty_ids=ids, reassign_only=True, panel_change_reason="External member withdrew")
+        with patch("app.google_freebusy_lookup", side_effect=self.opaque_own_event_lookup("Chair Person", schedule_id)), \
+                patch("app.google_calendar_event_request", return_value=({}, None)):
+            ok = self.staff().post(f"/api/defense-schedules/{schedule_id}/reconfirm", json={})
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        with app.app_context():
+            self.assertEqual(db.session.get(ScheduleRequest, schedule_id).status, "Scheduled")
+
+    def test_another_calendar_event_still_blocks_a_panelist_without_the_own_event(self):
+        self.ready_for_proposal()
+        schedule_id = self.booked()
+        self.connect_google("Chair Person")  # connected, but the defense has no stored event of its own
+        ids = [self.faculty_ids[n] for n in ["Chair Person", "Content Person", "Method Person", "Spare Person"]]
+        self.book(panel_faculty_ids=ids, reassign_only=True, panel_change_reason="External member withdrew")
+        with patch("app.google_freebusy_lookup", side_effect=self.opaque_own_event_lookup("Chair Person", schedule_id)):
+            bad = self.staff().post(f"/api/defense-schedules/{schedule_id}/reconfirm", json={})
+        self.assertEqual(bad.status_code, 400, bad.get_json())
+        self.assertIn("Chair Person is not available", bad.get_json()["error"])
+
+    def test_a_google_failure_never_breaks_booking_reschedule_or_cancel(self):
+        self.ready_for_proposal()
+        boom = RuntimeError("google exploded")
+        with patch("app.sync_defense_google_events", side_effect=boom):
+            booked = self.book()
+        self.assertEqual(booked.status_code, 200, booked.get_json())
+        with app.app_context():
+            old_id = self.schedules()[-1].id
+        with patch("app.remove_defense_google_events", side_effect=boom), patch("app.sync_defense_google_events", side_effect=boom):
+            moved = self.staff().post(f"/api/defense-schedules/{old_id}/reschedule", json={
+                "preferred_date": future_weekday(28).isoformat(), "selected_start": "13:00", "selected_end": "15:00",
+                "mode": "Online", "venue": "Zoom room B", "reason": "Travel", "requested_by": "Panel member"})
+        self.assertEqual(moved.status_code, 200, moved.get_json())
+        with app.app_context():
+            new_id = self.schedules()[-1].id
+            self.assertNotEqual(new_id, old_id)
+        with patch("app.remove_defense_google_events", side_effect=boom):
+            cancelled = self.research().post(f"/api/defense-schedules/{new_id}/cancel",
+                                             json={"reason": "Venue unavailable", "requested_by": "GS Office"})
+        self.assertEqual(cancelled.status_code, 200, cancelled.get_json())
+        with app.app_context():
+            self.assertEqual(db.session.get(ScheduleRequest, new_id).status, "Cancelled")
+
+    def test_a_google_failure_never_breaks_reconfirmation(self):
+        self.ready_for_proposal()
+        schedule_id = self.booked()
+        ids = [self.faculty_ids[n] for n in ["Chair Person", "Content Person", "Method Person", "Spare Person"]]
+        self.book(panel_faculty_ids=ids, reassign_only=True, panel_change_reason="External member withdrew")
+        with patch("app.sync_defense_google_events", side_effect=RuntimeError("google exploded")):
+            ok = self.staff().post(f"/api/defense-schedules/{schedule_id}/reconfirm", json={})
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        with app.app_context():
+            self.assertEqual(db.session.get(ScheduleRequest, schedule_id).status, "Scheduled")
+
     def test_reschedule_is_still_subject_to_the_protocol_rules(self):
         self.ready_for_proposal()
         old_id = self.booked()
@@ -1129,6 +1238,12 @@ class VerdictFlowTests(ResearchCoreBase):
             items = {i["item_name"]: i for i in detected_research_progress(self.student_obj())["milestone"]["requirements"]}
             self.assertEqual(items["Proposal defense result"]["status"], "Complete")
             self.assertEqual(items["Agreed defense schedule in Form 4"]["status"], "Complete")
+
+    def test_a_deferred_defense_removes_its_google_events(self):
+        with patch("app.remove_defense_google_events") as remove_events:
+            deferred_id, _ = self.proposal_booked_and_held("Deferred", remarks="Chair was ill")
+        self.assertTrue(remove_events.called)
+        self.assertEqual([call.args[0].id for call in remove_events.call_args_list], [deferred_id])
 
     def test_deferred_defense_is_rebooked_and_linked_to_the_deferred_record(self):
         deferred_id, _ = self.proposal_booked_and_held("Deferred", remarks="Chair was ill")
