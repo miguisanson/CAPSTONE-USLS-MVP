@@ -3811,6 +3811,8 @@ def faculty_teaching_load_limit() -> int:
 
 
 ACTIVE_SUBJECT_ENROLLMENT_STATUSES = {"Enrolled", "Current"}
+# A semester row with one of these statuses still says the student is enrolled that semester (a pending leave, withdrawal or AWOL flag does not remove the subjects).
+TERM_ENROLLED_SIGNALS = {"Confirmed", "Enrolled", "Active", "Withdrawal Pending", "LOA Pending", "AWOL"}
 RECORDED_SUBJECT_ENROLLMENT_STATUSES = ACTIVE_SUBJECT_ENROLLMENT_STATUSES | {
     "Completed",
     "Taken",
@@ -4694,7 +4696,7 @@ def enrollment_integrity_payload(
                 student_id=student.id,
                 term_id=item.term_id,
             ).first()
-            if not term_row or term_row.status not in {"Confirmed", "Enrolled", "Active"}:
+            if not term_row or term_row.status not in TERM_ENROLLED_SIGNALS:
                 issues.append({
                     "id": f"term-{item.id}",
                     "type": "Semester enrollment missing",
@@ -38453,11 +38455,21 @@ def seed_dean_review_cases() -> int:
             record.course_id: record.status
             for record in CourseRecord.query.filter_by(student_id=student.id).all()
         }
-        course = next(
-            (item for item in monitoring_curriculum_courses(student.program)
-             if taken.get(item.id) not in ("Completed", "Withdrawn")),
-            None,
-        )
+        open_courses = [
+            item for item in monitoring_curriculum_courses(student.program)
+            if taken.get(item.id) not in ("Completed", "Withdrawn")
+        ]
+        # A subject on the term's offering list, so the seed does not report an offering conflict:
+        # one already offered, else the first open one is put on the list (as the other demo seeds do).
+        offered_ids = {offer.course_id for offer in curriculum_offerings_for_term(student.program, active_term)}
+        course = next((item for item in open_courses if item.id in offered_ids), None)
+        if course is None and open_courses:
+            course = open_courses[0]
+            academic_year, semester = split_academic_term_label(active_term.label)
+            db.session.add(CurriculumOffering(
+                program_id=student.program_id, academic_year=academic_year, semester=semester,
+                course_id=course.id, added_by="Dean queue demo",
+            ))
         if course is None:
             return None
         record = CourseRecord.query.filter_by(student_id=student.id, course_id=course.id).first()
