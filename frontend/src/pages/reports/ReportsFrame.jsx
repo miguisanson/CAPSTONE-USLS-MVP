@@ -37,7 +37,7 @@ export function describeComparison(tile) {
 /** The small line under the figure: what it is made of. */
 function tileSub(tile) {
   const d = tile.detail;
-  if (tile.key === "active") return "Standing Active, not completed or withdrawn"; // the dashboard's "active" is Active standing alone (I-193)
+  if (tile.key === "active") return "Standing Active, not completed or withdrawn"; // the dashboard shares this count (student_is_active, I-193)
   if (tile.key === "behind") return `${tile.count} of ${tile.of} active students`;
   if (tile.key === "decide_days") return tile.count ? `${tile.count} decisions` : "No decisions in this period";
   if (tile.key === "defenses") return `${d.held} held · ${d.next_30_days} in the next 30 days · ${d.awaiting_verdict} waiting for a verdict`;

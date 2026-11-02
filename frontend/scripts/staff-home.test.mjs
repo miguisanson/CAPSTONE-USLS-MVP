@@ -131,7 +131,7 @@ test("key numbers, staff: own open tasks, students monitored, at risk or delayed
   assert.match(stats[0].sub, /2 overdue/);
   assert.equal(stats[0].tone, "danger");
   assert.equal(stats[1].value, 120);
-  assert.match(stats[1].sub, /100 with Active standing/);
+  assert.match(stats[1].sub, /100 active students/);
   assert.equal(stats[1].to, "/students");
   assert.equal(stats[2].value, 14);
   assert.match(stats[2].sub, /3 delayed/);
