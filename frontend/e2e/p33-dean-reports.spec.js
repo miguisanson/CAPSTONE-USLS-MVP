@@ -220,7 +220,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     // 390: no sideways scroll.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
-    await expect(boardOf(page)).toBeVisible();
+    await expect(page.getByRole("region", { name: "Graduation candidates by stage" })).toBeVisible(); // CHANGED (I-190): the Dean on a phone gets stacked cards, not the board
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
     await shot(page, "batches-ready-390.png");
   });
@@ -259,7 +259,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await cardOf(page).getByRole("button", { name: `View details for ${BATCH}` }).click();
+    await page.getByRole("region", { name: "Graduation candidates by stage" }).getByRole("button", { name: `View details for ${BATCH}` }).click();
     await expectSharedStageCheck(page, ["Complete", "Complete", "Complete", "Complete", "Complete", "Complete", "Current", "Pending"]);
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
     await shot(page, "stage-check-ready-390.png");
@@ -307,7 +307,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
-    await expect(boardOf(page)).toBeVisible();
+    await expect(page.getByRole("region", { name: "Graduation candidates by stage" })).toBeVisible(); // CHANGED (I-190)
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
     await shot(page, "batches-approved-390.png");
   });

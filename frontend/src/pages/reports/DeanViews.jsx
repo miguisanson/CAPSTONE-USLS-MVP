@@ -1,5 +1,5 @@
 // The Dean's report views (I-141, F4): D1 what waits and for how long, D2 how fast decisions are made, D3 what was
-// decided, D4 the graduation pipeline. The server counts everything (/api/reports/decisions), so the Dean home, the
+// decided, D4 the graduation pipeline, D5 the active students at each stage (I-189). The server counts everything (/api/reports/decisions), so the Dean home, the
 // approvals queue and these pages cannot disagree. Every count opens the cases behind it.
 import { useState } from "react";
 import { AlertTriangle, Clock } from "lucide-react";
@@ -8,6 +8,7 @@ import { useApi } from "../../hooks";
 import { EmptyState, Spinner, StatCard } from "../../components/ui/index.js";
 import { AMBER, BLUE, BarsChart, ChartCard, GREEN, ORANGE, RED } from "./ChartParts.jsx";
 import ListDialog, { CountButton } from "./ListDialog.jsx";
+import { DEFAULT_STAGES } from "../../lib/stages.js";
 
 // "Decide within 7 days": the same line the summary uses for a request that has waited too long (the server's
 // REPORT_WAITING_DAYS). shortcut: a constant until the Graduate School puts a decision target in the Business Rules register.
@@ -233,6 +234,45 @@ export function PipelineView({ scope, scopeKey, summary }) {
       {open && (open.endpoint
         ? <ListDialog title={open.title} endpoint={open.endpoint} params={scope} filterRows={open.keep} onClose={() => setOpen(null)} />
         : <ListDialog title={open.title} columns={CASE_COLUMNS} rows={open.rows} onClose={() => setOpen(null)} />)}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- D5 Students by stage
+// The Dean may read the list behind the "Active students" number (/api/reports/summary/active), so the stage counts are made
+// from it. shortcut: no days-in-stage or stuck zones - those are /api/reports/stages, which only staff and the coordinators may call.
+const STAGE_LIST_COLUMNS = [{ key: "student", label: "Student" }, { key: "program", label: "Program" }, { key: "detail", label: "Stage and risk" }];
+const stageRank = (stage) => { const i = DEFAULT_STAGES.indexOf(stage); return i < 0 ? DEFAULT_STAGES.length : i; };
+
+export function StagesView({ scope, scopeKey }) {
+  const { data, error } = useApi(() => api.reportV2("summary/active", scope), [scopeKey]);
+  const [open, setOpen] = useState(null);
+  if (!data) return <Loading error={error} label="Loading the students per stage…" />;
+  const byStage = {};
+  for (const row of data.rows) (byStage[row.stage || "No stage"] ||= []).push(row);
+  const stages = Object.entries(byStage)
+    .map(([stage, rows]) => ({ stage, rows, count: rows.length }))
+    .sort((a, b) => stageRank(a.stage) - stageRank(b.stage) || a.stage.localeCompare(b.stage));
+  const ask = (s) => `Show ${s.count} students in ${s.stage}`;
+  const table = {
+    caption: "How many active students are at each stage? (table)",
+    rowKey: "stage",
+    columns: [
+      { key: "stage", header: "Stage" },
+      { key: "count", header: "Students", align: "right", cell: (s) => <CountButton count={s.count} label={ask(s)} onClick={() => setOpen(s)} /> },
+    ],
+    rows: stages,
+  };
+  return (
+    <div className="page-stack">
+      <ChartCard
+        question="How many active students are at each stage?"
+        hint="Select a bar or a count to see the students. A stage with many students and few in the next one is where students wait."
+        empty={stages.length ? null : { title: "No active students for these filters", hint: "Change the program, cohort or period to look elsewhere." }}
+        chart={<BarsChart data={stages} categoryKey="stage" series={[{ key: "count", name: "Students", color: BLUE }]} onSelect={(row) => setOpen(stages.find((s) => s.stage === row.stage))} ariaLabel="Active students per stage" />}
+        table={table}
+      />
+      {open && <ListDialog title={`${open.stage}: ${open.count} students`} columns={STAGE_LIST_COLUMNS} rows={open.rows} onClose={() => setOpen(null)} />}
     </div>
   );
 }

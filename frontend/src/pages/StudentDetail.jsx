@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router-dom";
+import { useState } from "react";
 import {
   Briefcase,
   Mail,
@@ -51,6 +52,59 @@ const ENROLLMENT_COLUMNS = [
     ),
   },
 ];
+
+// The four counts of the course audit. A count with subjects behind it is a button that opens them under the tiles (I-192);
+// a zero is only a number.
+const AUDIT_TILES = [
+  { key: "completed", label: "Completed", tone: "success" },
+  { key: "current", label: "Current", tone: "info" },
+  { key: "incomplete", label: "Incomplete", tone: "warning" },
+  { key: "missing", label: "Missing", tone: "danger" },
+];
+
+function CourseAuditTiles({ audit }) {
+  const [openKey, setOpenKey] = useState("");
+  const chosen = AUDIT_TILES.find((tile) => tile.key === openKey);
+  const rows = chosen ? audit[chosen.key] : [];
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {AUDIT_TILES.map((tile) => {
+          const count = audit[tile.key].length;
+          const card = <StatCard size="sm" label={tile.label} value={count} tone={tile.tone} sub={count ? (openKey === tile.key ? "Hide subjects" : "Show subjects") : undefined} />;
+          return count ? (
+            <button
+              key={tile.key}
+              type="button"
+              aria-expanded={openKey === tile.key}
+              aria-controls="course-audit-subjects"
+              onClick={() => setOpenKey(openKey === tile.key ? "" : tile.key)}
+              className="block h-full w-full cursor-pointer rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            >
+              {card}
+            </button>
+          ) : <div key={tile.key}>{card}</div>;
+        })}
+      </div>
+      {chosen && (
+        <section id="course-audit-subjects" aria-label={`${chosen.label} subjects (${rows.length})`} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+          <p className="eyebrow mb-2">{chosen.label} subjects ({rows.length})</p>
+          <ul className="space-y-1.5">
+            {rows.map((row) => (
+              <li key={row.code} className="flex items-center justify-between gap-2 text-sm">
+                <span className="min-w-0 text-slate-700">
+                  <span className="font-semibold">{row.code}</span> · {row.title}
+                  <span className="meta block">{[row.units ? `${row.units} units` : "", row.term_label || row.recommended_term].filter(Boolean).join(" · ")}</span>
+                </span>
+                <StatusChip status={row.status} dot={false} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
+  );
+}
 
 export default function StudentDetail() {
   const { id } = useParams();
@@ -157,12 +211,7 @@ export default function StudentDetail() {
               </div>
               <ProgressBar value={course_audit.completion_rate} />
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatCard size="sm" label="Completed" value={course_audit.completed.length} tone="success" />
-              <StatCard size="sm" label="Current" value={course_audit.current.length} tone="info" />
-              <StatCard size="sm" label="Incomplete" value={course_audit.incomplete.length} tone="warning" />
-              <StatCard size="sm" label="Missing" value={course_audit.missing.length} tone="danger" />
-            </div>
+            <CourseAuditTiles audit={course_audit} />
 
             {/* Units + per-category subtotals */}
             <div>

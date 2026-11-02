@@ -83,6 +83,10 @@ export const canOpen = (to, role) => {
   return pages.has(path) || (path.startsWith("/students/") && pages.has("/students"));
 };
 
+// A Leave of Absence task opens the board on the open requests, with that filter showing (I-196); the board drops it on request.
+const LEAVE_BOARD = "/workflow/leave-of-absence";
+const onOpenRequests = (to) => (to === LEAVE_BOARD ? `${to}?show=open` : to);
+
 /**
  * Where "Open" leads for one of the viewer's own tasks: the task's own action_url, else the workflow page its title
  * names - either only if the role can open it - else the student's record (when the role has a Students page), else
@@ -90,11 +94,11 @@ export const canOpen = (to, role) => {
  * @returns { to, label }
  */
 export function taskTarget(task, role) {
-  if (task.action_url && canOpen(task.action_url, role)) return { to: task.action_url, label: openPageLabel(task.action_url, task.action_label || "Open") };
+  if (task.action_url && canOpen(task.action_url, role)) return { to: onOpenRequests(task.action_url), label: openPageLabel(task.action_url, task.action_label || "Open") };
   for (const [pattern, to, withStudent] of TITLE_TARGETS) {
     if (pattern.test(task.title || "")) {
       if (canOpen(to, role)) {
-        const path = withStudent && task.student_id ? `${to}?student_id=${encodeURIComponent(task.student_id)}` : to;
+        const path = withStudent && task.student_id ? `${to}?student_id=${encodeURIComponent(task.student_id)}` : onOpenRequests(to);
         return { to: path, label: openPageLabel(to) };
       }
       break; // the page the title names is not this role's: fall through to the record or the queue
@@ -244,7 +248,7 @@ export function officeStats({ role, own, waiting, kpis }) {
   if (kpis) {
     return [
       tasks,
-      { key: "students", label: "Students monitored", value: kpis.total_students, sub: `${kpis.active_students} active`, tone: "success", to: "/students" },
+      { key: "students", label: "Students monitored", value: kpis.total_students, sub: `${kpis.active_students} with Active standing`, tone: "success", to: "/students" },
       { key: "risk", label: "At risk or delayed", value: kpis.at_risk, sub: `${kpis.high_risk} delayed`, tone: "warning", to: "/students?risk=At Risk of Delay/Delayed" },
       { key: "defenses", label: "Confirmed defenses", value: kpis.confirmed_schedules, sub: `${kpis.needs_availability} awaiting availability`, tone: "info", to: "/workflow/defense-scheduling" },
     ];

@@ -1,8 +1,10 @@
-import { AlertTriangle, CheckCircle2, Circle } from "lucide-react";
+import { useId, useState } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Circle } from "lucide-react";
 import { InlineNotice, StatusChip } from "../../components/ui/index.js";
 import { LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
 import { formatDate } from "../../lib/format";
 import { toneOf } from "../../lib/tone";
+import { useIsPhone } from "../../hooks";
 
 // Plain-language Dean view of one Leave of Absence / Readmission case.
 // Everything here is read-only: the Dean's buttons and comment box stay in WorkflowApprovalCard.
@@ -35,6 +37,26 @@ function Panel({ title, children, className = "" }) {
     <section className={`rounded-xl border border-slate-200 bg-white p-4 ${className}`}>
       <h3 className="eyebrow mb-2">{title}</h3>
       {children}
+    </section>
+  );
+}
+
+// The policy text is long. On a phone it starts folded so the decision is not five screens down (I-191); on a desktop it
+// starts open. The Dean's own choice wins once made. The one line under the title keeps the advice in view while folded.
+function PolicyPanel({ summary, children }) {
+  const phone = useIsPhone();
+  const [chosen, setChosen] = useState(null);
+  const open = chosen ?? !phone;
+  const id = useId();
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 className="eyebrow">
+        <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setChosen(!open)} className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:min-h-0">
+          <span>Policy check{summary && !open ? <span className="ml-2 font-normal normal-case tracking-normal text-slate-500">{summary}</span> : null}</span>
+          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+        </button>
+      </h3>
+      {open && <div id={id} className="mt-2">{children}</div>}
     </section>
   );
 }
@@ -148,7 +170,7 @@ export function LeaveCaseSummary({ item }) {
       </div>
 
       {review && (
-        <Panel title="Policy check">
+        <PolicyPanel summary={review.suggested_dean_action ? `Suggested: ${review.suggested_dean_action}` : ""}>
           {checks.length > 0 && (
             <ul className="space-y-2">
               {checks.map((check, index) => (
@@ -169,7 +191,7 @@ export function LeaveCaseSummary({ item }) {
               <StatusChip label="Advice only - you decide" tone="muted" size="sm" dot={false} className="ml-2" />
             </p>
           )}
-        </Panel>
+        </PolicyPanel>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">

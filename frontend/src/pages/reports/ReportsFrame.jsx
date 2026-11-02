@@ -3,11 +3,11 @@
 // their tabs. The address holds the filters and the open tab (?report=stages&program_id=3&period=all), so a reload,
 // the Back button and a shared link all land on the same view.
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Minus, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Card, EmptyState, Field, PageHeader, Select, Skeleton, Tabs } from "../../components/ui/index.js";
+import { Button, Card, EmptyState, Field, PageHeader, Select, Skeleton, Tabs } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import ListDialog from "./ListDialog.jsx";
 import { DEFAULT_PERIOD, FRAME_KEYS, PERIODS, apiScope, scopeKey } from "./scope.js";
@@ -37,6 +37,7 @@ export function describeComparison(tile) {
 /** The small line under the figure: what it is made of. */
 function tileSub(tile) {
   const d = tile.detail;
+  if (tile.key === "active") return "Standing Active, not completed or withdrawn"; // the dashboard's "active" is Active standing alone (I-193)
   if (tile.key === "behind") return `${tile.count} of ${tile.of} active students`;
   if (tile.key === "decide_days") return tile.count ? `${tile.count} decisions` : "No decisions in this period";
   if (tile.key === "defenses") return `${d.held} held · ${d.next_30_days} in the next 30 days · ${d.awaiting_verdict} waiting for a verdict`;
@@ -55,7 +56,7 @@ function Tile({ tile, onOpen }) {
       onClick={() => onOpen(tile)}
       className="card flex h-full w-full cursor-pointer flex-col gap-1 p-3 text-left sm:p-4 transition-colors hover:border-brand-200 hover:bg-brand-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     >
-      <span className="text-xs font-semibold text-slate-600">{tile.label}</span>
+      <span className="text-xs font-semibold text-slate-600">{tile.key === "waiting" ? `${tile.label} (all offices)` : tile.label}</span>
       <span className="page-title">
         {tile.value == null ? "-" : tile.value}
         {tile.value != null && <span className="ml-1 text-sm font-medium text-slate-500">{unit}</span>}
@@ -89,7 +90,10 @@ export default function ReportsFrame({ title, description, icon, actions, tabs, 
   const showScope = !active.bare;
   const { data: summary, error } = useApi(() => (showScope ? api.reportV2("summary", scope) : Promise.resolve(null)), [showScope, key]);
   const [open, setOpen] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false); // phones only: the filters fold into one button so the numbers come first (I-194)
   const programs = meta?.programs || [];
+  const filterCount = ["program_id", "cohort"].filter((name) => params.get(name)).length + (params.get("period") && params.get("period") !== DEFAULT_PERIOD ? 1 : 0);
+  const periodLabel = PERIODS.find((p) => p.value === (params.get("period") || DEFAULT_PERIOD))?.label;
 
   function setParam(name, value) {
     const next = new URLSearchParams(params);
@@ -121,7 +125,18 @@ export default function ReportsFrame({ title, description, icon, actions, tabs, 
 
       {showScope && (
         <Card>
-          <div role="group" aria-label="Report filters" className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 max-sm:[&>label:last-child]:col-span-2">
+          <div className="flex items-center justify-between gap-3 sm:hidden">
+            <Button variant="secondary" icon={SlidersHorizontal} aria-expanded={filtersOpen} aria-controls="report-filters" onClick={() => setFiltersOpen((on) => !on)}>
+              Filters ({filterCount})
+            </Button>
+            <span className="meta">{periodLabel}</span>
+          </div>
+          <div
+            id="report-filters"
+            role="group"
+            aria-label="Report filters"
+            className={`${filtersOpen ? "mt-3 grid" : "hidden"} grid-cols-2 gap-3 sm:mt-0 sm:grid sm:grid-cols-3 sm:gap-4 max-sm:[&>label:last-child]:col-span-2`}
+          >
             <Field label="Program">
               <Select placeholder="All programs" value={params.get("program_id") || ""} onChange={(e) => setParam("program_id", e.target.value)} options={programs.map((p) => ({ value: String(p.id), label: p.code }))} />
             </Field>
@@ -132,7 +147,7 @@ export default function ReportsFrame({ title, description, icon, actions, tabs, 
               <Select placeholder={null} value={params.get("period") || DEFAULT_PERIOD} onChange={(e) => setParam("period", e.target.value)} options={PERIODS} />
             </Field>
           </div>
-          {summary && <p className="meta mt-3">{scopeSentence(summary, programs, scope)}</p>}
+          {summary && <p className={`meta mt-3 ${filtersOpen ? "" : "max-sm:hidden"}`}>{scopeSentence(summary, programs, scope)}</p>}
         </Card>
       )}
 

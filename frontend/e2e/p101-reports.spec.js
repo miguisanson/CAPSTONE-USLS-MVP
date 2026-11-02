@@ -38,7 +38,7 @@ const STAFF_TABS = [
   "Cohorts by stage", "Graduation candidates", "Overdue and pending", "Defenses", "Registrar changes",
 ];
 const RESEARCH_TABS = ["Needs attention", "Where students get stuck", "Records to fix"];
-const DEAN_TABS = ["Waiting for my decision", "How fast decisions are made", "Outcomes", "Graduation pipeline"];
+const DEAN_TABS = ["Waiting for my decision", "How fast decisions are made", "Outcomes", "Graduation pipeline", "Students by stage"]; // I-189 added the last
 
 const main = (page) => page.locator("main");
 const tab = (page, name) => page.getByRole("tab", { name, exact: true });

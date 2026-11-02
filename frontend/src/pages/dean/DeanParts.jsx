@@ -9,7 +9,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { api } from "../../api";
-import { useApi } from "../../hooks";
+import { useApi, useIsPhone } from "../../hooks";
 import { Button, Card, DecisionPanel, EmptyState, HistoryPanel, SearchInput, SkeletonBoard, StatusChip } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../../components/WorkflowTimeline";
@@ -88,6 +88,7 @@ export function DeanListFilters({ filters, setFilters, programs, statuses, showA
 // (approve / review / deny / return). The panel blocks return and deny without a comment, and asks first.
 export function WorkflowApprovalCard({ item, note, setNote, template, setTemplate, recipient, setRecipient, visibility, setVisibility, busy, onDecide, onMessage }) {
   const key = `${item.type}-${item.id}`;
+  const phone = useIsPhone();
   const isBusy = busy === key;
   const standingChange = ["leave-of-absence", "readmission", "awol-return"].includes(item.type);
   const decisionOnly = ["practicum", "withdrawal", "graduation"].includes(item.type);
@@ -218,9 +219,10 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
         className="field-input"
       />
       </div>}
+      {/* The buttons stay on screen while the case is read, like the graduation detail window's footer (I-191). */}
+      <div data-testid="decision-footer" className={canDecide ? "sticky bottom-3 z-20 mt-4 rounded-xl border border-slate-200 bg-white p-3 shadow-lift" : "mt-3"}>
       <DecisionPanel
         variant="plain"
-        className="mt-3"
         actions={actions}
         busy={isBusy}
         onDecide={(decision, text) => onDecide(item, decision, text)}
@@ -229,7 +231,7 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
         onCommentChange={(value) => setNote((current) => ({ ...current, [key]: value }))}
         commentLabel={decisionOnly ? "Review comment" : "Your comment"}
         commentPlaceholder={decisionOnly ? "Add a review comment. It will be saved with your name, role, date, and time." : "Write your reason. It is saved with your name, role, date and time."}
-        commentRows={4}
+        commentRows={2}
         commentRequiredMessage="Choose a reason or enter a comment before returning or denying the request."
         extra={
           <>
@@ -246,6 +248,7 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
           </>
         }
       />
+      </div>
     </Card>
   );
 }

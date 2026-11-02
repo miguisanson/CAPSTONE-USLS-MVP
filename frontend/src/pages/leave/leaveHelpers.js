@@ -4,7 +4,10 @@ import { formatDate } from "../../lib/format";
 // AWOL & Residency, Withdrawal). Nothing here decides what is allowed: the server sends
 // `case.actions` for the signed-in role, and every move is checked again by the server.
 
-export const EMPTY_FILTERS = { query: "", program: "", status: "", reason: "", kind: "" };
+export const EMPTY_FILTERS = { query: "", program: "", status: "", reason: "", kind: "", open: false };
+
+// "Open requests only" (the board's ?show=open link, I-196): every status that ends a request leaves the board.
+const ENDED_STATUSES = new Set(["Closed", "Approved", "Expired", "Completed", "Denied", "Withdrawn", "Cancelled"]);
 
 // The Dean's "approve" lands on a different status depending on the kind of request.
 const APPROVED_STATUSES = ["Leave Scheduled", "Approved"];
@@ -128,6 +131,7 @@ export function matchesFilters(item, filters) {
   if (filters.status && item.status !== filters.status) return false;
   if (filters.reason && item.reason_category !== filters.reason) return false;
   if (filters.kind && item.kind !== filters.kind) return false;
+  if (filters.open && ENDED_STATUSES.has(item.status)) return false;
   const query = (filters.query || "").trim().toLowerCase();
   if (query) {
     const haystack = [item.student?.name, item.student?.student_number, item.student?.program_code, item.student?.program_name]

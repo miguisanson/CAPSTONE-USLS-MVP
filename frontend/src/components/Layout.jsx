@@ -34,6 +34,7 @@ import { Button, Drawer } from "./ui/index.js";
 import { PORTAL_NAV, PORTAL_FOOTERS, findNavItem, usePortalNav } from "./portalNav";
 import NotificationBell from "./NotificationBell";
 import { PAGE, PORTAL_NAMES, RECORD_LABELS, stepLabel, withoutStep } from "../lib/labels.js";
+import { RecordTitleProvider } from "./recordTitle.jsx";
 
 // Ordered top-to-bottom to follow the graduate lifecycle, so a new staff user
 // moves down the list step by step instead of hunting between pages.
@@ -226,6 +227,7 @@ function SidebarContent({ onNavigate, onClose, user }) {
 
 export default function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [recordTitle, setRecordTitle] = useState(""); // set by a record page through useRecordTitle (I-196)
   const location = useLocation();
   const { user, logout } = useAuth();
   // Every role has a sidebar; the page's name is its sidebar label (without a "3 · " step number).
@@ -244,8 +246,9 @@ export default function Layout({ children }) {
 
   // Keep the browser tab title in step with the page (helps history and tabs).
   useEffect(() => {
-    document.title = pageTitle ? `${pageTitle} · USLS Graduate School` : "USLS Graduate School";
-  }, [pageTitle]);
+    const name = recordTitle || pageTitle;
+    document.title = name ? `${name} · USLS Graduate School` : "USLS Graduate School";
+  }, [pageTitle, recordTitle]);
 
   // "Name · Role", the role said once: a name that already ends in its role ("Dr. X (Faculty)") is not repeated.
   const roleLabel = user?.program || ROLE_LABELS[user?.role] || "Staff";
@@ -285,7 +288,7 @@ export default function Layout({ children }) {
         {/* Topbar */}
         <header className="sticky top-0 z-header flex items-center gap-3 border-b border-slate-200 bg-white/85 px-4 py-3 backdrop-blur lg:px-6 2xl:px-8">
           <Button variant="icon" icon={Menu} aria-label="Open menu" onClick={() => setMobileOpen(true)} className="lg:hidden" />
-          <Breadcrumb path={location.pathname} current={current} role={user?.role} />
+          <Breadcrumb path={location.pathname} current={current} role={user?.role} recordTitle={recordTitle} />
           <div className="ml-auto flex min-w-0 shrink-0 items-center gap-3">
             <span className="hidden max-w-[16rem] truncate rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-block xl:max-w-[24rem]" title={identity}>
               {identity}
@@ -298,7 +301,7 @@ export default function Layout({ children }) {
           </div>
         </header>
 
-        <main id="main-content" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-page flex-1 px-4 py-6 focus:outline-none lg:px-6 lg:py-7 2xl:px-8 2xl:py-8">{children}</main>
+        <main id="main-content" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-page flex-1 px-4 py-6 focus:outline-none lg:px-6 lg:py-7 2xl:px-8 2xl:py-8"><RecordTitleProvider value={setRecordTitle}>{children}</RecordTitleProvider></main>
       </div>
     </div>
   );
@@ -312,7 +315,7 @@ const FALLBACK_LABELS = {
 // One rule for every role: "<Portal name> > <Page name>", the page name being the sidebar label and the page's own
 // title (lib/labels.js). A record page that is not in the sidebar adds its list page in between and the record last:
 // "<Portal name> > Students > Student Record".
-function Breadcrumb({ path, current, role }) {
+function Breadcrumb({ path, current, role, recordTitle }) {
   const portal = PORTAL_NAMES[role] || PORTAL_NAMES.staff;
   const crumbs = [{ label: portal, hide: "hidden sm:flex" }];
   if (current) {
@@ -323,7 +326,7 @@ function Breadcrumb({ path, current, role }) {
     } else {
       const prefix = [current.item.to, ...(current.item.matches || [])].find((candidate) => trimmed === candidate || trimmed.startsWith(`${candidate}/`));
       crumbs.push({ label: name, to: current.item.to, hide: "hidden md:flex" });
-      crumbs.push({ label: RECORD_LABELS[prefix] || "Details", page: true });
+      crumbs.push({ label: recordTitle || RECORD_LABELS[prefix] || "Details", page: true });
     }
   } else {
     const segment = path.split("/").filter(Boolean)[0] || "";

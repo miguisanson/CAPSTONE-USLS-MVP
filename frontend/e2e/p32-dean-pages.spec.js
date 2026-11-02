@@ -134,7 +134,7 @@ test.describe("P3.2 Dean pages", () => {
     const total = Number((await waiting.innerText()).match(/Decisions waiting\s+(\d+)/i)?.[1]);
     expect(total, "Maureen, Daniel, Gabriel and the plan are waiting").toBeGreaterThanOrEqual(4);
     await expect(page.getByRole("main").getByRole("link", { name: /Oldest wait/ })).toContainText(/(Today|\d+ days?)/);
-    await expect(page.getByRole("main").getByRole("link", { name: /Waiting over 7 days/ })).toHaveAttribute("href", "/dean/approvals");
+    await expect(page.getByRole("main").getByRole("link", { name: /Waiting on you over 7 days/ })).toHaveAttribute("href", "/dean/approvals");
     await expect(page.getByRole("main").getByRole("link", { name: /Decided this week/ })).toHaveAttribute("href", "/dean/activity");
 
     // Needs your action: the oldest decisions first, each with a Review link to its case.

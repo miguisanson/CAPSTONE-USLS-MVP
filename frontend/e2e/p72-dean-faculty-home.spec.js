@@ -158,10 +158,10 @@ test.describe("Dean home", () => {
     await expect(main(page).locator("h2").first()).toHaveText("Needs your action");
     const waiting = waitingOf(loaded);
 
-    expect(await labels(page), "the key-number labels").toEqual(["decided this week", "decisions waiting", "oldest wait", "waiting over 7 days"]);
+    expect(await labels(page), "the key-number labels").toEqual(["decided this week", "decisions waiting", "oldest wait", "waiting on you over 7 days"]);
     await expect(statValue(page, "Decisions waiting")).toHaveText(String(waiting.total));
     const over = [...waiting.cases, ...waiting.plans].filter((item) => Date.now() - dateOf(item) > 7 * 86400000).length;
-    await expect(statValue(page, "Waiting over 7 days")).toHaveText(String(over));
+    await expect(statValue(page, "Waiting on you over 7 days")).toHaveText(String(over));
     await expect(statValue(page, "Oldest wait")).toHaveText(/^(Today|\d+ days?)$/);
     await expect(statValue(page, "Decided this week")).toHaveText(/^\d+$/);
     // the per-process tiles ("... waiting for your decision") are gone; the breakdown is the Approvals Queue
@@ -193,7 +193,7 @@ test.describe("Dean home", () => {
     await expect(mine.getByText("Nothing is waiting for your decision")).toBeVisible();
     await expect(statValue(page, "Decisions waiting")).toHaveText("0");
     await expect(statValue(page, "Oldest wait")).toHaveText("None");
-    await expect(statValue(page, "Waiting over 7 days")).toHaveText("0");
+    await expect(statValue(page, "Waiting on you over 7 days")).toHaveText("0");
     await shot(page, "dean-home-empty-1366.png");
   });
 

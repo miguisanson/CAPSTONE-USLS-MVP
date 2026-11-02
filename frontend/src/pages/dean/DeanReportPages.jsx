@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, BarChart3, ClipboardCheck, Clock, GraduationCap, Timer } from "lucide-react";
+import { Activity, BarChart3, ClipboardCheck, Clock, GraduationCap, Layers, Timer } from "lucide-react";
 import { DataTable, Field, PageHeader, Select, StatusChip } from "../../components/ui/index.js";
 import ReportsFrame from "../reports/ReportsFrame.jsx";
-import { OutcomesView, PipelineView, SpeedView as DeanSpeedView, WaitingView } from "../reports/DeanViews.jsx";
+import { OutcomesView, PipelineView, SpeedView as DeanSpeedView, StagesView, WaitingView } from "../reports/DeanViews.jsx";
 import { OnboardingGatePanel, CourseworkReportPanel } from "../../components/ProcessGates";
 import { formatDate } from "../../lib/format";
 import Assistant from "../Assistant";
@@ -31,13 +31,14 @@ export function DeanGateReportsPage() {
 }
 
 // ------------------------------------------------------------ Reports & analytics
-// The Dean's four questions (I-141, F4) in the frame the staff Reports page shares. The server counts every number, so the
+// The Dean's five questions (I-141, F4, I-189) in the frame the staff Reports page shares. The server counts every number, so the
 // figures here are the Dean home's (I-074).
 const DEAN_TABS = [
   { id: "waiting", label: "Waiting for my decision", icon: Clock, render: (c) => <WaitingView {...c} /> },
   { id: "speed", label: "How fast decisions are made", icon: Timer, render: (c) => <DeanSpeedView {...c} /> },
   { id: "outcomes", label: "Outcomes", icon: BarChart3, render: (c) => <OutcomesView {...c} /> },
   { id: "graduation", label: "Graduation pipeline", icon: GraduationCap, render: (c) => <PipelineView {...c} /> },
+  { id: "stages", label: "Students by stage", icon: Layers, render: (c) => <StagesView {...c} /> },
 ];
 
 export function DeanAnalyticsPage() {
