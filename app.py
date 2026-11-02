@@ -2617,6 +2617,7 @@ def monitoring_research_milestones(student: Student) -> dict:
 
 
 def require_research_prerequisite(student: Student) -> dict:
+    require_open_standing(student, "the research process")
     prerequisite = comprehensive_exam_eligibility(student)
     if not prerequisite["eligible"]:
         raise ValueError("Complete all curriculum subjects before taking the comprehensive exam.")
@@ -4384,6 +4385,34 @@ ENROLLMENT_BLOCKING_STANDINGS = {"AWOL", "On Leave", "Withdrawn", "Graduated", "
 ENROLLMENT_BLOCKING_TAGS = {"LOA", "AWOL", "Withdrawn", "Completed"}
 
 
+CLOSED_STANDING_NEXT_STEP = {
+    "AWOL": "the Return from AWOL process",
+    "On Leave": "a readmission",
+    "Withdrawn": "a readmission or re-enrollment decision",
+}
+
+
+def student_closed_standing(student: Student) -> str | None:
+    """"AWOL", "On Leave" or "Withdrawn" when research, practicum and graduation steps are closed to the student."""
+    standing, tag = student.standing or "", student.enrollment_tag or ""
+    if standing == "AWOL" or tag == "AWOL":
+        return "AWOL"
+    if standing == "On Leave" or tag == "LOA":
+        return "On Leave"
+    if standing == "Withdrawn" or tag == "Withdrawn":
+        return "Withdrawn"
+    return None
+
+
+def require_open_standing(student: Student, what: str) -> None:
+    """Rules are checked again at every step: a student who is AWOL, on leave or withdrawn cannot move on."""
+    word = student_closed_standing(student)
+    if word:
+        raise ValueError(
+            f"{student.name} is {word}, not an active student, so {what} stays closed until {CLOSED_STANDING_NEXT_STEP[word]} is completed."
+        )
+
+
 def student_enrollment_block_reason(student: Student, term: AcademicTerm | None = None) -> str | None:
     """Why this student may not be enrolled in subjects right now, or None.
 
@@ -5320,7 +5349,11 @@ def student_portal_recommendations(student: Student) -> list[dict]:
             item["recommendation"] = f"Upload the {count} missing file(s) for {milestone.get('label', indicators['research_gate'])}."
             item["owner"] = "You"
         elif rec["code"] == "coursework":
-            item["recommendation"] = f"Contact the Academic Coordinator about your {indicators['missing_subjects']} outstanding subject(s)."
+            # Only subjects behind schedule are "outstanding"; the rest are still ahead of the student or in progress.
+            behind = len(student_behind_subjects(student))
+            if not behind:
+                continue
+            item["recommendation"] = f"Contact the Academic Coordinator about your {behind} subject(s) that are behind schedule."
         elif rec["code"] == "schedule":
             item["recommendation"] = "Wait for the Research Coordinator to confirm a time shared by your adviser and panel."
         elif rec["code"] == "stalled":
@@ -5329,29 +5362,38 @@ def student_portal_recommendations(student: Student) -> list[dict]:
     return rows
 
 
-def student_delay_assessment(student: Student) -> dict:
-    """Return a progress status; every alert must explain a possible delay."""
-    term = get_active_term()
-    indicators = student_indicators(student)
-    delayed: list[str] = []
-    at_risk: list[str] = []
-    current_year = student_current_course_year(student, term) or 1
+def student_behind_subjects(student: Student, term: AcademicTerm | None = None) -> list[str]:
+    """Course codes still unfinished past their suggested course year. Subjects the student is taking now
+    (Current / Enrolled) and subjects that are not due yet are not behind."""
+    if student.program.code not in AUTHORITATIVE_CURRICULA:
+        return []
+    current_year = student_current_course_year(student, term or get_active_term()) or 1
     records = {
         record.course_id: record
         for record in CourseRecord.query.filter_by(student_id=student.id).all()
     }
-
+    behind = []
     for course in monitoring_curriculum_courses(student.program):
         record = records.get(course.id)
         status = record.status if record else "Missing"
-        if student.program.code in AUTHORITATIVE_CURRICULA:
-            year_match = re.search(r"year\s*(\d+)", course.recommended_term or "", re.IGNORECASE)
-            required_for_sequence = course.category != "Cognate" or course.code == "MBA218"
-            if (
-                year_match and int(year_match.group(1)) < current_year
-                and required_for_sequence and status not in {"Completed", "Current", "Enrolled"}
-            ):
-                delayed.append(f"{course.code} remains unfinished past its suggested course year")
+        year_match = re.search(r"year\s*(\d+)", course.recommended_term or "", re.IGNORECASE)
+        required_for_sequence = course.category != "Cognate" or course.code == "MBA218"
+        if (
+            year_match and int(year_match.group(1)) < current_year
+            and required_for_sequence and status not in {"Completed", "Current", "Enrolled"}
+        ):
+            behind.append(course.code)
+    return behind
+
+
+def student_delay_assessment(student: Student) -> dict:
+    """Return a progress status; every alert must explain a possible delay."""
+    term = get_active_term()
+    indicators = student_indicators(student)
+    delayed: list[str] = [
+        f"{code} remains unfinished past its suggested course year" for code in student_behind_subjects(student, term)
+    ]
+    at_risk: list[str] = []
 
     if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
         delayed.append("AWOL status has interrupted enrollment")
@@ -6958,6 +7000,7 @@ def leave_apply_start(case: LeaveCase, *, today: date | None = None) -> list[str
     student.current_stage = "LOA"
     student.enrollment_tag = "LOA"
     student.updated_at = now_utc()
+    flag_booked_defenses(student, "On Leave")
     start = leave_start_date(case)
     submitted = (case.submitted_at or now_utc()).date()
     filed_second_half = False
@@ -7008,6 +7051,21 @@ def leave_end_leave_for_readmission(case: LeaveCase, linked: LeaveCase | None) -
     recompute_risk(student)
 
 
+def flag_booked_defenses(student: Student, word: str) -> int:
+    """A student who goes on leave or AWOL keeps the booking, but the Research Coordinator must decide about it."""
+    booked = ScheduleRequest.query.filter(
+        ScheduleRequest.student_id == student.id,
+        ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+        ScheduleRequest.preferred_date >= date.today(),
+    ).count()
+    if booked:
+        ensure_task(
+            student.id, f"Booked defense for a student who is now {word}: keep, reschedule or cancel it",
+            "Research Coordinator", date.today() + timedelta(days=3), 80,
+        )
+    return booked
+
+
 def awol_remember_stage(awol: AwolCase, stage: str | None) -> None:
     """Keep the stage the student had before AWOL (first writer wins; never a standing stage)."""
     if not awol.prior_stage and stage and stage not in {"LOA", "AWOL", "Withdrawn", "Admission"}:
@@ -7022,6 +7080,7 @@ def leave_declare_awol(case: LeaveCase, account: UserAccount | None, comment: st
     """Staff confirmed that the leave ended with no return: the student is AWOL."""
     student = case.student
     stage_before = case.prior_stage or student.current_stage
+    flag_booked_defenses(student, "AWOL")
     student.standing = "AWOL"
     student.current_stage = "AWOL"
     student.enrollment_tag = "AWOL"
@@ -8291,6 +8350,7 @@ def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
             source_reference=source,
         )
         if newly_detected or flag_created:
+            flag_booked_defenses(student, "AWOL")
             ensure_task(
                 student.id,
                 "Review automatic AWOL policy alert",
@@ -14531,10 +14591,26 @@ def register_routes(app: Flask) -> None:
             return jsonify({
                 "error": f"You are at the {stage_progress['stage']} stage, so you can request a {expected_type} only."
             }), 400
+        preferred_date = (data.get("preferred_date") or "").strip()
+        if preferred_date:
+            try:
+                day = date.fromisoformat(preferred_date)
+            except ValueError:
+                return jsonify({"error": "Enter the preferred date as YYYY-MM-DD."}), 400
+            if day <= date.today():
+                return jsonify({"error": "The preferred date must be a future date."}), 400
         if not active_panel_assignments(student, stage_progress["gate"]):
             return jsonify({"error": "Panel matching must be completed before requesting a defense schedule."}), 400
+        booked = ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == student.id, ScheduleRequest.defense_type == defense_type,
+            ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+        ).first()
+        if booked:
+            return jsonify({"error": (
+                f"Your {defense_type} is already booked for {booked.preferred_date.isoformat()}. "
+                "Ask the Research Coordinator to move it if you need a different date."
+            )}), 409
         source = (data.get("venue") or "").strip()
-        preferred_date = (data.get("preferred_date") or "").strip()
         notes = [
             f"Student requested scheduling support for {defense_type}.",
             f"Preferred date: {preferred_date or 'Not specified'}.",
@@ -15989,11 +16065,20 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": f"{result} is not a possible outcome of this defense. Choose one of: {offered}."}), 400
         return None
 
-    def evaluation_score_or_error(data, result: str, gate: str, student: Student):
+    def evaluation_score_or_error(data, result: str, gate: str, student: Student, stored=None):
         """Protocol Form 7: below 85 (thesis / project paper) or 90 (dissertation) means the
-        panel cannot record a plain pass at the closed-door final defense."""
+        panel cannot record a plain pass at the closed-door final defense; at or above it the
+        outcome is not a major-revisions one. A pass at the final defense needs a score at all.
+        `stored` is the score already on the verdict when a correction does not send a new one."""
         raw = data.get("evaluation_score")
+        final_pass = gate == RESEARCH_GATE_FINAL and result in (VERDICT_PASSED, VERDICT_MINOR)
         if raw in (None, ""):
+            raw = stored
+        if raw in (None, ""):
+            if final_pass:
+                return None, (jsonify({
+                    "error": "Enter the Form 7 evaluation score: a final defense pass cannot be recorded without it."
+                }), 400)
             return None, None
         try:
             score = float(raw)
@@ -16001,13 +16086,20 @@ def register_routes(app: Flask) -> None:
             return None, (jsonify({"error": "The evaluation score must be a number."}), 400)
         if score < 0 or score > 100:
             return None, (jsonify({"error": "The evaluation score must be between 0 and 100."}), 400)
-        if gate == RESEARCH_GATE_FINAL and result in (VERDICT_PASSED, VERDICT_MINOR):
+        if gate == RESEARCH_GATE_FINAL:
             threshold = final_defense_passing_score(research_case_type(student))
-            if score < threshold:
+            if final_pass and score < threshold:
                 return None, (jsonify({
                     "error": (
                         f"A score of {score:g} is below {threshold} (Form 7). The protocol treats this as a "
                         "provisional pass with major revisions, not a pass."
+                    )
+                }), 400)
+            if result in (VERDICT_REDEFENSE, VERDICT_PANEL_APPROVAL) and score >= threshold:
+                return None, (jsonify({
+                    "error": (
+                        f"A score of {score:g} is {threshold} or above (Form 7), which is a pass. "
+                        "Major revisions apply only to a score below that line."
                     )
                 }), 400)
         return score, None
@@ -16026,6 +16118,10 @@ def register_routes(app: Flask) -> None:
         ).first()
         if not assignment or assignment.panel_role.lower() not in {"panel chair", "panel lead"}:
             return jsonify({"error": "Only the assigned panel chair or panel lead can submit this verdict."}), 403
+        try:
+            require_open_standing(schedule.student, "recording a defense verdict")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 409
         if schedule.status == RECONFIRM_DEFENSE_STATUS:
             return jsonify({"error": "The panel changed after this defense was booked. The schedule must be re-confirmed before a verdict can be recorded."}), 400
         if schedule.status not in ACTIVE_DEFENSE_STATUSES:
@@ -16107,7 +16203,7 @@ def register_routes(app: Flask) -> None:
         if verdict_is_acted_on(verdict):
             return jsonify({"error": "This verdict can no longer be corrected: the student or staff have already acted on it."}), 409
         student = verdict.student
-        score, score_error = evaluation_score_or_error(data, result, verdict.gate, student)
+        score, score_error = evaluation_score_or_error(data, result, verdict.gate, student, stored=verdict.evaluation_score)
         if score_error:
             return score_error
         previous = verdict.result
@@ -16603,6 +16699,22 @@ def register_routes(app: Flask) -> None:
         existing_monitoring_ids = set(preview["current_course_ids"])
         added = 0
         cancelled = 0
+        removing = set(current_active) - final_ids
+        removal_evidence = None
+        if removing and subject_adjustment_window(term, change=True)["closed"]:
+            # Past the add/drop week a subject leaves through Withdrawal (the student files it) or, with absence
+            # evidence, as a Drop recorded by the Academic Coordinator. Staff cannot just untick it.
+            if account and account.role == "academic_coordinator":
+                removal_evidence, _evidence_error = drop_evidence(
+                    data.get("unexcused_absence_percent"), data.get("drop_exception_reason"))
+            if not removal_evidence:
+                codes = ", ".join(sorted(current_active[cid].course.code for cid in removing if current_active[cid].course))
+                return jsonify({"error": (
+                    f"The add/drop week of {term.label} is over, so {codes} cannot simply be removed. The student "
+                    f"files a Subject Withdrawal (allowed until {_withdrawal_window_phrase(rule_value('withdrawal.window_days', 14))}; "
+                    f"{rule_citation('withdrawal.window_days')}), or the Academic Coordinator records a Drop with the "
+                    "student's unexcused absence percentage above the limit."
+                )}), 409
 
         for move_id in move_enrollment_ids:
             old_item = SubjectEnrollment.query.get(move_id)
@@ -16617,6 +16729,8 @@ def register_routes(app: Flask) -> None:
             item.status = "Cancelled"
             item.cancelled_at = now_utc()
             item.updated_at = now_utc()
+            if removal_evidence:
+                item.status_note = removal_evidence
             item.source_reference = source_reference
             record = CourseRecord.query.filter_by(
                 student_id=student.id,
@@ -16916,30 +17030,10 @@ def register_routes(app: Flask) -> None:
         # A withdrawal request for this same subject that nobody has decided yet is moot once
         # the subject is dropped; close it so the Dean is not asked to approve something that
         # can no longer be applied.
-        for pending in WithdrawalApplication.query.filter(
-            WithdrawalApplication.subject_enrollment_id == enrollment.id,
-            WithdrawalApplication.status.in_(
-                ["Submitted to GS Staff", "Dean Review", "Returned", "Returned for Clarification"]
-            ),
-        ).all():
-            previous_application_status = pending.status
-            pending.status = "Denied"
-            pending.dean_decision = "Denied"
-            pending.decided_at = changed_at
-            pending.staff_remarks = "\n".join(part for part in [
-                pending.staff_remarks,
-                f"Closed automatically: the Academic Coordinator recorded {course.code} as Dropped "
-                f"effective {effective_date.isoformat()}.",
-            ] if part)
-            resolve_standing_change_tasks(student.id, "withdrawal", "Graduate School Staff")
-            resolve_standing_change_tasks(student.id, "withdrawal", "Dean")
-            add_log(
-                "withdrawal", student.id, "Workflow System", source_reference,
-                f"Withdrawal request closed: {course.code} was dropped",
-                "Student",
-                f"The subject was recorded Dropped effective {effective_date.isoformat()} before the request was decided.",
-                previous_status=previous_application_status, new_status=pending.status,
-            )
+        close_undecided_withdrawals_for_dropped_subject(
+            enrollment, f"the Academic Coordinator recorded {course.code} as Dropped effective {effective_date.isoformat()}.",
+            source_reference, changed_at,
+        )
 
         close_approved_withdrawals_for_ended_subject(
             enrollment,
@@ -17720,6 +17814,10 @@ def register_routes(app: Flask) -> None:
                 }), 403
             previous_status = record.status
             if decision in {"approve", "review"}:
+                if record.status != "Report Sent to Dean":
+                    return jsonify({
+                        "error": "The Dean reviews a practicum only after the Academic Coordinator has sent the status report."
+                    }), 400
                 record.status = "Dean Reviewed"
                 record.dean_reviewed_at = now_utc()
                 result = "Practicum status reviewed by Dean"
@@ -20095,6 +20193,10 @@ def register_routes(app: Flask) -> None:
         faculty = Faculty.query.filter_by(id=safe_int(data.get("faculty_id")), active=True).first()
         if not faculty:
             return jsonify({"error": "Choose the faculty member you want as your research adviser."}), 400
+        try:
+            require_open_standing(student, "the adviser process")
+        except ValueError as exc:
+            return adviser_conflict(str(exc))
         migrate_student_adviser(student)
         if student_active_appointments(student.id):
             return adviser_conflict("You already have a research adviser. Use 'Request change of adviser' instead.")
@@ -20116,6 +20218,10 @@ def register_routes(app: Flask) -> None:
         if not student:
             return jsonify({"error": "This account is not linked to a student record."}), 400
         data = json_body()
+        try:
+            require_open_standing(student, "the adviser process")
+        except ValueError as exc:
+            return adviser_conflict(str(exc))
         migrate_student_adviser(student)
         tracker = adviser_tracker_payload(student)
         if not tracker["can_request_change"]:
@@ -20356,6 +20462,10 @@ def register_routes(app: Flask) -> None:
         faculty = Faculty.query.filter_by(id=safe_int(data.get("faculty_id")), active=True).first()
         if not student or not faculty:
             return jsonify({"error": "Choose the student and the adviser."}), 400
+        try:
+            require_open_standing(student, "the adviser process")
+        except ValueError as exc:
+            return adviser_conflict(str(exc))
         migrate_student_adviser(student)
         if student_active_appointments(student.id):
             return adviser_conflict("This student already has a research adviser. A change needs the change-of-adviser request (Form 3.1.1).")
@@ -21712,7 +21822,8 @@ def apply_practicum_payload(record: PracticumRecord, data: MultiDict, student: S
     record.moa_status = (data.get("moa_status") or record.moa_status or "Pending Review").strip()
     record.practicum_site = (data.get("practicum_site") or data.get("site") or record.practicum_site or "").strip()
     record.supervisor_name = (data.get("supervisor_name") or record.supervisor_name or "").strip()
-    record.required_hours = max(safe_int(data.get("required_hours"), record.required_hours or 0), 0)
+    # The 200-hour rule is a floor: a request payload can raise the hours but never lower them.
+    record.required_hours = max(safe_int(data.get("required_hours"), record.required_hours or 0), practicum_required_hours())
     record.completed_hours = max(safe_int(data.get("completed_hours"), record.completed_hours or 0), 0)
     record.document_status = (data.get("document_status") or record.document_status or "Pending Review").strip()
     record.completion_status = (data.get("completion_status") or record.completion_status or "Pending").strip()
@@ -21813,6 +21924,33 @@ def approved_withdrawal_applications(application_ids: list[int] | None = None) -
     if application_ids is not None:
         query = query.filter(WithdrawalApplication.id.in_(application_ids or {-1}))
     return query.order_by(WithdrawalApplication.decided_at.asc(), WithdrawalApplication.id.asc()).all()
+
+
+def close_undecided_withdrawals_for_dropped_subject(
+    enrollment: SubjectEnrollment, why: str, source: str, changed_at: datetime,
+) -> int:
+    """A withdrawal request nobody has decided yet is moot once its subject is recorded Dropped (any path)."""
+    closed = 0
+    course = enrollment.course
+    for pending in WithdrawalApplication.query.filter(
+        WithdrawalApplication.subject_enrollment_id == enrollment.id,
+        WithdrawalApplication.status.in_(["Submitted to GS Staff", "Dean Review", "Returned", "Returned for Clarification"]),
+    ).all():
+        previous = pending.status
+        pending.status = "Denied"
+        pending.dean_decision = "Denied"
+        pending.decided_at = changed_at
+        pending.staff_remarks = "\n".join(part for part in [pending.staff_remarks, f"Closed automatically: {why}"] if part)
+        resolve_standing_change_tasks(pending.student_id, "withdrawal", "Graduate School Staff")
+        resolve_standing_change_tasks(pending.student_id, "withdrawal", "Dean")
+        add_log(
+            "withdrawal", pending.student_id, "Workflow System", source,
+            f"Withdrawal request closed: {course.code if course else 'the subject'} was dropped", "Student",
+            f"The subject was recorded Dropped before the request was decided. {why}",
+            previous_status=previous, new_status=pending.status,
+        )
+        closed += 1
+    return closed
 
 
 def close_approved_withdrawals_for_ended_subject(enrollment: SubjectEnrollment, why: str, source: str) -> int:
@@ -22245,6 +22383,17 @@ def graduation_eligibility(student: Student) -> dict:
         "dean_reviewed_at": iso(practicum_record.dean_reviewed_at) if practicum_record else None,
     }
 
+    closed_standing = student_closed_standing(student)
+    not_enrolled = (student.enrollment_tag or "") == "Not Enrolled"
+    enrollment_ok = not (closed_standing or not_enrolled)
+    enrollment_actual = closed_standing or ("Not enrolled" if not_enrolled else "Enrolled")
+    enrollment_note = (
+        f"The student is {closed_standing}; graduation needs an officially enrolled student "
+        f"(Graduate School Handbook 2022-2023, p. 77, s. 3.11)." if closed_standing
+        else "The student is not enrolled this semester; graduation needs an officially enrolled student "
+             "(Graduate School Handbook 2022-2023, p. 77, s. 3.11)." if not_enrolled
+        else ""
+    )
     open_tasks = Task.query.filter(
         Task.student_id == student.id,
         Task.status.in_(["Pending", "Overdue"]),
@@ -22283,6 +22432,15 @@ def graduation_eligibility(student: Student) -> dict:
             practicum_complete if practicum_known else None,
             "confirmed practicum program scope + practicum_record",
             "Practicum completion needs verification." if not practicum_known else "",
+        ),
+        eligibility_item(
+            "enrollment",
+            "Officially enrolled this semester",
+            "Enrolled in the semester of application (Handbook 3.11)",
+            enrollment_actual,
+            enrollment_ok,
+            "student.standing + student.enrollment_tag",
+            enrollment_note,
         ),
         eligibility_item(
             "documents",
@@ -22976,6 +23134,15 @@ def workflow_approval_item(kind: str, item) -> dict:
     }
 
 
+def dean_returned_practicum_ids() -> list[int]:
+    """Practicum records the Dean sent back (AD11): they sit with the Coordinator as "Completed" but the Dean still
+    sees them, read-only, like every other process keeps a case the Dean returned."""
+    student_ids = [sid for (sid,) in db.session.query(TransactionLog.student_id).filter(
+        TransactionLog.transaction_slug == "practicum", TransactionLog.result == "Practicum status report returned by Dean").all()]
+    return [rid for (rid,) in db.session.query(PracticumRecord.id).filter(
+        PracticumRecord.status == "Completed", PracticumRecord.student_id.in_(student_ids or [-1])).all()]
+
+
 def workflow_approvals_payload() -> dict:
     def eligible_graduation_rows(query) -> list[GraduationEndorsement]:
         return [item for item in query.all() if graduation_eligibility(item.student)["eligible"]]
@@ -23054,7 +23221,7 @@ def workflow_approvals_payload() -> dict:
     recent.extend(
         workflow_approval_item("practicum", item)
         for item in scoped_practicum_records_query()
-        .filter(PracticumRecord.status == "Dean Reviewed")
+        .filter(or_(PracticumRecord.status == "Dean Reviewed", PracticumRecord.id.in_(dean_returned_practicum_ids())))
         .order_by(PracticumRecord.updated_at.desc())
         .limit(6)
         .all()
@@ -23068,9 +23235,10 @@ def workflow_approvals_payload() -> dict:
     overview.extend(
         workflow_approval_item("practicum", item)
         for item in scoped_practicum_records_query().filter(
-            PracticumRecord.status.in_({
-                "Report Sent to Dean", "Dean Reviewed", "Additional Certificates Requested",
-            })
+            or_(
+                PracticumRecord.status.in_({"Report Sent to Dean", "Dean Reviewed", "Additional Certificates Requested"}),
+                PracticumRecord.id.in_(dean_returned_practicum_ids()),
+            )
         ).order_by(PracticumRecord.updated_at.desc()).limit(100).all()
     )
     overview.extend(
@@ -26693,6 +26861,9 @@ def apply_class_list_row(item: dict, term: AcademicTerm, filename: str, actor: s
         ).strip()
         record.updated_at = changed_at
         db.session.flush()
+        close_undecided_withdrawals_for_dropped_subject(
+            ledger, f"{course.code} was recorded as Dropped in the class list ({filename}).", "Class list import", changed_at,
+        )
         close_approved_withdrawals_for_ended_subject(
             ledger, f"{course.code} was recorded as Dropped in the class list ({filename}).", "Class list import",
         )
@@ -30894,6 +31065,7 @@ def handle_practicum(data: MultiDict) -> int:
             "Practicum is available only to Psychology and Master of Science "
             "in Guidance and Counseling (MSGC) students."
         )
+    require_open_standing(student, "the practicum process")
     record = latest_practicum_record(student.id)
     if not record:
         record = PracticumRecord(student_id=student.id)
@@ -30968,6 +31140,8 @@ def handle_practicum(data: MultiDict) -> int:
         next_owner = "Student"
     elif requested_status == "Dean Reviewed":
         account = require_workflow_actor("dean")
+        if record.status != "Report Sent to Dean":
+            raise ValueError("The Dean reviews a practicum only after the Academic Coordinator has sent the status report.")
         record.status = "Dean Reviewed"
         record.dean_reviewed_at = now_utc()
         next_owner = "Graduate School Staff"

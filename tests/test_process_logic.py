@@ -221,6 +221,30 @@ class ProcessLogicTests(unittest.TestCase):
         with app.app_context():
             self.assertEqual(db.session.get(PracticumRecord, record_id).status, "Practicum In Progress")
 
+    def test_a_practicum_report_the_dean_returned_stays_visible_to_the_dean_read_only(self):
+        """I-187: after the return the case sits with the Coordinator, but the Dean can still open it."""
+        with app.app_context():
+            record = PracticumRecord.query.filter_by(student_id=self.student_named("2360101").id).one()
+            before = (record.status, record.report_sent_at, record.completion_status)
+            record_id = record.id
+
+        def restore():
+            with app.app_context():
+                row = db.session.get(PracticumRecord, record_id)
+                row.status, row.report_sent_at, row.completion_status = before
+                db.session.commit()
+        self.addCleanup(restore)
+        returned = self.dean().post(
+            f"/api/approvals/workflow/practicum/{record_id}/decide", json={"decision": "return", "note": "Certificates unclear."})
+        self.assertEqual(returned.status_code, 200, returned.get_json())
+        with app.app_context():
+            self.assertEqual(db.session.get(PracticumRecord, record_id).status, "Completed")
+        approvals = self.dean().get("/api/approvals").get_json()
+        mine = [row for row in approvals["workflow_overview"] if row["type"] == "practicum" and row["id"] == record_id]
+        self.assertEqual(len(mine), 1, "the returned practicum report vanished from the Dean's overview")
+        self.assertEqual(mine[0]["status"], "Completed")
+        self.assertNotIn(record_id, [row["id"] for row in approvals["workflow_pending"] if row["type"] == "practicum"])
+
     def test_a_defense_request_needs_a_real_future_date_and_no_booking_already_in_place(self):
         client = self.student_client("GS-2026-UD-01")  # Proposal Defense already booked for this student
         future = (date.today() + timedelta(days=40)).isoformat()
