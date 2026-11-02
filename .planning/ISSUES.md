@@ -210,3 +210,4 @@ hunt — becomes one row here. Rules adapted from DD-Project-GameMaker.
 | I-184 | BUG | P2 | audit (walkthrough capture): the student Enrollment page shows a withdrawn subject as selectable | same | open |
 | I-185 | BUG | P2 | audit (walkthrough capture): Panel Matching seat list shows the roles swapped after finalizing (cf. section J6) | same | open |
 | I-186 | UI | P3 | audit (walkthrough capture): the Dean Reports page still says "Decision History" | same | open |
+| I-187 | UI | P2 | consistency (pkt/e2efix2 review): after the Dean returns a practicum report (AD11, back to "Completed" with the Coordinator) it vanishes from the Dean's overview/recent lists (`app.py` ~23033 lists only Report Sent/Dean Reviewed/Additional Certificates) and `/dean/case/practicum/<id>` says "Case not found"; other processes keep a returned case visible to the Dean with its history | p31 spec change ab66753 | open (pkt/logic2 item 10) |
