@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Briefcase, CheckCircle2, Eye, HelpCircle, History, MessageSquare, RotateCcw } from "lucide-react";
-import { Button, DataTable, DecisionPanel, EmptyState, Modal, PageHeader, StatusChip } from "../../components/ui/index.js";
+import { Button, DataTable, EmptyState, PageHeader, StatusChip } from "../../components/ui/index.js";
+import StepDialog from "../../components/StepDialog";
 import PolicyRules from "../../components/PolicyRules";
 import StageBoard from "../../components/StageBoard";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
@@ -135,44 +136,27 @@ function PracticumTable({ items }) {
   return <DataTable caption="Practicum reports" columns={columns} rows={items} rowKey={(item) => item.id} minWidth="md" pageSize={0} />;
 }
 
-// One window for a decision made by dragging or "Move to...": named after the button, with the one button.
+// One window for a decision made by dragging or "Move to…": the shared step dialog, named after the button, with the one button.
 function DecisionWindow({ item, choice, onClose }) {
-  const { busy, requestWorkflowDecision } = useDean();
+  const { requestWorkflowDecision } = useDean();
   async function decide(_key, comment) {
     await requestWorkflowDecision(item, choice.decision, comment);
     onClose();
   }
   return (
-    <Modal
-      size="md"
-      icon={choice.icon}
+    <StepDialog
       title={`Confirm: ${choice.label}`}
       subtitle={`${item.student.name} · ${item.student.student_number} · Practicum`}
-      onClose={onClose}
-      dismissible={busy !== `${item.type}-${item.id}`}
-    >
-      <div className="space-y-4">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="eyebrow">Workflow movement</p>
-          <p className="mt-2 text-sm font-semibold text-ink">
-            {item.status} <span className="mx-1 text-slate-400">→</span> {choice.target}
-          </p>
-          <p className="meta mt-1">{item.subtitle}</p>
-          <p className="meta mt-1">This action is recorded against your signed-in account.</p>
-        </div>
-        <DecisionPanel
-          variant="plain"
-          subject="Dean decision"
-          busy={busy === `${item.type}-${item.id}`}
-          onDecide={decide}
-          onCancel={onClose}
-          commentLabel="Review comment"
-          commentHint={choice.decision === "return" ? "Required to return the report for revision." : "Optional. It is saved with your name, role, date and time."}
-          commentRequiredMessage="Choose a reason or enter a comment before returning or denying the request."
-          actions={[{ key: choice.decision, label: choice.label, tone: choice.tone, icon: choice.icon }]}
-        />
-      </div>
-    </Modal>
+      from={item.status}
+      to={choice.target}
+      explanation="This action is recorded against your signed-in account."
+      actions={[{ key: choice.decision, label: choice.label, tone: choice.tone, icon: choice.icon, requireComment: choice.decision === "return" }]}
+      onConfirm={decide}
+      onCancel={onClose}
+      reasonLabel="Review comment"
+      reasonHint={choice.decision === "return" ? "Required to return the report for revision." : "Optional. It is saved with your name, role, date and time."}
+      requiredMessage="Choose a reason or enter a comment before returning or denying the request."
+    />
   );
 }
 
@@ -261,7 +245,7 @@ export function DeanPracticumBoard() {
         <p className="text-base font-semibold text-ink" aria-live="polite">{summaryLine}</p>
         <p className="mt-1 max-w-3xl text-sm text-slate-500">
           Dragging a card to another column does the same as the buttons on its case page. On a keyboard or phone, use
-          &quot;Move to...&quot; on the card.
+          &quot;Move to…&quot; on the card.
         </p>
       </div>
 

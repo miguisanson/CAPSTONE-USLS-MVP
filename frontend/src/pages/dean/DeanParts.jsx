@@ -7,65 +7,19 @@ import {
   ArrowUpRight,
   Eye,
   MessageSquare,
-  CheckSquare,
 } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, DecisionPanel, EmptyState, HistoryPanel, Modal, SearchInput, Spinner, Stepper, StatusChip } from "../../components/ui/index.js";
-import { toneOf } from "../../lib/tone";
+import { Button, Card, DecisionPanel, EmptyState, HistoryPanel, SearchInput, SkeletonBoard, StatusChip } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../../components/WorkflowTimeline";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { GraduationRoster } from "../WorkflowPage";
 import { leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
 import { LeaveCaseSummary, isLeaveCaseItem } from "./DeanLeaveParts";
-import {
-  CLARIFICATION_TEMPLATES,
-  graduationBatchLabel,
-  isReadyForDeanReview,
-  deanGraduationStageChecks,
-  deanGraduationCurrentStage,
-  deanGraduationBatchActionLabel,
-  DEAN_BOARD_COLUMNS,
-  deanBoardGroup,
-} from "./deanHelpers";
+import { CLARIFICATION_TEMPLATES, graduationBatchLabel } from "./deanHelpers";
 
-export function DeanGraduationRequirementBoxes({ item }) {
-  const eligibility = item.eligibility || {};
-  const items = ["Coursework completed", "Thesis / research completed", eligibility.practicum_status === "Not Required" ? "Practicum not required" : "Practicum completed", "Eligible for graduation"];
-  const done = toneOf("success").notice;
-  return (
-    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-      {items.map((label) => (
-        <div key={label} className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${done}`}>
-          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-600 text-white"><CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /></span>
-          <p className="text-xs font-semibold">{label}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export function DeanGraduationBatchStudentList({ rows }) {
-  return (
-    <ul className="space-y-3">
-      {rows.map((item) => (
-        <li key={item.student.id} className="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-ink">{item.student.name}</p>
-              <p className="meta">{item.student.student_number} · {item.student.program_code}</p>
-            </div>
-            <StatusChip status={item.status || item.workflow_status} dot={false} />
-          </div>
-          <DeanGraduationRequirementBoxes item={item} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-export function DeanGraduationWorkspace() {
+export function DeanGraduationWorkspace({ batchesOnly = false }) {
   const { data: context, loading, error, refetch } = useApi(
     () => api.transactionContext("graduation"),
     [],
@@ -73,7 +27,7 @@ export function DeanGraduationWorkspace() {
   const [result, setResult] = useState(null);
   const [submitError, setSubmitError] = useState("");
 
-  if (loading && !context) return <Card pad="lg"><Spinner label="Loading graduation workflow…" /></Card>;
+  if (loading && !context) return <SkeletonBoard columns={4} label="Loading board" />;
   if (error && !context) return <Card pad="lg"><EmptyState icon={AlertTriangle} title="Could not load graduation workflow" hint={error} /></Card>;
 
   return (
@@ -90,49 +44,8 @@ export function DeanGraduationWorkspace() {
       }}
       refetch={refetch}
       accountRole="dean"
+      batchesOnly={batchesOnly}
     />
-  );
-}
-
-// The tint a stage-check chip takes from the stage's state (the words "Step 3: Current" are not in the status map).
-// "Needs action" is amber: a person must act, nothing has been denied (UI-SPEC section 3, warning).
-export const STAGE_TONE = { Complete: "success", Current: "info", "Needs action": "warning", Pending: "neutral" };
-
-// The Stepper state of each stage-check state; "Needs action" is a stage the Dean sent back for revision.
-const STAGE_STEP_STATE = { Complete: "complete", Current: "current", "Needs action": "returned", Pending: "upcoming" };
-
-export function DeanGraduationStageModal({ batch, onClose }) {
-  const stages = deanGraduationStageChecks(batch);
-  const currentStage = deanGraduationCurrentStage(batch);
-  const steps = stages.map((stage) => ({
-    key: stage.label,
-    label: stage.label,
-    state: STAGE_STEP_STATE[stage.state] || "upcoming",
-    hint: (
-      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <StatusChip status={stage.state} tone={STAGE_TONE[stage.state]} size="sm" dot={false} />
-        <span>{stage.detail}</span>
-      </span>
-    ),
-  }));
-  return (
-    <Modal
-      size="xl"
-      title={`Graduation stage check for ${batch.label}`}
-      subtitle={`${batch.rows.length} candidate${batch.rows.length === 1 ? "" : "s"} · Step ${currentStage.number}: ${currentStage.label}`}
-      onClose={onClose}
-    >
-      <div className="w-full max-w-none rounded-xl border border-slate-200 bg-white p-3">
-        <div className="flex w-full flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-sm font-semibold text-ink">Stage check</p>
-            <p className="meta">Follow where this batch is in the graduation endorsement process.</p>
-          </div>
-          <StatusChip status={`Step ${currentStage.number}: ${currentStage.state}`} tone={STAGE_TONE[currentStage.state]} dot={false} />
-        </div>
-        <Stepper className="mt-3" orientation="vertical" role="group" aria-label="Graduation stage check steps" steps={steps} />
-      </div>
-    </Modal>
   );
 }
 
@@ -142,65 +55,6 @@ export function deanApproveLabel(item) {
   const standingChange = ["leave-of-absence", "readmission", "awol-return"].includes(item.type);
   if (item.type === "practicum") return "Mark reviewed";
   return standingChange || item.type === "withdrawal" ? "Approve" : "Approve and prepare for export";
-}
-
-export function DeanGraduationBatchModal({ rows, onClose, onSaved }) {
-  const [busy, setBusy] = useState(false);
-  const batchLabels = [...new Set(rows.map((item) => graduationBatchLabel(item)))];
-  async function decide(action, comment) {
-    setBusy(true);
-    try {
-      const result = await api.graduationBatchAction({ student_ids: rows.map((item) => item.student.id), action, comment });
-      await onSaved(result);
-    } catch (err) {
-      throw new Error(err.message || "Could not apply the Dean group action.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <Modal
-      size="xl"
-      icon={CheckSquare}
-      title="Confirm Dean graduation group action"
-      subtitle={`${rows.length} selected candidate${rows.length === 1 ? "" : "s"} · ${batchLabels.join(", ")} · stage checks apply to every record`}
-      onClose={onClose}
-      dismissible={!busy}
-    >
-      <div className="space-y-4">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-semibold text-ink">Selected candidates</p>
-          <ul className="mt-2 space-y-3 text-sm text-slate-600">
-            {rows.map((item) => (
-              <li key={item.student.id} className="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-ink">{item.student.name}</p>
-                    <p className="meta">{item.student.student_number} · {item.student.program_code} · {graduationBatchLabel(item)}</p>
-                  </div>
-                  <StatusChip status={item.status || item.workflow_status} dot={false} />
-                </div>
-                <DeanGraduationRequirementBoxes item={item} />
-              </li>
-            ))}
-          </ul>
-        </div>
-        <DecisionPanel
-          variant="plain"
-          subject="Dean decision for the selected candidates"
-          busy={busy}
-          onDecide={decide}
-          commentLabel="Dean comment"
-          commentHint="Required to return the endorsement list for revision. Optional when approving."
-          commentRequiredMessage="Enter one return reason for the selected candidates."
-          actions={[
-            { key: "approve", label: deanGraduationBatchActionLabel("approve"), tone: "approve", icon: CheckSquare },
-            { key: "return", label: deanGraduationBatchActionLabel("return"), tone: "return", icon: RotateCcw },
-          ]}
-        />
-      </div>
-    </Modal>
-  );
 }
 
 export function DeanListFilters({ filters, setFilters, programs, statuses, showAdvanced = true }) {
@@ -393,72 +247,5 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
         }
       />
     </Card>
-  );
-}
-
-export function DeanWorkflowBoard({ rows, onOpen, selectedIds, onToggle }) {
-  const selectedRows = rows.filter((item) => item.type === "graduation" && selectedIds.has(item.student?.id));
-  const boardRows = selectedRows.length ? rows.filter((item) => !(item.type === "graduation" && selectedIds.has(item.student?.id))) : rows;
-  const renderCard = (item) => {
-    const selectable = item.type === "graduation" && item.status === "Ready for Dean Review";
-    const readyToDrag = isReadyForDeanReview(item);
-    return (
-      <article
-        key={`${item.type}-${item.id}`}
-        className={`rounded-xl border p-3 shadow-card transition-colors ${readyToDrag ? "border-brand-300 bg-brand-50 hover:border-brand-500" : "border-slate-200 bg-white hover:border-slate-300"}`}
-      >
-        <div className="flex items-start gap-2">
-          {selectable && <input type="checkbox" checked={selectedIds.has(item.student.id)} onChange={() => onToggle(item.student.id)} className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${item.student.name} for Dean group action`} />}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-ink">{item.student?.name || item.title}</p>
-            <p className="meta">{item.student?.student_number} · {item.student?.program_code}</p>
-            {item.type === "graduation" && <p className="meta mt-1 truncate font-semibold text-brand-700">{graduationBatchLabel(item)}</p>}
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <StatusChip status={item.workflow_status || item.status} dot={false} />
-          {readyToDrag
-            ? <StatusChip status="Ready" label="Ready for Dean review" size="sm" dot={false} />
-            : !item.has_submitted_documents && <StatusChip label="Waiting for documents" tone="muted" size="sm" dot={false} />}
-        </div>
-        <p className="meta mt-2">{item.type} · updated {formatDate(item.last_activity_at || item.submitted_at)}</p>
-        {item.messages?.length > 0 && <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-800"><MessageSquare className="mr-1 inline h-3.5 w-3.5" /> {item.messages.length} visible message{item.messages.length === 1 ? "" : "s"}</p>}
-        <button type="button" onClick={() => onOpen(item)} className="mt-2 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800 focus:ring-2 focus:ring-brand-500">View full request <Eye className="h-3.5 w-3.5" /></button>
-      </article>
-    );
-  };
-  return (
-    <div className="mb-5">
-      <div className="mb-3 flex items-center justify-between gap-3"><div><p className="section-title">Grouped workflow board</p><p className="meta">Open a card to review files, history, messages, and role-appropriate actions.</p></div><StatusChip status={`${rows.length} requests`} tone="muted" dot={false} /></div>
-      {selectedRows.length > 0 && (
-        <section className="mb-4 rounded-2xl border border-brand-200 bg-brand-50/50 p-3">
-          <header className="mb-3 flex items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-brand-800">Selected graduation candidates</h2>
-              <p className="text-xs text-brand-700">Alphabetized selected cards ready for Dean group action.</p>
-            </div>
-            <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-brand-700 ring-1 ring-brand-100">{selectedRows.length}</span>
-          </header>
-          <div className="relative max-w-full overflow-x-auto pb-1">
-            <div className="flex w-max gap-3">
-              {selectedRows.map((item) => <div key={`${item.type}-${item.id}`} className="w-[285px] shrink-0">{renderCard(item)}</div>)}
-            </div>
-          </div>
-        </section>
-      )}
-      <div className="relative max-w-full overflow-x-auto pb-3">
-        <div className="flex w-max snap-x gap-4">
-        {DEAN_BOARD_COLUMNS.map((column) => {
-          const items = boardRows.filter((item) => deanBoardGroup(item) === column);
-          return (
-            <section key={column} className="w-[285px] shrink-0 snap-start rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-              <header className="mb-3 flex items-center justify-between gap-2"><h2 className="text-sm font-semibold text-slate-700">{column}</h2><span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 ring-1 ring-slate-200">{items.length}</span></header>
-              <div className="space-y-3">{items.length ? items.map(renderCard) : <p className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-500">No requests</p>}</div>
-            </section>
-          );
-        })}
-        </div>
-      </div>
-    </div>
   );
 }

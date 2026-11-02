@@ -72,7 +72,7 @@ test.describe("Dean Graduation page", () => {
     await expect(mine.getByRole("button", { name: `View details for ${BATCH}` })).toBeVisible();
     await expect(mine.getByRole("button", { name: /Move to/ })).toBeVisible();
     // a card that waits for somebody else: the lock reason is text on the card, and there is no "Move to…"
-    const theirs = board.getByRole("article").filter({ hasText: OTHER });
+    const theirs = board.getByRole("article").filter({ hasText: OTHER }).locator(".."); // the card and its lock note
     await expect(theirs).toHaveCount(1);
     await expect(theirs.getByText(/^Waiting for: /)).toBeVisible();
     await expect(theirs.getByRole("button", { name: /Move to/ })).toHaveCount(0);
@@ -85,8 +85,7 @@ test.describe("Dean Graduation page", () => {
     await expect(board).toBeVisible();
     await page.screenshot({ path: join(SHOTS, "dean-batches-1366.png"), fullPage: true });
     // the description says who does what
-    await expect(page.getByRole("main").getByText(/Academic Coordinator checks coursework/)).toBeVisible();
-    await expect(page.getByRole("main").getByText(/Dean/).first()).toBeVisible();
+    await expect(page.locator('[data-slot="description"]')).toContainText(/Academic Coordinator checks coursework.*Research Coordinator.*staff prepare.*You approve or return it/);
   });
 
   test("a skeleton board shows on Endorsement batches while the board request is held", async ({ page }) => {
