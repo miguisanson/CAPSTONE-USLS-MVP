@@ -2,7 +2,7 @@
 // Written before the module exists. status.js must be importable by plain Node (no Vite, no JSX).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { SERVER_TONE, STATUS_GROUPS, STATUS_TONE, statusTone } from "../src/lib/status.js";
+import { SERVER_TONE, STATUS_GROUPS, STATUS_TONE, statusLabel, statusTone } from "../src/lib/status.js";
 
 test("known statuses map to the tone the spec gives them", () => {
   assert.equal(statusTone("Approved"), "success");
@@ -70,4 +70,15 @@ test("a status appears in exactly one group (no silent last-one-wins)", () => {
 
 test("the five tone groups are exactly the five tones", () => {
   assert.deepEqual(Object.keys(STATUS_GROUPS).sort(), ["danger", "info", "neutral", "success", "warning"]);
+});
+
+test("an Open item is blue, not the green of Approved (Fable F-24)", () => {
+  assert.equal(statusTone("Open"), "info");
+  assert.equal(statusTone("Approved"), "success");
+});
+
+test("a server status that is jargon is shown in words, the tone follows the original (Fable F-19)", () => {
+  assert.equal(statusLabel("Noted by AC"), "Noted by Academic Coordinator");
+  assert.equal(statusTone("Noted by AC"), "info");
+  assert.equal(statusLabel("Approved"), "Approved");
 });
