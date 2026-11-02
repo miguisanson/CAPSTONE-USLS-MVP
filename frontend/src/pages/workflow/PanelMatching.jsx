@@ -380,7 +380,7 @@ export function PanelMatchingForm({ context, studentId, submit, submitting, refe
       )}
 
       <Button type="submit" disabled={!profile.ready || !selectionComplete} loading={submitting} icon={CheckCircle2} className="w-full sm:w-auto">
-        {submitting ? "Finalizing..." : finalizedPanel.length === roles.length ? "Update final panel" : "Finalize selected panel"}
+        {submitting ? "Finalizing…" : finalizedPanel.length === roles.length ? "Update final panel" : "Finalize selected panel"}
       </Button>
     </form>
   );

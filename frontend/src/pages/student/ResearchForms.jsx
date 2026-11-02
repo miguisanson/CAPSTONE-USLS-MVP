@@ -240,7 +240,7 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
                 )}
                 {requirement.item_name === "Three concept papers" && (
                   <Button variant="secondary" size="sm" onClick={() => checkConceptPaper(file)} loading={checkingId === file.id}>
-                    {checkingId === file.id ? "Checking..." : file.compliance_status ? "Recheck" : "Check compliance"}
+                    {checkingId === file.id ? "Checking…" : file.compliance_status ? "Recheck" : "Check compliance"}
                   </Button>
                 )}
               </div>

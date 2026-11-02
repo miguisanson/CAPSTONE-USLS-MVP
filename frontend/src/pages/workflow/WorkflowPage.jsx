@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, EmptyState, InlineNotice, PageHeader, SectionTitle, SkeletonBoard, Spinner } from "../../components/ui/index.js";
+import { Button, Card, EmptyState, InlineNotice, PageHeader, SectionTitle, SkeletonBoard, Spinner, Tabs } from "../../components/ui/index.js";
 import StudentPicker from "../../components/StudentPicker";
 import { useAuth } from "../../auth";
 import { OnboardingGatePanel } from "../../components/ProcessGates";
@@ -86,29 +86,6 @@ const SUBVIEW_TABS = {
     { key: "calendar", label: "Calendar", icon: CalendarDays },
   ],
 };
-
-function SubviewTabs({ tabs, active, onChange }) {
-  return (
-    <div role="tablist" aria-label="Views" className="flex flex-wrap gap-2">
-      {tabs.map((tab) => {
-        const selected = active === tab.key;
-        const TabIcon = tab.icon;
-        return (
-          <button
-            key={tab.key || "main"}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            onClick={() => onChange(tab.key)}
-            className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors max-sm:min-h-11 ${selected ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}
-          >
-            <TabIcon className="h-4 w-4" aria-hidden="true" /> {tab.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 // Leave of Absence, Readmission, AWOL & Residency and Withdrawal are one page template
 // (ProcessBoardPage) with a different process. Every other workflow keeps its own screen.
@@ -249,7 +226,7 @@ function SingleWorkflowPage() {
 
       <PolicyRules process={RULE_PROCESS_BY_SLUG[slug]} />
 
-      {subviewTabs && <SubviewTabs tabs={subviewTabs} active={subview} onChange={changeSubview} />}
+      {subviewTabs && <Tabs label="Views" tabs={subviewTabs} value={subview} onChange={changeSubview} />}
 
       {!BOARD_SLUGS.has(slug) && slug !== "defense-scheduling" && result && <InlineNotice tone="success" icon={CheckCircle2}>{result.message}</InlineNotice>}
       {!BOARD_SLUGS.has(slug) && slug !== "defense-scheduling" && submitError && <InlineNotice tone="danger">{submitError}</InlineNotice>}

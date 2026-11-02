@@ -123,7 +123,7 @@ function WeeklyHours({ data, onSaved }) {
         <ErrorLine message={error} />
         {notice && <InlineNotice>{notice}</InlineNotice>}
         <div className="flex flex-wrap gap-2">
-          <Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Save weekly hours"}</Button>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save weekly hours"}</Button>
           <Button variant="secondary" onClick={copyMonday} disabled={saving}>Copy Monday to weekdays</Button>
         </div>
       </div>
@@ -240,7 +240,7 @@ function SpecificDates({ data, onSaved }) {
         </Field>
         <ErrorLine message={error} />
         {notice && <InlineNotice>{notice}</InlineNotice>}
-        <Button type="submit" icon={CalendarPlus} disabled={saving}>{saving ? "Saving..." : "Add date"}</Button>
+        <Button type="submit" icon={CalendarPlus} disabled={saving}>{saving ? "Saving…" : "Add date"}</Button>
       </form>
       <div className="mt-5">
         <h3 className="card-title mb-2">Your dates</h3>
@@ -317,7 +317,7 @@ function Requests({ data, onSaved }) {
                 {item.requested_by ? ` Asked by ${item.requested_by}.` : ""}
               </p>
               <Button variant="secondary" size="sm" className="mt-3" disabled={busyId === item.id} onClick={() => answer(item.id)}>
-                {busyId === item.id ? "Saving..." : "I already entered my hours - keep them"}
+                {busyId === item.id ? "Saving…" : "I already entered my hours - keep them"}
               </Button>
             </li>
           ))}
@@ -342,7 +342,7 @@ export default function FacultyAvailabilityEditor() {
     return (
       <div className="space-y-5">
         <PageHeader title="My Availability" icon={CalendarDays} />
-        <Card><Spinner label="Loading your availability..." /></Card>
+        <Card><Spinner label="Loading your availability…" /></Card>
       </div>
     );
   }

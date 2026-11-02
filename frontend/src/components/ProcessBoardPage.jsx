@@ -68,7 +68,7 @@ function GuideWindow({ slug, policyQuestions, onClose }) {
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-700">
             <span className="font-semibold">Moving a card: </span>
-            drag it to the next column, or use &quot;Move to...&quot; on the card. Both do exactly what the buttons in the request window do, and the server refuses a move the rules do not allow.
+            drag it to the next column, or use &quot;Move to…&quot; on the card. Both do exactly what the buttons in the request window do, and the server refuses a move the rules do not allow.
           </div>
           {policyQuestions.length > 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">

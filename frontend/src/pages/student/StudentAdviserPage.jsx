@@ -81,7 +81,7 @@ function ContractBlock({ appointment, onChanged }) {
               </Field>
               {error && <InlineNotice tone="danger">{error}</InlineNotice>}
               <Button loading={busy} onClick={() => run(() => api.submitAdviserContract(appointment.id, note))}>
-                {busy ? "Saving..." : "I emailed Forms 3.2 and 3.3 to the Research Coordinator"}
+                {busy ? "Saving…" : "I emailed Forms 3.2 and 3.3 to the Research Coordinator"}
               </Button>
             </div>
           )}
@@ -190,7 +190,7 @@ function OpenCard({ open, onChanged }) {
       {(open.warnings || []).map((line) => <InlineNotice key={line} tone="warning">{line}</InlineNotice>)}
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       <div>
-        <Button variant="secondary" loading={busy} onClick={withdraw}>{busy ? "Withdrawing..." : "Withdraw application"}</Button>
+        <Button variant="secondary" loading={busy} onClick={withdraw}>{busy ? "Withdrawing…" : "Withdraw application"}</Button>
       </div>
     </SectionCard>
   );

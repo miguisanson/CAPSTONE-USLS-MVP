@@ -217,7 +217,7 @@ export default function TermSettings() {
       {notice.text && <InlineNotice tone={notice.tone} onDismiss={() => say("")}>{notice.text}</InlineNotice>}
 
       {loading ? (
-        <Spinner label="Loading academic semesters..." />
+        <Spinner label="Loading academic semesters…" />
       ) : (
         <DataTable
           caption="Academic semesters, newest first, with their dates and actions"
@@ -240,7 +240,7 @@ export default function TermSettings() {
           footer={
             <>
               <Button variant="secondary" onClick={closeForm} disabled={saving === "create"}>Cancel</Button>
-              <Button type="submit" form="add-semester-form" loading={saving === "create"}>{saving === "create" ? "Saving..." : "Save semester"}</Button>
+              <Button type="submit" form="add-semester-form" loading={saving === "create"}>{saving === "create" ? "Saving…" : "Save semester"}</Button>
             </>
           }
         >
@@ -263,7 +263,7 @@ export default function TermSettings() {
           footer={
             <>
               <Button variant="secondary" onClick={() => setEditing(null)} disabled={saving === `edit-${editing.id}`}>Cancel</Button>
-              <Button onClick={saveEdit} loading={saving === `edit-${editing.id}`}>{saving === `edit-${editing.id}` ? "Saving..." : "Save dates"}</Button>
+              <Button onClick={saveEdit} loading={saving === `edit-${editing.id}`}>{saving === `edit-${editing.id}` ? "Saving…" : "Save dates"}</Button>
             </>
           }
         >

@@ -40,7 +40,7 @@ const BACKOFFICE_ROLES = new Set(["staff", "academic_coordinator", "research_coo
 
 export default function App() {
   const { user, loading } = useAuth();
-  if (loading) return <Spinner label="Checking account..." />;
+  if (loading) return <Spinner label="Checking account…" />;
   // An account created with a generated initial password must choose its own first.
   if (user?.must_change_password) return <ChangePassword />;
 

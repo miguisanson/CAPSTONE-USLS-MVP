@@ -72,7 +72,7 @@ function NoteForm({ slug, detail, onSent }) {
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       {done && <InlineNotice tone="success" icon>{done}</InlineNotice>}
       <Button type="submit" variant="secondary" loading={busy}>
-        {busy ? "Saving..." : "Save note"}
+        {busy ? "Saving…" : "Save note"}
       </Button>
     </form>
   );

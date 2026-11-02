@@ -58,7 +58,7 @@ export default function SlotCheck({ check, className = "" }) {
   const { result, error, waiting, hard, soft } = check;
   return (
     <div className={`space-y-2 ${className}`} aria-live="polite">
-      {waiting && !result && <p className="meta">Checking this slot against the panel and the room...</p>}
+      {waiting && !result && <p className="meta">Checking this slot against the panel and the room…</p>}
       {error && <InlineNotice tone="neutral" icon={Info} className="text-xs">{error}</InlineNotice>}
       {result && hard.length > 0 && (
         <InlineNotice tone="danger" icon={XCircle} title="Cannot be booked" className="px-4">

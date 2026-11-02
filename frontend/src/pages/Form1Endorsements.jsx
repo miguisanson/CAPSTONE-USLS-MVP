@@ -65,7 +65,7 @@ export function Form1EndorsementQueue({ embedded = false }) {
     }
   }
 
-  if (loading) return <Spinner label="Loading Form 1 endorsement queue..." />;
+  if (loading) return <Spinner label="Loading Form 1 endorsement queue…" />;
 
   const problem = error || submitError;
 

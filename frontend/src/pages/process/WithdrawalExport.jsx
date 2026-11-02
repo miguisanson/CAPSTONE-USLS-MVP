@@ -174,7 +174,7 @@ export default function WithdrawalExport({ ctx }) {
             <>
               <Button variant="secondary" onClick={close} disabled={busy}>Close</Button>
               <Button icon={Download} loading={busy} onClick={download} disabled={busy || !selected.size}>
-                {busy ? "Exporting..." : "Download Excel list"}
+                {busy ? "Exporting…" : "Download Excel list"}
               </Button>
             </>
           }

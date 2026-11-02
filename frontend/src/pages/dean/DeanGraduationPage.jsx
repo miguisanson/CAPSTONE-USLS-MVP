@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, GraduationCap } from "lucide-react";
-import { Button, PageHeader, StatusChip } from "../../components/ui/index.js";
+import { Button, PageHeader, StatusChip, Tabs } from "../../components/ui/index.js";
 import { DeanFeedback, DeanGate, useDean } from "./DeanContext";
 import { DeanGraduationWorkspace } from "./DeanParts";
 import { PAGE } from "../../lib/labels.js";
@@ -9,8 +9,8 @@ import { PAGE } from "../../lib/labels.js";
 // batches. The Dean decides, exports and prints from a batch's View details window (one decision dialog on both).
 
 const TABS = [
-  { id: "roster", label: "Roster & workflow" },
-  { id: "batches", label: "Endorsement batches" },
+  { key: "roster", label: "Roster & workflow" },
+  { key: "batches", label: "Endorsement batches" },
 ];
 
 export function DeanGraduationPage() {
@@ -24,7 +24,7 @@ export function DeanGraduationPage() {
 function DeanGraduationBody() {
   const [params, setParams] = useSearchParams();
   const { counts } = useDean();
-  const tab = TABS.some((item) => item.id === params.get("tab")) ? params.get("tab") : "roster";
+  const tab = TABS.some((item) => item.key === params.get("tab")) ? params.get("tab") : "roster";
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
@@ -35,20 +35,7 @@ function DeanGraduationBody() {
         actions={<Button as={Link} to="/dean/approvals" variant="secondary" icon={ArrowLeft}>All approvals</Button>}
       />
       <DeanFeedback />
-      <div role="tablist" aria-label="Graduation views" className="flex flex-wrap gap-2 border-b border-slate-200">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            onClick={() => setParams(item.id === "roster" ? {} : { tab: item.id }, { replace: true })}
-            className={`-mb-px cursor-pointer border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${tab === item.id ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-brand-700"}`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <Tabs label="Graduation views" tabs={TABS} value={tab} onChange={(key) => setParams(key === "roster" ? {} : { tab: key }, { replace: true })} />
       <DeanGraduationWorkspace batchesOnly={tab === "batches"} />
     </div>
   );

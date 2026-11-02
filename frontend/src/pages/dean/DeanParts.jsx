@@ -213,7 +213,7 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
       <input
         value={note[key] || ""}
         onChange={(e) => setNote((n) => ({ ...n, [key]: e.target.value }))}
-        placeholder={template[key] === "Other / Custom comment" ? "Enter a custom clarification message..." : "Comment or return reason..."}
+        placeholder={template[key] === "Other / Custom comment" ? "Enter a custom clarification message…" : "Comment or return reason…"}
         aria-label={`Comment or return reason for ${item.student?.name || item.title}`}
         className="field-input"
       />

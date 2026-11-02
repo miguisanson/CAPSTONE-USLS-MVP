@@ -103,7 +103,7 @@ export default function CourseOfferings() {
     } catch (err) { setError(err.message); } finally { setBusy(""); }
   }
 
-  if (loading && !data) return <Spinner label="Loading course offerings..." />;
+  if (loading && !data) return <Spinner label="Loading course offerings…" />;
 
   const columns = [
     {

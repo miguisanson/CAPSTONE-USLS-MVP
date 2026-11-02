@@ -61,7 +61,7 @@ export function FacultyGate({ children }) {
   if (loading && !data) {
     return (
       <Card>
-        <Spinner label="Loading faculty portal..." />
+        <Spinner label="Loading faculty portal…" />
       </Card>
     );
   }

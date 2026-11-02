@@ -82,7 +82,7 @@ export function OnboardingGatePanel({ role }) {
     },
   });
 
-  if (items === null) return <Spinner label="Loading onboarding reports..." />;
+  if (items === null) return <Spinner label="Loading onboarding reports…" />;
 
   return (
     <SectionCard
@@ -405,7 +405,7 @@ export function CourseworkReportPanel({ role }) {
     },
   });
 
-  if (items === null) return <Spinner label="Loading coursework reports..." />;
+  if (items === null) return <Spinner label="Loading coursework reports…" />;
 
   return (
     <SectionCard

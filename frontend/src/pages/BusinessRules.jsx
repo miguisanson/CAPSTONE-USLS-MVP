@@ -121,7 +121,7 @@ export default function BusinessRules() {
         </div>
       </Card>
 
-      {loading ? <Spinner label="Loading business rules..." /> : !groups.length ? (
+      {loading ? <Spinner label="Loading business rules…" /> : !groups.length ? (
         <Card><EmptyState icon={Scale} title="No rules match" hint="Try another filter or search." /></Card>
       ) : groups.map((group) => (
         <SectionCard key={group.key} title={group.label}>
@@ -222,7 +222,7 @@ function RuleEditor({ rule, onClose, onSave }) {
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button type="submit" form="rule-editor-form" loading={busy} disabled={busy || reason.trim().length < 3}>
-            {busy ? "Saving..." : "Save and record the change"}
+            {busy ? "Saving…" : "Save and record the change"}
           </Button>
         </>
       }

@@ -445,7 +445,7 @@ export function BoardSummary({ line, windowName = "request window", actions = nu
         </p>
         <p className="mt-1 max-w-3xl text-sm text-slate-500">
           Dragging a card to another column does the same as the buttons in its {windowName}. On a keyboard or phone, use
-          &quot;Move to...&quot; on the card.
+          &quot;Move to…&quot; on the card.
         </p>
       </div>
       {actions}

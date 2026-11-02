@@ -68,7 +68,7 @@ export default function ClassListPreviewDialog({ preview, busy, onClose, onImpor
           </p>
           <Button variant="secondary" onClick={onClose} disabled={busy}>Choose another file</Button>
           <Button onClick={onImport} disabled={!preview.total_rows} loading={busy}>
-            {busy ? "Importing..." : "Confirm import"}
+            {busy ? "Importing…" : "Confirm import"}
           </Button>
         </>
       }

@@ -241,7 +241,7 @@ function FacultyFormModal({ faculty, onClose, onSaved }) {
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button type="submit" form="faculty-form" icon={Save} disabled={busy}>{busy ? "Saving..." : isNew ? "Add faculty" : "Save changes"}</Button>
+          <Button type="submit" form="faculty-form" icon={Save} disabled={busy}>{busy ? "Saving…" : isNew ? "Add faculty" : "Save changes"}</Button>
         </>
       }
     >
@@ -306,7 +306,7 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
       >
         {/* data-autofocus: the dialog opens at the top of its content, not on a control far down the page */}
         <div className="space-y-6 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0" tabIndex={-1} data-autofocus>
-          {detailLoading && <p className="meta font-semibold" role="status">Refreshing calendar status and schedule...</p>}
+          {detailLoading && <p className="meta font-semibold" role="status">Refreshing calendar status and schedule…</p>}
           {detailError && <InlineNotice tone="warning" role="alert">Live calendar details could not be refreshed: {detailError}</InlineNotice>}
           <div className="grid gap-6 lg:grid-cols-3">
             <ProfileSection icon={BriefcaseBusiness} title="Specialization">

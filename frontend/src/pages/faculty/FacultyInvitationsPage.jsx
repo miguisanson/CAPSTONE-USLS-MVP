@@ -45,7 +45,7 @@ function ReasonForm({ label, confirmLabel, busy, error, onCancel, onSubmit }) {
       </Field>
       <ErrorLine message={localError || error} />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" variant="danger" disabled={busy}>{busy ? "Sending..." : confirmLabel}</Button>
+        <Button type="submit" variant="danger" disabled={busy}>{busy ? "Sending…" : confirmLabel}</Button>
         <Button variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button>
       </div>
     </form>
@@ -141,7 +141,7 @@ function InvitationCard({ invitation, onChanged }) {
           <div className="flex flex-wrap items-center gap-2">
             {invitation.status !== "Accepted" && (
               <Button onClick={accept} disabled={busy}>
-                {busy ? "Saving..." : "Accept"}
+                {busy ? "Saving…" : "Accept"}
               </Button>
             )}
             {invitation.status !== "Declined" && (
@@ -196,7 +196,7 @@ export default function FacultyInvitationsPage() {
     return (
       <div className="space-y-5">
         {header}
-        <Card><Spinner label="Loading your invitations..." /></Card>
+        <Card><Spinner label="Loading your invitations…" /></Card>
       </div>
     );
   }

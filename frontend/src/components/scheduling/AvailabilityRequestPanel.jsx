@@ -95,7 +95,7 @@ export default function AvailabilityRequestPanel({ context, studentId, refetch }
         <Field label="Message (optional)"><Textarea rows={2} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. Please enter your dates for the proposal defense." /></Field>
         <div className="flex flex-wrap items-center gap-3">
           <Button icon={Send} loading={busy} disabled={!windowStart || !windowEnd} onClick={send}>
-            {busy ? "Sending..." : "Ask for availability"}
+            {busy ? "Sending…" : "Ask for availability"}
           </Button>
           {done && <span className="meta font-semibold text-brand-700" role="status">{done}</span>}
         </div>

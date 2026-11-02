@@ -8,7 +8,7 @@ import { BarChart3, Briefcase, CalendarCheck, GraduationCap, ListTodo, RefreshCw
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { useApi } from "../hooks";
-import { Button, PageHeader } from "../components/ui/index.js";
+import { Button, PageHeader, Tabs } from "../components/ui/index.js";
 import { PAGE } from "../lib/labels.js";
 import { homePath } from "../lib/homePaths.js";
 import AnalyticsSection from "./reports/AnalyticsSection.jsx";
@@ -75,24 +75,7 @@ export default function Reports() {
         actions={<Button as={Link} to={homePath(user?.role)} variant="secondary">Back to dashboard</Button>}
       />
 
-      <div role="tablist" aria-label="Reports" className="flex flex-wrap gap-2">
-        {tabs.map((tab) => {
-          const selected = tab.id === active.id;
-          const Icon = TAB_ICONS[tab.id];
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => chooseTab(tab)}
-              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-colors max-sm:min-h-11 ${selected ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}
-            >
-              <Icon className="h-4 w-4" aria-hidden="true" /> {tab.tab}
-            </button>
-          );
-        })}
-      </div>
+      <Tabs label="Reports" tabs={tabs.map((item) => ({ key: item.id, label: item.tab, icon: TAB_ICONS[item.id] }))} value={active.id} onChange={(id) => chooseTab(tabs.find((item) => item.id === id))} />
 
       {report ? (
         <ReportPanel key={report.id} report={report} params={params} setParam={setParam} clearFilters={clearFilters} />

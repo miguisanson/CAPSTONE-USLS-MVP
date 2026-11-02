@@ -1,11 +1,12 @@
 // "Record dropped subject": the Academic Coordinator records that an enrolled subject was dropped (handbook: unexcused
 // absences above the limit). The dialog is the library Modal; the fields are library Fields. Validation happens when
 // Save is pressed (UX research s3: validate on submit, error summary at the top with a link to each field, answers
-// stay in the fields), not by greying the button out.
-import { useRef, useState } from "react";
+// stay in the fields), not by greying the button out. The summary is the shared ErrorSummary of the student forms.
+import { useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { Button, Field, InlineNotice, Input, Modal, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import PolicyRules from "../../components/PolicyRules";
+import { ErrorSummary } from "../student/shared";
 
 const FIELD_ORDER = ["status", "effectiveDate", "absence", "note"];
 
@@ -25,19 +26,14 @@ export function validateDrop(edit) {
 }
 
 export default function SubjectStatusDialog({ edit, setEdit, error, busy, onClose, onSave }) {
-  const [errors, setErrors] = useState({});
-  const summaryRef = useRef(null);
-  const fieldRefs = { status: useRef(null), effectiveDate: useRef(null), absence: useRef(null), note: useRef(null) };
-  const messages = FIELD_ORDER.filter((key) => errors[key]);
+  const [problems, setProblems] = useState([]); // [{ id, message }], one per field to fix, in form order
+  const errors = Object.fromEntries(problems.map((item) => [item.id.replace("drop-", ""), item.message]));
 
   function submit() {
     const found = validateDrop(edit);
-    setErrors(found);
-    if (Object.keys(found).length) {
-      // wait for the summary to render, then move the focus to it so a screen reader reads it first
-      window.setTimeout(() => summaryRef.current?.focus(), 0);
-      return;
-    }
+    const list = FIELD_ORDER.filter((key) => found[key]).map((key) => ({ id: `drop-${key}`, message: found[key] }));
+    setProblems(list);
+    if (list.length) return; // the summary takes the focus
     onSave();
   }
 
@@ -56,34 +52,13 @@ export default function SubjectStatusDialog({ edit, setEdit, error, busy, onClos
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button onClick={submit} loading={busy}>
-            {busy ? "Saving..." : `Save ${edit.status || "status"}`}
+            {busy ? "Saving…" : `Save ${edit.status || "status"}`}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        {messages.length > 0 && (
-          <div ref={summaryRef} tabIndex={-1} className="rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300">
-            <InlineNotice tone="danger" title="There is a problem">
-              <ul className="mt-1 list-disc space-y-0.5 pl-5">
-                {messages.map((key) => (
-                  <li key={key}>
-                    <a
-                      href={`#${key}`}
-                      className="font-semibold underline"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        fieldRefs[key].current?.focus();
-                      }}
-                    >
-                      {errors[key]}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </InlineNotice>
-          </div>
-        )}
+        <ErrorSummary errors={problems} />
 
         <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
           <div className="min-w-0">
@@ -96,7 +71,7 @@ export default function SubjectStatusDialog({ edit, setEdit, error, busy, onClos
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="New status" required error={errors.status}>
             <Select
-              ref={fieldRefs.status}
+              id="drop-status"
               placeholder="Choose status"
               options={["Dropped"]}
               value={edit.status}
@@ -104,7 +79,7 @@ export default function SubjectStatusDialog({ edit, setEdit, error, busy, onClos
             />
           </Field>
           <Field label="Effective date" required error={errors.effectiveDate}>
-            <Input ref={fieldRefs.effectiveDate} type="date" value={edit.effectiveDate} onChange={set("effectiveDate")} />
+            <Input id="drop-effectiveDate" type="date" value={edit.effectiveDate} onChange={set("effectiveDate")} />
           </Field>
         </div>
 
@@ -117,7 +92,7 @@ export default function SubjectStatusDialog({ edit, setEdit, error, busy, onClos
           error={errors.absence}
         >
           <Input
-            ref={fieldRefs.absence}
+            id="drop-absence"
             type="number"
             min="0"
             max="100"
@@ -130,7 +105,7 @@ export default function SubjectStatusDialog({ edit, setEdit, error, busy, onClos
 
         <Field label="Coordinator note" required error={errors.note}>
           <Textarea
-            ref={fieldRefs.note}
+            id="drop-note"
             rows={4}
             value={edit.note}
             onChange={set("note")}

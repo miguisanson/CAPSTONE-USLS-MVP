@@ -197,7 +197,7 @@ export default function PolicyDocuments() {
       </div>
     </Card>
 
-    {loading ? <Spinner label="Loading policy documents..." /> : !items.length ? <Card><EmptyState icon={FileText} title="No documents found" hint={query || categoryFilter || statusFilter ? "Try a different search or clear the filters." : "Add the first policy document to begin."} /></Card> : <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{items.map((item) =>
+    {loading ? <Spinner label="Loading policy documents…" /> : !items.length ? <Card><EmptyState icon={FileText} title="No documents found" hint={query || categoryFilter || statusFilter ? "Try a different search or clear the filters." : "Add the first policy document to begin."} /></Card> : <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{items.map((item) =>
       <Card key={`${item.kind}-${item.id}`} className={item.status === "archived" ? "opacity-75" : ""}>
         <div className="flex items-start gap-4">
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${item.file_type === "DOCX" ? "bg-blue-50 text-blue-700" : "bg-red-50 text-red-700"}`}><FileText className="h-5 w-5" aria-hidden="true" /></span>
@@ -284,7 +284,7 @@ function TestQuestion() {
   >
     <form onSubmit={(event) => { event.preventDefault(); run(); }} className="flex flex-col gap-2 sm:flex-row">
       <Input aria-label="Question to test" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={500} className="flex-1" placeholder="e.g. How many semesters can I take as leave of absence?" />
-      <Button type="submit" icon={Search} loading={busy} disabled={!question.trim()}>{busy ? "Searching..." : "Find passages"}</Button>
+      <Button type="submit" icon={Search} loading={busy} disabled={!question.trim()}>{busy ? "Searching…" : "Find passages"}</Button>
     </form>
     <div className="flex flex-wrap gap-2">{TEST_QUESTIONS.map((sample) => <button key={sample} type="button" onClick={() => run(sample)} disabled={busy} className="cursor-pointer rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition-colors duration-200 hover:border-brand-300 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-11">{sample}</button>)}</div>
     {error && <InlineNotice tone="danger">{error}</InlineNotice>}
@@ -370,7 +370,7 @@ function DocumentEditor({ initial, categories, maxMb, busy, onClose, onSave }) {
     dismissible={!busy}
     footer={<>
       <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
-      <Button type="submit" form="policy-document-form" icon={Upload} loading={busy} disabled={!title.trim() || (!isEdit && !file)}>{busy ? "Saving..." : isEdit ? "Save changes" : "Upload and index"}</Button>
+      <Button type="submit" form="policy-document-form" icon={Upload} loading={busy} disabled={!title.trim() || (!isEdit && !file)}>{busy ? "Saving…" : isEdit ? "Save changes" : "Upload and index"}</Button>
     </>}
   >
     <form id="policy-document-form" onSubmit={submit} className="space-y-4">
@@ -385,7 +385,7 @@ function DocumentEditor({ initial, categories, maxMb, busy, onClose, onSave }) {
       <Field label="Description (optional)"><Textarea maxLength={2000} value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-20 resize-y" placeholder="What policies or procedures does this document cover?" /></Field>
       {!isEdit && <Field label="Version note (optional)"><Input maxLength={500} value={note} onChange={(event) => setNote(event.target.value)} placeholder="e.g. First upload of the 2026 memo" /></Field>}
       {formError && <InlineNotice tone="danger">{formError}</InlineNotice>}
-      {busy && !isEdit && <p className="text-sm font-semibold text-slate-500" role="status">Reading the file and building the search index. A scanned PDF can take a minute...</p>}
+      {busy && !isEdit && <p className="text-sm font-semibold text-slate-500" role="status">Reading the file and building the search index. A scanned PDF can take a minute…</p>}
     </form>
   </Modal>;
 }
@@ -419,7 +419,7 @@ function ReplaceDialog({ item, maxMb, busy, onClose, onSave }) {
     dismissible={!busy}
     footer={<>
       <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
-      <Button type="submit" form="policy-replace-form" icon={RefreshCw} loading={busy} disabled={!file}>{busy ? "Replacing..." : "Replace and re-index"}</Button>
+      <Button type="submit" form="policy-replace-form" icon={RefreshCw} loading={busy} disabled={!file}>{busy ? "Replacing…" : "Replace and re-index"}</Button>
     </>}
   >
     <form id="policy-replace-form" onSubmit={submit} className="space-y-4">
