@@ -29,7 +29,7 @@
   decisions/cycle-times). Subset e2e 59/59 (server-death at 20:07 was an external kill; helpers told: kill own PID only).
 - **In flight:** `pkt/repui` (Reports UI F1/F2/F4; it is also the only app.py editor for small term=all/previous
   params); walkthrough rebuild (I-139, main checkout, scripts/docs/walkthrough + docx + archive shots, uncommitted until
-  reviewed); Mac gate on the rep2 merge -> `E:/Temp/claude/gate61/mac_rep2.txt`.
+  reviewed); Mac gate on the rep2 merge: **822 passed / 0 failed** (17.5 min).
 - **Next:** logic2 app.py packet (I-165, I-166, I-168, I-169, I-171..I-173, I-177, I-180) after repui; full e2e in
   wt/gate; persona-uat sweep (3 at a time); Fable full review; fix its findings.
   I-169, I-171..I-173). Frontend queue: E, C, D, F, G (consistency), Reports F1.
