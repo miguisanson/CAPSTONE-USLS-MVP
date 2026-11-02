@@ -6872,6 +6872,9 @@ def leave_mark_subjects_withdrawn(case: LeaveCase, filed_second_half: bool) -> l
             record.updated_at = changed_at
         if enrollment.course:
             closed.append(enrollment.course.code)
+        close_approved_withdrawals_for_ended_subject(
+            enrollment, "the leave of absence started and the subject was closed with it.", "Leave of absence",
+        )
     return closed
 
 
@@ -13470,6 +13473,12 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Only student-uploaded research evidence can be removed from the student view."}), 400
         if doc.gate == "Form 1 - Title Defense" and title_uploads_locked(student):
             return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
+        if ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == student.id,
+            ScheduleRequest.defense_type == RESEARCH_GATE_DEFENSE_TYPES.get(doc.gate),
+            ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+        ).first():
+            return jsonify({"error": "This defense is booked. Cancel the schedule first."}), 409
 
         original_name = evidence.original_name
         # Signed evidence is archived, never deleted: the adviser's signature points at the file.
@@ -16787,6 +16796,12 @@ def register_routes(app: Flask) -> None:
                 previous_status=previous_application_status, new_status=pending.status,
             )
 
+        close_approved_withdrawals_for_ended_subject(
+            enrollment,
+            f"the Academic Coordinator recorded {course.code} as Dropped effective {effective_date.isoformat()}.",
+            source_reference,
+        )
+
         remaining_active = SubjectEnrollment.query.filter(
             SubjectEnrollment.student_id == student.id,
             SubjectEnrollment.term_id == term.id,
@@ -17565,17 +17580,23 @@ def register_routes(app: Flask) -> None:
                 result = "Practicum status reviewed by Dean"
                 next_owner = "Graduate School Staff"
             else:
-                record.status = "Additional Certificates Requested"
-                result = "Practicum status returned by Dean"
+                # AD11 / I-159: the Dean's return goes back to the Coordinator's review stage ("Completed"),
+                # where "Report Sent to Dean" can be run again. It is not an evidence request to the student.
+                record.status = "Completed"
+                record.report_sent_at = None
+                record.completion_status = "Completed hours pending report review"
+                result = "Practicum status report returned by Dean"
                 next_owner = "Academic Coordinator"
+                resolve_standing_change_tasks(record.student_id, "Review practicum status report", "Dean")
                 add_task(record.student_id, "Revise practicum status report", "Academic Coordinator", 5, 35)
-            if decision == "return":
+                # The note is shown to the Coordinator and, as a student-visible message, to the student.
                 workflow_message_record(
                     "practicum", record.student, account, "Academic Coordinator",
-                    note or "This request requires additional review", note, "return",
-                    previous_status, record.status, visibility="internal",
+                    "Dean returned the practicum status report",
+                    note or "This request requires additional review", "return",
+                    previous_status, record.status, visibility="student_visible",
                 )
-            elif note:
+            if decision in {"approve", "review"} and note:
                 workflow_message_record(
                     "practicum", record.student, account, next_owner,
                     "Dean review comment", note, "note",
@@ -17585,7 +17606,7 @@ def register_routes(app: Flask) -> None:
                 "practicum", record.student_id, f"Dean · {account.full_name}",
                 "Approvals", result, next_owner, note or practicum_notes(record),
                 previous_status=previous_status, new_status=record.status,
-                visibility="internal" if decision == "return" else "student_visible",
+                visibility="student_visible",
             )
             decided_slug, decided_student, decided_record_id, decided_status = (
                 "practicum", record.student, record.id, record.status)
@@ -17788,7 +17809,7 @@ def register_routes(app: Flask) -> None:
         notify_workflow_step(
             decided_slug, decided_student, result, decided_status, next_owner,
             f"decision:{decided_slug}:{decided_record_id}:{decided_status}:{now_utc().strftime('%Y%m%d%H%M%S%f')}",
-            student_visible=decision != "return" or case_type in {"awol-return", "withdrawal"}, actor=account,
+            student_visible=decision != "return" or case_type in {"awol-return", "withdrawal", "practicum"}, actor=account,
         )
         db.session.commit()
         return jsonify({"ok": True, "message": result})
@@ -18777,8 +18798,9 @@ def register_routes(app: Flask) -> None:
     # policy questions; only Graduate School staff and admins also get answers
     # built from student records, and a student stays in the student sandbox.
     def assistant_rate_limited(account):
-        """The 429 response when this account has used its ASSISTANT_MAX_PER_HOUR questions."""
-        if ASSISTANT_LIMITER.allow(account.id, env_int("ASSISTANT_MAX_PER_HOUR", 30)):
+        """The 429 response when this account has used its ASSISTANT_MAX_PER_HOUR questions (0 = no limit)."""
+        limit = env_int("ASSISTANT_MAX_PER_HOUR", 30)
+        if limit == 0 or ASSISTANT_LIMITER.allow(account.id, limit):
             return None
         return jsonify({"error": ASSISTANT_RATE_LIMIT_MESSAGE}), 429
 
@@ -21646,6 +21668,29 @@ def approved_withdrawal_applications(application_ids: list[int] | None = None) -
     if application_ids is not None:
         query = query.filter(WithdrawalApplication.id.in_(application_ids or {-1}))
     return query.order_by(WithdrawalApplication.decided_at.asc(), WithdrawalApplication.id.asc()).all()
+
+
+def close_approved_withdrawals_for_ended_subject(enrollment: SubjectEnrollment, why: str, source: str) -> int:
+    """I-163: a Dean-approved withdrawal waiting for the subject tag is moot once the subject has ended
+    some other way (a leave started, or the subject was recorded Dropped). Cancel it with an audit note."""
+    closed = 0
+    for pending in WithdrawalApplication.query.filter(
+        WithdrawalApplication.subject_enrollment_id == enrollment.id,
+        WithdrawalApplication.status.in_(["Approved - Awaiting Subject Tag", "Approved - Registrar Preparation"]),
+    ).all():
+        previous = pending.status
+        pending.status = "Cancelled"
+        pending.registrar_status = "Not Applicable"
+        pending.completed_at = now_utc()
+        pending.staff_remarks = "\n".join(part for part in [pending.staff_remarks, f"Closed automatically: {why}"] if part)
+        resolve_standing_change_tasks(pending.student_id, "withdrawal", "Graduate School Staff")
+        add_log(
+            "withdrawal", pending.student_id, "Workflow System", source,
+            "Approved withdrawal closed: the subject ended another way", "Student", why,
+            previous_status=previous, new_status=pending.status,
+        )
+        closed += 1
+    return closed
 
 
 def apply_approved_subject_withdrawal(application: WithdrawalApplication) -> None:
@@ -25866,6 +25911,9 @@ def apply_class_list_row(item: dict, term: AcademicTerm, filename: str, actor: s
         ).strip()
         record.updated_at = changed_at
         db.session.flush()
+        close_approved_withdrawals_for_ended_subject(
+            ledger, f"{course.code} was recorded as Dropped in the class list ({filename}).", "Class list import",
+        )
         remaining_active = SubjectEnrollment.query.filter(
             SubjectEnrollment.student_id == student.id,
             SubjectEnrollment.term_id == term.id,
@@ -28088,10 +28136,13 @@ def schedule_slot_problems(student: Student, schedule: ScheduleRequest, panel: l
     _free, unavailable, _not_entered = slot_availability(
         participants, schedule.preferred_date, schedule.start_time, schedule.end_time, ignore_schedule=schedule,
     )
-    problems = [
+    problems = ["That date and time is already in the past."] if datetime.combine(
+        schedule.preferred_date, schedule.start_time) <= manila_now() else []
+    problems.extend(declined_invitation_problems(student, panel))
+    problems.extend(
         f"{name} is not available {schedule.start_time.strftime('%H:%M')}-{schedule.end_time.strftime('%H:%M')} on {schedule.preferred_date.isoformat()}"
         for name in unavailable
-    ]
+    )
     problems.extend(
         defense_schedule_conflicts(
             student, panel, schedule.preferred_date, schedule.start_time, schedule.end_time,
@@ -30203,6 +30254,11 @@ def handle_withdrawal(data: MultiDict) -> int:
         account = require_workflow_actor("staff")
         if application.dean_decision != "Pending" or application.status != "Submitted to GS Staff":
             raise ValueError("Only a newly submitted withdrawal request can be forwarded to the Dean.")
+        if not application.subject_enrollment_id:
+            raise ValueError(
+                "This withdrawal request does not name a subject. Return it to the student to choose "
+                "the subject before it goes to the Dean."
+            )
         application.status = "Dean Review"
         next_owner = "Dean"
         result = "Withdrawal request recorded and forwarded to the Dean"
@@ -37269,6 +37325,12 @@ def seed_database() -> None:
         term = AcademicTerm(label=label, start_date=start, end_date=start + timedelta(days=120))
         db.session.add(term)
         terms.append(term)
+    # I-162 (IM16): the 14-day withdrawal window of the running semester must be open on any seed day, or the
+    # withdrawal demo cannot run. The running semester is dated as if it began 3 days ago; its end date stays.
+    today = date.today()
+    running = next((t for t in terms if t.start_date <= today <= t.end_date), None)
+    if running and (today - running.start_date).days > 3:
+        running.start_date = today - timedelta(days=3)
     db.session.flush()
     active_term = get_active_term()
     if active_term:
@@ -37472,6 +37534,14 @@ def seed_dean_review_cases() -> int:
             new_status=status,
         )
         made += 1
+
+    # The newly submitted persona withdrawal (staff forward it next) must name a subject too (I-164).
+    persona = Student.query.filter_by(student_number="2360006").first()
+    waiting = WithdrawalApplication.query.filter_by(student_id=persona.id).first() if persona else None
+    if waiting and not waiting.subject_enrollment_id:
+        subject = active_subject(persona)
+        if subject is not None:
+            waiting.subject_enrollment_id, waiting.withdrawal_scope = subject.id, "Subject"
 
     # Practicum status report sent to the Dean
     student = student_for("practicum")

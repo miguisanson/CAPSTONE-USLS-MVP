@@ -13,6 +13,7 @@ from openpyxl import load_workbook
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
+os.environ.setdefault("ASSISTANT_MAX_PER_HOUR", "0")  # no per-account limit: tests ask many questions in one process
 # Never write into the committed seed library (uploads/policy_documents/) or the real RAG index.
 os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="policy-uploads-"))
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
@@ -407,6 +408,38 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             db.session.refresh(record)
             self.assertEqual(record.status, "Dean Reviewed")
+
+    def test_dean_return_of_practicum_report_goes_back_to_the_coordinator_and_student_sees_the_note(self):
+        """I-159 / AD11: the Dean's return must not dead-end; it lands where the Coordinator can resend."""
+        with app.app_context():
+            record = PracticumRecord(
+                student_id=self.student_id, practicum_site="Partner Site", required_hours=200,
+                completed_hours=200, document_status="Verified", status="Report Sent to Dean",
+                completion_status="Completed and accepted", report_sent_at=datetime.now(),
+            )
+            db.session.add(record)
+            db.session.commit()
+            record_id = record.id
+            response = self._dean_client().post(
+                f"/api/approvals/workflow/practicum/{record_id}/decide",
+                json={"decision": "return", "note": "Attach the supervisor evaluation."},
+            )
+            self.assertEqual(response.status_code, 200, response.get_json())
+            record = db.session.get(PracticumRecord, record_id)
+            # Back at the Coordinator's own stage, not at "Additional Certificates Requested".
+            self.assertEqual(record.status, "Completed")
+            seen = WorkflowMessage.query.filter_by(
+                transaction_slug="practicum", student_id=self.student_id, visibility="student_visible",
+            ).all()
+            self.assertTrue(any("supervisor evaluation" in m.comment for m in seen), [m.comment for m in seen])
+            self.assertTrue(any(
+                m.recipient_role == "Academic Coordinator" and "supervisor evaluation" in m.comment for m in seen
+            ))
+            # The Coordinator can resend to the Dean.
+            self._transition(self._academic_client(), "practicum", {
+                "student_id": self.student_id, "status": "Report Sent to Dean", "document_status": "Verified",
+            })
+            self.assertEqual(db.session.get(PracticumRecord, record_id).status, "Report Sent to Dean")
 
     def test_withdrawal_approval_sequence_and_denial_branch(self):
         with app.app_context():

@@ -942,6 +942,62 @@ class SchedulingRuleTests(ResearchCoreBase):
             self.assertEqual(row.status, "Needs Re-confirmation")
             self.assertIn("Spare Person", row.conflict_reason)
 
+    def test_reconfirmation_refuses_a_panelist_who_declined(self):
+        """I-160: the booking checks (declined seat) also apply when a held booking is re-confirmed."""
+        from app import PanelInvitation
+        self.ready_for_proposal()
+        schedule_id = self.booked()
+        ids = [self.faculty_ids[n] for n in ["Chair Person", "Content Person", "Method Person", "Spare Person"]]
+        self.book(panel_faculty_ids=ids, reassign_only=True, panel_change_reason="swap")
+        with app.app_context():
+            invitation = PanelInvitation.query.filter_by(
+                student_id=self.student_id, faculty_id=self.faculty_ids["Spare Person"]).one()
+            invitation.status, invitation.reason = "Declined", "Away"
+            db.session.commit()
+        bad = self.staff().post(f"/api/defense-schedules/{schedule_id}/reconfirm", json={})
+        self.assertEqual(bad.status_code, 400, bad.get_json())
+        self.assertIn("declined", bad.get_json()["error"])
+        with app.app_context():
+            self.assertEqual(db.session.get(ScheduleRequest, schedule_id).status, "Needs Re-confirmation")
+
+    def test_reconfirmation_refuses_a_date_that_is_already_past(self):
+        """I-160: a held booking whose date has gone by cannot be confirmed again."""
+        self.ready_for_proposal()
+        schedule_id = self.booked()
+        ids = [self.faculty_ids[n] for n in ["Chair Person", "Content Person", "Method Person", "Spare Person"]]
+        self.book(panel_faculty_ids=ids, reassign_only=True, panel_change_reason="swap")
+        with app.app_context():
+            row = db.session.get(ScheduleRequest, schedule_id)
+            row.preferred_date = date.today() - timedelta(days=3)
+            db.session.commit()
+        bad = self.staff().post(f"/api/defense-schedules/{schedule_id}/reconfirm", json={})
+        self.assertEqual(bad.status_code, 400, bad.get_json())
+        self.assertIn("past", bad.get_json()["error"])
+        with app.app_context():
+            self.assertEqual(db.session.get(ScheduleRequest, schedule_id).status, "Needs Re-confirmation")
+
+    def test_a_manuscript_cannot_be_deleted_while_its_defense_is_booked(self):
+        """I-161: removing the upload would wipe the panel under a Scheduled booking."""
+        self.ready_for_proposal()
+        schedule_id = self.booked()
+        with app.app_context():
+            evidence_id = (
+                ResearchEvidenceFile.query.join(DocumentCheck)
+                .filter(DocumentCheck.gate == PROPOSAL, DocumentCheck.item_name == "Proposal manuscript")
+                .one().id
+            )
+        response = self.student().delete(f"/api/student-portal/research-evidence/{evidence_id}")
+        self.assertEqual(response.status_code, 409, response.get_json())
+        self.assertIn("Cancel the schedule first", response.get_json()["error"])
+        with app.app_context():
+            self.assertEqual(db.session.get(ScheduleRequest, schedule_id).status, "Scheduled")
+            self.assertEqual(PanelAssignment.query.filter_by(student_id=self.student_id, gate=PROPOSAL).count(), 4)
+        cancelled = self.research().post(f"/api/defense-schedules/{schedule_id}/cancel",
+                                         json={"reason": "Venue unavailable", "requested_by": "GS Office"})
+        self.assertEqual(cancelled.status_code, 200, cancelled.get_json())
+        again = self.student().delete(f"/api/student-portal/research-evidence/{evidence_id}")
+        self.assertEqual(again.status_code, 200, again.get_json())
+
     def test_panel_carries_from_proposal_to_final_and_replacing_it_needs_a_reason(self):
         with app.app_context():
             self.pass_gate(self.student_id, TITLE, "Title Defense")

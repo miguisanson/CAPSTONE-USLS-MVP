@@ -465,6 +465,27 @@ class LeaveCaseTests(unittest.TestCase):
             labels = sorted(row.term.label for row in TermEnrollment.query.filter_by(status="LOA").all())
             self.assertEqual(labels, ["Running Term", "Term One"])
 
+    def test_a_leave_that_withdraws_the_subject_closes_a_dean_approved_withdrawal_waiting_for_the_tag(self):
+        """I-163: the subject is Withdrawn by the leave, so the open approved request must not stay stuck."""
+        from app import WithdrawalApplication
+        self.enroll("Running Term")
+        with app.app_context():
+            enrollment = SubjectEnrollment.query.one()
+            application = WithdrawalApplication(
+                student_id=self.student_id, subject_enrollment_id=enrollment.id,
+                status="Approved - Awaiting Subject Tag", dean_decision="Approved",
+            )
+            db.session.add(application)
+            db.session.commit()
+            application_id = application.id
+        case_id = self.file_and_forward("Running Term", "Term One")
+        self.approve(case_id)
+        with app.app_context():
+            self.assertEqual(SubjectEnrollment.query.one().status, "Withdrawn")
+            application = db.session.get(WithdrawalApplication, application_id)
+            self.assertEqual(application.status, "Cancelled")
+            self.assertIn("leave of absence", application.staff_remarks.lower())
+
     def test_a_leave_filed_in_the_second_half_of_the_semester_marks_subjects_w(self):
         with app.app_context():
             today = date.today()
