@@ -70,7 +70,7 @@ export function LoaRequestForm({ data, onSaved }) {
           submitState={submitState}
         />
       ) : (
-        <LeaveReasonNote>{reason}</LeaveReasonNote>
+        <LeaveReasonNote>{overview.banner?.link ? "" : reason}</LeaveReasonNote>
       )}
       <EarlierCases cases={earlier} onChanged={onSaved} />
     </div>
@@ -244,7 +244,7 @@ export function ReadmissionRequestForm({ data, onSaved }) {
           submitState={submitState}
         />
       ) : (
-        <LeaveReasonNote>{reason}</LeaveReasonNote>
+        <LeaveReasonNote>{overview.banner?.link ? "" : reason}</LeaveReasonNote>
       )}
       <EarlierCases cases={earlier} onChanged={onSaved} />
     </div>
@@ -409,11 +409,7 @@ export function AwolReturnRequestForm({ data, onSaved }) {
   return (
     <div className="space-y-4">
       <ProcessCaseList cases={data.standalone_cases?.awol || []} />
-      {(student.standing === "AWOL" || student.enrollment_tag === "AWOL") && (
-        <InlineNotice tone="danger">
-          Your record was automatically flagged AWOL from an official standing or full-semester withdrawal without approved LOA. Registration privileges remain restricted until your return request is reviewed.
-        </InlineNotice>
-      )}
+      <LeaveBanner banner={data.leave_overview?.banner} hideLink />
       {student.enrollment_tag === "Residency" && (
         <InlineNotice tone="info">
           You are enrolled in residency without subjects for an approved academic purpose. Check the workflow status for the recorded semester and purpose.

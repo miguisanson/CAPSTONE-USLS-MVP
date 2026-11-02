@@ -159,7 +159,8 @@ export function StudentRequestPage({ id, aside = null }) {
   const locked = item?.lockedWhen?.(data);
   const messageSlug = STUDENT_MESSAGE_SLUG_BY_VIEW[id];
   const Icon = page.icon;
-  const submitted = requestStateLabel(requestStatus(id, data)) !== NOT_SUBMITTED;
+  // A flagged AWOL record has a case before the student has filed anything; the "cannot cancel" note waits for the filing (I-206).
+  const submitted = requestStateLabel(requestStatus(id, data)) !== NOT_SUBMITTED && !(id === "awol" && data.awol_case?.status === "AWOL Declared");
   return (
     <RequestSentContext.Provider value={setSent}>
     <div className="page-stack animate-fade-up">

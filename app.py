@@ -7901,16 +7901,20 @@ def leave_student_overview(student: Student) -> dict:
             "leave_period": leave_period_text(active) if active else None,
         }
     banner = None
+    standing = student_standing_summary(student)
     if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
+        # I-204/I-206: one notice that says where the student stands and links to the form.
         banner = {"tone": "bad", "title": "Your record is marked AWOL",
-                  "text": "You cannot enroll until a return request is approved. Open Return from AWOL to start."}
+                  "text": standing["text"] if standing else "You cannot enroll until a return request is approved.",
+                  "link": "awol"}
     elif active and active.status == "Return Due":
         end = leave_end_date(active)
         banner = {"tone": "warn", "title": "Your leave is ending",
-                  "text": f"Your leave ends {end.isoformat() if end else 'soon'}. File a readmission request to come back, or ask for an extension."}
+                  "text": f"Your leave ends {end.isoformat() if end else 'soon'}. File a readmission request to come back, or ask for an extension."
+                          + (f" {standing['limit_text']}" if standing and standing["limit_text"] else "")}
     elif active and active.status == "On Leave" or (on_leave and not active):
         banner = {"tone": "info", "title": "You are on leave of absence",
-                  "text": "Your enrollment is closed until a readmission is approved."}
+                  "text": (f"{standing['text']} " if standing else "") + "Your enrollment is closed until a readmission is approved."}
     elif active and active.status == "Leave Scheduled":
         start = leave_start_date(active)
         banner = {"tone": "info", "title": "Your leave is scheduled",
@@ -7933,6 +7937,7 @@ def leave_student_overview(student: Student) -> dict:
         "loa_semester_options": loa_options[:6],
         "return_semester_options": [term.label for term in terms if term.start_date > today][:6],
         "active_case_id": active.id if active else None,
+        "standing": standing,
         "rules": leave_vocabulary()["rules"],
     }
 
@@ -8441,6 +8446,48 @@ def residence_limits(student: Student) -> dict:
         "includes_loa": rule_value("residency.includes_loa", True),
         "refresher_units": rule_value("residency.refresher_units", 6),
         "citation": rule_citation(f"residency.{level}_absolute_years"),
+    }
+
+
+def student_standing_summary(student: Student) -> dict | None:
+    """I-204: in plain words, whether the student is still a student, since when, and how long they have.
+
+    Uses the student's own program level (master's 5/7 years, doctorate 7/9) from residence_limits.
+    None for a student who is neither AWOL nor on leave."""
+    awol = student.standing == "AWOL" or student.enrollment_tag == "AWOL"
+    leave = None if awol else active_leave_case(student.id)
+    on_leave = student.standing == "On Leave" or student.enrollment_tag == "LOA" or student.current_stage == "LOA"
+    if not awol and not (leave or on_leave):
+        return None
+    limits = residence_limits(student)
+    level = limits["program_level"]
+    absolute = int(limits["absolute_years"])
+    entry_year = int(student.entry_year or _entry_year_from_ay(student.academic_year_entry or "") or 0)
+    deadline = date(entry_year + absolute, 5, 31) if entry_year else None
+    if awol:
+        case = latest_awol_case(student.id)
+        since = case.awol_effective_date if case else None
+        text = (
+            "You are still a USLS graduate student, but your record has been marked AWOL"
+            + (f" since {_plain_date(since)}" if since else "")
+            + ", so you cannot enroll until a return request is approved."
+        )
+    else:
+        since = leave_start_date(leave) if leave else None
+        end = leave_end_date(leave) if leave else None
+        text = (
+            "You are still a USLS graduate student, on an approved leave of absence"
+            + (f" since {_plain_date(since)}" if since else "")
+            + (f". Your leave ends {_plain_date(end)}; file a readmission request to come back." if end else ".")
+        )
+    limit_text = (
+        f"As a {level.lower()} student you have until {_plain_date(deadline)} to finish your program "
+        f"({absolute} academic years from admission, time away included; {limits['citation']})."
+    ) if deadline else ""
+    return {
+        "kind": "awol" if awol else "leave", "since": iso(since), "program_level": level,
+        "absolute_years": absolute, "deadline": iso(deadline), "limit_text": limit_text,
+        "text": f"{text} {limit_text}".strip(),
     }
 
 
@@ -8964,6 +9011,7 @@ def awol_process_case(item: AwolCase, role: str = "staff", detail: bool = False)
     }
     if not detail:
         return payload
+    live_limits = residence_limits(student)  # the student's own level, until the policy review stores it on the case
     payload["summary_rows"] = [
         {"label": "Type", "value": payload["kind_label"]},
         {"label": "AWOL effective date", "value": iso(item.awol_effective_date), "date": True},
@@ -8971,9 +9019,11 @@ def awol_process_case(item: AwolCase, role: str = "staff", detail: bool = False)
         {"label": "Last enrolled semester", "value": item.last_enrolled_term or "Not recorded"},
         {"label": "Returning in", "value": item.target_return_term or "Not chosen yet"},
         {"label": "Policy classification", "value": item.policy_classification or "Not reviewed yet"},
-        {"label": "Years in the program", "value": "Not calculated" if item.years_in_program is None else str(item.years_in_program)},
-        {"label": "Residence limits", "value": (f"{item.normal_residence_years} normal / {item.absolute_residence_years} absolute"
-                                                 if item.normal_residence_years else "Not calculated")},
+        {"label": "Years in the program", "value": str(item.years_in_program if item.years_in_program is not None else live_limits["years_in_program"])},
+        {"label": "Residence limits", "value": (
+            f"{item.normal_residence_years or live_limits['normal_years']} normal / "
+            f"{item.absolute_residence_years or live_limits['absolute_years']} absolute ({live_limits['program_level']})"
+        )},
         {"label": "Student's written intention", "value": item.return_intent or "Not filed yet", "full": True},
         {"label": "Reason for return", "value": item.return_reason or "None", "full": True},
         {"label": "Dean decision", "value": item.dean_decision},
@@ -10979,6 +11029,8 @@ _PERSONAL_QUESTION_PATTERNS = [
         r"\bwhat(?:'s| is) (?:waiting|pending|due)\b.{0,12}\bme\b",
         r"\bwhat(?:'s| is) next for me\b",
         r"\bwhere am i\b",
+        r"\bam i (?:still )?(?:a|an|enrolled|in)\b.{0,25}\b(?:student|enrolled|program|school)\b",
+        r"\bhow (?:long|much time) do i (?:still )?have\b.{0,30}\b(?:come|go|get|return|back|finish|graduate|complete)\b",
     )
 ]
 
@@ -11010,26 +11062,36 @@ def student_assistant_record(student: Student) -> dict:
         Task.query.filter(Task.student_id == student.id, Task.status.in_(["Pending", "Overdue"]))
         .order_by(Task.due_at.asc(), Task.id.asc()).limit(8).all()
     )
-    tasks = [
+    all_tasks = [
         {
             "title": task.title, "owner": normalize_owner_label(task.owner_role), "due": task.due_at,
             "overdue": task.due_at < today,
         }
         for task in open_tasks
     ]
+    # I-203: "your next step" is only what the student does; the office's tasks are shown as waiting on the office.
+    student_owner = ROLE_LABELS["student"]
+    tasks = [task for task in all_tasks if task["owner"] == student_owner]
+    waiting_on_others = [task for task in all_tasks if task["owner"] != student_owner]
     standing_note = None
-    if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
+    standing_step = None
+    summary = student_standing_summary(student)
+    if summary:
+        standing_note = summary["text"]
+    if summary and summary["kind"] == "awol":
         awol = latest_awol_case(student.id)
-        standing_note = (
-            "Your record is marked AWOL, so you cannot enroll until a return request is approved."
-            + (f" Your return request is at the stage: {awol.status}." if awol and awol.status else "")
-        )
-    elif student.standing == "On Leave" or student.enrollment_tag == "LOA" or student.current_stage == "LOA":
+        if awol and awol.status:
+            standing_note += f" Your return request is at the stage: {awol.status}."
+        if not awol or awol.status in {"AWOL Declared", "Returned for Revision", "Return Denied"}:
+            standing_step = "Open Return from AWOL and write your intention to return."
+        else:
+            standing_step = "Your return request is with the office and the Dean; watch your Inbox for their decision."
+    elif summary:
         leave = active_leave_case(student.id)
-        end = leave_end_date(leave) if leave else None
-        standing_note = "You are on an approved leave of absence" + (
-            f" that ends {_plain_date(end)}." if end else "."
-        ) + " A readmission request is needed to come back."
+        if leave is None or leave.kind != KIND_READMISSION:
+            standing_step = "When your leave ends, file a Readmission request to come back."
+        else:
+            standing_step = "Your readmission request is being reviewed; watch your Inbox for the decision."
     elif student.standing == "Withdrawn" or student.current_stage == "Withdrawal In Progress":
         standing_note = (
             "Your record shows: " + ("withdrawn." if student.standing == "Withdrawn" else "withdrawal in progress.")
@@ -11058,6 +11120,8 @@ def student_assistant_record(student: Student) -> dict:
         "research_status": case.status if case else None,
         "missing_documents": missing_documents,
         "tasks": tasks,
+        "waiting_on_others": waiting_on_others,
+        "standing_step": standing_step,
         "standing_note": standing_note,
         "defense": (
             {"type": defense.defense_type or "Defense", "date": defense.preferred_date, "status": defense.status}
@@ -11090,6 +11154,13 @@ def student_record_text(record: dict) -> str:
         lines.append("Open tasks: " + " | ".join(_record_task_line(task) for task in record["tasks"]))
     else:
         lines.append("Open tasks: none.")
+    if record["standing_step"]:
+        lines.append("Your own next step: " + record["standing_step"])
+    if record["waiting_on_others"]:
+        lines.append(
+            "Waiting on the office (not the student's to do): "
+            + " | ".join(_record_task_line(task) for task in record["waiting_on_others"])
+        )
     if record["standing_note"]:
         lines.append(record["standing_note"])
     if record["defense"]:
@@ -11111,7 +11182,11 @@ def student_record_answer(record: dict) -> str:
     ]
     if record["standing_note"]:
         parts.append(record["standing_note"])
-    if record["tasks"]:
+    if record["standing_step"]:
+        parts.append(f"Your next step: {record['standing_step']}")
+        if record["tasks"]:
+            parts.append("Also open: " + "; ".join(_record_task_line(task) for task in record["tasks"][:3]) + ".")
+    elif record["tasks"]:
         first = record["tasks"][0]
         parts.append(
             f"Your next step: {first['title']} - {'overdue since' if first['overdue'] else 'due'} {_plain_date(first['due'])}."
@@ -14772,6 +14847,27 @@ def register_routes(app: Flask) -> None:
                 "current_stage": detected_research_progress(student)["stage"],
             })
         return jsonify({"items": rows})
+
+    @app.route("/api/research-gate/overview")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def research_gate_overview():
+        """Every active student with a research case, at their gate, with ready / blocked / waiting and why (I-205, AD12)."""
+        rows = []
+        cases = (
+            ResearchCase.query.join(Student, Student.id == ResearchCase.student_id)
+            .filter(active_student_clause()).order_by(ResearchCase.opened_at.desc(), ResearchCase.id.desc()).all()
+        )
+        seen = set()
+        for case in cases:
+            if case.student_id in seen:
+                continue
+            seen.add(case.student_id)
+            row = research_gate_overview_row(db.session.get(Student, case.student_id), case)
+            if row:
+                rows.append(row)
+        rows.sort(key=lambda row: (row["student"]["name"] or "").lower())
+        counts = {key: sum(row["state"] == key for row in rows) for key in ("ready", "blocked", "waiting", "done")}
+        return jsonify({"items": rows, "counts": counts, "stages": [name for name, _ in RESEARCH_PORTAL_STAGE_SEQUENCE]})
 
     @app.route("/api/research-gate/form1-endorsements/<int:student_id>", methods=["POST"])
     @require_api_login("academic_coordinator")
@@ -34858,6 +34954,63 @@ def research_stage_status(milestone: dict) -> str:
     if any(item["status"] == "Submitted" for item in requirements):
         return "Awaiting Review"
     return "Pending Staff Action"
+
+
+def research_gate_overview_row(student: Student, case: ResearchCase) -> dict | None:
+    """I-205: where one student stands at their research gate, in the words of the Research Gate overview.
+
+    state: "ready" (documents are in; the next step is the Research Coordinator's), "blocked" (the student must act),
+    "waiting" (someone else must review, sign or record a verdict), "done" (stage complete). Read-only."""
+    gate = case.current_gate
+    if gate not in RESEARCH_MILESTONES:
+        return None
+    milestone = research_milestone_payload(student, gate)
+    stage = next((name for name, stage_gate in RESEARCH_PORTAL_STAGE_SEQUENCE if stage_gate == gate), milestone["short_label"])
+    status = research_stage_status(milestone)
+    student_owner, academic, research = ROLE_LABELS["student"], ROLE_LABELS["academic_coordinator"], ROLE_LABELS["research_coordinator"]
+    pending = [item for item in milestone["requirements"] if item["status"] != "Complete"]
+    state, owner, reason = "done", None, "Every requirement for this stage is complete."
+    by_status = {
+        "Revisions Pending": ("blocked", student_owner, "Revisions requested after the defense; the student has to submit the revised paper."),
+        "Revisions Submitted - Awaiting Confirmation": ("waiting", "Panel chair", "Revised paper submitted; the panel chair has to confirm it."),
+        "Defense Deferred": ("ready", research, "Defense deferred; it has to be rescheduled."),
+        "Re-defense Required": ("blocked", student_owner, "Re-defense required; the student has to resubmit first."),
+        "Resubmission Required": ("blocked", student_owner, "Resubmission required; the student has to upload again."),
+    }
+    if status in by_status:
+        state, owner, reason = by_status[status]
+    elif pending:
+        locked = next((item for item in pending if item["status"] == "Locked"), None)
+        missing = [item["label"] for item in pending if item["student_upload"] and item["status"] == "Missing"]
+        submitted = next((item for item in pending if item["status"] == "Submitted"), None)
+        first = next((item for item in pending if item["source_type"] != "student_upload"), pending[0])
+        if locked:
+            state, owner, reason = "blocked", student_owner, locked["status_label"]
+        elif missing:
+            state, owner, reason = "blocked", student_owner, "Still to upload: " + "; ".join(missing)
+        elif submitted and submitted["status_label"] == "Pending adviser signature":
+            state, owner, reason = "waiting", "Adviser", f"{submitted['label']}: waiting for the adviser's signature."
+        elif submitted:
+            reviewer = academic if gate == RESEARCH_GATE_TITLE else research
+            state = "waiting" if reviewer == academic else "ready"
+            owner, reason = reviewer, f"{submitted['label']} is submitted and waiting for review."
+        elif first["source_type"] == "coordinator_endorsement":
+            state, owner, reason = "waiting", academic, "Form 1 is waiting for the Academic Coordinator's endorsement."
+        elif first["source_type"] == "system_panel":
+            state, owner, reason = "ready", research, "Documents are in; the panel has not been matched yet."
+        elif first["source_type"].endswith("_schedule"):
+            state, owner, reason = "ready", research, "Panel is in place; the defense has not been scheduled yet."
+        elif first["source_type"] == "system_defense_result":
+            state, owner, reason = "waiting", "Panel chair", "Defense is scheduled; the panel chair has not recorded the verdict yet."
+        elif first["source_type"] == "ethics_clearance_record":
+            state, owner, reason = "ready", research, "The ethics clearance has to be recorded."
+        else:
+            state, owner, reason = "waiting", student_owner, first["status_label"]
+    return {
+        "student": student_brief(student), "stage": stage, "gate": gate, "status": status,
+        "state": state, "waiting_on": owner if state != "done" else None, "reason": reason,
+        "research_title": case.title, "adviser_name": student.adviser_name,
+    }
 
 
 def detected_research_progress(student: Student) -> dict:
