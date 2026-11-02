@@ -7,8 +7,8 @@
 //     says a comment or reason is needed;
 //   - with a comment it opens a confirmation window titled "Confirm: Return for revision" that shows the comment;
 //     Escape closes it and decides nothing; confirming returns the case to the process list with the server's message;
-//   - the decided case is read-only ("No Dean decision is due at this stage.") and its history ("View logs") has the
-//     entry the decision wrote;
+//   - the returned case leaves the Dean's lists (it is back with the Coordinator, AD11), so its card says "Case not found";
+//   - after "Mark reviewed" the case history ("View logs") holds both decisions, with the return comment;
 //   - "Mark reviewed" needs no comment, asks to confirm in a window titled after the button, and its history entry shows.
 // Setup (the practicum report reaching the Dean) goes through each role's own API login, like section-j.spec.js.
 // It changes data in the throwaway harness database and touches only the demo student Andrea Villanueva
@@ -92,7 +92,8 @@ async function practicumToDean(playwright) {
   await step(staff, "MOA Under Review")();
   await step(coordinator, "Practicum In Progress")();
   // The student submits the completion documents; staff forward them; the coordinator records completion and sends the
-  // report. After the Dean returns a report ("Additional Certificates Requested") the same walk starts again.
+  // report. After the Dean returns a report (AD11, 141bb8d) the case waits at "Completed" with the Coordinator, who sends
+  // it again: no new student upload (the stage is locked for the student).
   const send = async () => {
     const certificate = attachmentId(
       await attach(pdfFile("Andrea_Villanueva_Practicum_Certificates.pdf", ["Practicum Hours Certificates", "200 of 200 hours completed"])),
@@ -108,7 +109,7 @@ async function practicumToDean(playwright) {
     await step(coordinator, "Report Sent to Dean")();
   };
   await send();
-  return { send, dispose: () => Promise.all([student.dispose(), staff.dispose(), coordinator.dispose()]) };
+  return { resend: step(coordinator, "Report Sent to Dean"), dispose: () => Promise.all([student.dispose(), staff.dispose(), coordinator.dispose()]) };
 }
 
 test.describe("P3.1 Dean decisions on a case card", () => {
@@ -164,22 +165,18 @@ test.describe("P3.1 Dean decisions on a case card", () => {
     await page.getByRole("dialog").last().getByRole("button", { name: "Return for revision" }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page).toHaveURL(/\/dean\/approvals\/practicum$/);
-    await expect(page.getByText("Practicum status returned by Dean").first()).toBeVisible();
+    await expect(page.getByText("Practicum status report returned by Dean").first()).toBeVisible();
     expect(decideCalls).toHaveLength(1);
     expect(decideCalls[0]).toMatchObject({ decision: "return", note: comment });
 
-    // 5. The decided case is read-only and its history has the entry.
+    // 5. AD11 (141bb8d): the return sends the case back to the Coordinator, so it leaves the Dean's lists. Its history
+    //    (the return entry with the comment) is checked on the same card after step 6, once the Dean has reviewed it.
     await page.goto(`/dean/case/practicum/${caseId}`);
-    await expect(page.getByText("No Dean decision is due at this stage.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Case not found" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Return for revision" })).toHaveCount(0);
-    await page.getByRole("button", { name: /View logs/ }).click();
-    await expect(page.getByRole("button", { name: /Hide logs/ })).toBeVisible();
-    await expect(page.getByText("Practicum status returned by Dean").first()).toBeVisible();
-    await expect(page.getByText(comment).first()).toBeVisible();
-    await page.screenshot({ path: join(SHOTS, "history-open-1366.png"), fullPage: true });
 
     // 6. Send the report to the Dean again and mark it reviewed: no comment needed, a window titled after the button.
-    await setup.send();
+    await setup.resend();
     await page.goto(`/dean/case/practicum/${caseId}`);
     const approve = page.getByRole("button", { name: "Mark reviewed" });
     await approve.scrollIntoViewIfNeeded();
@@ -197,7 +194,9 @@ test.describe("P3.1 Dean decisions on a case card", () => {
     await page.goto(`/dean/case/practicum/${caseId}`);
     await page.getByRole("button", { name: /View logs/ }).click();
     await expect(page.getByText("Practicum status reviewed by Dean").first()).toBeVisible();
-    await expect(page.getByText("Practicum status returned by Dean").first()).toBeVisible();
+    await expect(page.getByText("Practicum status report returned by Dean").first()).toBeVisible();
+    await expect(page.getByText(comment).first()).toBeVisible();
+    await page.screenshot({ path: join(SHOTS, "history-open-1366.png"), fullPage: true });
     await setup.dispose();
   });
 });

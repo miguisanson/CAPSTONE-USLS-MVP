@@ -5,7 +5,7 @@
 //   - Maya Torres (AWOL, one open task held by the Academic Coordinator, one recommendation): the first section of
 //     the page is "Needs your action" (the AWOL banner, with a working link) and holds only what SHE must do; the
 //     coordinator's alert sits in the second section, "Waiting on the Graduate School" (AD7); "Your open tasks" counts 0;
-//   - Roberto Aquino (nothing waiting): the same section says "Nothing is waiting on you" and holds no list and there is no empty second group;
+//   - Ana Chua (roster student, nothing waiting): the same section says "Nothing is waiting on you" and holds no list and there is no empty second group;
 //   - Miguel Yu (any stage on the lifecycle path): each key number is shown ONCE (coursework %, research status, open tasks, unread
 //     messages), the lifecycle Stepper marks his current stage, "On track" appears at most once, and the blocks that
 //     left the home are still one click away: Defense Schedule, Request Center, Leave of Absence, Research Adviser;
@@ -16,7 +16,9 @@ import { PASSWORD } from "./support/accounts.js";
 import { attachWatchers, formatProblems, stubExternal } from "./support/checker.js";
 
 const MAYA = "awol.maya@usls.edu.ph";
-const ROBERTO = "roberto.aquino@student.usls.edu.ph";
+// Ana Chua: a roster student no spec writes, with no enrolled subject, so no withdrawal-window reminder (Roberto has three
+// since the semester start was re-dated, 141bb8d / pkt/logic1: that reminder is correct for him).
+const NOBODY_WAITING = "ana.chua@student.usls.edu.ph";
 const MIGUEL = "student@usls.edu.ph";
 
 // A fresh browser context per test, signed in through the login API (the page then uses the same cookie).
@@ -79,8 +81,8 @@ test.describe("student home, action first (IM19)", () => {
     await expect(page.locator("main h1")).toBeVisible();
   });
 
-  test("Roberto: with nothing waiting the section says so and holds no list", async ({ page, context }) => {
-    await openHome(page, context, ROBERTO);
+  test("Ana Chua: with nothing waiting the section says so and holds no list", async ({ page, context }) => {
+    await openHome(page, context, NOBODY_WAITING);
     await expect(main(page).locator("h2").first()).toHaveText("Needs your action");
     const section = sectionOf(page, "Needs your action");
     await expect(section.getByText("Nothing is waiting on you")).toBeVisible();
