@@ -138,6 +138,45 @@ class Be6Tests(unittest.TestCase):
             self.assertEqual(self._client("dean").get(path).status_code, 200, path)
             self.assertEqual(self._client("student").get(path).status_code, 403, path)
 
+    # ------------------------------------------------------------------ I-197
+    def _earlier_terms(self):
+        active = app_module.get_active_term()
+        recent = app_module.term_before(active)
+        return recent, app_module.term_before(recent)
+
+    def test_earlier_terms_have_held_defenses_with_verdicts(self):
+        with app.app_context():
+            for term in self._earlier_terms():
+                rows = app_module.report_defenses({"when": "Held", "term": term.label})["rows"]
+                self.assertGreaterEqual(len(rows), 2, term.label)
+                self.assertTrue(all(r["verdict"] != app_module.NO_VERDICT_YET for r in rows), term.label)
+            tile = next(t for t in app_module.report_summary({})["tiles"] if t["key"] == "defenses")
+            self.assertEqual(tile["comparison"]["kind"], "previous_term")
+            self.assertGreater(tile["comparison"]["previous"], 0)
+
+    def test_earlier_terms_have_closed_cases_for_cycle_times(self):
+        with app.app_context():
+            for term in self._earlier_terms():
+                rows = app_module.report_cycle_times({"term": term.label})["rows"]
+                self.assertGreaterEqual(sum(r["closed_cases"] for r in rows), 4, term.label)
+                self.assertTrue(any(r["median_cycle_days"] is not None for r in rows), term.label)
+
+    def test_activity_older_than_twelve_weeks_is_tagged_seeded_history(self):
+        with app.app_context():
+            cutoff = datetime.combine(app_module.ph_today() - timedelta(weeks=12, days=1), datetime.min.time())
+            old = app_module.TransactionLog.query.filter(app_module.TransactionLog.created_at < cutoff).all()
+            self.assertTrue(old)
+            self.assertEqual({row.source_reference for row in old}, {app_module.SEEDED_HISTORY_SOURCE})
+
+    def test_history_defenses_sit_on_students_with_no_other_story(self):
+        with app.app_context():
+            requests = app_module.ScheduleRequest.query.filter(app_module.ScheduleRequest.notes.like("Seeded history%")).all()
+            self.assertGreaterEqual(len(requests), 4)
+            for req in requests:
+                student = db.session.get(app_module.Student, req.student_id)
+                self.assertIn(student.current_stage, ("Coursework", "Admission"))
+                self.assertIsNone(app_module.ResearchCase.query.filter_by(student_id=student.id).first())
+
 
 if __name__ == "__main__":
     unittest.main()
