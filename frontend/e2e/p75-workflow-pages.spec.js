@@ -150,7 +150,7 @@ test.describe("Student Handoff (staff)", () => {
     await openFromSidebar(page, /1 · Student Handoff/);
     const input = main(page).locator('input[type="file"]').first();
     await input.setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("x") });
-    await expect(main(page).getByText("Please choose an Excel .xlsx file in the AC Student Monitoring format.")).toBeVisible();
+    await expect(main(page).getByText("Please choose an Excel .xlsx file in the Academic Coordinator Student Monitoring format.")).toBeVisible();
     await expect(main(page).getByRole("button", { name: /Import students/ })).toBeDisabled();
     await input.setInputFiles({ name: "sheet.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from("x") });
     await expect(main(page).getByText("sheet.xlsx")).toBeVisible();

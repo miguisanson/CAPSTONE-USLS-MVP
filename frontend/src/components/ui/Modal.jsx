@@ -16,9 +16,10 @@
 //
 // Layers (tailwind zIndex scale): header 30 < drawer 40 < modal 100 < confirm 110. A dialog opened while another one
 // is open (a confirm over a modal) takes the confirm layer, and only the top one answers to Escape and Tab.
-import { createElement, isValidElement, useEffect, useId, useRef, useState } from "react";
+import { createElement, isValidElement, useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { ConfirmContext } from "../confirm.jsx";
 
 const SIZE_CLASS = {
   sm: "max-w-md", // confirm, reasons
@@ -170,7 +171,15 @@ export function Modal({
   const panelRef = useRef(null);
   // Decided once, when the dialog mounts: is another dialog already open underneath?
   const [stacked] = useState(() => openLayers.length > 0);
-  useDialogLayer(panelRef, onClose, dismissible);
+  const confirm = useContext(ConfirmContext);
+  // Escape and a click on the backdrop ask first when a reason box has been typed in (F-18): one slip must not lose it.
+  // The X button and Cancel are deliberate and close at once.
+  const askClose = () => {
+    const typed = Array.from(panelRef.current?.querySelectorAll("textarea") || []).some((box) => box.dataset.touched && box.value.trim());
+    if (!typed || !confirm) return onClose?.();
+    return confirm({ title: "Discard your changes?", message: "What you typed has not been saved.", confirmLabel: "Discard", cancelLabel: "Keep editing", tone: "danger" }).then((ok) => ok && onClose?.());
+  };
+  useDialogLayer(panelRef, askClose, dismissible);
 
   const layerClass = layer === "confirm" || stacked ? "z-confirm" : "z-modal";
   const tile = tone === "danger" ? "bg-red-50 text-red-600" : "bg-brand-50 text-brand-700";
@@ -184,7 +193,7 @@ export function Modal({
       onMouseDown={(event) => {
         if (event.target !== event.currentTarget || !dismissible) return;
         event.preventDefault(); // keep the mousedown from moving the focus after we hand it back to the opener
-        onClose?.();
+        askClose();
       }}
     >
       <section
@@ -194,6 +203,7 @@ export function Modal({
         aria-labelledby={titleId}
         aria-describedby={subtitle ? subtitleId : describedBy}
         tabIndex={-1}
+        onInput={(event) => { if (event.target.tagName === "TEXTAREA") event.target.dataset.touched = "1"; }}
         className={`flex max-h-[90dvh] w-full ${SIZE_CLASS[size] || SIZE_CLASS.md} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift animate-dialog-panel focus:outline-none ${className}`}
       >
         <header data-modal-header="" className="flex shrink-0 items-start gap-3 border-b border-slate-200 px-4 py-4 sm:px-6">

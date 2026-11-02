@@ -159,7 +159,7 @@ const NAV_SCROLL_SHADOW = {
   ].join(", "),
 };
 
-function SidebarContent({ onNavigate, onClose, user }) {
+function SidebarContent({ onNavigate, onClose, user, identity, onSignOut }) {
   const { counts, flags } = usePortalNav();
   const { pathname } = useLocation();
   const navRef = useRef(null);
@@ -201,6 +201,12 @@ function SidebarContent({ onNavigate, onClose, user }) {
         </div>
         {onClose && <Button variant="icon" icon={X} aria-label="Close menu" onClick={onClose} className="ml-auto" />}
       </div>
+      {/* In the phone menu: who is signed in (the header chip is hidden below sm) and a labelled way out (F-05) */}
+      {onSignOut && (
+        <p data-testid="drawer-identity" className="mx-5 mb-3 break-words rounded-xl bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700" title={identity}>
+          {identity}
+        </p>
+      )}
 
       <nav ref={navRef} style={NAV_SCROLL_SHADOW} className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 pb-6">
         {groups.map((group) => (
@@ -216,6 +222,7 @@ function SidebarContent({ onNavigate, onClose, user }) {
       </nav>
 
       <div className="shrink-0 border-t border-slate-200 px-5 py-4">
+        {onSignOut && <Button variant="secondary" icon={LogOut} onClick={onSignOut} className="mb-3 w-full max-sm:min-h-11">Sign out</Button>}
         <p className="mb-1 text-xs font-semibold text-brand-700">{ROLE_LABELS[user?.role] || "Graduate School Staff"}</p>
         <p className="micro leading-relaxed">
           {PORTAL_FOOTERS[user?.role] || "Figures are computed live from recorded transactions."}
@@ -280,7 +287,7 @@ export default function Layout({ children }) {
       {/* Mobile menu: the library Drawer (focus moves in and is trapped, Escape and the backdrop close it, focus returns to the menu button) */}
       {mobileOpen && (
         <Drawer side="left" label="Menu" width="w-80 max-w-[85vw]" onClose={() => setMobileOpen(false)}>
-          <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} onClose={() => setMobileOpen(false)} />
+          <SidebarContent user={user} identity={identity} onSignOut={logout} onNavigate={() => setMobileOpen(false)} onClose={() => setMobileOpen(false)} />
         </Drawer>
       )}
 

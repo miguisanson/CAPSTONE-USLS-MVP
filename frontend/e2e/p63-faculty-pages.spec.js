@@ -410,7 +410,7 @@ test.describe("Adviser appointments", () => {
       await tab(page, "In progress").click();
       const noted = card(page, "Marielle Navarro");
       await expect(noted).toBeVisible();
-      await expect(noted).toContainText("Noted by AC");
+      await expect(noted).toContainText("Noted by Academic Coordinator");
       await expect(noted).toContainText("Academic Coordinator note");
       await expect(noted).toContainText("Fits the program; please send to the Dean.");
       await expect(noted.getByRole("button")).toHaveCount(0);
@@ -430,7 +430,7 @@ test.describe("Adviser appointments", () => {
     test("Send to the Dean asks first; the record card is offered", async ({ page }) => {
       await page.goto("/workflow/research-gate?view=adviser");
       const marielle = card(page, "Marielle Navarro");
-      await expect(marielle).toContainText("Noted by AC");
+      await expect(marielle).toContainText("Noted by Academic Coordinator");
       await expect(marielle.getByRole("button", { name: "Send to the Dean" })).toBeVisible();
       await expect(marielle.getByRole("button", { name: "Note application" })).toHaveCount(0);
       // Staff can also record an appointment made outside the portal.

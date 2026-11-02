@@ -20,6 +20,8 @@ export default function ChangePassword() {
 
   if (!user) return <Navigate to="/login" replace />;
   const forced = Boolean(user.must_change_password);
+  // Seeded demo logins are shared by every tester: one changed password would lock the others out (I-212). The server says so.
+  if (user.demo_account && !forced) return <Navigate to={HOME[user.role] || "/"} replace />;
 
   async function onSubmit(event) {
     event.preventDefault();

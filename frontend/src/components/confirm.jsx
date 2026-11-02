@@ -10,7 +10,7 @@ import { Modal } from "./ui/Modal.jsx";
 // Built on ui/Modal (size sm, confirm layer). Keyboard: Escape and the backdrop cancel. Enter does whatever the
 // focused button does, and the focus starts on the SAFE button of a destructive dialog (Cancel), so pressing Enter
 // can never confirm a destructive action (UI-SPEC AD1); a normal dialog starts on its confirm button.
-const ConfirmContext = createContext(null);
+export const ConfirmContext = createContext(null); // also read by ui/Modal (the "Discard your changes?" question)
 
 export function ConfirmProvider({ children }) {
   const [dialog, setDialog] = useState(null);

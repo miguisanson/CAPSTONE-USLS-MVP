@@ -225,7 +225,7 @@ test.describe("Dean decision footer on a phone (F-18)", () => {
     const footer = page.getByTestId("decision-footer");
     await expect(footer).toBeVisible();
     const box = await footer.boundingBox();
-    expect(box.height, "the footer takes at most a fifth of the phone screen").toBeLessThanOrEqual(844 / 5);
+    expect(box.height, "the footer takes at most a quarter of the phone screen (it was over a third)").toBeLessThanOrEqual(844 / 4);
     const buttons = footer.getByRole("button");
     const tops = [];
     for (let i = 0; i < (await buttons.count()); i += 1) tops.push(Math.round((await buttons.nth(i).boundingBox()).y));

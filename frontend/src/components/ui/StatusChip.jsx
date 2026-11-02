@@ -1,6 +1,6 @@
 // StatusChip (UI-SPEC section 4): one coloured pill for any status word. The colour comes from lib/status.js, never from
 // the caller. Colour is never the only signal: the chip always shows its words (the dot is optional decoration).
-import { statusTone } from "../../lib/status";
+import { statusLabel, statusTone } from "../../lib/status";
 import { toneOf } from "../../lib/tone";
 
 const SIZES = {
@@ -25,7 +25,7 @@ export function StatusChip({ status, tone, label, dot = true, size = "md", class
       className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-semibold ring-1 ring-inset ${SIZES[size] || SIZES.md} ${toneOf(name).chip} ${className}`}
     >
       {dot && <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />}
-      {label || status}
+      {label || statusLabel(status)}
     </span>
   );
 }

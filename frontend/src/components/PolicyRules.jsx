@@ -14,7 +14,7 @@ export function formatRuleValue(rule) {
   return rule.unit ? `${rule.value} ${rule.unit}` : String(rule.value);
 }
 
-export function RuleBadges({ rule }) {
+export function RuleBadges({ rule, showReview = true }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       {rule.enforced ? (
@@ -22,7 +22,7 @@ export function RuleBadges({ rule }) {
       ) : (
         <StatusChip status="Documented only" tone="muted" size="sm" dot={false} />
       )}
-      {rule.status === "needs_review" && <StatusChip status="Needs review" size="sm" dot={false} />}
+      {showReview && rule.status === "needs_review" && <StatusChip status="Needs review" size="sm" dot={false} />}
     </span>
   );
 }
@@ -38,7 +38,10 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
   const items = (data?.items || []).filter((rule) => !onlyEnforced || rule.enforced);
   if (!items.length) return null;
   const canOpenPage = user && user.role !== "student" && user.role !== "faculty";
-  const needsReview = items.filter((rule) => rule.status === "needs_review").length;
+  // "Prototype rule / needs review" is the Graduate School's own to-do (F-11): the Dean, the student and faculty see a plain source.
+  const gsStaff = canOpenPage && user.role !== "dean";
+  const needsReview = gsStaff ? items.filter((rule) => rule.status === "needs_review").length : 0;
+  const sourceOf = (rule) => (!gsStaff && /^Prototype rule/i.test(rule.citation || "") ? "Graduate School policy" : rule.citation);
 
   return (
     <section className={`rounded-2xl border border-brand-100 bg-brand-50/40 ${className}`} aria-label={title}>
@@ -68,8 +71,8 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
                 <span className="shrink-0 rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white">{formatRuleValue(rule)}</span>
               </div>
               <p className="meta mt-1 leading-relaxed text-slate-600">{rule.description}</p>
-              <p className="meta mt-1.5 font-semibold text-brand-800">Source: {rule.citation}{rule.source_section ? ` (${rule.source_section})` : ""}</p>
-              <div className="mt-1.5"><RuleBadges rule={rule} /></div>
+              <p className="meta mt-1.5 font-semibold text-brand-800">Source: {sourceOf(rule)}{rule.source_section ? ` (${rule.source_section})` : ""}</p>
+              <div className="mt-1.5"><RuleBadges rule={rule} showReview={gsStaff} /></div>
               {!rule.enforced && rule.not_enforced_reason && <p className="micro mt-1">{rule.not_enforced_reason}</p>}
             </div>
           ))}

@@ -76,6 +76,8 @@ const joinOr = (words) => (words.length > 1 ? `${words.slice(0, -1).join(", ")} 
  * @param extra              a node at the end of the button row (a "Message" button, a read-only sentence)
  * @param children           extra controls between the comment box and the buttons (a checkbox, a select, a signature pad)
  * @param variant            "card" (default, bordered) | "plain" (no chrome, for use inside a Modal or an existing card)
+ * @param compact            on a phone the buttons share ONE row (their words wrap) instead of one full-width button per line, and
+ *                           the box scrolls into view when it takes the focus (a pinned footer, F-18)
  */
 export function DecisionPanel({
   title,
@@ -102,6 +104,7 @@ export function DecisionPanel({
   extra,
   children,
   variant = "card",
+  compact = false,
   className = "",
   ...rest
 }) {
@@ -188,7 +191,7 @@ export function DecisionPanel({
       role="group"
       aria-labelledby={title ? titleId : undefined}
       aria-label={title ? undefined : "Decision"}
-      className={`space-y-3 ${className}`.trim()}
+      className={`space-y-3 ${compact ? "max-sm:space-y-2" : ""} ${className}`.trim()}
     >
       {(title || subject) && (
         <div>
@@ -212,6 +215,7 @@ export function DecisionPanel({
             data-autofocus={commentAutoFocus ? "" : undefined}
             disabled={working}
             onChange={(event) => setText(event.target.value)}
+            onFocus={compact ? (event) => { const box = event.currentTarget; setTimeout(() => box.scrollIntoView?.({ block: "nearest" }), 250); } : undefined}
           />
         </Field>
       )}
@@ -221,7 +225,7 @@ export function DecisionPanel({
       {success && <InlineNotice tone="success">{success}</InlineNotice>}
       {shownError && <InlineNotice tone="danger">{shownError}</InlineNotice>}
 
-      <div className="flex flex-wrap gap-2">
+      <div className={`flex flex-wrap gap-2 ${compact ? "max-sm:flex-nowrap" : ""}`}>
         {actions.map((action) => {
           const tone = toneOf(action);
           const hintId = action.hint ? `${base}-hint-${action.key}` : undefined;
@@ -233,7 +237,7 @@ export function DecisionPanel({
               loading={pending === action.key}
               disabled={working || action.disabled}
               aria-describedby={hintId}
-              className="max-sm:w-full"
+              className={compact ? "max-sm:min-w-0 max-sm:flex-1 max-sm:px-2 max-sm:text-xs max-sm:leading-tight" : "max-sm:w-full"}
               onClick={(event) => decide(action, event.currentTarget)}
             >
               {action.label}

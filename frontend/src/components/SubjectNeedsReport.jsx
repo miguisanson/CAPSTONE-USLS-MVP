@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { StatusChip } from "./ui/index.js";
-import { csvCell, downloadBlob } from "../lib/format";
+import { csvCell, downloadBlob, formatDateTime } from "../lib/format";
 
 // Subject-needs figures for Course Adjustments (I-117: they used to be a second list of the same subjects).
 // Two different numbers per subject:
@@ -139,9 +139,7 @@ export function studentMatches(student, needle) {
 }
 
 export function formatGeneratedAt(value) {
-  if (!value) return "now";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return value ? formatDateTime(value) : "now";
 }
 
 // One line per student per subject, so the file opens cleanly in Excel and can be filtered or pivoted.
