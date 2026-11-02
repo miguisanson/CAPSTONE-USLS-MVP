@@ -16,6 +16,7 @@
 - **MERGED `pkt/harden`** (I-138 audit): DEMO_SHOW_ACCOUNTS, reset staff/admin only, ASSISTANT_MAX_PER_HOUR, MAX_UPLOAD_MB,
   env_int/env_float, security headers, SQLite WAL + busy_timeout, Therese's leave stays "On Leave". After it: Mac Python
   gate + PC e2e running -> `E:/Temp/claude/gate61/mac_harden.txt`, `e2e3.txt`.
+- **Gate after harden (invalid / found):** PC e2e 397 failed = INVALID (persona-uat `server.mjs` cleared `frontend/e2e-artifacts` incl. .auth storage in the same checkout mid-run, and a merge rebuilt dist mid-run). RULE: run full e2e only in `wt/gate` (detached), never in the main checkout while anything else runs there. Mac Python gate 742/756: 12 real = assistant limiter 429s across tests (fix = item 7 of pkt/logic1) + .env.example not synced to the Mac (conf fixed).
 - **Audits done:** I-143 logic -> `research/PROCESS-LOGIC-AUDIT-2026-11-02.md`, I-159..I-174; I-144 consistency ->
   `research/CONSISTENCY-PROCESSES-2026-11-02.md`, I-146..I-158 (packets A,B,E,C,D,F,G).
 - **In flight:** `pkt/motion` (wt/motion, packets A+B: motion tokens, StageBoard feedback); `pkt/logic1` (wt/logic1,
