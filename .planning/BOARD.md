@@ -1,5 +1,25 @@
 # USLS GS Platform — board
 
+## v6.1 run (2026-11-02, branch `v6.1-migui`) — UAT Wednesday 2026-11-04
+
+**Agreed (IM28-IM33):** v6.1-migui is the one UAT line (from Natalie's v6.0); UAT served from this PC at
+https://miguisanson.dev via Cloudflare Tunnel; demo seed data only; no e-mail sending (bell only); Ponytail + Caveman in
+the dev kit; max 3 helpers, Mac for long test runs; stop at 80% weekly (auto-resume after 5-hour limits and after the
+weekly reset); Fable full review at the end; don't redo teammates' work drastically.
+
+**Done:** Natalie's calendar work reviewed (bugs found); 3 paused v5.3 packets merged (Reports rebuild, consistency,
+test isolation); UAT server `npm run uat` + `UAT.md` + `.env.example`; `/continue_capstone`.
+
+**Being built:** Google Calendar fixes (I-134..I-137, I-140); dev kit + Mac test runner; Reports & Analytics research
+(I-141). **Next:** public-site hardening (demo password list, reset, assistant limit); Reports upgrade; walkthrough to
+the team's demo order (I-139); bug/consistency/UI/database loops; Fable review.
+
+**Waiting on you:** Cloudflare login step (`UAT.md`); Natalie's Google client ID/secret on this PC + testers added as
+Google test users + https://miguisanson.dev redirect URI; PC on and awake from Wednesday. Do not open the tunnel to the
+public before the hardening packet lands.
+
+---
+
 ## v5.3 run (2026-10-22, branch `v5.3-migui_test`) — what changed today
 
 A one-time senior review (Fable) of every page and the code found 41 new problems (`research/FULL-REVIEW-2026-10-22.md`,
