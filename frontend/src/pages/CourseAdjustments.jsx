@@ -18,6 +18,7 @@ import {
   StatusChip,
   Stepper,
 } from "../components/ui/index.js";
+import { useConfirm } from "../components/confirm";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 import {
   NeedsMeaning,
@@ -54,6 +55,7 @@ export default function CourseAdjustments() {
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState("all");
   const dirtyRef = useRef(false);
+  const confirm = useConfirm();
 
   function load(pid, tid) {
     setLoading(true);
@@ -133,6 +135,12 @@ export default function CourseAdjustments() {
       await saveDraft(true);
       return;
     }
+    // Submitting and publishing change what other people see and decide, so they ask first (I-150).
+    const ask = {
+      submit: { title: "Submit this plan for approval?", message: "The Dean will review the offering plan. You cannot change it unless it is returned to you.", confirmLabel: "Submit plan" },
+      publish: { title: "Publish this plan?", message: "The approved offering plan becomes the semester's published offering.", confirmLabel: "Publish plan" },
+    }[action];
+    if (ask && !(await confirm(ask))) return;
     setBusy(action);
     setError("");
     setMessage("");

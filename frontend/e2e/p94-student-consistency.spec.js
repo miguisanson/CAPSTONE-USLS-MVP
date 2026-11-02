@@ -288,6 +288,7 @@ test.describe("conD: student pages that are alike behave alike", () => {
         }
         const submit = main(page).locator('button[type="submit"]').first();
         await submit.click();
+        await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
         await expect(submit, `${name}: busy text`).toHaveText("Submitting…");
         release();
       } finally {

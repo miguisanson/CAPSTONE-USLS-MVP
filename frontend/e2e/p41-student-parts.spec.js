@@ -647,7 +647,12 @@ test.describe("P4.1 shared student parts", () => {
   });
 
   test("Withdrawal page: the process case card, the numbered stage card and the discussion panel", async ({ browser }) => {
-    await runPage(browser, { email: MAYA, mutate: processScenario, path: "/student/requests/withdrawal", shot: "withdrawal" }, async (page) => {
+    // A subject inside the window keeps the form on the page; with none the page shows the "closed" notice instead (I-178, p99).
+    const withEligibleSubject = (data) => {
+      processScenario(data);
+      data.subject_enrollments = [{ id: 951, course_code: "SPEC-951", course_title: "Spec SPEC-951", term_label: "AY 2026-2027 1st Semester", status: "Enrolled", withdrawal_eligible: true, withdrawal_window: { eligible: true, deadline: "2099-11-20", status: "Withdrawal window open", term_start_date: "2099-11-07", fee_consequence: "Spec fee.", rule_source: "Spec Handbook p. 49", policy: "Spec policy." } }];
+    };
+    await runPage(browser, { email: MAYA, mutate: withEligibleSubject, path: "/student/requests/withdrawal", shot: "withdrawal" }, async (page) => {
       const c = article(page, "Subject Withdrawal");
       await expect(c).toContainText("Withdraw MAED-COG1");
       await expect(c).toContainText("Filed Oct 1");

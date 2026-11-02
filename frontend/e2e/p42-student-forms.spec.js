@@ -256,7 +256,8 @@ test.describe("P4.2 student request forms", () => {
       await expect(fieldOf(page, "Leave ends")).toContainText("That is 2 semesters.");
       await expect(submit).toBeEnabled();
       await submit.click();
-      await expect(form.getByRole("status").filter({ hasText: "Spec: request saved." })).toBeVisible();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
+      await expect(page.getByRole("status").filter({ hasText: "Spec: request saved." })).toBeVisible(); // the page-level "Request sent" notice (I-149)
       const write = lastWrite(writes, "requests/leave-of-absence");
       expect(write.method).toBe("POST");
       expect(write.body).toEqual({ effective_start: "AY 2026-2027 2nd Semester", effective_end: "AY 2027-2028 1st Semester", reason_category: "Medical / health", reason_remarks: "Spec reason text." });
@@ -274,6 +275,7 @@ test.describe("P4.2 student request forms", () => {
       await ctl(page, "Reason").selectOption("Family emergency");
       await ctl(page, "Tell us what is happening").fill("Spec.");
       await submitButton(page, "Submit leave request").click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByRole("alert").filter({ hasText: "Spec: the Dean office is closed." })).toBeVisible();
       await expect(submitButton(page, "Submit leave request")).toBeEnabled();
       await snap(page, "loa-error");
@@ -309,6 +311,7 @@ test.describe("P4.2 student request forms", () => {
       await ctl(page, "Tell us what is happening").fill("Need one more semester.");
       await expect(submit).toBeEnabled();
       await submit.click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/leave-of-absence").body).toEqual({ effective_start: "AY 2026-2027 2nd Semester", effective_end: "AY 2026-2027 2nd Semester", reason_category: "Other documented circumstance", reason_remarks: "Need one more semester." });
     } finally {
@@ -336,6 +339,7 @@ test.describe("P4.2 student request forms", () => {
       await ctl(page, "Tell us what is happening").fill("Spec reason text, with the certificate.");
       await snap(page, "loa-returned");
       await submitButton(page, "Resubmit leave request").click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/leave-of-absence").body).toEqual({ effective_start: "AY 2026-2027 2nd Semester", effective_end: "AY 2026-2027 2nd Semester", reason_category: "Medical / health", reason_remarks: "Spec reason text, with the certificate." });
     } finally {
@@ -380,6 +384,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(submit).toBeEnabled();
       await snap(page, "readmission-ready");
       await submit.click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/readmission").body).toEqual({
         target_return_term: "AY 2027-2028 1st Semester", return_intent: "Spec: I am ready.", readmission_items: ITEMS,
@@ -409,6 +414,7 @@ test.describe("P4.2 student request forms", () => {
       await ctl(page, "Why you are ready to come back").fill("Spec: back after the leave.");
       await snap(page, "readmission-linked");
       await submitButton(page, "Submit readmission request").click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/readmission").body).toEqual({ target_return_term: "AY 2026-2027 2nd Semester", return_intent: "Spec: back after the leave.", readmission_items: [] });
     } finally {
@@ -452,6 +458,7 @@ test.describe("P4.2 student request forms", () => {
       await ctl(page, "Last enrolled semester").selectOption("AY 2025-2026 2nd Semester");
       await expect(submit).toBeEnabled();
       await submit.click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/awol-return").body).toEqual({
         student_id: info.studentId, target_return_term: "AY 2027-2028 1st Semester", last_enrolled_term: "AY 2025-2026 2nd Semester",
@@ -485,6 +492,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(ctl(page, "Last enrolled semester")).toHaveValue("AY 2026-2027 1st Semester");
       await ctl(page, "Intended return semester").selectOption("AY 2026-2027 2nd Semester");
       await submitButton(page, "Resubmit return declaration").click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/awol-return").body).toMatchObject({ target_return_term: "AY 2026-2027 2nd Semester", last_enrolled_term: "AY 2026-2027 1st Semester", return_intent: "Spec old intention.", return_reason: "Spec old reason." });
 
@@ -544,6 +552,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(page.getByRole("alert").filter({ hasText: "There is a problem" })).toContainText("Explain why you are withdrawing from this subject.");
       await ctl(page, "Reason for withdrawing from this subject").fill("Spec: schedule clash.");
       await submit.click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       // a chosen subject is the select's string (the preselected one keeps its numeric id: see the returned-request test)
       expect(lastWrite(writes, "requests/withdrawal").body).toEqual({ student_id: info.studentId, reason: "Spec: schedule clash.", subject_enrollment_id: "902" });
@@ -552,7 +561,7 @@ test.describe("P4.2 student request forms", () => {
     }
   });
 
-  test("Withdrawal (I-037): with no subject inside the window the message is a calm info notice, not an alert", async ({ browser }) => {
+  test("Withdrawal (I-037, I-178): with no subject inside the window one calm notice replaces the form, not an alert", async ({ browser }) => {
     const { context, page } = await formPage(browser, (d) => {
       d.withdrawal_application = null;
       d.standalone_cases = { ...(d.standalone_cases || {}), withdrawal: [] };
@@ -562,16 +571,14 @@ test.describe("P4.2 student request forms", () => {
     try {
       await page.goto("/student/requests/withdrawal");
       const main = page.locator("main");
-      const message = "No active subject is currently inside the withdrawal window (until the end of the second week of classes). Contact Graduate School staff if the recorded semester dates are incorrect.";
-      await expect(main.getByRole("status").filter({ hasText: message })).toHaveCount(1);
-      await expect(main.getByRole("alert").filter({ hasText: "No active subject" })).toHaveCount(0);
-      await expect(main).toContainText("When you can withdraw a subject");
-      await expect(ctl(page, "Enrolled subject")).toHaveValue("");
-      await expect(submitButton(page, "Submit withdrawal request")).toBeDisabled();
-      await expect(main).toContainText("No subject is currently inside the withdrawal window.");
+      await expect(main.getByRole("status").filter({ hasText: "Subject withdrawal is closed right now" })).toHaveCount(1);
+      await expect(main.getByRole("alert").filter({ hasText: "withdrawal" })).toHaveCount(0);
+      await expect(main).toContainText("Spec closed policy.");
+      await expect(main).toContainText("If the recorded semester dates look wrong, ask Graduate School staff to correct them.");
+      // the form and its disabled button are gone (p99 pins the rest)
+      await expect(submitButton(page, "Submit withdrawal request")).toHaveCount(0);
+      await expect(page.getByText("Enrolled subject", { exact: true })).toHaveCount(0);
       await snap(page, "withdrawal-none");
-      // choosing the closed subject is impossible (its option is disabled), so no red "window closed" card appears
-      await expect(main.getByText("Withdrawal window closed", { exact: true })).toHaveCount(0);
     } finally {
       await context.close();
     }
@@ -612,6 +619,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(main.getByText("Needs revision", { exact: true })).toHaveCount(0);
       await expect(ctl(page, "Reason for withdrawing from this subject")).toHaveValue("Spec first reason.");
       await submitButton(page, "Resubmit withdrawal request").click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/withdrawal").body).toEqual({ student_id: info.studentId, reason: "Spec first reason.", subject_enrollment_id: 901 });
       await snap(page, "withdrawal-returned");
@@ -634,7 +642,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(main).toContainText("Spec Saved Title");
       await expect(main).toContainText("Adviser");
       for (const stage of ["Title Defense", "Proposal Defense", "Final Defense", "Completion"]) await expect(main.getByText(stage, { exact: true }).first()).toBeVisible();
-      await expectRequired(page, "Research title from uploaded Form 1", false);
+      await expectRequired(page, "Research title from uploaded Form 1", true); // I-153: the title is checked when Submit is pressed
       await expect(fieldOf(page, "Research title from uploaded Form 1")).toContainText("This fills automatically after the Form 1 application PDF is uploaded below.");
       await expect(ctl(page, "Research title from uploaded Form 1")).toHaveValue("Spec Saved Title");
       await expect(ctl(page, "Research title from uploaded Form 1")).toHaveAttribute("placeholder", "Upload Form 1 below to auto-fill");
@@ -685,6 +693,7 @@ test.describe("P4.2 student request forms", () => {
       const submit = submitButton(page, "Submit Form 1 for review");
       await expect(submit).toBeEnabled();
       await submit.click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/research-gate").body).toEqual({ student_id: info.studentId, research_title: "Spec Title From Form 1", submitted_package: "Spec message." });
       await snap(page, "research-sent");
@@ -715,12 +724,13 @@ test.describe("P4.2 student request forms", () => {
     }
   });
 
-  test("Research (ready, no title yet): the hint asks for Form 1", async ({ browser }) => {
+  test("Research (ready, no title yet): Submit is usable and the problem summary asks for Form 1 (I-153)", async ({ browser }) => {
     const { context, page } = await formPage(browser, (d) => researchBase(d, { ready: true }));
     try {
       await page.goto("/student/research");
-      await expect(submitButton(page, "Submit Form 1 for review")).toBeDisabled();
-      await expect(page.locator("main")).toContainText("Upload Form 1 so the research title can be read automatically.");
+      await expect(submitButton(page, "Submit Form 1 for review")).toBeEnabled();
+      await submitButton(page, "Submit Form 1 for review").click();
+      await expect(page.getByRole("alert").filter({ hasText: "There is a problem" })).toContainText("Upload Form 1 below so the research title can be read, or type the title.");
       await expect(page.locator("main")).toContainText("Research title pending Form 1 submission");
     } finally {
       await context.close();
@@ -806,6 +816,7 @@ test.describe("P4.2 student request forms", () => {
       await ctl(page, "Venue / meeting link").fill("https://meet.example/spec");
       await ctl(page, "Scheduling constraints").fill("Not on Mondays.");
       await submit.click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/defense-scheduling").body).toEqual({
         student_id: info.studentId, preferred_date: "2026-12-04", defense_type: "Final Defense", mode: "Online", venue: "https://meet.example/spec", constraints: "Not on Mondays.",
@@ -915,6 +926,7 @@ test.describe("P4.2 student request forms", () => {
       await ctl(page, "Supervisor name").fill("Dr. Spec");
       await ctl(page, "Remarks for the reviewer").fill("Spec remarks.");
       await submit.click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/practicum").body).toEqual({
         student_id: info.studentId, attachment_id: 7001, certificate_attachment_id: null, practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec",
@@ -966,6 +978,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(submit).toBeEnabled();
       await ctl(page, "Completed hours").fill("200");
       await submit.click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/practicum").body).toEqual({
         student_id: info.studentId, attachment_id: 6001, certificate_attachment_id: 7001, practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec",
@@ -1015,6 +1028,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(submit).toBeEnabled();
       await ctl(page, "Remarks for the reviewer").fill("Spec graduation remarks.");
       await submit.click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/graduation").body).toEqual({ student_id: info.studentId, attachment_id: 7001, review_window: "AY 2026-2027", remarks: "Spec graduation remarks." });
       await snap(page, "graduation-sent");

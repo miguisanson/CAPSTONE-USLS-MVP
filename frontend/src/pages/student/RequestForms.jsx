@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { CalendarClock } from "lucide-react";
 import { Field, InlineNotice, Select, Textarea } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
@@ -32,11 +33,6 @@ function withCurrentValue(options, value) {
   return [...options, { value, label: `${value} (your earlier choice)` }];
 }
 
-function SuccessNote({ message }) {
-  if (!message) return null;
-  return <InlineNotice tone="success">{message}</InlineNotice>;
-}
-
 export function LoaRequestForm({ data, onSaved }) {
   const submitState = useSubmitRequest("leave-of-absence", onSaved);
   const overview = data.leave_overview;
@@ -60,7 +56,6 @@ export function LoaRequestForm({ data, onSaved }) {
   return (
     <div className="space-y-4">
       <LeaveBanner banner={overview.banner} />
-      {mode === null && <SuccessNote message={submitState.message} />}
       {shown.map((item) => (
         <LeaveCaseCard key={item.id} item={item} onChanged={onSaved} />
       ))}
@@ -176,12 +171,15 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
             return;
           }
           clear();
-          submit({
-            effective_start: form.effective_start,
-            effective_end: form.effective_end,
-            reason_category: form.reason_category,
-            reason_remarks: form.reason_remarks,
-          });
+          submit(
+            {
+              effective_start: form.effective_start,
+              effective_end: form.effective_end,
+              reason_category: form.reason_category,
+              reason_remarks: form.reason_remarks,
+            },
+            { lines: [extension ? "Leave extension request" : "Leave of absence request", `From: ${form.effective_start}`, `To: ${form.effective_end}`, `Reason: ${form.reason_category}`] },
+          );
         }}
         className="mt-4 space-y-4"
       >
@@ -233,7 +231,6 @@ export function ReadmissionRequestForm({ data, onSaved }) {
   return (
     <div className="space-y-4">
       <LeaveBanner banner={overview.banner} />
-      {!showForm && <SuccessNote message={submitState.message} />}
       {shown.map((item) => (
         <LeaveCaseCard key={item.id} item={item} onChanged={onSaved} />
       ))}
@@ -310,7 +307,7 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
       payload.previous_loa_start = form.previous_loa_start;
       payload.previous_loa_end = form.previous_loa_end;
     }
-    submit(payload);
+    submit(payload, { lines: ["Readmission request", `Return in: ${form.target_return_term}`] });
   }
 
   const title = editable ? "Correct your request and send it again" : "Ask to come back";
@@ -393,7 +390,7 @@ export function AwolReturnRequestForm({ data, onSaved }) {
   });
   const { busy, error, message, submit } = useSubmitRequest("awol-return", onSaved);
   const { errors, fail, clear, messageFor } = useFormErrors();
-  const locked = existing && ["Dean Review", "Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required"].includes(existing.status);
+  const locked = existing && ["Return Submitted", "Dean Review", "Return Approved", "Extension Approved - Refresher Required", "Re-enrollment Required"].includes(existing.status);
 
   function onSubmit(event) {
     event.preventDefault();
@@ -406,7 +403,7 @@ export function AwolReturnRequestForm({ data, onSaved }) {
       return;
     }
     clear();
-    submit({ student_id: data.student.id, ...form });
+    submit({ student_id: data.student.id, ...form }, { lines: ["Return from AWOL", `Return in: ${form.target_return_term}`] });
   }
 
   return (
@@ -445,6 +442,34 @@ export function AwolReturnRequestForm({ data, onSaved }) {
   );
 }
 
+function WithdrawalClosedNotice({ subjects }) {
+  const first = subjects[0]?.withdrawal_window;
+  return (
+    <InlineNotice tone="info" role="status" icon={CalendarClock} title="Subject withdrawal is closed right now">
+      {subjects.length ? (
+        <div className="space-y-2 text-sm">
+          <p>{first?.policy || "You may withdraw a subject until the end of the second week of classes (14 calendar days)."}</p>
+          <ul className="list-disc space-y-1 pl-5 text-xs">
+            {subjects.map((item) => (
+              <li key={item.id}>
+                {item.course_code} — {item.withdrawal_window?.status || "Withdrawal window closed"}
+                {item.withdrawal_window?.deadline ? ` (deadline ${formatDate(item.withdrawal_window.deadline)})` : ""}
+              </li>
+            ))}
+          </ul>
+          {first?.rule_source && <p className="micro">Rule: {first.rule_source}</p>}
+          <p>
+            If the recorded semester dates look wrong, ask Graduate School staff to correct them.{" "}
+            <Link to="/student/messages" className="font-semibold underline">Open your Messages</Link>
+          </p>
+        </div>
+      ) : (
+        <p className="text-sm">You have no enrolled subject to withdraw from right now.</p>
+      )}
+    </InlineNotice>
+  );
+}
+
 export function WithdrawalRequestForm({ data, onSaved }) {
   const existing = data.withdrawal_application;
   const activeSubjects = (data.subject_enrollments || []).filter((item) => ["Enrolled", "Current"].includes(item.status));
@@ -467,7 +492,15 @@ export function WithdrawalRequestForm({ data, onSaved }) {
       return;
     }
     clear();
-    submit({ student_id: data.student.id, ...form });
+    const windowInfo = selectedSubject?.withdrawal_window;
+    submit({ student_id: data.student.id, ...form }, {
+      lines: [
+        "Subject withdrawal",
+        `Subject: ${selectedSubject?.course_code || ""} — ${selectedSubject?.course_title || ""}`,
+        `Semester: ${selectedSubject?.term_label || ""}`,
+        windowInfo?.fee_consequence ? `Fee: ${windowInfo.fee_consequence}` : "",
+      ],
+    });
   }
 
   const status = existing?.status || "Not Submitted";
@@ -486,6 +519,16 @@ export function WithdrawalRequestForm({ data, onSaved }) {
   const windowClosed = Boolean(selectedSubject) && !selectedSubject.withdrawal_eligible;
   const blocked = !eligibleSubjects.length || windowClosed;
   const blockedHint = !eligibleSubjects.length ? "No subject is currently inside the withdrawal window." : windowClosed ? "The withdrawal window for this subject has closed." : "";
+
+  // Outside the window nothing can be sent, so the form is replaced by one notice: why, which window, and who to ask (I-178).
+  if (applicationEditable && !eligibleSubjects.length) {
+    return (
+      <div className="space-y-4">
+        <ProcessCaseList cases={data.standalone_cases?.withdrawal || []} />
+        <WithdrawalClosedNotice subjects={activeSubjects} />
+      </div>
+    );
+  }
 
   return (
     <form noValidate onSubmit={onSubmit} className="space-y-4">

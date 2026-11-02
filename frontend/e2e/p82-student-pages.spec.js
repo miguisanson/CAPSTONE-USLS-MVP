@@ -328,7 +328,7 @@ test.describe("P82 student pages (pinned)", () => {
       await open(page, "/student/requests", "requests");
       await expect(h1(page)).toHaveText("Request Center");
       await expect(main(page)).toContainText("Every request you can file, with its current status. Choose the one that matches your situation.");
-      await expect(h2s(page)).toHaveText(["Research & Defense", "Leave & Return", "Completion"]);
+      await expect(h2s(page)).toHaveText(["Research & Defense", "Requests", "Completion"]);
       const links = [
         ["Research Progress", "/student/research"], ["Defense Schedule", "/student/defense-schedule"], ["Leave of Absence", "/student/requests/leave-of-absence"],
         ["Readmission", "/student/requests/readmission"], ["Return from AWOL", "/student/requests/awol-return"], ["Subject Withdrawal", "/student/requests/withdrawal"],
@@ -765,6 +765,7 @@ test.describe("P82 changes: request forms show an error summary on submit", () =
       await expect(summary(page).getByRole("link")).toHaveCount(1);
       await ctl(page, "Tell us what is happening").fill("Spec: a family matter.");
       await submitButton(page, "Submit leave request").click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByRole("alert").filter({ hasText: "Spec: the Dean office is closed." })).toBeVisible();
       await expect(summary(page), "a clean form shows no summary").toHaveCount(0);
       // the server said no: every answer is still in the form
@@ -806,6 +807,7 @@ test.describe("P82 changes: request forms show an error summary on submit", () =
       await ctl(page, "Why you are ready to come back").fill("Spec: ready.");
       for (const item of ITEMS) await page.getByLabel(item).check();
       await submit.click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/readmission").body).toMatchObject({ target_return_term: "AY 2026-2027 2nd Semester", readmission_items: ITEMS });
     } finally {
@@ -850,6 +852,7 @@ test.describe("P82 changes: request forms show an error summary on submit", () =
       await expectSummaryOnSubmit(page, writes, "Submit withdrawal request", [["Reason for withdrawing from this subject", "Explain why you are withdrawing from this subject."]], { prefix: "requests/withdrawal" });
       await ctl(page, "Reason for withdrawing from this subject").fill("Spec: schedule clash.");
       await submitButton(page, "Submit withdrawal request").click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/withdrawal").body).toMatchObject({ reason: "Spec: schedule clash.", subject_enrollment_id: 901 });
     } finally {

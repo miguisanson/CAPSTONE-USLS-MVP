@@ -21,6 +21,7 @@ export function ResearchRequestForm({ data, onSaved }) {
   const savedTitle = data.research_case?.title && data.research_case.title !== PENDING_TITLE ? data.research_case.title : "";
   const [form, setForm] = useState({ research_title: savedTitle, submitted_package: "" });
   const { busy, error, message, submit } = useSubmitRequest("research-gate", onSaved);
+  const { errors, fail, clear, messageFor } = useFormErrors();
   const [prefillNote, setPrefillNote] = useState("");
   const uploadRequirements = (milestone.requirements || []).filter((item) => item.student_upload);
   const managedRequirements = (milestone.requirements || []).filter((item) => !item.student_upload);
@@ -38,11 +39,20 @@ export function ResearchRequestForm({ data, onSaved }) {
 
   function onSubmit(e) {
     e.preventDefault();
-    submit({
-      student_id: data.student.id,
-      research_title: form.research_title,
-      submitted_package: form.submitted_package,
-    });
+    // Submit is off only when no answer can fix it (files still missing); a missing title is reported here.
+    if (progress.stage === "Title Defense" && !form.research_title.trim()) {
+      fail([{ id: "research-title", message: "Upload Form 1 below so the research title can be read, or type the title." }]);
+      return;
+    }
+    clear();
+    submit(
+      {
+        student_id: data.student.id,
+        research_title: form.research_title,
+        submitted_package: form.submitted_package,
+      },
+      { lines: [`${milestone.label || "Research milestone"} for review`, progress.stage === "Title Defense" ? `Research title: ${form.research_title}` : ""] },
+    );
   }
 
   async function handleEvidenceSaved(result, requirement) {
@@ -54,7 +64,8 @@ export function ResearchRequestForm({ data, onSaved }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form noValidate onSubmit={onSubmit} className="space-y-4">
+      <ErrorSummary errors={errors} />
       <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow text-brand-700">Automatically detected stage</p><p className="section-title mt-1">{progress.stage || "Title Defense"}</p><p className="mt-1 text-xs text-slate-600">{milestone.description}</p></div><StatusChip status={progress.status || "Pending"} dot={false} /></div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><p className="eyebrow">Research title</p><p className="mt-1 text-sm font-semibold text-ink">{data.research_case?.title || "Complete Form 1 to set the title"}</p></div><div className="rounded-lg bg-white/80 px-3 py-2"><p className="eyebrow">Adviser</p><p className="mt-1 text-sm font-semibold text-ink">{data.student.adviser_name || "Not assigned"}</p></div></div>
@@ -63,8 +74,8 @@ export function ResearchRequestForm({ data, onSaved }) {
         {(progress.stages || []).map((stage, index) => <div key={stage.name} className={`rounded-lg border px-2.5 py-2 text-xs font-semibold ${index === progress.stage_index ? "border-brand-400 bg-brand-50 text-brand-800" : stage.complete ? "border-brand-200 bg-brand-50/60 text-brand-700" : "border-slate-200 text-slate-500"}`}>{stage.name}</div>)}
       </div>
       {progress.stage === "Title Defense" && (
-        <Field label="Research title from uploaded Form 1" hint="This fills automatically after the Form 1 application PDF is uploaded below.">
-          <Input value={form.research_title} onChange={set("research_title")} required placeholder="Upload Form 1 below to auto-fill" />
+        <Field label="Research title from uploaded Form 1" required hint="This fills automatically after the Form 1 application PDF is uploaded below." error={messageFor("research-title")}>
+          <Input id="research-title" value={form.research_title} onChange={set("research_title")} placeholder="Upload Form 1 below to auto-fill" />
           {prefillNote && <p className="meta mt-1 font-medium text-brand-700">{prefillNote}</p>}
         </Field>
       )}
@@ -107,9 +118,9 @@ export function ResearchRequestForm({ data, onSaved }) {
         busy={busy}
         error={error}
         message={message}
-        disabled={!milestone?.student_uploads_ready || (progress.stage === "Title Defense" && !form.research_title.trim())}
+        disabled={!milestone?.student_uploads_ready}
         label={`Submit ${milestone?.short_label || "milestone"} for review`}
-        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : progress.stage === "Title Defense" && !form.research_title.trim() ? "Upload Form 1 so the research title can be read automatically." : ""}
+        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : ""}
       />
     </form>
   );
@@ -372,7 +383,7 @@ export function ScheduleRequestForm({ data, onSaved }) {
       return;
     }
     clear();
-    submit({ student_id: studentId, ...form });
+    submit({ student_id: studentId, ...form }, { lines: [`${form.defense_type} schedule request`, `Preferred date: ${form.preferred_date}`, `Mode: ${form.mode}`] });
   }
 
   return (
