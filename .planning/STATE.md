@@ -19,10 +19,15 @@
 - **Gate after harden (invalid / found):** PC e2e 397 failed = INVALID (persona-uat `server.mjs` cleared `frontend/e2e-artifacts` incl. .auth storage in the same checkout mid-run, and a merge rebuilt dist mid-run). RULE: run full e2e only in `wt/gate` (detached), never in the main checkout while anything else runs there. Mac Python gate 742/756: 12 real = assistant limiter 429s across tests (fix = item 7 of pkt/logic1) + .env.example not synced to the Mac (conf fixed).
 - **Audits done:** I-143 logic -> `research/PROCESS-LOGIC-AUDIT-2026-11-02.md`, I-159..I-174; I-144 consistency ->
   `research/CONSISTENCY-PROCESSES-2026-11-02.md`, I-146..I-158 (packets A,B,E,C,D,F,G).
-- **In flight:** `pkt/motion` (wt/motion, packets A+B: motion tokens, StageBoard feedback); `pkt/logic1` (wt/logic1,
-  only app.py editor: I-159..I-164 incl. withdrawal demo window); persona-uat skill (new files in main checkout
-  `.claude/skills/persona-uat/`, uncommitted until reviewed).
-- **app.py queue after logic1:** panel-matching seed papers (I-145) -> Reports B1+B2 -> logic2 (I-165, I-166, I-168,
+- **MERGED since:** `pkt/motion` (A+B), `pkt/student` (F: I-149..I-153, I-176, I-178), `pkt/stepdlg` (E+C: one
+  StepDialog, BoardNotice on every board, SkeletonBoard), `pkt/logic1` (I-159..I-164 + limiter 0=unlimited in tests,
+  AD11; seed dates the running semester from seed day - 3, so re-seed the morning UAT starts, UAT.md says so).
+- **GATE:** full e2e in wt/gate on 8f4ac38 (after stepdlg, before logic1): **656 passed, 0 failed, 2 skipped**.
+  Mac Python gate after logic1 running -> `E:/Temp/claude/gate61/mac_logic1.txt`.
+- **In flight:** `pkt/deangrad` (D+G: Dean Graduation on the shared board, one decision UI, Tabs, "…", ErrorSummary);
+  `pkt/pm` (only app.py editor: I-145 per-student papers + "No paper on file", I-179 assistant text per role, I-175
+  drop/AWOL retrieval).
+- **app.py queue after pkt/pm:** Reports B1+B2 -> logic2 (I-165, I-166, I-168,
   I-169, I-171..I-173). Frontend queue: E, C, D, F, G (consistency), Reports F1.
 - **Planned:** Reports per `research/REPORTS-SPEC-2026-11-02.md` (AD10; B1 stage clock first, after pkt/harden);
   `persona-uat` skill per `research/PERSONA-UAT-RESEARCH-2026-11-02.md` (I-142); walkthrough rebuild (I-139).
