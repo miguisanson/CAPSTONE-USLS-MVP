@@ -571,6 +571,46 @@ class VerdictOutcomeTests(ResearchCoreBase):
         good = self.submit(schedule_id, "Provisional pass - re-defense required", evaluation_score=80)
         self.assertEqual(good.status_code, 200, good.get_json())
 
+    def final_defense_ready(self):
+        with app.app_context():
+            self.pass_gate(self.student_id, TITLE, "Title Defense")
+            self.pass_gate(self.student_id, PROPOSAL, "Proposal Defense")
+            self.fill_uploads(self.student_id, FINAL)
+            names = ["Chair Person", "Content Person", "Method Person", "External Person"]
+            self.panel(self.student_id, FINAL, names)
+            schedule = self.schedule(self.student_id, "Final Defense", names=names)
+            db.session.commit()
+            return schedule.id
+
+    def test_a_final_defense_pass_needs_a_score_and_a_major_revision_needs_a_score_below_the_line(self):
+        """I-173 (Form 7): no score, no pass; a score in the passing band is not a major-revision outcome."""
+        schedule_id = self.final_defense_ready()
+        no_score = self.submit(schedule_id, "Passed")
+        self.assertEqual(no_score.status_code, 400, no_score.get_json())
+        self.assertIn("score", no_score.get_json()["error"].lower())
+        minor_no_score = self.submit(schedule_id, "Passed with minor revisions")
+        self.assertEqual(minor_no_score.status_code, 400, minor_no_score.get_json())
+        major_high = self.submit(schedule_id, "Provisional pass - re-defense required", evaluation_score=95)
+        self.assertEqual(major_high.status_code, 400, major_high.get_json())
+        self.assertIn("score", major_high.get_json()["error"].lower())
+        ok = self.submit(schedule_id, "Passed", evaluation_score=90)
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+
+    def test_correcting_a_verdict_to_passed_is_checked_against_the_stored_score(self):
+        """I-173: a verdict recorded at 80 cannot be 'corrected' to Passed without a passing score."""
+        schedule_id = self.final_defense_ready()
+        first = self.submit(schedule_id, "Provisional pass - re-defense required", evaluation_score=80)
+        self.assertEqual(first.status_code, 200, first.get_json())
+        with app.app_context():
+            verdict_id = DefenseVerdict.query.filter_by(schedule_request_id=schedule_id).one().id
+        url = f"/api/faculty-portal/defense-verdicts/{verdict_id}/correction"
+        refused = self.faculty_client("Chair Person").post(url, json={"result": "Passed", "reason": "Entered the wrong outcome."})
+        self.assertEqual(refused.status_code, 400, refused.get_json())
+        self.assertIn("score", refused.get_json()["error"].lower())
+        ok = self.faculty_client("Chair Person").post(
+            url, json={"result": "Passed", "reason": "Entered the wrong outcome.", "evaluation_score": 91})
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+
 
 class SchedulingRuleTests(ResearchCoreBase):
     """Stage/type match, protocol lead times, past slots, overrides, reschedule, cancel."""

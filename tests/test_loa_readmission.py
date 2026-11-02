@@ -937,6 +937,23 @@ class LeaveCaseTests(unittest.TestCase):
         self.assertEqual(again.status_code, 409, again.get_json())
         self.assertIn("readmission", again.get_json()["error"].lower())
 
+    def test_a_booked_defense_is_flagged_for_the_coordinators_when_a_leave_starts(self):
+        """I-172: the booking stays, but the Research Coordinator gets a task naming the problem."""
+        from app import ScheduleRequest
+        with app.app_context():
+            db.session.add(ScheduleRequest(
+                student_id=self.student_id, preferred_date=date.today() + timedelta(days=30), defense_type="Proposal Defense",
+                mode="Online", venue="Zoom", status="Scheduled"))
+            db.session.commit()
+        self.make_on_leave("Running Term", "Running Term")
+        with app.app_context():
+            tasks = Task.query.filter(
+                Task.student_id == self.student_id, Task.owner_role == "Research Coordinator",
+                Task.title.like("Booked defense%")).all()
+            self.assertEqual(len(tasks), 1)
+            self.assertIn("leave", tasks[0].title.lower())
+            self.assertEqual(ScheduleRequest.query.one().status, "Scheduled")
+
     # ---- AW-01: an AWOL return that needs full re-enrollment is finished by staff -----------------
     def awol_student_with_case(self, status="Re-enrollment Required"):
         with app.app_context():
