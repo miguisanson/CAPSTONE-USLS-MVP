@@ -13,8 +13,16 @@
 - **e2e after merges:** 603 passed, 8 failed. Fixed here: p72 (calendar link moved by v6.0), p51/p78 (hard-coded dates).
   The other 5 fail alone too -> `pkt/e2efix` (wt/e2efix, no app.py).
 - **MERGED `pkt/e2efix`** (p33 batch month, p86 follow-up count + Hazel Flores at Dean Review); Therese's seed leave -> item 8 of pkt/harden.
-- **In flight:** read-only audits I-143 (process logic vs policy) and I-144 (cross-process UI consistency + motion); `pkt/harden` (wt/harden, only app.py editor): DEMO_SHOW_ACCOUNTS, reset staff/admin only,
-  ASSISTANT_MAX_PER_HOUR, MAX_UPLOAD_MB, env_int, security headers, SQLite WAL/busy_timeout. `pkt/e2efix`. Dev-kit agent.
+- **MERGED `pkt/harden`** (I-138 audit): DEMO_SHOW_ACCOUNTS, reset staff/admin only, ASSISTANT_MAX_PER_HOUR, MAX_UPLOAD_MB,
+  env_int/env_float, security headers, SQLite WAL + busy_timeout, Therese's leave stays "On Leave". After it: Mac Python
+  gate + PC e2e running -> `E:/Temp/claude/gate61/mac_harden.txt`, `e2e3.txt`.
+- **Audits done:** I-143 logic -> `research/PROCESS-LOGIC-AUDIT-2026-11-02.md`, I-159..I-174; I-144 consistency ->
+  `research/CONSISTENCY-PROCESSES-2026-11-02.md`, I-146..I-158 (packets A,B,E,C,D,F,G).
+- **In flight:** `pkt/motion` (wt/motion, packets A+B: motion tokens, StageBoard feedback); `pkt/logic1` (wt/logic1,
+  only app.py editor: I-159..I-164 incl. withdrawal demo window); persona-uat skill (new files in main checkout
+  `.claude/skills/persona-uat/`, uncommitted until reviewed).
+- **app.py queue after logic1:** panel-matching seed papers (I-145) -> Reports B1+B2 -> logic2 (I-165, I-166, I-168,
+  I-169, I-171..I-173). Frontend queue: E, C, D, F, G (consistency), Reports F1.
 - **Planned:** Reports per `research/REPORTS-SPEC-2026-11-02.md` (AD10; B1 stage clock first, after pkt/harden);
   `persona-uat` skill per `research/PERSONA-UAT-RESEARCH-2026-11-02.md` (I-142); walkthrough rebuild (I-139).
 - **Auto-resume:** scheduled task `oathbound-keep-going` (every 30 min, while `E:/DevCache/dev-kit-workers/autopilot.on` exists) resumes session `local_51b87609-0806-4cf8-87f2-0c79290158d8` after a turn ending `PAUSED for 5-hour limit`; stop at 80% weekly with `WEEKLY BUDGET`, resumed after the weekly reset (Wed 2026-11-04 02:00 PH). Extra usage is OFF on the account (no charges).
