@@ -17,6 +17,7 @@ from unittest.mock import patch
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
+os.environ.setdefault("ASSISTANT_MAX_PER_HOUR", "0")  # no per-account limit: tests ask many questions in one process
 
 import app as appmod  # noqa: E402
 from app import (  # noqa: E402

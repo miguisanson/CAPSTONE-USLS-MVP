@@ -21,6 +21,7 @@ from datetime import date, datetime, timedelta
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
+os.environ.setdefault("ASSISTANT_MAX_PER_HOUR", "0")  # no per-account limit: tests ask many questions in one process
 os.environ.setdefault("USLS_UPLOAD_DIR", tempfile.mkdtemp(prefix="usls-uploads-"))
 
 from app import (  # noqa: E402

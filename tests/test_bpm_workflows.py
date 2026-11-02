@@ -13,6 +13,7 @@ from openpyxl import load_workbook
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
+os.environ.setdefault("ASSISTANT_MAX_PER_HOUR", "0")  # no per-account limit: tests ask many questions in one process
 # Never write into the committed seed library (uploads/policy_documents/) or the real RAG index.
 os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="policy-uploads-"))
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
@@ -414,7 +415,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             record = PracticumRecord(
                 student_id=self.student_id, practicum_site="Partner Site", required_hours=200,
                 completed_hours=200, document_status="Verified", status="Report Sent to Dean",
-                completion_status="Completed and accepted", report_sent_at=datetime.utcnow(),
+                completion_status="Completed and accepted", report_sent_at=datetime.now(),
             )
             db.session.add(record)
             db.session.commit()
