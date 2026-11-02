@@ -1240,10 +1240,10 @@ class VerdictFlowTests(ResearchCoreBase):
             self.assertEqual(items["Agreed defense schedule in Form 4"]["status"], "Complete")
 
     def test_a_deferred_defense_removes_its_google_events(self):
-        with patch("app.remove_defense_google_events") as remove_events:
+        removed = []
+        with patch("app.remove_defense_google_events", side_effect=lambda schedule: removed.append(schedule.id)):
             deferred_id, _ = self.proposal_booked_and_held("Deferred", remarks="Chair was ill")
-        self.assertTrue(remove_events.called)
-        self.assertEqual([call.args[0].id for call in remove_events.call_args_list], [deferred_id])
+        self.assertEqual(removed, [deferred_id])
 
     def test_deferred_defense_is_rebooked_and_linked_to_the_deferred_record(self):
         deferred_id, _ = self.proposal_booked_and_held("Deferred", remarks="Chair was ill")

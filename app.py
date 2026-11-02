@@ -10,6 +10,8 @@ import sys
 import tempfile
 import json
 import hashlib
+import base64
+import http.client
 import csv
 import io
 import html
@@ -15535,6 +15537,10 @@ def register_routes(app: Flask) -> None:
             access_token = (token_payload.get("access_token") or "").strip()
             if not access_token:
                 raise ValueError("Google returned no access token")
+            if "scope" in token_payload and not set(GOOGLE_CALENDAR_REQUIRED_SCOPES) <= set(
+                str(token_payload.get("scope") or "").split()
+            ):
+                return redirect("/faculty-portal/calendar?calendar=missing-scope")
             userinfo_request = Request(
                 "https://openidconnect.googleapis.com/v1/userinfo",
                 headers={"Authorization": f"Bearer {access_token}"},
@@ -19595,7 +19601,7 @@ def register_routes(app: Flask) -> None:
             f"{defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)} with the new panel.",
             f"defense_reconfirmed:{now_utc().strftime('%Y%m%d%H%M%S')}",
         )
-        sync_defense_google_events(schedule)
+        run_google_calendar_hook(sync_defense_google_events, schedule)
         db.session.commit()
         return jsonify({"ok": True, "message": "Schedule re-confirmed."})
 
@@ -24967,10 +24973,16 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
             context["verdict_outcome"] = stage_outcome
             context["lead_reference"] = {"date": iso(lead_reference), "label": lead_reference_label, "days": lead_days}
             context["change_requesters"] = list(SCHEDULE_CHANGE_REQUESTERS)
+            current_booking = ScheduleRequest.query.filter(
+                ScheduleRequest.student_id == selected_student.id,
+                ScheduleRequest.defense_type == stage_defense_type,
+                ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+            ).order_by(ScheduleRequest.id.desc()).first() if stage_defense_type else None
             context["availability"] = defense_availability_context(
                 participants,
                 window_start,
                 window_end,
+                ignore_schedule=current_booking,
             )
             context["availability"].update({
                 "today": iso(today),
@@ -27942,13 +27954,19 @@ def panel_snapshot_for(panel: list[PanelAssignment]) -> list[dict]:
     ]
 
 
-def slot_availability(participants: list[dict], day: date, start: time, end: time) -> tuple[int, list[str], list[str]]:
+def slot_availability(
+    participants: list[dict],
+    day: date,
+    start: time,
+    end: time,
+    ignore_schedule: ScheduleRequest | None = None,
+) -> tuple[int, list[str], list[str]]:
     """How many participants are free for the whole slot, who is not, and who has entered nothing.
 
     A participant who has not entered availability is neither free nor unavailable: they are
     reported separately so the scheduler can warn instead of guessing.
     """
-    context = defense_availability_context(participants, day, day)
+    context = defense_availability_context(participants, day, day, ignore_schedule=ignore_schedule)
     free = 0
     unavailable = []
     not_entered = []
@@ -27979,7 +27997,9 @@ def schedule_slot_problems(student: Student, schedule: ScheduleRequest, panel: l
     if not schedule.start_time or not schedule.end_time:
         return ["The booking has no start and end time."]
     participants = defense_participants(student, panel)
-    _free, unavailable, _not_entered = slot_availability(participants, schedule.preferred_date, schedule.start_time, schedule.end_time)
+    _free, unavailable, _not_entered = slot_availability(
+        participants, schedule.preferred_date, schedule.start_time, schedule.end_time, ignore_schedule=schedule,
+    )
     problems = [
         f"{name} is not available {schedule.start_time.strftime('%H:%M')}-{schedule.end_time.strftime('%H:%M')} on {schedule.preferred_date.isoformat()}"
         for name in unavailable
@@ -28220,6 +28240,7 @@ def evaluate_schedule_slot(
     venue: str,
     manuscript_received_on: date | None = None,
     participants: list[dict] | None = None,
+    ignore_schedule: ScheduleRequest | None = None,
 ) -> dict:
     """Every warning for one candidate slot, split into hard (blocks) and soft (needs a reason).
 
@@ -28239,7 +28260,7 @@ def evaluate_schedule_slot(
             f"{defense_type} needs at least {lead_days} days after {reference_label}; "
             f"the earliest date is {earliest.isoformat()}"
         )
-    matched_count, unavailable, not_entered = slot_availability(participants, day, start, end) if participants else (0, [], [])
+    matched_count, unavailable, not_entered = slot_availability(participants, day, start, end, ignore_schedule) if participants else (0, [], [])
     for name in unavailable:
         hard.append(f"{name} is not available {start.strftime('%H:%M')}-{end.strftime('%H:%M')} on {day.isoformat()}")
     if not_entered:
@@ -28373,7 +28394,7 @@ def book_defense_schedule(
         received_on = None
     evaluation = evaluate_schedule_slot(
         student, panel, defense_type, preferred_date, selected_start, selected_end, venue,
-        received_on, participants=participants,
+        received_on, participants=participants, ignore_schedule=replaces,
     )
     matched_count = evaluation["matched_count"]
     status_reason = evaluation["soft"]
@@ -28452,8 +28473,8 @@ def book_defense_schedule(
     close_research_tasks(student.id, prefix=f"Reschedule {defense_type}:")
     notify_defense_booked(schedule, replaces, change_reason, requested_by)
     if replaces:
-        remove_defense_google_events(replaces)
-    sync_defense_google_events(schedule)
+        run_google_calendar_hook(remove_defense_google_events, replaces)
+    run_google_calendar_hook(sync_defense_google_events, schedule)
     sync_research_progress(student)
     return schedule
 
@@ -28472,7 +28493,7 @@ def cancel_defense_schedule(schedule: ScheduleRequest, account: UserAccount, rea
         f"Requested by {requested_by or 'not recorded'}. Reason: {reason}",
     )
     notify_defense_cancelled(schedule, reason, requested_by)
-    remove_defense_google_events(schedule)
+    run_google_calendar_hook(remove_defense_google_events, schedule)
 
 
 # ===========================================================================
@@ -32426,6 +32447,15 @@ def has_hard_schedule_conflict(conflicts: list[str]) -> bool:
     )
 
 
+def run_google_calendar_hook(action, *args):
+    """Run a Google Calendar step of a booking; a Google failure must never fail or undo the booking."""
+    try:
+        return action(*args)
+    except Exception:
+        app.logger.exception("Google Calendar step %s failed; the schedule change was kept", getattr(action, "__name__", action))
+        return None
+
+
 def faculty_calendar_id(faculty: Faculty) -> str | None:
     return (faculty.google_calendar_id or "").strip() or None
 
@@ -32439,6 +32469,11 @@ def google_calendar_configured(faculty: Faculty) -> bool:
 
 
 GOOGLE_CALENDAR_TOKEN_PREFIX = "fernet:v1:"
+GOOGLE_CALENDAR_RECONNECT_MESSAGE = "Google Calendar access expired; faculty must reconnect"
+GOOGLE_CALENDAR_REQUIRED_SCOPES = (
+    "https://www.googleapis.com/auth/calendar.freebusy",
+    "https://www.googleapis.com/auth/calendar.events.owned",
+)
 _GOOGLE_CALENDAR_FERNET_CACHE: Fernet | None = None
 
 
@@ -32477,12 +32512,19 @@ def google_calendar_decrypt_token(stored_token: str | None) -> str | None:
         raise ValueError("Stored Google Calendar credentials could not be decrypted") from exc
 
 
+def google_calendar_needs_reconnect(faculty: Faculty) -> bool:
+    """Google refused the saved refresh token (revoked, or expired after 7 days in testing mode)."""
+    return google_calendar_configured(faculty) and faculty.google_calendar_last_error == GOOGLE_CALENDAR_RECONNECT_MESSAGE
+
+
 def faculty_google_calendar_dict(faculty: Faculty) -> dict:
     connected = google_calendar_configured(faculty)
+    needs_reconnect = google_calendar_needs_reconnect(faculty)
     return {
         "provider": "Google Calendar",
         "connected": connected,
-        "status": "Connected" if connected else "Not connected",
+        "needs_reconnect": needs_reconnect,
+        "status": "Reconnect your Google Calendar" if needs_reconnect else "Connected" if connected else "Not connected",
         "sync_status": (
             "Google busy periods subtract conflicts; system-scheduled defenses are kept on this Google Calendar."
             if connected
@@ -32558,6 +32600,8 @@ def faculty_google_calendar_token(faculty: Faculty) -> tuple[str | None, str | N
         if not expiry or expiry > now_utc() + timedelta(minutes=2):
             return access_token, None
     if faculty.google_calendar_refresh_token:
+        if google_calendar_needs_reconnect(faculty):
+            return None, GOOGLE_CALENDAR_RECONNECT_MESSAGE
         if not google_calendar_oauth_configured():
             return None, "Google Calendar OAuth credentials are not configured"
         try:
@@ -32572,15 +32616,29 @@ def faculty_google_calendar_token(faculty: Faculty) -> tuple[str | None, str | N
                 "grant_type": "refresh_token",
             })
         except HTTPError as exc:
+            try:
+                refusal = json.loads(exc.read().decode("utf-8")).get("error")
+            except (OSError, ValueError, AttributeError, UnicodeDecodeError):
+                refusal = None
+            if refusal == "invalid_grant":
+                faculty.google_calendar_last_error = GOOGLE_CALENDAR_RECONNECT_MESSAGE
+                return None, GOOGLE_CALENDAR_RECONNECT_MESSAGE
             return None, f"Google Calendar token refresh HTTP {exc.code}"
-        except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        except (URLError, TimeoutError, OSError, http.client.HTTPException, json.JSONDecodeError) as exc:
             return None, f"Google Calendar token refresh unavailable: {exc}"
         token = (payload.get("access_token") or "").strip()
         if not token:
             return None, "Google Calendar token refresh returned no access token"
+        try:
+            faculty.google_calendar_access_token = google_calendar_encrypt_token(token)
+            faculty.google_calendar_token_expires_at = now_utc() + timedelta(
+                seconds=max(int(payload.get("expires_in") or 3600) - 30, 60)
+            )
+        except (ValueError, TypeError):
+            pass  # still usable for this request; the next one refreshes again
         return token, None
     if has_faculty_connection:
-        return None, "Google Calendar access expired; faculty must reconnect"
+        return None, GOOGLE_CALENDAR_RECONNECT_MESSAGE
     return None, "Google Calendar access token is missing"
 
 
@@ -32597,6 +32655,7 @@ def google_freebusy_lookup(faculty: Faculty, start_day: date, end_day: date) -> 
         return {"configured": False, "calendar_id": None, "busy": [], "error": None}
     token, token_error = faculty_google_calendar_token(faculty)
     if not token:
+        faculty.google_calendar_last_error = token_error
         return {
             "configured": google_calendar_configured(faculty),
             "calendar_id": calendar_id,
@@ -32626,14 +32685,17 @@ def google_freebusy_lookup(faculty: Faculty, start_day: date, end_day: date) -> 
         with urlopen(req, timeout=8) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
-        return {"configured": True, "calendar_id": calendar_id, "busy": [], "error": f"Google Calendar HTTP {exc.code}"}
-    except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        return {"configured": True, "calendar_id": calendar_id, "busy": [], "error": f"Google Calendar unavailable: {exc}"}
+        faculty.google_calendar_last_error = f"Google Calendar HTTP {exc.code}"
+        return {"configured": True, "calendar_id": calendar_id, "busy": [], "error": faculty.google_calendar_last_error}
+    except (URLError, TimeoutError, OSError, http.client.HTTPException, json.JSONDecodeError) as exc:
+        faculty.google_calendar_last_error = f"Google Calendar unavailable: {exc}"
+        return {"configured": True, "calendar_id": calendar_id, "busy": [], "error": faculty.google_calendar_last_error}
 
     calendar = (payload.get("calendars") or {}).get(calendar_id) or {}
     if calendar.get("errors"):
         reason = calendar["errors"][0].get("reason") or "calendar error"
-        return {"configured": True, "calendar_id": calendar_id, "busy": [], "error": f"Google Calendar {reason}"}
+        faculty.google_calendar_last_error = f"Google Calendar {reason}"
+        return {"configured": True, "calendar_id": calendar_id, "busy": [], "error": faculty.google_calendar_last_error}
     busy = []
     local_tz = timezone(timedelta(hours=8))
     for item in calendar.get("busy", []):
@@ -32676,6 +32738,7 @@ def defense_google_event_payload(schedule: ScheduleRequest) -> dict:
         ),
         "location": schedule.venue or "",
         "transparency": "opaque",
+        "visibility": "private",
         "start": {"dateTime": start_dt.isoformat(), "timeZone": CALENDAR_TIMEZONE},
         "end": {"dateTime": end_dt.isoformat(), "timeZone": CALENDAR_TIMEZONE},
         "extendedProperties": {
@@ -32715,9 +32778,53 @@ def google_calendar_event_request(
     except HTTPError as exc:
         if method == "DELETE" and exc.code in {404, 410}:
             return {}, None
-        return None, f"Google Calendar event HTTP {exc.code}"
-    except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        return {"http_status": exc.code}, f"Google Calendar event HTTP {exc.code}"
+    except (URLError, TimeoutError, OSError, http.client.HTTPException, json.JSONDecodeError) as exc:
         return None, f"Google Calendar event sync unavailable: {exc}"
+
+
+def defense_google_event_id(schedule: ScheduleRequest, faculty_id: int, version: int = 1) -> str:
+    """A fixed Google event ID (base32hex: a-v, 0-9) so a retried create cannot make a second event."""
+    digest = hashlib.sha1(f"usls-gs-defense:{schedule.id}:{faculty_id}:{version}".encode("utf-8")).digest()
+    return base64.b32hexencode(digest).decode("ascii").rstrip("=").lower()
+
+
+def defense_google_next_event_id(schedule: ScheduleRequest, faculty_id: int, previous_id: str) -> str:
+    """Google never frees the ID of a deleted event, so a replacement takes the next version."""
+    for version in range(1, 50):
+        if defense_google_event_id(schedule, faculty_id, version) == previous_id:
+            return defense_google_event_id(schedule, faculty_id, version + 1)
+    return defense_google_event_id(schedule, faculty_id)
+
+
+def push_defense_google_event(
+    faculty: Faculty,
+    schedule: ScheduleRequest,
+    stored_id: str | None,
+    payload: dict,
+) -> tuple[str | None, bool, str | None]:
+    """Update the stored event or create it. Returns (event ID to keep, created, error)."""
+    event_id = stored_id
+    if stored_id:
+        response, error = google_calendar_event_request(faculty, "PATCH", stored_id, payload)
+        if not error:
+            return stored_id, False, None
+        if (response or {}).get("http_status") not in {404, 410}:
+            return stored_id, False, error
+        # The event is gone from Google (deleted there): forget it and create a new one.
+        event_id = defense_google_next_event_id(schedule, faculty.id, stored_id)
+    else:
+        event_id = defense_google_event_id(schedule, faculty.id)
+    response, error = google_calendar_event_request(faculty, "POST", None, {**payload, "id": event_id})
+    if error and (response or {}).get("http_status") == 409:
+        # An earlier attempt already created it (the reply was lost): bring it up to date instead.
+        _response, error = google_calendar_event_request(
+            faculty, "PATCH", event_id, {**payload, "status": "confirmed"},
+        )
+        return (event_id, True, None) if not error else (None, False, error)
+    if error:
+        return None, False, error
+    return str((response or {}).get("id") or event_id), True, None
 
 
 def defense_google_faculty(schedule: ScheduleRequest) -> list[Faculty]:
@@ -32757,24 +32864,17 @@ def sync_defense_google_events(
 
     for faculty_id, faculty in eligible.items():
         key = str(faculty_id)
-        event_id = stored.get(key)
-        method = "PATCH" if event_id else "POST"
-        response, error = google_calendar_event_request(faculty, method, event_id, payload)
+        kept_id, created, error = push_defense_google_event(faculty, schedule, stored.get(key), payload)
         if error:
+            if kept_id:
+                stored[key] = kept_id
+            else:
+                stored.pop(key, None)
             faculty.google_calendar_last_error = error
             result["errors"].append({"faculty_id": faculty_id, "error": error})
             continue
-        if method == "POST":
-            new_event_id = (response or {}).get("id")
-            if not new_event_id:
-                error = "Google Calendar created no event ID"
-                faculty.google_calendar_last_error = error
-                result["errors"].append({"faculty_id": faculty_id, "error": error})
-                continue
-            stored[key] = str(new_event_id)
-            result["created"] += 1
-        else:
-            result["updated"] += 1
+        stored[key] = kept_id
+        result["created" if created else "updated"] += 1
         faculty.google_calendar_last_synced_at = now_utc()
         faculty.google_calendar_last_error = None
 
@@ -32864,6 +32964,35 @@ def google_busy_by_faculty(participants: list[dict], start_day: date, end_day: d
     }
 
 
+def without_own_defense_events(google_busy: dict[int, dict], schedule: ScheduleRequest) -> dict[int, dict]:
+    """Free/busy shows this system's own (opaque) defense event as busy; take that time back out.
+
+    Only for the faculty who hold a stored event of this schedule, and only the schedule's own slot:
+    anything else on their calendar still counts.
+    """
+    if not schedule.start_time or not schedule.end_time:
+        return google_busy
+    local_tz = timezone(timedelta(hours=8))
+    own_start = datetime.combine(schedule.preferred_date, schedule.start_time).replace(tzinfo=local_tz)
+    own_end = datetime.combine(schedule.preferred_date, schedule.end_time).replace(tzinfo=local_tz)
+    result = dict(google_busy)
+    for key in defense_google_event_ids(schedule):
+        entry = result.get(int(key))
+        if not entry or not entry.get("busy"):
+            continue
+        busy = []
+        for item in entry["busy"]:
+            if item["end"] <= own_start or item["start"] >= own_end:
+                busy.append(item)
+                continue
+            if item["start"] < own_start:
+                busy.append({"start": item["start"], "end": own_start})
+            if item["end"] > own_end:
+                busy.append({"start": own_end, "end": item["end"]})
+        result[int(key)] = {**entry, "busy": busy}
+    return result
+
+
 def slot_conflicts_google_busy(slot: FacultyAvailability, busy_items: list[dict]) -> bool:
     slot_start = datetime.combine(slot.available_date, slot.start_time).replace(tzinfo=timezone(timedelta(hours=8)))
     slot_end = datetime.combine(slot.available_date, slot.end_time).replace(tzinfo=timezone(timedelta(hours=8)))
@@ -32932,6 +33061,7 @@ def defense_availability_context(
     window_start: date,
     window_end: date,
     duration_minutes: int = 120,
+    ignore_schedule: ScheduleRequest | None = None,
 ) -> dict:
     if not participants:
         return {
@@ -32947,6 +33077,8 @@ def defense_availability_context(
     participant_ids = [participant["faculty"].id for participant in participants]
     participant_faculty = {participant["faculty"].id: participant["faculty"] for participant in participants}
     google_busy = google_busy_by_faculty(participants, window_start, window_end)
+    if ignore_schedule is not None:
+        google_busy = without_own_defense_events(google_busy, ignore_schedule)
     bundles = {faculty_id: faculty_availability_bundle(faculty) for faculty_id, faculty in participant_faculty.items()}
     # Availability comes only from what people entered (weekly hours and dated exceptions).
     # Google Calendar can subtract busy periods from those candidate windows, but it never
@@ -34104,6 +34236,7 @@ def apply_verdict_effects(student: Student, schedule: ScheduleRequest, verdict: 
     if effect == "reschedule":
         schedule.status = DEFERRED_DEFENSE_STATUS
         schedule.conflict_reason = "Defense deferred by the panel chair; it must be rescheduled."
+        run_google_calendar_hook(remove_defense_google_events, schedule)
         ensure_open_task(student.id, f"Reschedule deferred {defense_type}", "Research Coordinator", 3, 50)
         return "Research Coordinator"
     schedule.status = HELD_DEFENSE_STATUS
@@ -35560,6 +35693,8 @@ def migrate_research_vocabulary() -> None:
             continue
         if schedule.status in ACTIVE_DEFENSE_STATUSES + (RESCHEDULED_DEFENSE_STATUS, "Failed"):
             schedule.status = DEFERRED_DEFENSE_STATUS if verdict_effect(verdict) == "reschedule" else HELD_DEFENSE_STATUS
+            if schedule.status == DEFERRED_DEFENSE_STATUS:
+                run_google_calendar_hook(remove_defense_google_events, schedule)
     # Old code used "Rescheduled" for the CURRENT booking of a stage; now it marks a record that
     # was replaced. Keep it only where a newer record for the same stage exists.
     for schedule in ScheduleRequest.query.filter_by(status=RESCHEDULED_DEFENSE_STATUS).all():

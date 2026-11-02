@@ -4,6 +4,14 @@ import { api } from "../../api";
 import { Button, InlineNotice, Modal, StatusChip } from "../../components/ui/index.js";
 import { formatDateTime } from "../../lib/format";
 
+// Messages for the ?calendar=... value Google's consent screen sends the browser back with.
+const RETURN_NOTICES = {
+  "missing-scope": "Please allow both calendar permissions (see busy times, and manage the defense events this system adds). Select Reconnect calendar and tick both boxes.",
+  "connection-failed": "Google Calendar could not be connected. Please try again.",
+  "already-connected": "That Google account is already connected to another faculty member.",
+  cancelled: "Google Calendar was not connected because the permission screen was cancelled.",
+};
+
 export function FacultyCalendarConnection({ calendar, onChanged }) {
   const [operation, setOperation] = useState("");
   const [error, setError] = useState("");
@@ -11,6 +19,8 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
   const [previewOpened, setPreviewOpened] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const connected = Boolean(calendar?.connected);
+  const needsReconnect = connected && Boolean(calendar?.needs_reconnect);
+  const returnNotice = RETURN_NOTICES[new URLSearchParams(window.location.search).get("calendar")] || "";
   const sectionRef = useRef(null);
   const wasOpen = useRef(false);
 
@@ -69,7 +79,7 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
     }
   }
 
-  const connectionStatus = connected ? "Connected" : previewOpened ? "Integration preview opened" : "Not connected";
+  const connectionStatus = needsReconnect ? "Reconnect your Google Calendar" : connected ? "Connected" : previewOpened ? "Integration preview opened" : "Not connected";
 
   return (
     <section ref={sectionRef} className="card p-3" aria-label="Google Calendar connection">
@@ -80,8 +90,8 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="card-title">Google Calendar</p>
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-2xs font-semibold ${connected || previewOpened ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-600"}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${connected || previewOpened ? "bg-brand-500" : "bg-slate-400"}`} aria-hidden="true" />
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-2xs font-semibold ${needsReconnect ? "bg-amber-50 text-amber-800" : connected || previewOpened ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-600"}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${needsReconnect ? "bg-amber-500" : connected || previewOpened ? "bg-brand-500" : "bg-slate-400"}`} aria-hidden="true" />
               {connectionStatus}
             </span>
           </div>
@@ -100,6 +110,9 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
           ? "Busy times prevent scheduling conflicts. New defense schedules are added to this calendar automatically."
           : "Connect once to check busy times and add new defense schedules automatically."}
       </p>
+      <p className="mt-1 text-xs leading-relaxed text-slate-600">
+        Only events on your main Google calendar (the one with your name) count as busy.
+      </p>
       {connected ? (
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
           <Button data-connect="" variant="secondary" size="sm" icon={CalendarCheck2} loading={operation === "connect"} disabled={Boolean(operation)} onClick={connectCalendar}>
@@ -117,9 +130,15 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
           Connect Google Calendar
         </Button>
       )}
-      {connected && calendar?.last_error && (
+      {needsReconnect && (
+        <InlineNotice tone="warning" className="mt-2">
+          Google no longer accepts the saved permission, so busy times cannot be checked and no defenses are added. Select Reconnect calendar to allow it again.
+        </InlineNotice>
+      )}
+      {connected && !needsReconnect && calendar?.last_error && (
         <InlineNotice tone="warning" className="mt-2">Last check failed: {calendar.last_error}</InlineNotice>
       )}
+      {returnNotice && <InlineNotice tone={returnNotice === RETURN_NOTICES.cancelled ? "info" : "danger"} className="mt-2">{returnNotice}</InlineNotice>}
       {error && <InlineNotice tone="danger" className="mt-2">{error}</InlineNotice>}
       {preview && (
         <GoogleCalendarPreviewDialog
