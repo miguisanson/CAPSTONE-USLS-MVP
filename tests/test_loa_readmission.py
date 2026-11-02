@@ -879,6 +879,64 @@ class LeaveCaseTests(unittest.TestCase):
         recent = self.dean_client().get("/api/approvals").get_json()["workflow_recent"]
         self.assertTrue(any(i["id"] == case_id for i in recent))
 
+    # ---- process-logic audit (I-165, I-166, I-168) ---------------------------------------------------
+    def test_staff_cannot_confirm_awol_in_the_middle_of_a_valid_leave(self):
+        """I-165: the leave runs another 100 days; AWOL is only for a leave that ended plus the grace period."""
+        case_id = self.make_on_leave("Running Term", "Running Term")
+        refused = self.act(self.staff_client(), case_id, "confirm_awol", comment="Student did not answer.")
+        self.assertEqual(refused.status_code, 409, refused.get_json())
+        self.assertIn("grace", refused.get_json()["error"].lower())
+        self.assertEqual(self.status_of(case_id), "On Leave")
+        self.assertEqual(self.student_state(), ("On Leave", "LOA", "LOA"))
+        with app.app_context():  # the leave ended 30 days ago, the grace period is 14 days
+            term = AcademicTerm.query.filter_by(label="Running Term").one()
+            term.end_date = date.today() - timedelta(days=30)
+            db.session.commit()
+        ok = self.act(self.staff_client(), case_id, "confirm_awol", comment="Student did not answer.")
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        self.assertEqual(self.student_state(), ("AWOL", "AWOL", "AWOL"))
+
+    def test_an_awol_return_restores_the_stage_the_student_had_before_the_leave(self):
+        """I-166: a student who was in Final Defense comes back to Final Defense, not Coursework."""
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.current_stage = "Final Defense"
+            db.session.commit()
+        case_id = self.make_on_leave("Running Term", "Running Term")
+        with app.app_context():
+            term = AcademicTerm.query.filter_by(label="Running Term").one()
+            term.end_date = date.today() - timedelta(days=30)
+            db.session.commit()
+        self.assertEqual(self.act(self.staff_client(), case_id, "confirm_awol", comment="No reply.").status_code, 200)
+        with app.app_context():
+            awol = AwolCase.query.filter_by(student_id=self.student_id).one()
+            self.assertEqual(awol.prior_stage, "Final Defense")
+            awol.status, awol.dean_decision = "Dean Review", "Pending"
+            awol.refresher_required = awol.full_reenrollment_required = False
+            awol_id = awol.id
+            db.session.commit()
+        decided = self.dean_client().post(
+            f"/api/approvals/workflow/awol-return/{awol_id}/decide", json={"decision": "approve", "note": "Welcome back."})
+        self.assertEqual(decided.status_code, 200, decided.get_json())
+        self.assertEqual(self.student_state(), ("Active", "Final Defense", "Not Enrolled"))
+
+    def test_an_open_readmission_and_an_open_extension_cannot_coexist(self):
+        """I-168: filing one is refused while the other is open (either order)."""
+        self.make_on_leave("Running Term", "Running Term")
+        body = {"target_return_term": "Term Two", "return_intent": "I am ready to return.", "readmission_items": CHECKLIST}
+        self.assertEqual(self.file_loa("Term One", "Term Two").status_code, 200)
+        read = self.student_client().post("/api/student-portal/requests/readmission", json=body)
+        self.assertEqual(read.status_code, 409, read.get_json())
+        self.assertIn("extension", read.get_json()["error"].lower())
+        overview = self.student_client().get("/api/student-portal/context").get_json()["leave_overview"]
+        self.assertFalse(overview["can_file"]["readmission"]["allowed"])
+        ext_id = self.case()
+        self.assertEqual(self.act(self.student_client(), ext_id, "withdraw").status_code, 200)
+        self.assertEqual(self.student_client().post("/api/student-portal/requests/readmission", json=body).status_code, 200)
+        again = self.file_loa("Term One", "Term Two")
+        self.assertEqual(again.status_code, 409, again.get_json())
+        self.assertIn("readmission", again.get_json()["error"].lower())
+
     # ---- AW-01: an AWOL return that needs full re-enrollment is finished by staff -----------------
     def awol_student_with_case(self, status="Re-enrollment Required"):
         with app.app_context():
