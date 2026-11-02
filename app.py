@@ -5491,17 +5491,12 @@ def portfolio_recommendations(limit: int = 150) -> dict:
             f"Escalate “{t.title}” to {t.owner_role} — {d} day(s) past due.",
             t.owner_role, bonus=min(d * 2, 32)), t.student))
 
-    cutoff = now_utc() - timedelta(days=STALL_WARN_DAYS)
-    for s in (
-        Student.query.filter(
-            Student.standing == "Active",
-            Student.current_stage != "Completed",
-            Student.updated_at < cutoff,
-        )
-        .order_by(Student.updated_at.asc())
-        .all()
-    ):
-        d = max((now_utc() - (s.updated_at or s.created_at)).days, 0)
+    entered = stage_entered_map()
+    stalled = [
+        (stage_days(s, entered), s)
+        for s in Student.query.filter(Student.standing == "Active", Student.current_stage != "Completed").all()
+    ]
+    for d, s in sorted((item for item in stalled if item[0] >= STALL_WARN_DAYS), key=lambda item: -item[0]):
         owner = "Research Coordinator" if s.current_stage in (
             "Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense"
         ) else "Academic Coordinator" if s.current_stage == "Coursework" else STAFF_OWNER
@@ -14808,6 +14803,21 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
     def reports_summary():
         return jsonify(report_summary(request.args))
+
+    @app.route("/api/reports/attention")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def reports_attention():
+        return jsonify(report_attention(request.args))
+
+    @app.route("/api/reports/stages")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def reports_stages():
+        return jsonify(report_stages(request.args))
+
+    @app.route("/api/reports/records-to-fix")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def reports_records_to_fix():
+        return jsonify(report_records_to_fix(request.args))
 
     @app.route("/api/reports/summary/<key>")
     @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
@@ -25210,6 +25220,127 @@ def report_summary_list(key: str, args) -> dict | None:
             ("student", "Student"), ("program", "Program"), ("stage", "Stage"), ("detail", "Why it is counted"))],
         "rows": tile["rows"],
     }
+
+
+# ---- B3: S1 attention, S2 stages, S8 records to fix ------------------------------------------------------------
+# GET /api/reports/attention -> {filters, count, levels:{"At Risk of Delay":n,"Delayed":n}, causes:[{key,label,count}],
+#     rows:[{student_id, student, student_number, program, stage, level, causes:[key], reasons:[text], days_in_stage,
+#     owner, detail}]}; ?cause=<key> keeps the rows of one cause (the counts stay whole).
+# GET /api/reports/stages -> {filters, thresholds:{warn,high}, rows:[{stage, students, median_days, p90_days,
+#     longest_days, green, yellow, red}], count, students:[{student_id, ..., stage, days_in_stage, zone}]};
+#     ?stage=&zone= narrow `students` (the rows stay whole).
+# GET /api/reports/records-to-fix -> {filters, count, counts:{research_case, adviser, both}, rows:[{student_id, ...,
+#     missing:["research_case"|"adviser"], detail}]}; ?missing= keeps one kind.
+ATTENTION_CAUSES = [
+    ("stalled", "No progress recorded for a long time", "no progress update has been recorded"),
+    ("overdue_tasks", "Overdue actions", "overdue action"),
+    ("missing_documents", "Required documents missing", "required document"),
+    ("awol", "AWOL", "AWOL status"),
+    ("coursework_behind", "Coursework behind the suggested year", "past its suggested course year"),
+    ("subject_not_offered", "Needed subject not offered", "is needed next but is not offered"),
+]
+ATTENTION_CAUSE_LABELS = {key: label for key, label, _ in ATTENTION_CAUSES}
+RESEARCH_STAGES_OPEN = ("Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense")
+ZONE_ORDER = ("green", "yellow", "red")
+
+
+def _cause_key(reason: str) -> str:
+    return next((key for key, _label, phrase in ATTENTION_CAUSES if phrase in reason), "other")
+
+
+def stall_zone(days: int) -> str:
+    """Green until STALL_WARN_DAYS, yellow until STALL_HIGH_DAYS, red from there (the same lines the risk model uses)."""
+    return "red" if days >= STALL_HIGH_DAYS else "yellow" if days >= STALL_WARN_DAYS else "green"
+
+
+def report_attention(args) -> dict:
+    scope = report_scope(args)
+    wanted = _filter_value(args, "cause")
+    entered = stage_entered_map(scope["ids"])
+    rows = []
+    for student in scope["students"]:
+        if student.current_stage in TERMINAL_STAGES:
+            continue
+        assessment = student_priority(student)
+        if assessment["level"] not in AT_RISK_LEVELS:
+            continue
+        advice = student_recommendations(student)
+        owner = advice["recommendations"][0]["owner"] if advice["recommendations"] else (
+            normalize_owner_label(advice["indicators"]["next_owner"]) or STAFF_OWNER)
+        keys = list(dict.fromkeys(_cause_key(reason) for reason in assessment["causes"]))
+        rows.append({
+            **_student_row(student, assessment["reason"]),
+            "level": assessment["level"], "causes": keys, "reasons": assessment["causes"],
+            "days_in_stage": stage_days(student, entered), "owner": owner,
+        })
+    tally: dict[str, int] = {}
+    for row in rows:
+        for key in row["causes"]:
+            tally[key] = tally.get(key, 0) + 1
+    causes = [
+        {"key": key, "label": ATTENTION_CAUSE_LABELS.get(key, "Other"), "count": count}
+        for key, count in sorted(tally.items(), key=lambda item: (-item[1], item[0]))
+    ]
+    levels = {level: sum(1 for row in rows if row["level"] == level) for level in AT_RISK_LEVELS}
+    rows.sort(key=lambda row: (row["level"] != "Delayed", -row["days_in_stage"], row["student"]))
+    if wanted:
+        rows = [row for row in rows if wanted in row["causes"]]
+    return {"filters": scope["filters"], "count": len(rows), "levels": levels, "causes": causes, "rows": rows}
+
+
+def report_stages(args) -> dict:
+    scope = report_scope(args)
+    wanted_stage, wanted_zone = _filter_value(args, "stage"), _filter_value(args, "zone")
+    entered = stage_entered_map(scope["ids"])
+    people = []
+    for student in scope["students"]:
+        if not student_is_active(student):
+            continue
+        days = stage_days(student, entered)
+        people.append({**_student_row(student, f"{days} days in {student.current_stage}"), "days_in_stage": days, "zone": stall_zone(days)})
+    rows = []
+    for stage in (s for s in STAGES if s not in TERMINAL_STAGES):
+        days = [p["days_in_stage"] for p in people if p["stage"] == stage]
+        zones = [p["zone"] for p in people if p["stage"] == stage]
+        rows.append({
+            "stage": stage, "students": len(days),
+            "median_days": round(_median([float(d) for d in days]), 1) if days else None,
+            "p90_days": _percentile([float(d) for d in days], 90), "longest_days": max(days) if days else None,
+            **{zone: zones.count(zone) for zone in ZONE_ORDER},
+        })
+    people.sort(key=lambda p: (-p["days_in_stage"], p["student"]))
+    listed = [p for p in people if (not wanted_stage or p["stage"] == wanted_stage) and (not wanted_zone or p["zone"] == wanted_zone)]
+    return {
+        "filters": scope["filters"], "thresholds": {"warn": STALL_WARN_DAYS, "high": STALL_HIGH_DAYS},
+        "rows": rows, "count": len(listed), "students": listed,
+    }
+
+
+def report_records_to_fix(args) -> dict:
+    scope = report_scope(args)
+    wanted = _filter_value(args, "missing")
+    ids = [s.id for s in scope["students"] if s.current_stage in RESEARCH_STAGES_OPEN]
+    with_case = {sid for (sid,) in db.session.query(ResearchCase.student_id).filter(ResearchCase.student_id.in_(ids)).distinct().all()} if ids else set()
+    rows = []
+    for student in scope["students"]:
+        if student.current_stage not in RESEARCH_STAGES_OPEN:
+            continue
+        missing = []
+        if student.id not in with_case:
+            missing.append("research_case")
+        if not adviser_faculty_ids_for_student(student):
+            missing.append("adviser")
+        if missing:
+            text = " and ".join({"research_case": "no research record", "adviser": "no adviser"}[m] for m in missing)
+            rows.append({**_student_row(student, f"{student.current_stage}: {text}"), "missing": missing})
+    counts = {
+        "research_case": sum(1 for r in rows if "research_case" in r["missing"]),
+        "adviser": sum(1 for r in rows if "adviser" in r["missing"]),
+        "both": sum(1 for r in rows if len(r["missing"]) == 2),
+    }
+    if wanted:
+        rows = [r for r in rows if wanted in r["missing"]]
+    return {"filters": scope["filters"], "count": len(rows), "counts": counts, "rows": rows}
 
 
 # ---------------------------------------------------------------------------
