@@ -1,3 +1,4 @@
+// e2e-writes: faculty-availability
 // Behaviour pin for packets P5.1 and P5.2 (Phase 5 migration of pages/faculty/*: FacultyPages, FacultyClasses,
 // FacultyAdviserPanel, FacultyInvitationsPage, FacultyCalendar, FacultyAvailabilityEditor, FacultyContext, FacultyRoutes).
 // Written BEFORE the migration and green on the old code, so it proves the migrated pages keep the same headings, data,
@@ -155,7 +156,15 @@ test.describe("My Advisees", () => {
     await expect(page.getByRole("heading", { name: "Advisees", exact: true })).toBeVisible();
     await expect(main(page).getByText(/\d+ of \d+ advisees/).first()).toBeVisible();
     await expect(main(page).getByText(/You are at the limit|places? left/)).toBeVisible();
-    await expect(page.getByText("No adviser requests are waiting for you.")).toBeVisible();
+    // The inbox as the API gives it now (p63 appoints advisers to this faculty member, so a request may be waiting):
+    // empty means the empty note is shown; otherwise the note is gone and every waiting student is on the page.
+    const requests = await (await page.request.get("/api/faculty-portal/adviser-requests")).json();
+    const waitingRequests = [...(requests.inbox || []), ...(requests.consents || [])];
+    if (waitingRequests.length === 0) await expect(page.getByText("No adviser requests are waiting for you.")).toBeVisible();
+    else {
+      await expect(page.getByText("No adviser requests are waiting for you.")).toHaveCount(0);
+      for (const item of waitingRequests) await expect(main(page).getByText(item.student_name, { exact: true }).first(), `request of ${item.student_name}`).toBeVisible();
+    }
     await expect(page.getByRole("heading", { name: "Your advisees" })).toBeVisible();
     await expect(page.getByText("Forms 3.2 and 3.3 (adviser contract) are due 5 days after Form 3.1.")).toBeVisible();
 
@@ -579,6 +588,10 @@ test("My Calendar: header and the shared calendar view", async ({ page }) => {
 // ================================================================================================ Availability
 test.describe("My Availability", () => {
   test("page: header, notice, weekly hours, specific dates form, requests, calendar link, other windows", async ({ page }) => {
+    // The "specific dates" test below adds and removes one date in the real database; when it runs in another worker at the
+    // same time this page would list that date. So the page gets the REAL availability with an empty "Your dates" list.
+    const realAvailability = await (await page.request.get("/api/faculty-portal/availability")).json();
+    await mockJson(page, "**/api/faculty-portal/availability", () => ({ ...realAvailability, exceptions: [] }));
     await openFromSidebar(page, "My Availability", "My Availability");
     await expect(page.getByText("Tell the Graduate School when you can sit in a defense. All times are Philippine time.")).toBeVisible();
     await expect(page.getByRole("link", { name: "See your calendar" })).toHaveAttribute("href", "/faculty-portal/calendar");

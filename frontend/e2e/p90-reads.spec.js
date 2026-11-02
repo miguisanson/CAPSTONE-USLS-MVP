@@ -1,3 +1,4 @@
+// e2e-writes: leave-sync
 // Packet get-writes (I-038, I-039): opening a page must not write. A page view sends only GET requests to /api.
 // Through the real UI: Leave of Absence and Readmission as staff and as admin (I-039 - they used to send
 // POST /api/leave-cases/sync on load), and the faculty portal as the seeded adviser (I-038 - its first load used to

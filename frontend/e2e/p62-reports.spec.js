@@ -1,3 +1,4 @@
+// e2e-writes: daily-changes
 // Behaviour pin for packet P6.2 (Phase 5 migration of pages/Reports.jsx, pages/ActivityLog.jsx, pages/BusinessRules.jsx).
 // Written BEFORE the migration and green on the old code, so it proves the migrated pages keep the same data, the same
 // API query parameters, the same filters, the same exports (file names and header rows) and the same rule dialog.

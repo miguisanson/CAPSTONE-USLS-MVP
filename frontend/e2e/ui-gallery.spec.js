@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Component gallery proof (Phase 5, UI-SPEC section 4 "Component proof"). Opens /__ui at 1366, 1920 and 390 and
 // checks what the design contract promises: the type scale, the button classes, 16px inputs on phones, the page
 // width cap and the z-index scale; no console error, failed API call or horizontal overflow; screenshots saved.

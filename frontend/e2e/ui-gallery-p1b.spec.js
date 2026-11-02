@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Component gallery proof for packet P1b (Phase 5, UI-SPEC sections 3, 3a and 4): StatusChip, Button, Card /
 // SectionCard and Field / Input / Select / Textarea. Opens /__ui at 1366, 1920 and 390 and checks the P1b block of
 // the gallery (data-gallery="p1b"): every tone, every button variant and size, every card padding, each field type;

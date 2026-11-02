@@ -1,3 +1,4 @@
+// e2e-writes: none
 // P1e proof (Phase 5, UI-SPEC section 4 "PageHeader", "StatCard", "Stepper" rows, sections 5 and 8; idea X-02):
 // opens /__ui at 1366, 1920 and 390 and checks the P1e block of the gallery (data-gallery="p1e"):
 //   - PageHeader: one title class (.page-title), a long title with three actions fits at 390 with the actions

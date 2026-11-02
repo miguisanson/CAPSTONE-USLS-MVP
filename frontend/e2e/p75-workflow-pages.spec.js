@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P7.5 (Phase 5, UI-SPEC section 8, WorkflowPage restyle): pins what the Student Handoff, Course Audit, Research Gate,
 // Panel Matching and Defense Scheduling workflow pages show and do BEFORE they are moved onto the component library.
 // Written first and green on the old markup; it must stay green after the restyle. Read-only: the sidebar and links are

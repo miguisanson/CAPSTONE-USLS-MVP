@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Component gallery proof for packet P1f (Phase 5, UI-SPEC section 4 "DecisionPanel" and "HistoryPanel" rows, sections 5
 // and 8; ideas X-04 and X-05). Opens /__ui at 1366, 1920 and 390 and checks the P1f block (data-gallery="p1f"):
 //   DecisionPanel (the one widget for the EXISTING approve / return / reject actions - it adds no action):

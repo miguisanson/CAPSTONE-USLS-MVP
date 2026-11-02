@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Behaviour pin for packet P2.1 (Phase 5 migration of the app shell: components/Layout.jsx, RoleSidebar.jsx,
 // NotificationBell.jsx, ExportFollowUpModal.jsx, FacultyAssignmentProfile.jsx). Written BEFORE the migration. It reaches
 // everything through the real UI and pins what must not change: which sidebar links each role sees (recorded from the old

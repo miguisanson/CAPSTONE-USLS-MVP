@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P82 (Phase 5 design system P4.3 + P4.4, student stream; review findings F-33 and F-37; I-086, I-087).
 // Pins what the student PAGES show, so moving pages/student/{StudentOverview,StudentProgress,MyCourses,StudentAdviserPage,
 // StudentRequestPages,StudentInbox,StudentCalendarPage,StudentSupportPages,StudentAssistant,StudentRoutes}.jsx onto the

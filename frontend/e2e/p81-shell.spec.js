@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P8.1 (issues I-103, I-101, I-112): the app shell.
 // Written BEFORE the change; red on the old code. Through the real UI, read only:
 //   - I-103  at 1366x768 every sidebar link of every role can be reached: the nav area scrolls between the brand and the

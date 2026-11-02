@@ -1,3 +1,4 @@
+// e2e-writes: maureen, daniel-fernandez, gabriel, plan-mscs-2026-2
 // Packet P3.2 (Phase 5 design system, dean stream): pins what the Dean's pages DO that the sweep only photographs, so the
 // restyle of DeanPages.jsx, DeanLeaveParts.jsx and DeanContext.jsx onto the component library cannot change it.
 // Written against the old code; it must pass on both. Through the real UI, as the Dean:
@@ -405,11 +406,23 @@ test.describe("P3.2 Dean pages", () => {
     // Student standing: two bars with their words, and the program level.
     const standing = page.getByRole("heading", { name: "Student standing" }).locator("xpath=ancestor::section[1]");
     await expect(standing.getByRole("img", { name: /^Years in the program: \d+ of \d+$/ })).toBeVisible();
-    await expect(standing.getByRole("img", { name: "Leave already approved: 0 of 4" })).toBeVisible();
+    // What the server says about this student right now (I-121: another spec, or a legacy log adopted at someone's sign-in, can
+    // add an earlier case or an approved leave; the page must agree with the API in any order).
+    const detail = (await (await page.request.get(`/api/leave-cases/${ids.loaId}`)).json()).case;
+    const approved = detail.student_summary.approved_leave_semesters;
+    const mostLeave = detail.student_summary.max_leave_semesters;
+    await expect(standing.getByRole("img", { name: `Leave already approved: ${approved} of ${mostLeave}` })).toBeVisible();
     await expect(standing).toContainText(/\d+ years? so far · normal \d+ · most allowed \d+/);
-    await expect(standing).toContainText("0 of 4 semesters");
+    await expect(standing).toContainText(`${approved} of ${mostLeave} semesters`);
     await expect(standing).toContainText("level");
-    await expect(page.getByRole("heading", { name: "Earlier cases of this student" }).locator("xpath=ancestor::section[1]")).toContainText("No earlier leave or readmission cases.");
+    const earlierPanel = page.getByRole("heading", { name: "Earlier cases of this student" }).locator("xpath=ancestor::section[1]");
+    const earlierCases = detail.earlier_cases || [];
+    if (earlierCases.length === 0) await expect(earlierPanel).toContainText("No earlier leave or readmission cases.");
+    else {
+      await expect(earlierPanel).not.toContainText("No earlier leave or readmission cases.");
+      await expect(earlierPanel.getByRole("listitem")).toHaveCount(earlierCases.length);
+      for (const row of earlierCases) await expect(earlierPanel).toContainText(`${row.kind_label}`);
+    }
     await expect(page.getByRole("heading", { name: "Comments on earlier decisions" })).toHaveCount(0);
     await expect(page.getByRole("note")).toHaveCount(0);
     await page.screenshot({ path: join(SHOTS, "loa-case-1366.png"), fullPage: true });

@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P4.1 (Phase 5 design system, student stream): pins what the shared student-portal parts DO, so moving
 // pages/student/{shared,Panels,ProcessCaseCard,LeaveCaseCards,requestMeta}.jsx onto the component library (InlineNotice,
 // StatusChip, HistoryPanel, Stepper, StatCard, Fact) cannot change it. Written against the old code; it passes on both.

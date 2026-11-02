@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet "lists" (I-075, I-083, I-098, I-104 part, I-109): pins five small list fixes on the back-office pages.
 // Written BEFORE the change and red on the old pages. Read-only (nothing but navigation and filters is touched).
 //   - I-075  Students "Compre exam" column shows what the API says (Passed / Eligible / "N subjects left"), never a

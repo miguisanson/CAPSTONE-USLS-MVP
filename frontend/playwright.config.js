@@ -3,8 +3,13 @@
 import { defineConfig, devices } from "@playwright/test";
 import { BASE_URL, PORT, ARTIFACTS_DIR } from "./e2e/support/paths.mjs";
 import { join } from "node:path";
+import { assertOwnership } from "./e2e/support/check-ownership.mjs";
 
 const negative = process.env.E2E_NEGATIVE === "1";
+
+// Data-ownership guard (e2e/DATA-OWNERSHIP.md): two specs may not declare writes to the same record. Runs once, in the
+// process that starts the run (workers also load this file; they have TEST_WORKER_INDEX set).
+if (!process.env.TEST_WORKER_INDEX) assertOwnership();
 
 export default defineConfig({
   testDir: "./e2e",
