@@ -18,7 +18,7 @@
 //     Withdrawal export window, and the residency dialog with the I-012 rule (Record stays off when the checker says
 //     "Needs Human Review", on when it says "Eligible for Residency").
 // Demo data read only: Benjamin Santos, Therese Lacson, Gabriel Domingo (Leave of Absence), Maria Dela Cruz
-// (Readmission), Clarisse Tan, Elena Mendoza (AWOL & Residency), Adrian Lim (Withdrawal).
+// (Readmission), Clarisse Tan, Elena Mendoza (AWOL & Residency), Adrian Lim (Withdrawal, staff), Hazel Flores (Withdrawal, Dean).
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -344,21 +344,26 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
     });
 
     test("Leave of Absence: the follow-up strip lists a leave that ended and opens the confirm box", async ({ page }) => {
+      const asReturnDue = (item) =>
+        item.student.name === "Therese Lacson" ? { ...item, status: "Return Due", status_label: "Return due", awol_proposed: true, overdue_days: 3, period: { ...(item.period || {}), end_date: "2026-09-30" } } : item;
       await page.route(/\/api\/process-cases\?slug=leave-of-absence/, async (route) => {
         const response = await route.fetch();
         const json = await response.json();
-        json.cases = json.cases.map((item) =>
-          item.student.name === "Therese Lacson" ? { ...item, status: "Return Due", status_label: "Return due", awol_proposed: true, overdue_days: 3, period: { ...(item.period || {}), end_date: "2026-09-30" } } : item,
-        );
+        json.cases = json.cases.map(asReturnDue);
         await route.fulfill({ response, json });
       });
+      // Which leaves are "return due" depends on today's date (the seed's leaves end 2026-11-29; "return due" starts 30 days
+      // before), so the strip's count is read from the real list with the same edit, not hard-coded (IM16).
+      const real = await (await page.request.get("/api/process-cases?slug=leave-of-absence")).json();
+      const waiting = real.cases.map(asReturnDue).filter((item) => item.status === "Return Due" || item.awol_proposed).length;
       await page.goto("/workflow/leave-of-absence");
       const strip = page.getByRole("region", { name: "Needs follow-up" });
-      await expect(strip.getByRole("heading", { name: "Needs follow-up (1)" })).toBeVisible();
-      await expect(strip).toContainText("Therese Lacson");
-      await expect(strip).toContainText("Overdue 3 days");
-      await expect(strip).toContainText("AWOL proposed");
-      const confirm = strip.getByRole("button", { name: "Confirm AWOL", exact: true });
+      await expect(strip.getByRole("heading", { name: `Needs follow-up (${waiting})` })).toBeVisible();
+      const row = strip.getByRole("listitem").filter({ hasText: "Therese Lacson" });
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText("Overdue 3 days");
+      await expect(row).toContainText("AWOL proposed");
+      const confirm = row.getByRole("button", { name: "Confirm AWOL", exact: true });
       await confirm.click();
       const dialog = page.getByRole("dialog");
       await expect(dialog).toHaveCount(1);
@@ -367,7 +372,7 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       await page.keyboard.press("Escape");
       await expect(dialog).toHaveCount(0);
       await expect(confirm).toBeFocused();
-      await strip.getByRole("button", { name: "View details", exact: true }).click();
+      await row.getByRole("button", { name: "View details", exact: true }).click();
       await expect(page.getByRole("dialog").getByRole("heading", { level: 2, name: "Therese Lacson" })).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -505,7 +510,9 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
 
     test("Withdrawal: the Dean's case window offers Return to student with a reason box; Escape returns the focus", async ({ page }) => {
       await page.goto("/dean/approvals/withdrawal");
-      const { opener, dialog } = await open(page, "Adrian Lim");
+      // AD9 (870ec52): the Dean returns a withdrawal only once staff forwarded it (Dean Review); Adrian Lim is still with staff.
+      // Hazel Flores is the seeded withdrawal waiting for the Dean (DEAN_DEMO_STUDENTS, I-062); nothing here decides it.
+      const { opener, dialog } = await open(page, "Hazel Flores");
       const button = footerAction(dialog, "Return to student");
       await button.click();
       await expect(page.getByRole("dialog")).toHaveCount(2);

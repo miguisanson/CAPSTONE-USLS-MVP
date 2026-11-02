@@ -13,7 +13,7 @@
 //     follow-up window, then "Export again");
 //   - Activity Log (was Decision History): the entry the approval wrote (link to the case, process, status), the process filter and its count.
 // Setup (one graduation batch reaching the Dean) goes through each role's own API login, like p31 / p32. It changes data in
-// the throwaway harness database and touches only the demo student Isabel Flores (2260007, "Batch 1 October 2026"), whom no
+// the throwaway harness database and touches only the demo student Isabel Flores (2260007, "Batch 1 <this month>"), whom no
 // other spec uses.
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
@@ -39,7 +39,9 @@ async function okJson(res, what) {
 }
 
 const STUDENT_ID = 1; // Isabel Flores
-const BATCH = "Batch 1 October 2026";
+// The app names a new batch after the month it is made in ("Batch 1 <Month> <Year>", default_graduation_batch_name, UTC), and the seed makes it on the run day (IM16).
+const NOW = new Date();
+const BATCH = `Batch 1 ${NOW.toLocaleString("en-US", { month: "long", timeZone: "UTC" })} ${NOW.getUTCFullYear()}`;
 const WINDOW = "AY 2026-2027";
 
 /** Walk Isabel's graduation batch through every role until it is "Ready for Dean Review". */
