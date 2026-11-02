@@ -579,8 +579,8 @@ test.describe("P4.1 shared student parts", () => {
         ["Last enrolled semester", /AY 2025-2026 2nd Semester/],
         ["Returning in", /Not chosen yet/],
         ["Policy classification", /Awaiting return intent/],
-        ["Years in the program", /Not calculated/],
-        ["Residence limits", /Not calculated/],
+        ["Years in the program", /^Years in the program\s*\d+$/i], // CHANGED BY p105 (I-204): her own count, not "Not calculated"
+        ["Residence limits", /5 normal \/ 7 absolute \(Master's\)/],
         ["Dean decision", /Not Submitted/],
       ]) await expect(fact(c, label), label).toHaveText(value);
       await expect(c.locator("dt").filter({ hasText: /^(Type|Reason for return|Dean decided)$/i })).toHaveCount(0);

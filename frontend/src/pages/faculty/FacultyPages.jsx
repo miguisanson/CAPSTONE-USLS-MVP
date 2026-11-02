@@ -17,7 +17,7 @@ import { Button, Card, DataTable, InlineNotice, PageHeader, StatusChip } from ".
 import RoleHome, { MAX_WAITING } from "../../components/RoleHome.jsx";
 import { facultyActions, facultyStats, facultyUpcoming, facultyWaiting } from "../../lib/facultyHome.js";
 import { firstNameOf } from "../../lib/staffHome.js";
-import { formatDate } from "../../lib/format";
+import { formatDate, todayISO } from "../../lib/format";
 import FacultyResearchWorkspace from "../../components/FacultyResearchWorkspace";
 import FacultyVerdicts from "./FacultyVerdicts";
 import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
@@ -163,6 +163,21 @@ const DEFENSE_COLUMNS = [
     cell: (panel) => nameCell(panel.student.name, panel.research_title || "Research title pending"),
     sortable: true, sortValue: (panel) => panel.student.name,
   },
+  {
+    key: "status",
+    header: "Status",
+    cell: (panel) => (
+      <>
+        <StatusChip status={panel.defense.display_status || panel.defense.status} dot={false} />
+        {(panel.defense.attention || []).map((note) => (
+          <p key={note} className="mt-1.5 flex max-w-[16rem] items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {note}
+          </p>
+        ))}
+      </>
+    ),
+    sortable: true, sortValue: (panel) => panel.defense.display_status || panel.defense.status,
+  },
   { key: "defense", header: "Defense", cell: (panel) => panel.defense.defense_type, sortable: true, sortValue: (panel) => panel.defense.defense_type },
   {
     key: "when",
@@ -188,25 +203,10 @@ const DEFENSE_COLUMNS = [
   },
   { key: "role", header: "My role", cell: (panel) => <StatusChip status={panel.panel_role} dot={false} />, sortable: true, sortValue: (panel) => panel.panel_role },
   {
-    key: "status",
-    header: "Status",
-    cell: (panel) => (
-      <>
-        <StatusChip status={panel.defense.display_status || panel.defense.status} dot={false} />
-        {(panel.defense.attention || []).map((note) => (
-          <p key={note} className="mt-1.5 flex max-w-[16rem] items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {note}
-          </p>
-        ))}
-      </>
-    ),
-    sortable: true, sortValue: (panel) => panel.defense.display_status || panel.defense.status,
-  },
-  {
     key: "calendar",
     header: "Calendar",
     cell: (panel) =>
-      panel.defense.ics_url ? (
+      panel.defense.ics_url && !isPastDefense(panel) ? (
         <a href={panel.defense.ics_url} download className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline">
           <Download className="h-3.5 w-3.5" aria-hidden="true" /> Add to calendar
         </a>
@@ -216,11 +216,20 @@ const DEFENSE_COLUMNS = [
   },
 ];
 
+// A defense is "past" once its day has gone or it is finished / cancelled.
+const isPastDefense = (panel) => {
+  const day = panel.defense.preferred_date || "";
+  return (day && day < todayISO()) || ["Finished", "Held", "Cancelled"].includes(panel.defense.display_status || panel.defense.status);
+};
+
 export function FacultyDefensesPage() {
   const { data } = useFaculty();
+  // What is coming first (soonest first), then the earlier ones (latest first).
+  const byDay = (panel) => panel.defense.preferred_date || "";
   const rows = (data.panels || [])
     .filter((panel) => panel.defense)
-    .sort((left, right) => new Date(left.defense.preferred_date || 0) - new Date(right.defense.preferred_date || 0));
+    .sort((left, right) => Number(isPastDefense(left)) - Number(isPastDefense(right))
+      || (isPastDefense(left) ? byDay(right).localeCompare(byDay(left)) : byDay(left).localeCompare(byDay(right))));
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader

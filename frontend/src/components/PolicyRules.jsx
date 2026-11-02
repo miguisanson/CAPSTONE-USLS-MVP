@@ -11,7 +11,10 @@ import { StatusChip } from "./ui/index.js";
 export function formatRuleValue(rule) {
   if (rule.value_type === "bool") return rule.value ? "Yes" : "No";
   if (rule.value_type === "text") return String(rule.value);
-  return rule.unit ? `${rule.value} ${rule.unit}` : String(rule.value);
+  if (!rule.unit) return String(rule.value);
+  // "1 semesters" -> "1 semester"
+  const unit = Number(rule.value) === 1 && rule.unit.endsWith("s") ? rule.unit.slice(0, -1) : rule.unit;
+  return `${rule.value} ${unit}`;
 }
 
 export function RuleBadges({ rule }) {

@@ -244,6 +244,11 @@ export default function Layout({ children }) {
     return () => wide.removeEventListener("change", onChange);
   }, [mobileOpen]);
 
+  // A page opens at its top, not where the last page was scrolled to (I-206); a link with a #anchor keeps its anchor.
+  useEffect(() => {
+    if (!location.hash) window.scrollTo(0, 0);
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Keep the browser tab title in step with the page (helps history and tabs).
   useEffect(() => {
     const name = recordTitle || pageTitle;

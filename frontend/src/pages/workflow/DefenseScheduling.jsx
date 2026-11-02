@@ -421,9 +421,10 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
         <Field label="Source reference">
           <Input value={form.source_reference} onChange={set("source_reference")} />
         </Field>
-        <Button type="submit" loading={submitting || actionBusy} disabled={submitDisabled} className="w-full sm:w-auto">
+        <Button type="submit" loading={submitting || actionBusy} disabled={submitDisabled} className="w-full sm:w-auto" aria-describedby="schedule-notify-note">
           {submitting || actionBusy ? "Saving…" : activeSchedule ? "Reschedule defense" : isRetry ? "Book the re-defense" : "Set defense schedule"}
         </Button>
+        <p id="schedule-notify-note" className="meta">The student and every panel member are told the date at once (their calendar and bell).</p>
         {!schedulableTypes.length && <p className="text-xs font-semibold text-amber-800">No defense can be booked at this stage right now{stageOutcome && !stageOutcome.complete ? ` (${stageOutcome.label})` : ""}.</p>}
         {actionMessage && <InlineNotice tone="success" icon={CheckCircle2}>{actionMessage}</InlineNotice>}
         {actionError && <InlineNotice tone="danger">{actionError}</InlineNotice>}

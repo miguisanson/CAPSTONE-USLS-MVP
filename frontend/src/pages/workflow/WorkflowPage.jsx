@@ -34,6 +34,7 @@ import { HandoffPanel } from "./HandoffImport";
 import { PanelMatchingForm } from "./PanelMatching";
 import { PracticumRoster } from "./Practicum";
 import { ResearchGateForm } from "./ResearchGate";
+import ResearchGateOverview from "./ResearchGateOverview";
 import { WorkflowSupportModal } from "./shared";
 
 // Which business-rules process each workflow screen applies.
@@ -236,8 +237,19 @@ function SingleWorkflowPage() {
         {subview === "calendar" && (
           <CalendarPage scope="staff" embedded title="Defense calendar" description="All defenses with stage, status, panel and venue, plus the protocol deadlines. Open a defense to reschedule it in the Scheduling tab." />
         )}
+        {!subview && slug === "research-gate" && (
+          <ResearchGateOverview
+            selectedId={studentId}
+            onOpen={(student) => {
+              setStudentId(student.id);
+              setStudentLabel("");
+              setResult(null);
+              window.setTimeout(() => document.getElementById("workflow-student")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+            }}
+          />
+        )}
         {!subview && needsStudent && (
-          <Card pad="lg">
+          <Card pad="lg" id="workflow-student" className="scroll-mt-24">
             <SectionTitle title="Choose a student" subtitle="Pick the record this action applies to" icon={Users} />
             <StudentPicker
               value={studentId}

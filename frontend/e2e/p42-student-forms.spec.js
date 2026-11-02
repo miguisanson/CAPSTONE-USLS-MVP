@@ -435,7 +435,8 @@ test.describe("P4.2 student request forms", () => {
     try {
       await page.goto("/student/requests/awol-return");
       const main = page.locator("main");
-      await expect(main).toContainText("Your record was automatically flagged AWOL from an official standing or full-semester withdrawal without approved LOA. Registration privileges remain restricted until your return request is reviewed.");
+      // CHANGED BY p105 (I-204/I-206): one notice with her standing and limit replaces the old AWOL paragraph
+      await expect(main).toContainText("You cannot enroll until a return request is approved.");
       await expect(main).toContainText("The handbook requires a written intention to enroll routed through the Graduate School Dean. Complete the form below; no file needs to be uploaded.");
       await expectRequired(page, "Intended return semester", true);
       await expectRequired(page, "Last enrolled semester", false);

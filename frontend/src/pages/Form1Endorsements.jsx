@@ -3,7 +3,7 @@ import { CheckCircle2, Eye, FileSignature, PenLine } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Button, Card, DecisionPanel, EmptyState, InlineNotice, PageHeader, SectionTitle, Spinner, StatusChip } from "../components/ui/index.js";
-import { formatDate } from "../lib/format";
+import { formatDate, formatDateTime } from "../lib/format";
 import { toneOf } from "../lib/tone";
 import SignaturePad from "../components/SignaturePad";
 import { PAGE } from "../lib/labels.js";
@@ -112,7 +112,7 @@ export function Form1EndorsementQueue({ embedded = false }) {
             </div>
 
             {selected.endorsement ? (
-              <div className={`mt-4 rounded-xl border p-4 ${toneOf("success").notice}`}><p className="text-sm font-semibold">Endorsed by {selected.endorsement.coordinator_name}</p><p className="mt-1 text-xs">{new Date(selected.endorsement.endorsed_at).toLocaleString()} · Drawn signature saved</p>{selected.endorsement.signature_data && <img src={selected.endorsement.signature_data} alt="Academic Coordinator signature" className="mt-3 h-16 max-w-full object-contain object-left" />}</div>
+              <div className={`mt-4 rounded-xl border p-4 ${toneOf("success").notice}`}><p className="text-sm font-semibold">Endorsed by {selected.endorsement.coordinator_name}</p><p className="mt-1 text-xs">{formatDateTime(selected.endorsement.endorsed_at)} · Drawn signature saved</p>{selected.endorsement.signature_data && <img src={selected.endorsement.signature_data} alt="Academic Coordinator signature" className="mt-3 h-16 max-w-full object-contain object-left" />}</div>
             ) : (
               <DecisionPanel
                 variant="plain"

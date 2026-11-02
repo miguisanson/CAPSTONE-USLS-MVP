@@ -3,6 +3,7 @@ import { Rss, Copy, RefreshCw, Trash2 } from "lucide-react";
 import { api } from "../../api";
 import { Button, Card, InlineNotice, SectionTitle } from "../ui/index.js";
 import { useConfirm } from "../confirm";
+import { formatDateTime } from "../../lib/format";
 
 // "Subscribe in Google Calendar / Outlook / Apple Calendar": a private link that works without
 // signing in. Regenerating it or turning it off stops the old link at once.
@@ -82,7 +83,7 @@ export default function CalendarFeedCard() {
           </div>
           <p className="text-xs leading-relaxed text-slate-500">
             In Google Calendar choose "Other calendars" then "From URL" and paste the link. Anyone with the link can see your calendar, so do not share it.
-            {feed.last_used_at ? ` Last read ${new Date(feed.last_used_at).toLocaleString()}.` : " Not read yet."}
+            {feed.last_used_at ? ` Last read ${formatDateTime(feed.last_used_at)}.` : " Not read yet."}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" icon={RefreshCw} disabled={busy} onClick={regenerate}>New link</Button>

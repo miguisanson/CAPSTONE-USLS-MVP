@@ -16,6 +16,8 @@ import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { LeaveStatusBadge, LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus";
 import { formatDate } from "../../lib/format";
 import { Fact } from "./shared";
+import { STUDENT_REQUEST_PATHS } from "./requestMeta";
+import { PAGE } from "../../lib/labels.js";
 
 // Everything the student sees about Leave of Absence, leave extension and readmission cases.
 // The words, the tone and the next owner of each case come from the server
@@ -65,8 +67,13 @@ export function leaveRequestStatus(data, slug) {
 }
 
 /** The notice at the top of the leave pages: AWOL, leave ending, on leave, leave scheduled. */
-export function LeaveBanner({ banner, linkTo = "", linkLabel = "", className = "" }) {
+export function LeaveBanner({ banner, linkTo = "", linkLabel = "", className = "", hideLink = false }) {
   if (!banner) return null;
+  // The server names the form to open ("awol"); the Return from AWOL page itself has nothing to link to (I-206).
+  if (!linkTo && !hideLink && banner.link === "awol") {
+    linkTo = STUDENT_REQUEST_PATHS.awol;
+    linkLabel = `Open ${PAGE.returnFromAwol}`;
+  }
   return (
     <InlineNotice tone={banner.tone || "info"} title={banner.title} icon className={className}>
       {banner.text && <p>{banner.text}</p>}
