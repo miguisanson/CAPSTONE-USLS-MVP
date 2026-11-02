@@ -103,7 +103,7 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
   function cancelActiveSchedule(schedule) {
     const reason = globalThis.prompt("Why is this defense being cancelled? (required, recorded with the schedule)");
     if (!reason || !reason.trim()) return;
-    const requestedBy = globalThis.prompt("Who asked for the cancellation? (student, adviser, panel, GS office...)", "GS Office") || "";
+    const requestedBy = globalThis.prompt("Who asked for the cancellation? (student, adviser, panel, GS office…)", "GS Office") || "";
     runScheduleAction(() => api.cancelDefense(schedule.id, { reason: reason.trim(), requested_by: requestedBy.trim() }), "Defense cancelled. Book a new schedule when a date is agreed.");
   }
 

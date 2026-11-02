@@ -25,7 +25,7 @@ const HISTORY_COLUMNS = [
 
 function ExportHistory({ slug }) {
   const { data, loading, error } = useApi(() => api.leaveExportLog(slug), [slug]);
-  if (loading) return <Spinner label="Loading export history..." />;
+  if (loading) return <Spinner label="Loading export history…" />;
   if (error) return <InlineNotice tone="danger">{error}</InlineNotice>;
   return (
     <DataTable
@@ -199,10 +199,10 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
           <>
             <div className="flex flex-wrap items-center gap-2">
               <Button icon={Download} loading={busy === "xlsx"} onClick={() => download("xlsx")} disabled={Boolean(busy)}>
-                {busy === "xlsx" ? "Preparing..." : "Download list (Excel)"}
+                {busy === "xlsx" ? "Preparing…" : "Download list (Excel)"}
               </Button>
               <Button variant="secondary" icon={Download} loading={busy === "csv"} onClick={() => download("csv")} disabled={Boolean(busy)}>
-                {busy === "csv" ? "Preparing..." : "Download list (CSV)"}
+                {busy === "csv" ? "Preparing…" : "Download list (CSV)"}
               </Button>
               <Button variant="secondary" icon={Send} onClick={() => advance("Sent to Registrar")} disabled={Boolean(busy) || !selectedRows.length}>
                 Mark as sent

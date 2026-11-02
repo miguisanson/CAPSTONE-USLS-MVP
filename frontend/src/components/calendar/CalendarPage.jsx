@@ -88,7 +88,7 @@ function CannotAttend({ event, onDone }) {
       </Field>
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" loading={busy} disabled={reason.trim().length < 3} onClick={send}>{busy ? "Sending..." : "Send request"}</Button>
+        <Button size="sm" loading={busy} disabled={reason.trim().length < 3} onClick={send}>{busy ? "Sending…" : "Send request"}</Button>
         <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
       </div>
     </div>

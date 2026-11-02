@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardCheck, FileCheck2, Send, UserRoundCheck } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Button, Card, DecisionPanel, EmptyState, Field, InlineNotice, Input, PageHeader, Spinner, Stepper, StatusChip, Textarea } from "../components/ui/index.js";
+import { Button, Card, DecisionPanel, EmptyState, Field, InlineNotice, Input, PageHeader, Spinner, Stepper, StatusChip, Tabs, Textarea } from "../components/ui/index.js";
 import { toneOf } from "../lib/tone";
 import { useConfirm } from "../components/confirm";
 import { formatDay } from "./faculty/FacultyContext";
@@ -343,29 +343,11 @@ export default function AdviserAppointments({ role, embedded = false, onChanged 
 
       {canRecord && <AdviserRecordCard onRecorded={refetch} />}
 
-      <div role="tablist" aria-label="Appointment lists" className="flex flex-wrap gap-2">
-        {TABS.map((item) => {
-          const count = tabCount(item);
-          const active = tab === item.key;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(item.key)}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors duration-200 cursor-pointer max-sm:min-h-11 ${active ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}
-            >
-              {item.label}
-              {count ? <span className={`ml-2 rounded-full px-1.5 py-0.5 text-2xs ${active ? "bg-white/25" : "bg-slate-100 text-slate-600"}`}>{count}</span> : null}
-            </button>
-          );
-        })}
-      </div>
+      <Tabs label="Appointment lists" tabs={TABS.map((item) => ({ key: item.key, label: item.label, count: tabCount(item) }))} value={tab} onChange={setTab} />
 
       {source.error && <InlineNotice tone="danger">{source.error}</InlineNotice>}
       {source.loading && !source.data ? (
-        <Card pad="lg"><Spinner label="Loading appointments..." /></Card>
+        <Card pad="lg"><Spinner label="Loading appointments…" /></Card>
       ) : rows.length === 0 ? (
         !source.error && <Card pad="lg"><EmptyState icon={CheckCircle2} title={current.empty[0]} hint={current.empty[1]} /></Card>
       ) : (

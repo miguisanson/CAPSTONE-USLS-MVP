@@ -9,6 +9,7 @@ import {
   MessageSquare,
   CheckSquare,
   BookOpenCheck,
+  Printer,
 } from "lucide-react";
 import { api } from "../../api";
 import { formatDate } from "../../lib/format";
@@ -18,7 +19,7 @@ import ExportFollowUpModal from "../../components/ExportFollowUpModal";
 import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
 import { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { GraduationBatchModal } from "./GraduationBatchModal";
-import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchCurrentStage, graduationBatchGroups, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, sortSelectedWorkflowRows } from "./graduationShared";
+import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchCurrentStage, graduationBatchGroups, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, printGraduationBatch, sortSelectedWorkflowRows } from "./graduationShared";
 import { CaseMessageHistory, DemoResetButton, Detail, RosterFilters, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, uniqueValues, useDemoCaseReset } from "./shared";
 
 function graduationBatchSelectionState(group, selectedIds) {
@@ -105,7 +106,7 @@ function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, det
 
 // "View details" on a batch card: the stage check and, below it, every student of the batch.
 // The batch's step (and the Dean's Export) are buttons in this window, not on the card, like the process boards.
-function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStudent, onMessageStudent, onProcessBatch, onExportBatch, exporting = false }) {
+function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStudent, onMessageStudent, onProcessBatch, onExportBatch, onPrintBatch = null, exporting = false }) {
   const currentStage = graduationBatchCurrentStage(group);
   const modalId = `graduation-stage-${String(group.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
   const stageSelection = graduationStageSelection(group.rows, accountRole);
@@ -118,14 +119,19 @@ function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStuden
       subtitle={`${group.rows.length} candidate${group.rows.length === 1 ? "" : "s"} · Step ${currentStage.number}: ${currentStage.label}`}
       onClose={onClose}
       size="wide"
-      footer={canExport ? (
-        <Button icon={Download} loading={exporting} onClick={() => onExportBatch(group)}>
-          {exporting ? "Exporting…" : alreadyExported ? "Export approved list again" : "Export approved list"}
-        </Button>
-      ) : stageSelection.action ? (
-        <Button icon={CheckSquare} onClick={() => onProcessBatch(group)}>{graduationBatchActionLabel(stageSelection.action)}</Button>
-      ) : (
-        <span className="meta self-center font-semibold">No {WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.</span>
+      footer={(
+        <>
+          {onPrintBatch && <Button variant="secondary" icon={Printer} onClick={() => onPrintBatch(group)}>Print endorsement</Button>}
+          {canExport ? (
+            <Button icon={Download} loading={exporting} onClick={() => onExportBatch(group)}>
+              {exporting ? "Exporting…" : alreadyExported ? "Export approved list again" : "Export approved list"}
+            </Button>
+          ) : stageSelection.action ? (
+            <Button icon={CheckSquare} onClick={() => onProcessBatch(group)}>{graduationBatchActionLabel(stageSelection.action)}</Button>
+          ) : (
+            <span className="meta self-center font-semibold">No {WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.</span>
+          )}
+        </>
       )}
     >
       <div className="space-y-5">
@@ -203,10 +209,8 @@ const GRADUATION_BOARD_COLUMNS = [
   },
 ];
 
-const GRADUATION_ALL_BOARD_COLUMNS = [
-  ...GRADUATION_STAGE_COLUMNS,
-  ...GRADUATION_BOARD_COLUMNS.map((column, index) => ({ ...column, key: `batch-${index + 3}`, kind: "batch" })),
-];
+const GRADUATION_BATCH_COLUMNS = GRADUATION_BOARD_COLUMNS.map((column, index) => ({ ...column, key: `batch-${index + 3}`, kind: "batch" }));
+const GRADUATION_ALL_BOARD_COLUMNS = [...GRADUATION_STAGE_COLUMNS, ...GRADUATION_BATCH_COLUMNS];
 
 // The batch status each step leads to, so a drop is only allowed on the column the step really moves to.
 // Steps that keep the batch in the same column (prepare endorsement, mark not eligible) are left out.
@@ -401,7 +405,8 @@ function GraduationSelectionBar({ count, onCreateBatch, stepLabel, onStep, note,
   );
 }
 
-export function GraduationRoster({ context, submitting, refreshing, clearSubmitFeedback, refetch, accountRole }) {
+// `batchesOnly` (the Dean's "Endorsement batches" tab) is the same board without the two candidate columns.
+export function GraduationRoster({ context, submitting, refreshing, clearSubmitFeedback, refetch, accountRole, batchesOnly = false }) {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [messageRow, setMessageRow] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
@@ -449,12 +454,12 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
     [filteredRows, selectedIds],
   );
   const awaitingApplicationRows = useMemo(
-    () => visibleRows.filter((row) => row.eligibility?.eligible && !row.endorsement?.batch_name && !row.has_submitted_documents),
-    [visibleRows],
+    () => (batchesOnly ? [] : visibleRows.filter((row) => row.eligibility?.eligible && !row.endorsement?.batch_name && !row.has_submitted_documents)),
+    [visibleRows, batchesOnly],
   );
   const readyForBatchRows = useMemo(
-    () => visibleRows.filter((row) => row.eligibility?.eligible && !row.endorsement?.batch_name && row.has_submitted_documents),
-    [visibleRows],
+    () => (batchesOnly ? [] : visibleRows.filter((row) => row.eligibility?.eligible && !row.endorsement?.batch_name && row.has_submitted_documents)),
+    [visibleRows, batchesOnly],
   );
   const visibleBatchedRows = useMemo(
     () => visibleRows.filter((row) => Boolean(row.endorsement?.batch_name)),
@@ -468,6 +473,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
     () => graduationBatchGroups(visibleBatchedRows, selectedIds),
     [visibleBatchedRows, selectedIds],
   );
+  const boardColumns = batchesOnly ? GRADUATION_BATCH_COLUMNS : GRADUATION_ALL_BOARD_COLUMNS;
   const boardItems = useMemo(
     () => [
       ...awaitingApplicationRows.map((row) => ({ kind: "student", stage: "stage-1", row })),
@@ -480,12 +486,14 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
   const summaryLine = useMemo(() => {
     const totals = {};
     const bump = (key) => { if (key) totals[key] = (totals[key] || 0) + 1; };
-    rows.forEach((row) => {
-      if (row.eligibility?.eligible && !row.endorsement?.batch_name) bump(row.has_submitted_documents ? "stage-2" : "stage-1");
-    });
+    if (!batchesOnly) {
+      rows.forEach((row) => {
+        if (row.eligibility?.eligible && !row.endorsement?.batch_name) bump(row.has_submitted_documents ? "stage-2" : "stage-1");
+      });
+    }
     graduationBatchGroups(rows.filter((row) => Boolean(row.endorsement?.batch_name))).forEach((group) => bump(graduationBoardColumnKey({ kind: "batch", group })));
-    return boardSummaryLine(GRADUATION_ALL_BOARD_COLUMNS, totals, "candidates");
-  }, [rows]);
+    return boardSummaryLine(boardColumns, totals, "candidates");
+  }, [rows, boardColumns, batchesOnly]);
   // The table lists the same students as the board, one row each, with the batch under the stage.
   const columnLabelByKey = useMemo(() => Object.fromEntries(GRADUATION_ALL_BOARD_COLUMNS.map((column) => [column.key, column.label])), []);
   const tableRows = useMemo(
@@ -723,7 +731,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
         <StageBoard
           boardNotice={boardNotice}
           ariaLabel="Graduation workflow Kanban board"
-          columns={GRADUATION_ALL_BOARD_COLUMNS}
+          columns={boardColumns}
           items={boardItems}
           getItemId={graduationBoardItemId}
           getColumnKey={graduationBoardColumnKey}
@@ -756,6 +764,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           onMessageStudent={setMessageRow}
           onProcessBatch={processBatchGroup}
           onExportBatch={accountRole === "dean" ? (group) => { setStageGroupId(null); exportApprovedBatch(group); } : null}
+          onPrintBatch={accountRole === "dean" ? printGraduationBatch : null}
           exporting={exportingBatchId === stageGroup.id}
         />
       )}

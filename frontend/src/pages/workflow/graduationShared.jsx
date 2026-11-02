@@ -1,5 +1,6 @@
 import { CheckCircle2, Eye } from "lucide-react";
 import { StatusChip } from "../../components/ui/index.js";
+import { printDataTable } from "../../lib/print";
 import { uniqueValues } from "./shared";
 
 export const GRADUATION_STAGE_ACTIONS = {
@@ -194,6 +195,25 @@ const GRADUATION_BATCH_STAGES = [
 
 export function graduationRowStatus(row) {
   return row.endorsement?.endorsement_status || "Not Prepared";
+}
+
+// The Dean's printed endorsement list of one batch (a group from graduationBatchGroups).
+export function printGraduationBatch(group) {
+  printDataTable({
+    title: `Graduate Endorsement - ${group.label}`,
+    subtitle: "Dean-approved Graduate School endorsement list",
+    columns: ["Student ID", "Student name", "Program", "Coursework", "Thesis / research", "Practicum", "Eligibility", "Endorsement status"],
+    rows: group.rows.map((row) => [
+      row.student.student_number,
+      row.student.name,
+      row.student.program_code,
+      "Completed",
+      "Completed",
+      row.eligibility?.practicum_status === "Not Required" ? "Not required" : "Completed",
+      "Eligible for graduation",
+      graduationRowStatus(row),
+    ]),
+  });
 }
 
 function graduationRowBatchLabel(row, fallback = GRADUATION_UNBATCHED_LABEL) {

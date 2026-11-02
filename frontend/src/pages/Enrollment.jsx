@@ -284,7 +284,7 @@ export default function Enrollment() {
     }
   }
 
-  if (loading && !data) return <Spinner label="Loading enrollment workspace..." />;
+  if (loading && !data) return <Spinner label="Loading enrollment workspace…" />;
 
   const programOptions = (data?.programs || []).map((program) => ({ value: String(program.id), label: `${program.code} — ${program.name}` }));
   const termOptions = (data?.terms || []).map((term) => ({
@@ -411,7 +411,7 @@ export default function Enrollment() {
               disabled={Boolean(busy) && busy !== "classlist-preview"}
               className="cursor-pointer focus-within:ring-2 focus-within:ring-brand-500"
             >
-              {busy === "classlist-preview" ? "Reading class list..." : "Upload class list"}
+              {busy === "classlist-preview" ? "Reading class list…" : "Upload class list"}
               <input type="file" accept=".csv,.xlsx,.xlsm" className="sr-only" onChange={previewClassList} disabled={Boolean(busy)} />
             </Button>
             <Button as={Link} to="/course-adjustments?view=offerings" variant="secondary" icon={BookOpenCheck}>Offering list</Button>
@@ -456,7 +456,7 @@ export default function Enrollment() {
             className="mt-3 max-w-md"
             value={studentSearch}
             onChange={setStudentSearch}
-            placeholder="Filter the student picker..."
+            placeholder="Filter the student picker…"
             label="Filter students"
           />
         )}

@@ -75,7 +75,7 @@ function LeaveHeaderActions({ ctx }) {
   }
   return (
     <button type="button" onClick={refreshDates} disabled={syncing} className="btn-ghost px-4 py-2">
-      <CalendarClock className="h-4 w-4" /> {syncing ? "Checking..." : "Refresh leave dates"}
+      <CalendarClock className="h-4 w-4" /> {syncing ? "Checking…" : "Refresh leave dates"}
     </button>
   );
 }

@@ -374,7 +374,7 @@ export default function CourseAdjustments() {
   return (
     <div className="page-stack">
       {loading ? (
-        <Spinner label="Loading course adjustments..." />
+        <Spinner label="Loading course adjustments…" />
       ) : error ? (
         <EmptyState icon={AlertTriangle} title="Could not load course adjustments" hint={error} />
       ) : (
@@ -438,7 +438,7 @@ export default function CourseAdjustments() {
               </InlineNotice>
             )}
             {message && <InlineNotice tone="success" onDismiss={() => setMessage("")}>{message}</InlineNotice>}
-            {autosave !== "idle" && <p className="meta font-semibold" role="status">{autosave === "pending" ? "Draft changes pending..." : autosave === "saving" ? "Saving..." : "Saved"}</p>}
+            {autosave !== "idle" && <p className="meta font-semibold" role="status">{autosave === "pending" ? "Draft changes pending…" : autosave === "saving" ? "Saving…" : "Saved"}</p>}
             {data.latest_plan && (
               <div className="meta flex flex-wrap items-center justify-between gap-2">
                 <span>{data.latest_plan.program_code} - {data.latest_plan.term_label} - {data.latest_plan.offerings.length} offering row(s)</span>

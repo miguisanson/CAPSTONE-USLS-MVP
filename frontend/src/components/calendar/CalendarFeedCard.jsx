@@ -69,7 +69,7 @@ export default function CalendarFeedCard() {
       <SectionTitle title="Subscribe to this calendar" subtitle="Defenses and deadlines in your own calendar app" icon={Rss} />
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       {feed === undefined ? (
-        <p className="text-sm text-slate-500" role="status">Loading...</p>
+        <p className="text-sm text-slate-500" role="status">Loading…</p>
       ) : feed ? (
         <div className="space-y-3">
           <div>
@@ -92,7 +92,7 @@ export default function CalendarFeedCard() {
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-slate-600">Get a private link that keeps your phone or Google Calendar up to date with your defenses and deadlines.</p>
-          <Button size="sm" loading={busy} onClick={regenerate}>{busy ? "Creating..." : "Create my private link"}</Button>
+          <Button size="sm" loading={busy} onClick={regenerate}>{busy ? "Creating…" : "Create my private link"}</Button>
         </div>
       )}
     </Card>

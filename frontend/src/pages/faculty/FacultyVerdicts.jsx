@@ -159,7 +159,7 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
             </Field>
           )}
         </div>
-        <Button icon={Gavel} className="mt-3" disabled={busy} onClick={() => submitVerdict(panel)}>{busy ? "Submitting..." : "Submit final verdict"}</Button>
+        <Button icon={Gavel} className="mt-3" disabled={busy} onClick={() => submitVerdict(panel)}>{busy ? "Submitting…" : "Submit final verdict"}</Button>
         <p className="mt-2 text-xs text-brand-800">Tied to defense schedule #{scheduleId}. GS staff have read-only access.</p>
       </div>
     );

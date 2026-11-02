@@ -36,7 +36,7 @@ export default function CaseDetailModal({ caseId, slug, vocabulary, version, onC
     <Modal
       size="lg"
       title={detail ? detail.student.name : "Request details"}
-      subtitle={detail ? `${detail.kind_label} · ${detail.student.student_number} · ${detail.student.program_code}` : "Loading the request..."}
+      subtitle={detail ? `${detail.kind_label} · ${detail.student.student_number} · ${detail.student.program_code}` : "Loading the request…"}
       badge={detail ? leaveCaseStatusBadge(detail) : null}
       onClose={onClose}
       closeLabel="Close request details"
@@ -59,7 +59,7 @@ export default function CaseDetailModal({ caseId, slug, vocabulary, version, onC
       }
     >
       {error && !detail && <InlineNotice tone="danger">{error}</InlineNotice>}
-      {!detail && !error && <Spinner label="Loading the request..." />}
+      {!detail && !error && <Spinner label="Loading the request…" />}
       {detail && (
         <div className="space-y-4">
           {error && <InlineNotice tone="danger">{error}</InlineNotice>}

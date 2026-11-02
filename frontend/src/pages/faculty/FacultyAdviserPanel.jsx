@@ -61,7 +61,7 @@ function ReasonBox({ label, confirmLabel, busy, onCancel, onSubmit }) {
       </Field>
       <ErrorLine message={error} />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" variant="danger" disabled={busy}>{busy ? "Sending..." : confirmLabel}</Button>
+        <Button type="submit" variant="danger" disabled={busy}>{busy ? "Sending…" : confirmLabel}</Button>
         <Button variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button>
       </div>
     </form>
@@ -92,7 +92,7 @@ function RequestCard({ children, yesLabel, noLabel, reasonLabel, noConfirmLabel,
         <ReasonBox label={reasonLabel} confirmLabel={noConfirmLabel} busy={busy} onCancel={() => { setAsking(false); setError(""); }} onSubmit={(reason) => run(() => onNo(reason))} />
       ) : (
         <div className="flex flex-wrap gap-2">
-          <Button disabled={busy} onClick={() => run(onYes)}>{busy ? "Saving..." : yesLabel}</Button>
+          <Button disabled={busy} onClick={() => run(onYes)}>{busy ? "Saving…" : yesLabel}</Button>
           <Button variant="secondary" disabled={busy} onClick={() => { setAsking(true); setError(""); }}>{noLabel}</Button>
         </div>
       )}
@@ -293,7 +293,7 @@ export function FacultyAdviserPanel({ portalAdvisees = [] }) {
     await refetchPortal();
   };
 
-  if (loading && !data) return <Card><Spinner label="Loading adviser requests..." /></Card>;
+  if (loading && !data) return <Card><Spinner label="Loading adviser requests…" /></Card>;
   if (!data) {
     return (
       <div className="space-y-5">

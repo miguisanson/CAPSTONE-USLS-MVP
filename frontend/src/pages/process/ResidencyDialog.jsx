@@ -92,7 +92,7 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button variant="secondary" icon={ClipboardCheck} loading={checking} onClick={runCheck} disabled={checking || saving}>
-            {checking ? "Checking..." : "Run residency policy checker"}
+            {checking ? "Checking…" : "Run residency policy checker"}
           </Button>
           <Button
             type="submit"
@@ -102,7 +102,7 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
             title={blockedReason || undefined}
             aria-describedby={blockedReason ? blockedId : undefined}
           >
-            {saving ? "Saving..." : "Record residency"}
+            {saving ? "Saving…" : "Record residency"}
           </Button>
         </>
       }
