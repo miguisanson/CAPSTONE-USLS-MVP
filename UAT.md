@@ -4,6 +4,10 @@ The app runs on this Windows 11 PC. A free **Cloudflare Tunnel** (`cloudflared`)
 `https://miguisanson.dev` to it, so testers only need a browser. Nothing on your router changes.
 Data is the demo data (`npm run seed`). The app sends no e-mail.
 
+**Re-seed on the morning UAT starts** (and again if UAT runs longer than about 10 days): the demo semester is dated
+from the seed day, so the Subject Withdrawal window (first 14 days of the semester, Handbook p.49) is open for about
+10 days after `npm run seed`. A re-seed also gives every tester the same starting data.
+
 If the PC is off, asleep or offline, the site is down. Plan for that (step 6).
 
 ## 1. One-time: the tunnel
