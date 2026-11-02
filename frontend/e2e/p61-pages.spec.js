@@ -187,29 +187,24 @@ test.describe("Dashboard page", () => {
     await expect(page.getByRole("button", { name: "Clear dashboard filters" })).toHaveCount(0);
   });
 
-  test("a chart category on Reports > Analytics opens the details dialog: loads its rows from the drill-down API and closes with its X button", async ({ page }) => {
-    await page.goto("/reports?workflow_type=analytics");
-    await expect(page.getByRole("heading", { level: 2, name: "Analytics", exact: true })).toBeVisible();
-    const chip = page.locator('button[aria-label^="Show "]').first();
-    await expect(chip).toBeVisible();
-    const label = (await chip.getAttribute("aria-label")).replace(/^Show /, "").replace(/: \d+ records?$/, "");
-    const drill = apiGet(page, "/api/dashboard/drilldown");
-    await chip.click();
+  // CHANGED BY p101 (I-141): Reports > Analytics (four count charts with a drill-down dialog) is gone. What it pinned - a
+  // number opens a dialog of its students, loaded from the API, closed with its Close button - is now the summary strip.
+  test("a number on Reports opens the students behind it: loads its rows from the summary API and closes with its Close button", async ({ page }) => {
+    await page.goto("/reports");
+    const tile = page.getByRole("group", { name: "Summary numbers" }).getByRole("button").first();
+    await expect(tile).toBeVisible();
+    const drill = apiGet(page, "/api/reports/summary/active");
+    await tile.click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    const { params, json } = await drill;
-    expect(params.get("type")).toBeTruthy();
-    expect(params.get("value")).toBe(label);
+    const { json } = await drill;
     await expect(dialog.getByRole("heading", { level: 2 })).toHaveText(json.title);
-    await expect(dialog.getByText("Loading filtered details…")).toBeHidden();
-    if (json.rows?.length) {
-      await expect(dialog).toContainText(json.rows[0].name || json.rows[0].student?.name || json.rows[0].title);
-    } else {
-      await expect(dialog.getByText("No records in this category")).toBeVisible();
-    }
+    await expect(dialog.getByText("Loading the students…")).toBeHidden();
+    if (json.rows?.length) await expect(dialog).toContainText(json.rows[0].student);
+    else await expect(dialog.getByText("Nobody is in this list")).toBeVisible();
     // the page behind is still there
     await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
-    await page.getByRole("button", { name: "Close dashboard details" }).click();
+    await page.getByRole("button", { name: `Close ${json.title}` }).click();
     await expect(dialog).toHaveCount(0);
   });
 
@@ -220,12 +215,11 @@ test.describe("Dashboard page", () => {
     // Waiting on others (when another office holds tasks) leads to the work queue
     const waiting = page.locator("main section", { has: page.getByRole("heading", { name: "Waiting on others", exact: true }) });
     if (await waiting.count()) await expect(waiting.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/work-queue");
-    // stage drill-down (now on Reports) lists students that link to their record
-    await page.goto("/reports?workflow_type=analytics");
-    const chip = page.locator('button[aria-label^="Show "]').first();
-    await chip.click();
+    // the list behind a number on Reports (CHANGED BY p101: was the Analytics drill-down) links students to their record
+    await page.goto("/reports");
+    await page.getByRole("group", { name: "Summary numbers" }).getByRole("button").first().click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByText("Loading filtered details…")).toBeHidden();
+    await expect(dialog.getByText("Loading the students…")).toBeHidden();
     const student = dialog.locator('a[href^="/students/"]').first();
     if (await student.count()) {
       const href = await student.getAttribute("href");

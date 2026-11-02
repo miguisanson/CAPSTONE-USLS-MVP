@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { FileText, LayoutDashboard, PieChart, RefreshCw } from "lucide-react";
+import { FileText, LayoutDashboard, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { useApi } from "../hooks";
@@ -116,11 +116,6 @@ export default function Dashboard() {
             {isGraduateSchool && (
               <Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={refreshData}>
                 Refresh data
-              </Button>
-            )}
-            {isGraduateSchool && (
-              <Button as={Link} to="/reports?workflow_type=analytics" variant="secondary" icon={PieChart}>
-                Analytics
               </Button>
             )}
             {canOpen("/reports", role) && (

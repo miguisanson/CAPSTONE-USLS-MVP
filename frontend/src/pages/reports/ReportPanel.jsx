@@ -10,10 +10,11 @@ import { Button, DataTable, EmptyState, SectionCard, Spinner, StatusChip } from 
 import { formatDate } from "../../lib/format";
 import ReportFilters from "./ReportFilters.jsx";
 
-const STATUS_COLUMNS = new Set(["risk", "eligibility", "when", "batch_status", "kind"]);
+const STATUS_COLUMNS = new Set(["risk", "level", "eligibility", "when", "batch_status", "kind"]);
+const ZONE_WORDS = { green: "On time", yellow: "Slow", red: "Stuck" };
 const DATE_COLUMNS = new Set(["since", "date"]);
-const NUMBER_COLUMNS = new Set(["days_late", "days_waiting", "total"]);
-const WIDE_TEXT = new Set(["reason", "missing", "panel", "item"]);
+const NUMBER_COLUMNS = new Set(["days_late", "days_waiting", "total", "days_in_stage", "days"]);
+const WIDE_TEXT = new Set(["reason", "missing", "panel", "item", "detail"]);
 
 const isCount = (key) => NUMBER_COLUMNS.has(key) || key.startsWith("s_");
 
@@ -21,13 +22,15 @@ const isCount = (key) => NUMBER_COLUMNS.has(key) || key.startsWith("s_");
 function cellFor(key, row) {
   const value = row[key];
   if (key === "student") {
+    // A course plan or a report belongs to a program, not a student: no record to link to.
     return (
       <>
-        <Link to={`/students/${row.student_id}`} className="font-semibold text-brand-700 hover:underline">{row.student}</Link>
-        <p className="meta">{row.student_number}</p>
+        {row.student_id ? <Link to={`/students/${row.student_id}`} className="font-semibold text-brand-700 hover:underline">{row.student}</Link> : <span className="font-semibold text-ink">{row.student}</span>}
+        {row.student_number && <p className="meta">{row.student_number}</p>}
       </>
     );
   }
+  if (key === "zone") return ZONE_WORDS[value] || value;
   if (key === "verdict" && value !== "Not yet recorded") return <StatusChip status={value} dot={false} />;
   if (STATUS_COLUMNS.has(key)) return <StatusChip status={value} dot={false} />;
   if (DATE_COLUMNS.has(key)) return formatDate(value);
@@ -36,7 +39,8 @@ function cellFor(key, row) {
   return value === "" || value == null ? "-" : value;
 }
 
-function columnsFor(data) {
+/** DataTable columns for a list the API describes as [{ key, label }]. */
+export function columnsFor(data) {
   return data.columns.map((column) => ({
     key: column.key,
     header: column.label,
@@ -51,7 +55,8 @@ function columnsFor(data) {
 export default function ReportPanel({ report, params, setParam, clearFilters }) {
   const query = useMemo(() => {
     const picked = {};
-    for (const spec of report.filters) if (params.get(spec.key)) picked[spec.key] = params.get(spec.key);
+    // The program is chosen in the frame at the top of the page, so it is not one of the report's own filters.
+    for (const key of ["program_id", ...report.filters.map((spec) => spec.key)]) if (params.get(key)) picked[key] = params.get(key);
     return picked;
   }, [report, params]);
   const queryKey = JSON.stringify(query);

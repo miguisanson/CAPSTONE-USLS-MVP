@@ -121,7 +121,7 @@ test.describe("staff home", () => {
     await expect(main(page).locator("select")).toHaveCount(0);
     // the moved blocks stay one click away
     await expect(main(page).getByRole("link", { name: "Reports", exact: true }).first()).toHaveAttribute("href", "/reports");
-    await expect(main(page).getByRole("link", { name: "Analytics", exact: true })).toHaveAttribute("href", "/reports?workflow_type=analytics");
+    await expect(main(page).getByRole("link", { name: "Analytics", exact: true }), "CHANGED BY p101 (I-141): the Analytics tab is gone; Reports is the one link").toHaveCount(0);
     await shot(page, "staff-home-1366.png");
   });
 
@@ -146,86 +146,9 @@ test.describe("staff home", () => {
   });
 });
 
-test.describe("analytics on Reports", () => {
-  test.use({ storageState: join(AUTH_DIR, "staff.json"), viewport: { width: 1366, height: 768 } });
-
-  test("the Analytics tab shows the charts with every stage labelled, and a category opens the drill-down dialog", async ({ page, context }) => {
-    const dash = await (await context.request.get("/api/dashboard")).json();
-    await page.goto("/reports");
-    await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
-    await page.getByRole("tab", { name: "Analytics", exact: true }).click(); // P9.3: the pill buttons became a tab list
-    await expect(page).toHaveURL(/report=analytics/);
-    await expect(page.getByRole("heading", { level: 2, name: "Analytics", exact: true })).toBeVisible();
-    for (const title of ["Lifecycle stage distribution", "Risk level", "Students by college", "Research gate position"]) {
-      await expect(page.getByRole("heading", { level: 3, name: title, exact: true }), title).toBeVisible();
-    }
-    await expect(page.getByRole("heading", { name: "Open work queue by owner" }), "the two-bar owner chart is dropped").toHaveCount(0);
-    await page.waitForLoadState("networkidle");
-    await expect(main(page).locator(".recharts-wrapper").first()).toBeVisible();
-    expect(await main(page).locator(".recharts-wrapper").count(), "3-4 charts").toBeGreaterThanOrEqual(3);
-    expect(await main(page).locator(".recharts-wrapper").count(), "3-4 charts").toBeLessThanOrEqual(4);
-
-    // the stage chart: one readable label per bar (the old chart skipped axis labels)
-    const stageCard = main(page).locator("section", { has: page.getByRole("heading", { name: "Lifecycle stage distribution", exact: true }) });
-    const stageLabels = await stageCard.locator(".recharts-yAxis .recharts-cartesian-axis-tick-value").allTextContents();
-    expect(stageLabels.length, "every stage has an axis label").toBe(dash.stage_distribution.length);
-    // (a long name may wrap onto two lines, whose pieces the page text joins without a space)
-    const squash = (text) => text.replace(/\s+/g, "");
-    for (const row of dash.stage_distribution) expect(stageLabels.map(squash), `label for ${row.stage}`).toContain(squash(row.stage));
-
-    // a category opens the dialog: rows come from the drill-down API, the X closes it, the page behind stays
-    const chip = page.locator('button[aria-label^="Show "]').first();
-    await expect(chip).toBeVisible();
-    const drill = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/dashboard/drilldown");
-    await chip.click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    const { params, json } = await drill.then(async (r) => ({ params: new URL(r.url()).searchParams, json: await r.json() }));
-    expect(params.get("type")).toBeTruthy();
-    await expect(dialog.getByRole("heading", { level: 2 })).toHaveText(json.title);
-    await expect(dialog.getByText("Loading filtered details…")).toBeHidden();
-    const student = dialog.locator('a[href^="/students/"]').first();
-    if (json.rows?.length) {
-      await expect(dialog).toContainText(json.rows[0].name || json.rows[0].student?.name || json.rows[0].title);
-      await expect(student, "student rows link to records").toBeVisible();
-    }
-    await page.getByRole("button", { name: "Close dashboard details" }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
-    await shot(page, "reports-analytics-1366.png");
-  });
-
-  test("the Reports filters narrow the charts (the dashboard API gets the same filters) and ?workflow_type=analytics opens the tab", async ({ page }) => {
-    await page.goto("/reports?workflow_type=analytics");
-    await expect(page.getByRole("heading", { level: 2, name: "Analytics", exact: true })).toBeVisible();
-    const field = (label) => page.locator("label", { has: page.locator(`span:text-is("${label}")`) }).locator("select");
-    const program = field("Program");
-    const value = await program.locator("option").nth(1).getAttribute("value");
-    const narrowed = page.waitForResponse((r) => {
-      const u = new URL(r.url());
-      return u.pathname === "/api/dashboard" && u.searchParams.get("program_id") === value;
-    });
-    await program.selectOption(value);
-    await narrowed;
-    await expect(page).toHaveURL(new RegExp(`program_id=${value}`));
-    await expect(page.getByRole("heading", { level: 2, name: "Analytics", exact: true }), "the tab stays open under a filter").toBeVisible();
-    const risk = page.waitForResponse((r) => {
-      const u = new URL(r.url());
-      return u.pathname === "/api/dashboard" && u.searchParams.get("risk") === "On Track" && u.searchParams.get("program_id") === value;
-    });
-    await field("Risk").selectOption("On Track");
-    await risk;
-  });
-
-  test("no sideways scroll at 390", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/reports?workflow_type=analytics");
-    await expect(page.getByRole("heading", { level: 2, name: "Analytics", exact: true })).toBeVisible();
-    await page.waitForLoadState("networkidle");
-    expect(await noOverflow(page), "horizontal overflow at 390").toBeLessThanOrEqual(1);
-    await shot(page, "reports-analytics-390.png");
-  });
-});
+// REMOVED BY p101 (I-141): "analytics on Reports" pinned the old Analytics tab (four count charts: stage, risk, college, research
+// gate) and its filters. The tab is gone by the redesign (spec .planning/research/REPORTS-SPEC-2026-11-02.md); its replacements
+// (question-led charts with a table alternative, filters in the address, no sideways scroll at 390) are pinned in p101-reports.spec.js.
 
 test.describe("academic coordinator home", () => {
   test.use({ storageState: join(AUTH_DIR, "academic-coordinator.json"), viewport: { width: 1366, height: 768 } });

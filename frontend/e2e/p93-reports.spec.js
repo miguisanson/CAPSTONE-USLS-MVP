@@ -10,6 +10,9 @@
 //   - an empty result says what it means and offers no download;
 //   - Analytics: 3-4 charts, a bar and a chip list the students behind it; the Academic Coordinator has no Analytics;
 //   - nothing scrolls sideways at 390 on any tab.
+// CHANGED BY p101 (I-141, Reports redesign): "Students at risk" is replaced by "Needs attention" and the Analytics tab is gone
+// (both pinned in p101-reports.spec.js); four new tabs come first; the four kept reports follow in the spec's order; the
+// program filter moved to the shared frame at the top. Every data check below stays, on the kept reports.
 // Nothing here asserts a seeded count: every figure is read from the API at test time (e2e/README.md, "Specs share
 // one database").
 import { test, expect } from "@playwright/test";
@@ -33,12 +36,12 @@ test.afterEach(async () => {
   expect(tracker.writes, `non-GET API calls while the pages were open: ${tracker.writes.join(", ")}`).toEqual([]);
 });
 
+const NEW_TABS = ["Needs attention", "Where students get stuck", "Office speed", "Records to fix"];
 const REPORTS = [
-  { id: "at-risk", tab: "Students at risk" },
   { id: "cohorts", tab: "Cohorts by stage" },
+  { id: "graduation", tab: "Graduation candidates" },
   { id: "overdue", tab: "Overdue and pending" },
   { id: "defenses", tab: "Defenses" },
-  { id: "graduation", tab: "Graduation candidates" },
 ];
 const OLD_TABS = [
   "Dashboard summary", "Daily changes", "Missing requirements", "Practicum monitoring", "Withdrawal requests",
@@ -72,12 +75,12 @@ async function open(page, report) {
 test.describe("staff Reports", () => {
   test.use({ storageState: join(AUTH_DIR, "staff.json"), viewport: { width: 1366, height: 768 } });
 
-  test("the page is five reports and Analytics: the old wall of tabs and the eight tiles are gone", async ({ page }) => {
+  test("the page is the new views and four kept reports: the old wall of tabs and the eight tiles are gone", async ({ page }) => {
     await page.goto("/reports");
     await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
     const tabs = (await page.getByRole("tab").allTextContents()).map((text) => text.trim());
-    expect(tabs, "the report tabs").toEqual([...REPORTS.map((r) => r.tab), "Registrar changes", "Analytics"]);
-    await expect(tab(page, REPORTS[0].tab), "the first report opens").toHaveAttribute("aria-selected", "true");
+    expect(tabs, "the report tabs").toEqual([...NEW_TABS, ...REPORTS.map((r) => r.tab), "Registrar changes"]);
+    await expect(tab(page, NEW_TABS[0]), "the first view opens").toHaveAttribute("aria-selected", "true");
     for (const old of OLD_TABS) {
       await expect(page.getByRole("button", { name: new RegExp(`^${old.replace(/[/&]/g, (c) => `\\${c}`)}( ·|$)`) }), `old tab "${old}"`).toHaveCount(0);
     }
@@ -116,18 +119,18 @@ test.describe("staff Reports", () => {
   }
 
   test("filters narrow the rows: the API gets the same filter, the URL follows, Clear filters resets", async ({ page, context }) => {
-    const all = await api(context, "at-risk");
-    expect(all.count, "the demo data gives at least one student at risk").toBeGreaterThan(0);
+    const all = await api(context, "graduation");
+    expect(all.count, "the demo data gives at least one graduation candidate").toBeGreaterThan(0);
     const programCode = all.rows[0].program;
     const program = all.options.programs.find((p) => p.code === programCode);
-    await open(page, REPORTS[0]);
+    await open(page, REPORTS[1]);
     const narrowed = page.waitForResponse((r) => {
       const u = new URL(r.url());
-      return u.pathname === "/api/reports/at-risk" && u.searchParams.get("program_id") === String(program.id);
+      return u.pathname === "/api/reports/graduation" && u.searchParams.get("program_id") === String(program.id);
     });
     await field(page, "Program").selectOption(String(program.id));
     const json = await (await narrowed).json();
-    const expected = await api(context, "at-risk", { program_id: program.id });
+    const expected = await api(context, "graduation", { program_id: program.id });
     expect(json.count).toBe(expected.count);
     await expect(page).toHaveURL(new RegExp(`program_id=${program.id}`));
     const table = page.getByRole("table", { name: json.title });
@@ -139,7 +142,7 @@ test.describe("staff Reports", () => {
     const stage = all.rows[0].stage;
     const both = page.waitForResponse((r) => {
       const u = new URL(r.url());
-      return u.pathname === "/api/reports/at-risk" && u.searchParams.get("stage") === stage && u.searchParams.get("program_id") === String(program.id);
+      return u.pathname === "/api/reports/graduation" && u.searchParams.get("stage") === stage && u.searchParams.get("program_id") === String(program.id);
     });
     await field(page, "Stage").selectOption(stage);
     await both;
@@ -148,7 +151,7 @@ test.describe("staff Reports", () => {
 
     const cleared = page.waitForResponse((r) => {
       const u = new URL(r.url());
-      return u.pathname === "/api/reports/at-risk" && !u.searchParams.get("program_id") && !u.searchParams.get("stage");
+      return u.pathname === "/api/reports/graduation" && !u.searchParams.get("program_id") && !u.searchParams.get("stage");
     });
     await page.getByRole("button", { name: "Clear filters" }).click();
     await cleared;
@@ -158,7 +161,6 @@ test.describe("staff Reports", () => {
 
   test("each report offers the filters that fit it", async ({ page }) => {
     const wanted = {
-      "at-risk": ["Program", "Stage", "Risk"],
       cohorts: ["Program", "Stage", "AY entry"],
       overdue: ["Program", "Stage", "Term", "Office", "Type"],
       defenses: ["Program", "Term", "Status", "Defense"],
@@ -206,9 +208,9 @@ test.describe("staff Reports", () => {
   });
 
   test("an empty result says what it means and offers no download", async ({ page, context }) => {
-    const none = await api(context, "at-risk", { stage: "Withdrawn" });
-    expect(none.count, "no student is both Withdrawn and at risk in the demo data").toBe(0);
-    await page.goto("/reports?report=at-risk&stage=Withdrawn");
+    const none = await api(context, "graduation", { stage: "Withdrawn" });
+    expect(none.count, "no student is both Withdrawn and a graduation candidate in the demo data").toBe(0);
+    await page.goto("/reports?report=graduation&stage=Withdrawn");
     await expect(page.getByText(none.empty)).toBeVisible();
     await expect(page.getByRole("table", { name: none.title })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Download Excel" })).toHaveCount(0);
@@ -223,47 +225,12 @@ test.describe("staff Reports", () => {
     await expect(page.getByLabel("Change report date")).toBeVisible();
   });
 
-  test("Analytics: three or four charts, a bar and a chip list the students behind them, the old link still opens it", async ({ page, context }) => {
-    const dash = await (await context.request.get("/api/dashboard")).json();
-    await page.goto("/reports?workflow_type=analytics");
-    await expect(tab(page, "Analytics")).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByRole("heading", { level: 2, name: "Analytics", exact: true })).toBeVisible();
-    await page.waitForLoadState("networkidle");
-    const charts = main(page).locator(".recharts-wrapper");
-    expect(await charts.count(), "3-4 charts").toBeGreaterThanOrEqual(3);
-    expect(await charts.count(), "3-4 charts").toBeLessThanOrEqual(4);
-    await expect(main(page).locator(".recharts-pie"), "no pie or donut for a quantity").toHaveCount(0);
-    for (const title of ["Lifecycle stage distribution", "Risk level", "Students by college", "Research gate position"]) {
-      await expect(page.getByRole("heading", { level: 3, name: title, exact: true }), title).toBeVisible();
-    }
-    // every bar has a readable label: the stage chart labels all the stages the dashboard API reports
-    const stageCard = main(page).locator("section", { has: page.getByRole("heading", { name: "Lifecycle stage distribution", exact: true }) });
-    const labels = await stageCard.locator(".recharts-yAxis .recharts-cartesian-axis-tick-value").allTextContents();
-    expect(labels.length).toBe(dash.stage_distribution.length);
-
-    // a bar lists the students behind it
-    const drill = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/dashboard/drilldown");
-    await stageCard.locator(".recharts-bar-rectangle").first().click();
-    const { json } = await drill.then(async (r) => ({ json: await r.json() }));
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("heading", { level: 2 })).toHaveText(json.title);
-    await expect(dialog.getByText("Loading filtered details…")).toBeHidden();
-    if (json.rows?.length) await expect(dialog.locator('a[href^="/students/"]').first(), "student rows link to records").toBeVisible();
-    await page.getByRole("button", { name: "Close dashboard details" }).click();
-    await expect(dialog).toHaveCount(0);
-
-    // a chip does the same for the keyboard
-    const chip = page.locator('button[aria-label^="Show "]').first();
-    await chip.click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.getByRole("button", { name: "Close dashboard details" }).click();
-    await shot(page, "analytics-1366.png");
-  });
+  // REMOVED BY p101 (I-141): "Analytics: three or four charts ..." pinned the Analytics tab (stage, risk, college and research-gate
+  // count charts). The tab is gone; its replacements are pinned in p101-reports.spec.js.
 
   test("390 px: every tab fits without sideways scroll", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    for (const id of [...REPORTS.map((r) => r.id), "daily-changes", "analytics"]) {
+    for (const id of ["attention", "stages", "speed", "fix", ...REPORTS.map((r) => r.id), "daily-changes"]) {
       await page.goto(`/reports?report=${id}`);
       await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
       await page.waitForLoadState("networkidle");
@@ -276,13 +243,13 @@ test.describe("staff Reports", () => {
 test.describe("academic coordinator Reports", () => {
   test.use({ storageState: join(AUTH_DIR, "academic-coordinator.json"), viewport: { width: 1366, height: 768 } });
 
-  test("sees the five reports and the daily list, no Analytics (the dashboard API is Graduate School only), no failed call", async ({ page }) => {
+  test("sees the new views, the four kept reports and the daily list, no failed call", async ({ page }) => {
     tracker.where = { role: "academic-coordinator", page: "P9.3 reports", viewport: 1366 };
     await page.goto("/reports");
     await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
     await page.waitForLoadState("networkidle");
     const tabs = (await page.getByRole("tab").allTextContents()).map((text) => text.trim());
-    expect(tabs).toEqual([...REPORTS.map((r) => r.tab), "Registrar changes"]);
+    expect(tabs).toEqual([...NEW_TABS, ...REPORTS.map((r) => r.tab), "Registrar changes"]);
     await tab(page, "Graduation candidates").click();
     await expect(page.getByRole("heading", { level: 2, name: "Graduation candidates", exact: true })).toBeVisible();
     await page.waitForLoadState("networkidle");

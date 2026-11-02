@@ -106,7 +106,7 @@ const ROLE_LABELS = {
 const ROLE_PATHS = {
   academic_coordinator: new Set(["/", "/reports", "/students", "/faculty", "/monitoring-sheet", "/enrollment-class-list", "/course-adjustments", "/enrollment", "/workflow/course-audit", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/practicum", "/workflow/graduation", "/workflow/awol", "/work-queue", "/assistant", "/business-rules"]),
   // Protocol: the Research Coordinator nominates the panel and informs panel and student of the date.
-  research_coordinator: new Set(["/", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant", "/business-rules"]),
+  research_coordinator: new Set(["/", "/reports", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant", "/business-rules"]),
 };
 
 /** "Dr. Liwayway Bautista (Faculty)" -> "Dr. Liwayway Bautista" when the role follows the name in brackets. */

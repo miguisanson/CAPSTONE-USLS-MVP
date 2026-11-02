@@ -4,8 +4,8 @@
 // list in DeanParts.jsx) onto the component library cannot change it. Written against the old code; it must pass on both.
 // Through the real UI, as the Dean:
 //   - Admission & Coursework Reports: the page and its two report panels;
-//   - Reports & Analytics: the four tiles and where they link, the "Decisions by process" table (its columns, one row per
-//     process with a link to that process, the live waiting / approved numbers), "Pending load by program";
+//   - Reports & Analytics: rebuilt by p101 (I-141) - the Dean's four tabs and the waiting table (was: four tiles, "Decisions by
+//     process", "Pending load by program");
 //   - Graduation Endorsement: the header (waiting badge, "All approvals"), the two tabs, then on "Endorsement batches" the
 //     shared board with the ready batch (candidates, step, owner, View details, table, the filter), its stage-check window
 //     (which steps are complete, which is current, which is pending), the Dean decision that approves it, the approved batch
@@ -110,51 +110,28 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await shot(page, "gate-reports-390.png");
   });
 
-  test("Reports & Analytics: tiles, the Decisions by process table, Pending load by program", async ({ page }) => {
+  // CHANGED BY p101 (I-141): Reports & Analytics is rebuilt (four tiles, "Decisions by process", "Pending load by program" are
+  // gone; DROP per the spec). Kept: the heading, one row per process with a link-able waiting count, the graduation batch counted
+  // as waiting, no sideways scroll at 390. The page's own behaviour is pinned in p101-reports.spec.js.
+  test("Reports & Analytics: the Dean's four tabs, the waiting decisions per process (graduation batch counted), no sideways scroll", async ({ page }) => {
     await page.goto("/dean/analytics");
     await expect(page.getByRole("heading", { level: 1, name: "Reports & Analytics" })).toBeVisible();
-    await expect(page.getByText("Where Dean decisions stand across every process. Figures are computed live from the approvals records.")).toBeVisible();
+    await expect(page.getByText("What waits for the Dean's decision, how fast decisions are made, what was decided and where graduation candidates stand.")).toBeVisible();
     const main = page.getByRole("main");
-
-    // The four tiles; three of them open something.
-    await expect(main.getByRole("link", { name: /Waiting now/ })).toHaveAttribute("href", "/dean/approvals");
-    await expect(main.getByRole("link", { name: /Decided this week/ })).toHaveAttribute("href", "/dean/activity");
-    await expect(main.getByRole("link", { name: /Course plans waiting/ })).toHaveAttribute("href", "/dean/approvals/course-adjustments");
-    await expect(main.getByText("Approval share")).toBeVisible();
-    await expect(main.getByText("of recent workflow decisions")).toBeVisible();
-    await expect(main.getByText("across all processes")).toBeVisible();
-
-    // The table: its six columns, and one row per process with a link to that process.
-    await expect(main.getByRole("heading", { level: 2, name: "Decisions by process" })).toBeVisible();
-    await expect(main.getByText("Current pending load and recent outcomes")).toBeVisible();
-    for (const header of ["Process", "Waiting", "Approved / completed", "Returned", "Denied", "Average wait"]) {
-      await expect(main.getByRole("columnheader", { name: header }), header).toBeVisible();
+    await expect(main.getByRole("link", { name: /Decisions waiting/ })).toHaveAttribute("href", "/dean/approvals");
+    for (const name of ["Waiting for my decision", "How fast decisions are made", "Outcomes", "Graduation pipeline"]) {
+      await expect(page.getByRole("tab", { name, exact: true }), name).toBeVisible();
     }
-    const processes = {
-      "Leave of Absence": "leave-of-absence",
-      Readmission: "readmission",
-      "AWOL & Residency": "awol",
-      "Subject Withdrawal": "withdrawal",
-      "Practicum Reports": "practicum",
-      "Graduation Endorsement": "graduation",
-      "Course Adjustments": "course-adjustments",
-    };
-    for (const [label, key] of Object.entries(processes)) {
-      const link = main.getByRole("row").getByRole("link", { name: label, exact: true });
-      await expect(link, `row for ${label}`).toHaveAttribute("href", `/dean/approvals/${key}`);
-    }
-    await expect(main.getByRole("row")).toHaveCount(1 + Object.keys(processes).length);
+    for (const label of ["Pending load by program", "Approval share"]) await expect(main.getByText(label), `${label} is dropped`).toHaveCount(0);
 
-    // The graduation row counts the batch that is waiting for the Dean (the first number in the Waiting cell).
-    const graduationRow = main.getByRole("row").filter({ has: page.getByRole("link", { name: "Graduation Endorsement", exact: true }) });
+    // The waiting table (behind "Show as table"): one row per process; the graduation row counts the batch waiting for the Dean.
+    await main.getByRole("button", { name: "Show as table" }).click();
+    const table = main.getByRole("table", { name: /Which decisions have waited the longest/ });
+    for (const header of ["Process", "Waiting", "0-3 days", "4-7 days", "8-14 days", "15+ days", "Longest wait (days)"]) {
+      await expect(table.getByRole("columnheader", { name: header }), header).toBeVisible();
+    }
+    const graduationRow = table.getByRole("row").filter({ has: page.getByText("Graduation Endorsement", { exact: true }) });
     expect(await numberIn(graduationRow.getByRole("cell").nth(1)), "graduation: waiting").toBeGreaterThanOrEqual(1);
-
-    // Pending load by program: MAED has at least the graduation batch waiting.
-    await expect(main.getByRole("heading", { level: 2, name: "Pending load by program" })).toBeVisible();
-    await expect(main.getByText("Where the waiting requests come from")).toBeVisible();
-    const maed = main.getByRole("listitem").filter({ hasText: /^MAED\s*\d+$/ });
-    await expect(maed).toHaveCount(1);
-    expect(await numberIn(maed), "MAED pending").toBeGreaterThanOrEqual(1);
     await shot(page, "analytics-1366.png");
 
     // 390: the page never scrolls sideways (the table scrolls inside its own box).

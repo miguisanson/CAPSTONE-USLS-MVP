@@ -1,102 +1,51 @@
-// Reports (owner decision IM20): five real reports, each filterable and downloadable as Excel and PDF, the Registrar's
-// daily list, and a short Analytics section. One tab per report; the address says which one is open and how it is
-// filtered (?report=overdue&office=Dean), so a filtered report can be shared and the browser's Back button works.
-// Everything the old page had beyond these (eleven report tabs, eight analytics tabs, a tile row) is gone.
-import { useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { BarChart3, Briefcase, CalendarCheck, GraduationCap, ListTodo, RefreshCw, Users } from "lucide-react";
-import { api } from "../api";
+// Reports (I-141, redesign of IM20): each tab answers one question, over the filters and the strip of six numbers in the
+// shared frame (reports/ReportsFrame.jsx). Staff and the Academic Coordinator get the office views and the older
+// reports the redesign keeps; the Research Coordinator gets the three views the research flow needs.
+import { Link } from "react-router-dom";
+import { AlertOctagon, BarChart3, CalendarCheck, ClipboardCheck, Clock, GraduationCap, ListTodo, RefreshCw, Timer } from "lucide-react";
 import { useAuth } from "../auth";
-import { useApi } from "../hooks";
-import { Button, PageHeader, Tabs } from "../components/ui/index.js";
+import { Button } from "../components/ui/index.js";
 import { PAGE } from "../lib/labels.js";
 import { homePath } from "../lib/homePaths.js";
-import AnalyticsSection from "./reports/AnalyticsSection.jsx";
 import DailyChanges from "./reports/DailyChanges.jsx";
-import ReportFilters from "./reports/ReportFilters.jsx";
 import ReportPanel from "./reports/ReportPanel.jsx";
-import { ANALYTICS_FILTERS, ANALYTICS_ROLES, ANALYTICS_TAB, DAILY_TAB, FILTER_KEYS, REPORTS, RISK_CHOICES } from "./reports/reportConfig.js";
+import ReportsFrame from "./reports/ReportsFrame.jsx";
+import { REPORTS } from "./reports/reportConfig.js";
+import { AttentionView, RecordsView, SpeedView, StagesView } from "./reports/StaffViews.jsx";
 
-const TAB_ICONS = {
-  "at-risk": Users,
-  cohorts: BarChart3,
-  overdue: ListTodo,
-  defenses: CalendarCheck,
-  graduation: GraduationCap,
-  "daily-changes": RefreshCw,
-  analytics: Briefcase,
+const ICONS = { cohorts: BarChart3, overdue: ListTodo, defenses: CalendarCheck, graduation: GraduationCap };
+
+const NEW_TABS = {
+  attention: { id: "attention", label: "Needs attention", icon: AlertOctagon, filters: ["cause"], render: (c) => <AttentionView {...c} /> },
+  stages: { id: "stages", label: "Where students get stuck", icon: Clock, render: (c) => <StagesView {...c} /> },
+  speed: { id: "speed", label: "Office speed", icon: Timer, render: (c) => <SpeedView {...c} /> },
+  fix: { id: "fix", label: "Records to fix", icon: ClipboardCheck, filters: ["missing"], render: (c) => <RecordsView {...c} /> },
 };
+
+// An older report keeps its own table, filters and downloads; the frame's program filter applies to it too.
+const olderTab = (report) => ({
+  id: report.id,
+  label: report.tab,
+  icon: ICONS[report.id],
+  filters: report.filters.map((spec) => spec.key),
+  render: ({ params, setParam, clearFilters }) => <ReportPanel key={report.id} report={report} params={params} setParam={setParam} clearFilters={clearFilters} />,
+});
+const DAILY = { id: "daily-changes", label: "Registrar changes", icon: RefreshCw, bare: true, render: () => <DailyChanges /> };
+
+export function reportTabs(role) {
+  if (role === "research_coordinator") return [NEW_TABS.attention, NEW_TABS.stages, NEW_TABS.fix];
+  return [NEW_TABS.attention, NEW_TABS.stages, NEW_TABS.speed, NEW_TABS.fix, ...REPORTS.map(olderTab), DAILY];
+}
 
 export default function Reports() {
   const { user } = useAuth();
-  const canSeeCharts = ANALYTICS_ROLES.has(user?.role);
-  const [params, setParams] = useSearchParams();
-
-  const tabs = useMemo(
-    () => [...REPORTS, DAILY_TAB, ...(canSeeCharts ? [ANALYTICS_TAB] : [])],
-    [canSeeCharts],
-  );
-  // The old address (?workflow_type=analytics, still linked from the home) opens Analytics.
-  const wanted = params.get("report") || (params.get("workflow_type") === "analytics" ? "analytics" : REPORTS[0].id);
-  const active = tabs.find((tab) => tab.id === wanted) || REPORTS[0];
-  const report = REPORTS.find((item) => item.id === active.id);
-
-  function setParam(key, value) {
-    const next = new URLSearchParams(params);
-    next.delete("workflow_type");
-    next.set("report", active.id);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setParams(next, { replace: true });
-  }
-
-  function clearFilters() {
-    const next = new URLSearchParams();
-    next.set("report", active.id);
-    setParams(next, { replace: true });
-  }
-
-  // Program, stage and term mean the same on every report, so they stay when the tab changes; a filter the next report
-  // does not have is dropped (a hidden filter would narrow the rows with no way to see why).
-  function chooseTab(tab) {
-    const target = REPORTS.find((item) => item.id === tab.id);
-    const keep = new Set((target ? target.filters : tab.id === ANALYTICS_TAB.id ? ANALYTICS_FILTERS : []).map((spec) => spec.key));
-    const next = new URLSearchParams();
-    next.set("report", tab.id);
-    for (const key of FILTER_KEYS) if (keep.has(key) && params.get(key)) next.set(key, params.get(key));
-    setParams(next, { replace: false });
-  }
-
   return (
-    <div className="page-stack animate-fade-up">
-      <PageHeader
-        title={PAGE.reportsAnalytics}
-        description="Who is late, where each cohort stands, what is waiting, defenses and graduation. Filter, sort, and download Excel or PDF."
-        actions={<Button as={Link} to={homePath(user?.role)} variant="secondary">Back to dashboard</Button>}
-      />
-
-      <Tabs label="Reports" tabs={tabs.map((item) => ({ key: item.id, label: item.tab, icon: TAB_ICONS[item.id] }))} value={active.id} onChange={(id) => chooseTab(tabs.find((item) => item.id === id))} />
-
-      {report ? (
-        <ReportPanel key={report.id} report={report} params={params} setParam={setParam} clearFilters={clearFilters} />
-      ) : active.id === DAILY_TAB.id ? (
-        <DailyChanges />
-      ) : (
-        <AnalyticsPanel params={params} setParam={setParam} clearFilters={clearFilters} />
-      )}
-    </div>
+    <ReportsFrame
+      title={PAGE.reportsAnalytics}
+      description="Which students need attention, where they get stuck, how fast offices work and which records to fix. Filter, then download Excel or PDF."
+      actions={<Button as={Link} to={homePath(user?.role)} variant="secondary">Back to dashboard</Button>}
+      tabs={reportTabs(user?.role)}
+    />
   );
 }
 
-// Analytics: the same program / stage / risk filters over the four charts.
-function AnalyticsPanel({ params, setParam, clearFilters }) {
-  const { data: meta } = useApi(() => api.meta(), []);
-  const options = { programs: meta?.programs || [], stages: meta?.stages || [], risks: RISK_CHOICES };
-  const filters = { program_id: params.get("program_id") || "", stage: params.get("stage") || "", risk: params.get("risk") || "" };
-  return (
-    <div className="page-stack">
-      <ReportFilters specs={ANALYTICS_FILTERS} options={options} params={params} onChange={setParam} onClear={clearFilters} />
-      <AnalyticsSection filters={filters} />
-    </div>
-  );
-}
