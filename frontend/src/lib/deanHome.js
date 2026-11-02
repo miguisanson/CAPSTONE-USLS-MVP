@@ -156,7 +156,7 @@ export function deanStats({ pending = [], plans = [], adviserCount = 0, recent =
     },
     {
       key: "overdue",
-      label: "Waiting over 7 days",
+      label: "Waiting on you over 7 days",
       value: overWeek,
       sub: overWeek ? "Decide these first" : "Nothing has waited a week",
       tone: overWeek ? "danger" : "success",

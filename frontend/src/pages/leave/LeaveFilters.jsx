@@ -1,4 +1,4 @@
-import { Columns3, List, SlidersHorizontal } from "lucide-react";
+import { Columns3, List, SlidersHorizontal, X } from "lucide-react";
 import { Button, SearchInput, Select } from "../../components/ui/index.js";
 import { EMPTY_FILTERS } from "./leaveHelpers";
 
@@ -59,8 +59,13 @@ export default function LeaveFilters({ filters, setFilters, programs, statusOpti
         )}
       </div>
       <div className="meta mt-2 flex flex-wrap items-center justify-between gap-2">
-        <span>
+        <span className="inline-flex flex-wrap items-center gap-2">
           Showing {count} of {total} {noun}
+          {filters.open && (
+            <Button variant="secondary" size="sm" icon={X} aria-label="Open requests only: select to show every request" onClick={() => set("open", false)}>
+              Open requests only
+            </Button>
+          )}
         </span>
         {active > 0 && (
           <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={() => setFilters(EMPTY_FILTERS)}>

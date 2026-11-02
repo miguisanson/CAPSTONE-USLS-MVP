@@ -436,17 +436,19 @@ export function boardSummaryLine(columns, totals, noun) {
   return parts.length ? parts.join(", ") : `No ${noun} yet`;
 }
 
-export function BoardSummary({ line, windowName = "request window", actions = null }) {
+export function BoardSummary({ line, windowName = "request window", actions = null, showHint = true }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3" data-testid="board-summary">
       <div className="min-w-0">
         <p data-summary-line className="text-base font-semibold text-ink" aria-live="polite">
           {line}
         </p>
-        <p className="mt-1 max-w-3xl text-sm text-slate-500">
-          Dragging a card to another column does the same as the buttons in its {windowName}. On a keyboard or phone, use
-          &quot;Move to…&quot; on the card.
-        </p>
+        {showHint && (
+          <p className="mt-1 max-w-3xl text-sm text-slate-500">
+            Dragging a card to another column does the same as the buttons in its {windowName}. On a keyboard or phone, use
+            &quot;Move to…&quot; on the card.
+          </p>
+        )}
       </div>
       {actions}
     </div>

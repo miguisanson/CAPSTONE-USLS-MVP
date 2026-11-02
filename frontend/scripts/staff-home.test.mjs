@@ -93,7 +93,7 @@ test("where a task opens: its own action_url, else the workflow page its title n
   assert.equal(to("Export endorsed list for manual Registrar email"), "/workflow/graduation");
   assert.equal(to("Complete admission handoff missing items"), "/workflow/student-handoff");
   assert.equal(to("Resolve missing curriculum subjects"), "/course-adjustments");
-  assert.equal(to("Tell the Registrar the approved leave was cancelled"), "/workflow/leave-of-absence");
+  assert.equal(to("Tell the Registrar the approved leave was cancelled"), "/workflow/leave-of-absence?show=open", "a leave task opens the board on the open requests (I-196)");
   assert.equal(to("Review student readmission request"), "/workflow/readmission");
   assert.equal(to("Send the adviser application to the Dean"), "/workflow/research-gate?view=adviser");
   assert.equal(to("Receive Forms 3.2 and 3.3 (advising contract)"), "/workflow/research-gate?view=adviser");
@@ -131,7 +131,7 @@ test("key numbers, staff: own open tasks, students monitored, at risk or delayed
   assert.match(stats[0].sub, /2 overdue/);
   assert.equal(stats[0].tone, "danger");
   assert.equal(stats[1].value, 120);
-  assert.match(stats[1].sub, /100 active/);
+  assert.match(stats[1].sub, /100 with Active standing/);
   assert.equal(stats[1].to, "/students");
   assert.equal(stats[2].value, 14);
   assert.match(stats[2].sub, /3 delayed/);

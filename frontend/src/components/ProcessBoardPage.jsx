@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { HelpCircle, History, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
@@ -145,7 +146,16 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
 
   const [state, setState] = useState({ data: null, loading: true, error: "" });
   const [view, setView] = useState("board");
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  // The address can open the board on the open requests (?show=open, the dashboard's link); clearing the filter drops it again (I-196).
+  const [urlParams, setUrlParams] = useSearchParams();
+  const urlFilters = () => ({ ...EMPTY_FILTERS, open: urlParams.get("show") === "open" });
+  const [filters, setFilters] = useState(urlFilters);
+  useEffect(() => {
+    if (filters.open || urlParams.get("show") !== "open") return;
+    const next = new URLSearchParams(urlParams);
+    next.delete("show");
+    setUrlParams(next, { replace: true });
+  }, [filters.open]); // eslint-disable-line react-hooks/exhaustive-deps
   const [selected, setSelected] = useState(() => new Set());
   const [detailId, setDetailId] = useState(null);
   const [detailVersion, setDetailVersion] = useState(0);
@@ -186,7 +196,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
     dismissNotice();
     setBatchResult(null);
     setSignal(null);
-    setFilters(EMPTY_FILTERS);
+    setFilters(urlFilters());
     (async () => {
       await load({ quiet: true });
       if (active && config.afterOpen) await config.afterOpen({ isStaff, reload: () => load({ quiet: true }) });

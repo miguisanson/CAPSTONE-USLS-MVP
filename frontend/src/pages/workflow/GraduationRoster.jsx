@@ -12,6 +12,7 @@ import {
   Printer,
 } from "lucide-react";
 import { api } from "../../api";
+import { useIsPhone } from "../../hooks";
 import { formatDate } from "../../lib/format";
 import { Button, DataTable, EmptyState, StatusChip } from "../../components/ui/index.js";
 import WorkflowTimeline, { graduationTimelineSteps } from "../../components/WorkflowTimeline";
@@ -417,6 +418,8 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
   const [stageGroupId, setStageGroupId] = useState(null);
   const [exportingBatchId, setExportingBatchId] = useState("");
   const [exportNotice, setExportNotice] = useState(null);
+  // A phone cannot hold ten columns: the Dean gets the same cards stacked by stage (I-190). The other roles keep the board.
+  const phoneList = useIsPhone() && accountRole === "dean";
   const reset = useDemoCaseReset("graduation", refetch);
   // A reset answers in the board notice too. The case window closes so the notice is not hidden behind it.
   useEffect(() => {
@@ -473,7 +476,9 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
     () => graduationBatchGroups(visibleBatchedRows, selectedIds),
     [visibleBatchedRows, selectedIds],
   );
-  const allBatchCount = useMemo(() => graduationBatchGroups(rows.filter((row) => Boolean(row.endorsement?.batch_name))).length, [rows]);
+  const allBatchGroups = useMemo(() => graduationBatchGroups(rows.filter((row) => Boolean(row.endorsement?.batch_name))), [rows]);
+  const allBatchCount = allBatchGroups.length;
+  const approvedGroups = useMemo(() => allBatchGroups.filter((group) => group.boardStatus === "Dean Approved"), [allBatchGroups]);
   const boardColumns = batchesOnly ? GRADUATION_BATCH_COLUMNS : GRADUATION_ALL_BOARD_COLUMNS;
   const boardItems = useMemo(
     () => [
@@ -611,13 +616,15 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
       </button>
     );
   }
-  async function exportApprovedBatch(group) {
-    setExportingBatchId(group.id);
+  // One file for the batches it is given: the batch window passes its own batch, the page's button passes every approved one.
+  async function exportApproved(groups, busyKey = groups[0]?.id) {
+    setExportingBatchId(busyKey);
+    const what = groups.length === 1 ? groups[0].label : `${groups.length} approved batches`;
     try {
-      const endorsementIds = group.rows.map((row) => row.endorsement?.id).filter(Boolean);
+      const endorsementIds = groups.flatMap((group) => group.rows.map((row) => row.endorsement?.id)).filter(Boolean);
       const exportResult = await api.exportGraduationCsv("", endorsementIds);
-      setExportNotice({ filename: exportResult.filename, batchLabel: group.label });
-      boardNotice.show("success", `${group.label} exported as ${exportResult.filename}. The Dean must email the file to the Registrar and wait for acknowledgement.`);
+      setExportNotice({ filename: exportResult.filename, batchLabel: what });
+      boardNotice.show("success", `${what} exported as ${exportResult.filename}. The Dean must email the file to the Registrar and wait for acknowledgement.`);
       await refetch();
     } catch (error) {
       boardNotice.show("error", error.message || "Could not export the Dean-approved graduation list.");
@@ -703,8 +710,20 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
   return (
     <div className="space-y-4">
       {/* No card title and no loose line under the header: the page header says it all, with who does what in its description (finding 11, I-157). */}
-      <BoardSummary line={summaryLine} windowName="details window" />
-      <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
+      <BoardSummary line={summaryLine} windowName="details window" showHint={!phoneList} />
+      {accountRole === "dean" && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Button icon={Download} loading={exportingBatchId === "all"} disabled={!approvedGroups.length} onClick={() => exportApproved(approvedGroups, "all")} className="max-sm:w-full">
+            Export approved list
+          </Button>
+          <p className="meta">
+            {approvedGroups.length
+              ? `${approvedGroups.length} approved ${approvedGroups.length === 1 ? "batch is" : "batches are"} ready for the Registrar.`
+              : "No batch is approved yet. Approve a batch, then export the list here."}
+          </p>
+        </div>
+      )}
+      <BoardFilterRow toggle={phoneList ? null : <ViewToggle value={view} onChange={setView} />}>
         <RosterFilters
           filters={filters}
           setFilters={setFilters}
@@ -728,8 +747,27 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           onClear={() => setSelectedIds(new Set())}
         />
       )}
-      {view !== "board" && <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />}
-      {view === "board" ? (
+      {(view !== "board" || phoneList) && <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />}
+      {phoneList ? (
+        boardItems.length ? (
+          <section aria-label="Graduation candidates by stage" className="space-y-5">
+            {boardColumns.map((column) => {
+              const items = boardItems.filter((item) => graduationBoardColumnKey(item) === column.key);
+              if (!items.length) return null;
+              return (
+                <div key={column.key} className="space-y-2">
+                  <h3 className="text-sm font-semibold text-ink">{column.label} <span className="meta">({items.length})</span></h3>
+                  <ul className="space-y-3">
+                    {items.map((item) => <li key={graduationBoardItemId(item)}>{renderGraduationBoardCard(item)}</li>)}
+                  </ul>
+                </div>
+              );
+            })}
+          </section>
+        ) : (
+          <EmptyState title="No candidates match these filters" hint="Clear a filter to see more." />
+        )
+      ) : view === "board" ? (
         <StageBoard
           boardNotice={boardNotice}
           ariaLabel="Graduation workflow Kanban board"
@@ -765,7 +803,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           onOpenStudent={openCase}
           onMessageStudent={setMessageRow}
           onProcessBatch={processBatchGroup}
-          onExportBatch={accountRole === "dean" ? (group) => { setStageGroupId(null); exportApprovedBatch(group); } : null}
+          onExportBatch={accountRole === "dean" ? (group) => { setStageGroupId(null); exportApproved([group]); } : null}
           onPrintBatch={accountRole === "dean" ? printGraduationBatch : null}
           exporting={exportingBatchId === stageGroup.id}
         />

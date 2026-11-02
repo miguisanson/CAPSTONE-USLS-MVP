@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useSyncExternalStore } from "react";
 
 // Minimal data-fetching hook with loading/error/refetch.
 export function useApi(fn, deps = []) {
@@ -24,3 +24,12 @@ export function useApi(fn, deps = []) {
 
   return { data, loading, error, refetch: run };
 }
+
+// True below Tailwind's `sm` (640 px): the width where the layout switches to its phone form.
+const PHONE = "(max-width: 639px)";
+const subscribePhone = (notify) => {
+  const query = window.matchMedia(PHONE);
+  query.addEventListener("change", notify);
+  return () => query.removeEventListener("change", notify);
+};
+export const useIsPhone = () => useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE).matches, () => false);

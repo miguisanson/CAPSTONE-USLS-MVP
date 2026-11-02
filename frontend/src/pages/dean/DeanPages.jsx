@@ -23,6 +23,7 @@ import { DeanPracticumBoard } from "./DeanPracticumBoard";
 import ProcessBoardPage from "../../components/ProcessBoardPage";
 import AdviserAppointments from "../AdviserAppointments";
 import { PAGE } from "../../lib/labels.js";
+import { useRecordTitle } from "../../components/recordTitle.jsx";
 
 const PROCESS_ORDER = ["course-adjustments", "leave-of-absence", "readmission", "awol", "withdrawal", "practicum", "graduation"];
 // The four standalone processes are one page template (the same board staff use).
@@ -357,6 +358,7 @@ function DeanCaseBody() {
   const item = dean.findCase(type, id);
   const processKey = processOfType(type);
   const backTo = processKey ? `/dean/approvals/${processKey}` : "/dean/approvals";
+  useRecordTitle(item ? `${item.student?.name || item.title} · ${processLabel(item.type)}` : "");
   if (!item) {
     return (
       <div className="space-y-5 animate-fade-up">
