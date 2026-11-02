@@ -213,7 +213,7 @@ test.describe("P7.7 Graduation actions as staff", () => {
     await expect(dialog.getByRole("heading").first()).toContainText("Create batch");
     await expect(dialog.getByLabel("Batch No.")).toBeVisible();
     await expect(dialog.getByText("Completed-course cohort:")).toBeVisible(); // the cohort list lives here
-    await dialog.getByRole("button", { name: "Close details" }).click();
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click(); // CHANGED BY p98 (I-152): the step dialog closes with Cancel, not "Close details"
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
     // Isabel's batch: View details shows the stage check and the students; the step is in this window and the card has "Move to...".
@@ -228,9 +228,12 @@ test.describe("P7.7 Graduation actions as staff", () => {
     // CHANGED BY conC (I-126): the step is a button in this window, not on the card (the card has "View details" only).
     await expect(batch.getByRole("button", { name: "Forward to Academic Coordinator" })).toHaveCount(0);
     await dialog.getByRole("button", { name: "Forward to Academic Coordinator" }).click();
-    dialog = page.getByRole("dialog");
+    // CHANGED BY p98 (I-152): the step dialog opens over the batch window (the batch window stays, so the focus can go back to its button).
+    dialog = page.getByRole("dialog").last();
     await expect(dialog.getByRole("heading").first()).toContainText("Forward to Academic Coordinator");
-    await dialog.getByRole("button", { name: "Close details" }).click();
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Close details" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await batch.getByRole("button", { name: /Move to/ }).click();
     const menu = page.getByRole("menu");
@@ -273,10 +276,14 @@ test.describe("P7.7 Graduation actions as the Dean", () => {
     await expect(batch.getByRole("button", { name: "Approve endorsement list" })).toHaveCount(0);
     await batch.getByRole("button", { name: `View details for ${BATCH}` }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Approve endorsement list" }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByLabel("Dean decision")).toBeVisible();
-    await expect(dialog.getByRole("option", { name: "Return endorsement list for revision" })).toHaveCount(1);
-    await dialog.getByRole("button", { name: "Close details" }).click();
+    // CHANGED BY p98 (I-152): the Dean's decision is the one step dialog over the batch window, with two buttons (approve, or
+    // return with a reason) instead of a "Dean decision" select; both choices are still offered.
+    const dialog = page.getByRole("dialog").last();
+    await expect(dialog.getByRole("heading", { level: 2, name: "Dean decision" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Approve endorsement list", exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Return endorsement list for revision", exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.getByRole("dialog").getByRole("button", { name: "Close details" }).click();
     await shot(page, "dean-ready-1366.png");
   });
 

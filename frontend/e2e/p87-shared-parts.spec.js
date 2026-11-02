@@ -528,7 +528,7 @@ test.describe("Case discussion", () => {
       });
       await page.goto("/workflow/practicum");
       await main(page).getByRole("button", { name: "Table" }).click();
-      await main(page).getByRole("table").getByRole("row", { name: /Andrea Villanueva/ }).getByRole("button", { name: /Open case/ }).click();
+      await main(page).getByRole("table").getByRole("row", { name: /Andrea Villanueva/ }).getByRole("button", { name: /View details for Andrea Villanueva/ }).click(); // CHANGED BY p98 (I-155): the Practicum table button is "View", not "Open case"
       const dialog = page.getByRole("dialog");
       await expect(dialog.getByRole("heading", { name: "Andrea Villanueva" })).toBeVisible();
       return dialog;

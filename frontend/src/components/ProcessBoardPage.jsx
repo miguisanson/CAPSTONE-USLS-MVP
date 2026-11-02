@@ -3,9 +3,9 @@ import { HelpCircle, History, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { formatDateTime } from "../lib/format";
-import { Button, EmptyState, InlineNotice, Modal, PageHeader, Spinner } from "./ui/index.js";
+import { Button, EmptyState, InlineNotice, Modal, PageHeader, SkeletonBoard } from "./ui/index.js";
 import PolicyRules from "./PolicyRules";
-import StageBoard, { BoardSummary, boardSummaryLine } from "./StageBoard";
+import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "./StageBoard";
 import { GUIDES, PROCESS_CONFIG } from "./processConfig";
 import ActionDialog from "../pages/leave/ActionDialog";
 import BatchBar, { BatchResult } from "../pages/leave/BatchBar";
@@ -150,7 +150,8 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
   const [detailId, setDetailId] = useState(null);
   const [detailVersion, setDetailVersion] = useState(0);
   const [dialog, setDialog] = useState(null); // { item, action, detail }
-  const [banner, setBanner] = useState(null); // { tone, text }
+  const boardNotice = useBoardNotice(); // the one place a step says what happened (the board shows it above its columns)
+  const dismissNotice = boardNotice.dismiss;
   const [batchResult, setBatchResult] = useState(null);
   const [signal, setSignal] = useState(null); // an extra window a step opens instead of a confirm box
   const [support, setSupport] = useState(""); // "guide" | "activity"
@@ -182,7 +183,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
     setSelected(new Set());
     setDetailId(null);
     setDialog(null);
-    setBanner(null);
+    dismissNotice();
     setBatchResult(null);
     setSignal(null);
     setFilters(EMPTY_FILTERS);
@@ -193,7 +194,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
     return () => {
       active = false;
     };
-  }, [slug, isStaff, load, config]);
+  }, [slug, isStaff, load, config, dismissNotice]);
 
   const data = state.data;
   const vocabulary = data?.vocabulary;
@@ -264,7 +265,8 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
     const current = dialog;
     const result = await submitTransition(current.item, payload);
     setDialog(null);
-    setBanner({ tone: "success", text: `${current.item.student.name}: ${result.message || "Done."}` });
+    setDetailId(null); // the case window would hide the notice
+    boardNotice.show("success", `${current.item.student.name}: ${result.message || "Done."}`);
   }
 
   const checkMove = useCallback((item, column) => checkMoveFor(item, column, vocabulary), [vocabulary]);
@@ -386,7 +388,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
     reload: () => load({ quiet: true }),
     openDetail: (item) => setDetailId(item.id),
     runAction,
-    banner: (tone, text) => setBanner({ tone, text }),
+    banner: boardNotice.show,
     signal,
     clearSignal: () => setSignal(null),
   };
@@ -395,7 +397,14 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
   const BelowBoard = config.BelowBoard;
 
   // ---- states ------------------------------------------------------------------------
-  if (state.loading && !data) return <Spinner label="Loading requests..." />;
+  if (state.loading && !data) {
+    return (
+      <div className="page-stack">
+        <PageHeader title={config.title} description={(role === "dean" && config.deanDescription) || config.description} icon={Icon} badge={headerBadge} />
+        <SkeletonBoard columns={4} label="Loading requests" />
+      </div>
+    );
+  }
   if (!data) {
     return (
       <div className="space-y-3">
@@ -429,11 +438,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
       />
 
       {state.error && <InlineNotice tone="danger">{state.error}</InlineNotice>}
-      {banner && (
-        <InlineNotice tone={banner.tone} icon onDismiss={() => setBanner(null)}>
-          {banner.text}
-        </InlineNotice>
-      )}
+      {!(view === "board" && cases.length > 0) && <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />}
 
       {AboveBoard && <AboveBoard ctx={ctx} />}
 
@@ -482,6 +487,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
               renderColumnFooter={renderColumnFooter}
               emptyText={`No ${config.noun} here`}
               ariaLabel={config.boardLabel}
+              boardNotice={boardNotice}
             />
           ) : filtered.length ? (
             <CaseTable
@@ -509,11 +515,6 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
           version={detailVersion}
           onClose={() => setDetailId(null)}
           onAction={(detail, action) => runAction(detail, action, detail)}
-          onTransition={async (item, payload) => {
-            const result = await submitTransition(item, payload);
-            setBanner({ tone: "success", text: `${item.student.name}: ${result.message || "Done."}` });
-            return result;
-          }}
           onNoteSent={async () => {
             await load({ quiet: true });
             setDetailVersion((value) => value + 1);

@@ -36,6 +36,9 @@ import { EmptyState, InlineNotice } from "./ui/index.js";
  * "Scroll board left/right" buttons (keyboard reachable) and a soft fade at the cut edge. Column titles wrap, never cut.
  *   ariaLabel      label for the scrolling region
  *   readOnly       turns drag and the menu off
+ *   boardNotice    the result of useBoardNotice() when the page reports other things (a dialog, a group step) in the same
+ *                  place. The board shows it above its columns; a page renders <BoardNotice> itself only when it shows no
+ *                  board (the table view, no cases), so there is one notice on screen, never two.
  */
 export default function StageBoard({
   columns,
@@ -54,14 +57,16 @@ export default function StageBoard({
   columnClassName = "w-[248px]",
   ariaLabel = "Stage board",
   readOnly = false,
+  boardNotice = null,
 }) {
   const [dragging, setDragging] = useState(null); // { id, from }
   const [hoverColumn, setHoverColumn] = useState(null);
   const [busyId, setBusyId] = useState(null);
-  const [notice, setNotice] = useState(null); // { tone, text }
   const [pending, setPending] = useState(null); // { id, label }: a move that is under way or waits on its confirm dialog
   const [settledId, setSettledId] = useState(null); // the card that has just arrived in its column (1 s ring)
-  const noticeTimer = useRef(null);
+  const ownNotice = useBoardNotice();
+  const activeNotice = boardNotice || ownNotice; // a page that reports its own steps passes useBoardNotice()
+  const { show } = activeNotice;
   const settleTimer = useRef(null);
   const moveRef = useRef(null); // { id, toKey, at }: the move to look for in the next items
   const watchRef = useRef(null); // { observer, timer }: waits for the confirm dialog to close
@@ -71,14 +76,8 @@ export default function StageBoard({
   const columnByKey = useMemo(() => Object.fromEntries(columns.map((column) => [column.key, column])), [columns]);
   const itemById = useMemo(() => new Map(items.map((item) => [String(getItemId(item)), item])), [items, getItemId]);
 
-  const show = useCallback((tone, text) => {
-    setNotice({ tone, text });
-    window.clearTimeout(noticeTimer.current);
-    noticeTimer.current = window.setTimeout(() => setNotice(null), tone === "error" ? 9000 : 6000);
-  }, []);
   useEffect(
     () => () => {
-      window.clearTimeout(noticeTimer.current);
       window.clearTimeout(settleTimer.current);
       stopWatching();
     },
@@ -259,7 +258,7 @@ export default function StageBoard({
 
   return (
     <div data-testid="stage-board">
-      <BoardNotice notice={notice} onDismiss={() => setNotice(null)} />
+      <BoardNotice notice={activeNotice.notice} onDismiss={activeNotice.dismiss} />
       {(hidden.left > 0 || hidden.right > 0) && (
         <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
           <p data-testid="board-scroll-hint" className="meta font-medium text-slate-600">
@@ -387,6 +386,28 @@ export default function StageBoard({
 
 function reducedMotion() {
   return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+}
+
+/**
+ * The text a board says about what just happened: `{ tone: "success" | "error", text }`, gone after 6 s (9 s for an error).
+ * A board page that has actions of its own (a dialog, a group step) calls this once, renders <BoardNotice> above the
+ * board or table, and passes the result to StageBoard as `boardNotice`, so a drop, a dialog and a group step all report
+ * in the same place.
+ */
+export function useBoardNotice() {
+  const [notice, setNotice] = useState(null);
+  const timer = useRef(null);
+  const dismiss = useCallback(() => {
+    window.clearTimeout(timer.current);
+    setNotice(null);
+  }, []);
+  const show = useCallback((tone, text) => {
+    setNotice({ tone, text });
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setNotice(null), tone === "error" ? 9000 : 6000);
+  }, []);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  return { notice, show, dismiss };
 }
 
 // The one place a board says what happened to a move (done, or refused and why). At the top of the board, role="status",

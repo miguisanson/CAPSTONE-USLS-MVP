@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
-import { CornerUpLeft, MessageSquarePlus } from "lucide-react";
+import { MessageSquarePlus } from "lucide-react";
 import { api } from "../../api";
-import { Button, DecisionPanel, Field, InlineNotice, Select, Textarea } from "../../components/ui/index.js";
+import { Button, Field, InlineNotice, Select, Textarea } from "../../components/ui/index.js";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { Block } from "./leaveUi";
 
@@ -78,35 +78,9 @@ function NoteForm({ slug, detail, onSent }) {
   );
 }
 
-// Sends the request back through the same guarded step as the "Return to student" button.
-function ReturnForm({ detail, action, onTransition }) {
-  async function send(_key, comment) {
-    try {
-      await onTransition(detail, { action: action.action, comment });
-    } catch (err) {
-      throw new Error(err?.message || "The request could not be returned.");
-    }
-  }
-
-  return (
-    <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-3">
-      <h4 className="flex items-center gap-2 text-sm font-semibold text-ink">
-        <CornerUpLeft className="h-4 w-4 text-amber-700" aria-hidden="true" /> {action.label}
-      </h4>
-      <DecisionPanel
-        variant="plain"
-        actions={[{ key: action.action, label: action.label, tone: "return", requireComment: true, confirm: false }]}
-        onDecide={send}
-        commentLabel="What should the student fix? (the student will see this)"
-        commentHint="Required for this step."
-        commentRequiredMessage="Tell the student what to fix. A reason is required."
-      />
-    </div>
-  );
-}
-
-export default function CaseConversation({ slug, detail, onTransition, onNoteSent }) {
-  const returnAction = (detail.actions || []).find((action) => action.action === "return");
+// Returning a request to the student is the "Return to student" step in the case window's footer, which opens the one
+// step dialog (StepDialog); this block only holds the conversation and the note box (I-152).
+export default function CaseConversation({ slug, detail, onNoteSent }) {
   return (
     <Block title="Messages" hint="Notes and returns about this request, newest at the bottom.">
       <WorkflowDiscussion
@@ -116,9 +90,8 @@ export default function CaseConversation({ slug, detail, onTransition, onNoteSen
         title="Messages about this request"
         emptyText="No messages yet."
       />
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+      <div className="mt-4">
         <NoteForm slug={slug} detail={detail} onSent={onNoteSent} />
-        {returnAction && <ReturnForm detail={detail} action={returnAction} onTransition={onTransition} />}
       </div>
     </Block>
   );

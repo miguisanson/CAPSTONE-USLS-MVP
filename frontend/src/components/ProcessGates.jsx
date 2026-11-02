@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, Send, FileSpreadsheet, GraduationCap, ClipboardL
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { Button, DataTable, EmptyState, Field, InlineNotice, Input, SectionCard, Select, Spinner, StatusChip } from "./ui/index.js";
+import StepDialog from "./StepDialog";
 
 /* Panels for the process steps the BPMN models require but that previously had
    no screen: the Dean onboarding gate (BPMN 1), the derived study plan and
@@ -13,6 +14,28 @@ import { Button, DataTable, EmptyState, Field, InlineNotice, Input, SectionCard,
 function Notice({ msg }) {
   if (!msg || !msg.text) return null;
   return <InlineNotice tone={msg.tone}>{msg.text}</InlineNotice>;
+}
+
+/**
+ * Approve / return of a gate opens the one step dialog (I-152): the remarks box is in the dialog, a return asks for its
+ * reason in words, and a refusal from the server is shown inside it. `step` = { title, subtitle, label, tone, needsReason,
+ * reasonLabel, run(reason) }; `run` throws to refuse, and when it returns the dialog closes.
+ */
+function GateStepDialog({ step, onClose }) {
+  return (
+    <StepDialog
+      title={step.title}
+      subtitle={step.subtitle}
+      actions={[{ key: "go", label: step.label, tone: step.tone, requireComment: step.needsReason }]}
+      reasonLabel={step.reasonLabel}
+      reasonHint={step.needsReason ? "Required to return." : "Optional. Kept with this decision."}
+      onConfirm={async (_key, reason) => {
+        await step.run(reason);
+        onClose();
+      }}
+      onCancel={onClose}
+    />
+  );
 }
 
 /** A remark from the person who reviewed the item (Dean, Coordinator). */
@@ -29,7 +52,7 @@ export function OnboardingGatePanel({ role }) {
   const [items, setItems] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
-  const [remarks, setRemarks] = useState({});
+  const [step, setStep] = useState(null);
 
   const load = useCallback(() => {
     api.onboardingReviews()
@@ -44,6 +67,20 @@ export function OnboardingGatePanel({ role }) {
     catch (err) { setMsg({ tone: "danger", text: err.message }); }
     finally { setBusy(false); }
   }
+
+  // The Dean's decision on one report, as a step dialog.
+  const onboardingStep = (item, decision) => ({
+    title: decision === "approve" ? "Approve the onboarding report" : "Return the onboarding report",
+    subtitle: `${item.program_code} · ${item.student_count} student${item.student_count === 1 ? "" : "s"}`,
+    label: decision === "approve" ? "Approve onboarding" : "Return",
+    tone: decision === "approve" ? "approve" : "return",
+    needsReason: decision === "return",
+    reasonLabel: decision === "approve" ? "Remarks (optional)" : "Why is the report returned?",
+    run: async (reason) => {
+      await api.decideOnboardingReview(item.id, { decision, remarks: reason });
+      load();
+    },
+  });
 
   if (items === null) return <Spinner label="Loading onboarding reports..." />;
 
@@ -103,23 +140,16 @@ export function OnboardingGatePanel({ role }) {
                 ) : null}
                 {role === "dean" && item.status === "Dean Review" ? (
                   <>
-                    <Input
-                      value={remarks[item.id] || ""}
-                      onChange={(e) => setRemarks((r) => ({ ...r, [item.id]: e.target.value }))}
-                      placeholder="Remarks (required to return)"
-                      aria-label="Dean remarks (required to return)"
-                      className="max-w-xs"
-                    />
                     <Button
                       disabled={busy}
-                      onClick={() => act(() => api.decideOnboardingReview(item.id, { decision: "approve", remarks: remarks[item.id] || "" }))}
+                      onClick={() => setStep(onboardingStep(item, "approve"))}
                     >
                       Approve onboarding
                     </Button>
                     <Button
                       variant="secondary"
                       disabled={busy}
-                      onClick={() => act(() => api.decideOnboardingReview(item.id, { decision: "return", remarks: remarks[item.id] || "" }))}
+                      onClick={() => setStep(onboardingStep(item, "return"))}
                     >
                       Return
                     </Button>
@@ -135,6 +165,7 @@ export function OnboardingGatePanel({ role }) {
           ))}
         </div>
       )}
+      {step && <GateStepDialog step={step} onClose={() => setStep(null)} />}
     </SectionCard>
   );
 }
@@ -152,7 +183,7 @@ export function StudyPlanPanel({ students = [], studentId: fixedStudentId, stude
   const [rationale, setRationale] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
-  const [reviewRemarks, setReviewRemarks] = useState({});
+  const [step, setStep] = useState(null);
   const { user } = useAuth();
   const role = user?.role;
 
@@ -179,6 +210,20 @@ export function StudyPlanPanel({ students = [], studentId: fixedStudentId, stude
   const multipleVersions = (tag?.available_versions || []).length > 1;
   const studentOptions = students.map((s) => ({ value: String(s.id), label: `${s.name} · ${s.student_number}` }));
   const versionOptions = (tag?.available_versions || []).map((v) => ({ value: v, label: v }));
+
+  // The coordinator's decision on one plan, as a step dialog.
+  const planStep = (p, decision) => ({
+    title: decision === "approve" ? "Approve the study plan" : "Return the study plan",
+    subtitle: `${p.student?.name || "Student"} · ${p.term_label || "study plan"}`,
+    label: decision === "approve" ? "Approve plan" : "Return with comment",
+    tone: decision === "approve" ? "approve" : "return",
+    needsReason: decision === "return",
+    reasonLabel: decision === "approve" ? "Remarks (optional)" : "What should be changed in the plan?",
+    run: async (reason) => {
+      await api.reviewStudyPlan(p.id, { decision, remarks: reason });
+      load();
+    },
+  });
 
   const planColumns = [
     { key: "student", header: "Student", cell: (p) => <span className="font-semibold text-ink">{p.student?.name}</span> },
@@ -217,26 +262,11 @@ export function StudyPlanPanel({ students = [], studentId: fixedStudentId, stude
           ) : null}
           {p.status === "Sent to Academic Coordinator" && role === "academic_coordinator" ? (
             <div className="space-y-2">
-              <Input
-                value={reviewRemarks[p.id] || ""}
-                onChange={(e) => setReviewRemarks((r) => ({ ...r, [p.id]: e.target.value }))}
-                placeholder="Remarks (required to return)"
-                aria-label="Review remarks (required to return)"
-                className="min-w-[200px]"
-              />
               <div className="flex flex-wrap gap-2">
-                <Button
-                  disabled={busy}
-                  onClick={() => act(() => api.reviewStudyPlan(p.id, { decision: "approve", remarks: (reviewRemarks[p.id] || "").trim() }))}
-                >
+                <Button disabled={busy} onClick={() => setStep(planStep(p, "approve"))}>
                   Approve plan
                 </Button>
-                <Button
-                  variant="secondary"
-                  disabled={busy || !(reviewRemarks[p.id] || "").trim()}
-                  title={(reviewRemarks[p.id] || "").trim() ? "" : "Write a comment to return the plan"}
-                  onClick={() => act(() => api.reviewStudyPlan(p.id, { decision: "return", remarks: (reviewRemarks[p.id] || "").trim() }))}
-                >
+                <Button variant="secondary" disabled={busy} onClick={() => setStep(planStep(p, "return"))}>
                   Return with comment
                 </Button>
               </div>
@@ -337,6 +367,7 @@ export function StudyPlanPanel({ students = [], studentId: fixedStudentId, stude
           />
         )}
       </div>
+      {step && <GateStepDialog step={step} onClose={() => setStep(null)} />}
     </SectionCard>
   );
 }
@@ -346,7 +377,7 @@ export function CourseworkReportPanel({ role }) {
   const [items, setItems] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
-  const [remarks, setRemarks] = useState({});
+  const [step, setStep] = useState(null);
 
   const load = useCallback(() => {
     api.courseworkReports().then((res) => setItems(res.items || [])).catch((e) => setMsg({ tone: "danger", text: e.message }));
@@ -359,6 +390,20 @@ export function CourseworkReportPanel({ role }) {
     catch (err) { setMsg({ tone: "danger", text: err.message }); }
     finally { setBusy(false); }
   }
+
+  // The Dean's decision on one report, as a step dialog.
+  const reportStep = (item, decision) => ({
+    title: decision === "acknowledge" ? "Acknowledge the coursework report" : "Return the coursework report",
+    subtitle: `${item.term_label || "Active term"}${item.program ? ` · ${item.program.code}` : " · All programs"}`,
+    label: decision === "acknowledge" ? "Acknowledge" : "Return",
+    tone: decision === "acknowledge" ? "approve" : "return",
+    needsReason: decision === "return",
+    reasonLabel: decision === "acknowledge" ? "Remarks (optional)" : "Why is the report returned?",
+    run: async (reason) => {
+      await api.decideCourseworkReport(item.id, { decision, remarks: reason });
+      load();
+    },
+  });
 
   if (items === null) return <Spinner label="Loading coursework reports..." />;
 
@@ -404,24 +449,10 @@ export function CourseworkReportPanel({ role }) {
                 ) : null}
                 {role === "dean" && item.status === "Dean Review" ? (
                   <>
-                    <Input
-                      value={remarks[item.id] || ""}
-                      onChange={(e) => setRemarks((r) => ({ ...r, [item.id]: e.target.value }))}
-                      placeholder="Remarks (required to return)"
-                      aria-label="Dean remarks (required to return)"
-                      className="max-w-xs"
-                    />
-                    <Button
-                      disabled={busy}
-                      onClick={() => act(() => api.decideCourseworkReport(item.id, { decision: "acknowledge", remarks: remarks[item.id] || "" }))}
-                    >
+                    <Button disabled={busy} onClick={() => setStep(reportStep(item, "acknowledge"))}>
                       Acknowledge
                     </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() => act(() => api.decideCourseworkReport(item.id, { decision: "return", remarks: remarks[item.id] || "" }))}
-                    >
+                    <Button variant="secondary" disabled={busy} onClick={() => setStep(reportStep(item, "return"))}>
                       Return
                     </Button>
                   </>
@@ -431,6 +462,7 @@ export function CourseworkReportPanel({ role }) {
           ))}
         </div>
       )}
+      {step && <GateStepDialog step={step} onClose={() => setStep(null)} />}
     </SectionCard>
   );
 }

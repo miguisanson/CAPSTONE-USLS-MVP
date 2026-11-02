@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, EmptyState, InlineNotice, PageHeader, SectionTitle, Spinner } from "../../components/ui/index.js";
+import { Button, Card, EmptyState, InlineNotice, PageHeader, SectionTitle, SkeletonBoard, Spinner } from "../../components/ui/index.js";
 import StudentPicker from "../../components/StudentPicker";
 import { useAuth } from "../../auth";
 import { OnboardingGatePanel } from "../../components/ProcessGates";
@@ -53,6 +53,15 @@ const ICONS = {
   "defense-scheduling": CalendarCheck,
   practicum: Briefcase,
   graduation: GraduationCap,
+};
+
+// Pages that are a staged board: they report what happened in the board notice (not a banner) and load as a skeleton board.
+const BOARD_SLUGS = new Set(["practicum", "graduation"]);
+
+// One more sentence for the page description (it used to be a loose line under the header).
+const PAGE_NOTE = {
+  practicum: "Practicum applies to Psychology and MSGC students only; other programs are not listed.",
+  graduation: "The Academic Coordinator checks coursework, the Research Coordinator validates research evidence, Graduate School staff prepare the list, and the Dean owns the endorsement and export.",
 };
 
 const NEEDS_STUDENT = {
@@ -179,17 +188,21 @@ function SingleWorkflowPage() {
     }
   }, [context, studentLabel]);
 
-  async function submit(payload) {
+  // `strict` is for a caller that shows the outcome itself (a step dialog and the board notice): it gets the answer back, or the
+  // refusal is thrown, and this page puts nothing on screen.
+  async function submit(payload, { strict = false } = {}) {
     setSubmitting(true);
     setSubmitError("");
     setResult(null);
     try {
       const res = await api.submitTransaction(slug, payload);
-      setResult(res);
+      if (!strict) setResult(res);
       await refetch();
-      return true;
+      return strict ? res : true;
     } catch (err) {
-      setSubmitError(err.message || "Could not save. Please review the form.");
+      const message = err.message || "Could not save. Please review the form.";
+      if (strict) throw new Error(message);
+      setSubmitError(message);
       return false;
     } finally {
       setSubmitting(false);
@@ -222,32 +235,24 @@ function SingleWorkflowPage() {
 
   return (
     <div className="page-stack animate-fade-up">
-      <div className="space-y-2">
-        <PageHeader
-          title={tx.title}
-          description={tx.short}
-          icon={Icon}
-          actions={(
-            <>
-              <Button variant="secondary" icon={HelpCircle} onClick={() => setSupportModal("guide")}>How this works</Button>
-              <Button variant="secondary" icon={History} onClick={() => setSupportModal("activity")}>View recent activity</Button>
-            </>
-          )}
-        />
-        {slug === "practicum" && (
-          <p className="meta flex items-center gap-1.5">
-            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            Practicum applies to Psychology and MSGC students only; other programs are not listed.
-          </p>
+      <PageHeader
+        title={tx.title}
+        description={[tx.short, PAGE_NOTE[slug]].filter(Boolean).join(" ")}
+        icon={Icon}
+        actions={(
+          <>
+            <Button variant="secondary" icon={HelpCircle} onClick={() => setSupportModal("guide")}>How this works</Button>
+            <Button variant="secondary" icon={History} onClick={() => setSupportModal("activity")}>View recent activity</Button>
+          </>
         )}
-      </div>
+      />
 
       <PolicyRules process={RULE_PROCESS_BY_SLUG[slug]} />
 
       {subviewTabs && <SubviewTabs tabs={subviewTabs} active={subview} onChange={changeSubview} />}
 
-      {slug !== "defense-scheduling" && result && <InlineNotice tone="success" icon={CheckCircle2}>{result.message}</InlineNotice>}
-      {slug !== "defense-scheduling" && submitError && <InlineNotice tone="danger">{submitError}</InlineNotice>}
+      {!BOARD_SLUGS.has(slug) && slug !== "defense-scheduling" && result && <InlineNotice tone="success" icon={CheckCircle2}>{result.message}</InlineNotice>}
+      {!BOARD_SLUGS.has(slug) && slug !== "defense-scheduling" && submitError && <InlineNotice tone="danger">{submitError}</InlineNotice>}
 
       <div className="page-stack">
         {subview === "adviser" && <AdviserAppointments role={user?.role} embedded />}
@@ -281,9 +286,13 @@ function SingleWorkflowPage() {
             <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
           </Card>
         ) : loading && !context ? (
-          <Card pad="lg">
-            <Spinner label="Loading workflow data…" />
-          </Card>
+          BOARD_SLUGS.has(slug) ? (
+            <SkeletonBoard columns={4} label="Loading board" />
+          ) : (
+            <Card pad="lg">
+              <Spinner label="Loading workflow data…" />
+            </Card>
+          )
         ) : error && !context ? (
           <Card pad="lg">
             <EmptyState icon={AlertTriangle} title="Could not load workflow" hint={error} />

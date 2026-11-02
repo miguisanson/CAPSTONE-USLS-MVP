@@ -205,7 +205,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     const tabs = page.getByRole("tablist", { name: "Graduation views" });
     await expect(tabs.getByRole("tab", { name: "Roster & workflow" })).toHaveAttribute("aria-selected", "true");
     await expect(tabs.getByRole("tab", { name: "Endorsement batches" })).toHaveAttribute("aria-selected", "false");
-    await expect(page.getByText(/Dean view · AC checks coursework/)).toBeVisible(); // conE: the card title "Graduation endorsement candidates" repeated the page title
+    await expect(page.getByText(/AC checks coursework/)).toHaveCount(0); // CHANGED BY p98 (I-157): the loose "Dean view · AC checks coursework..." line is gone (the staff page says who does what in its description); conE: no card title repeating the page title
     await expect(page.getByText("Isabel Flores").first()).toBeVisible();
     await shot(page, "graduation-roster-1366.png");
   });

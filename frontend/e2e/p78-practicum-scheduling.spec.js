@@ -147,7 +147,10 @@ test.describe("Practicum (staff)", () => {
     await expect(main(page).getByText(/Showing 1 of 2/)).toBeVisible();
     await expect(board.getByText("Paolo Ramirez", { exact: true })).toHaveCount(0);
     await main(page).getByPlaceholder(/Search students/).fill("zzzz-nobody");
-    await expect(main(page).getByText("No recent practicum submissions match the filters.")).toBeVisible();
+    // CHANGED BY p98 (I-155): a search that matches nothing keeps the columns (each says "No practicum students here") instead of replacing the board with an empty-state box.
+    await expect(board.getByRole("heading", { name: "Awaiting Submission" })).toBeVisible();
+    await expect(board.getByText("No practicum students here")).toHaveCount(8);
+    await expect(board.getByText("Paolo Ramirez", { exact: true })).toHaveCount(0);
     await main(page).getByRole("button", { name: /Clear 1 filter/ }).click();
     await expect(board.getByText("Paolo Ramirez", { exact: true })).toBeVisible();
   });
@@ -175,7 +178,7 @@ test.describe("Practicum (staff)", () => {
     await expect(row).toContainText("0/200");
     await shotsAt(page, "practicum-table");
 
-    await row.getByRole("button", { name: /Open case/ }).click();
+    await row.getByRole("button", { name: "View details for Andrea Villanueva" }).click(); // CHANGED BY p98 (I-155): "Open case" is "View", like the other tables
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: "Andrea Villanueva" })).toBeVisible();
     await expect(dialog).toContainText("Practicum case");
@@ -200,7 +203,7 @@ test.describe("Practicum (staff)", () => {
     await page.getByRole("dialog").getByRole("button", { name: "Forward to Academic Coordinator" }).click();
     const confirm = page.getByRole("dialog").last();
     await expect(confirm.getByRole("heading", { name: "Confirm: Forward to Academic Coordinator" })).toBeVisible();
-    await expect(confirm).toContainText("Workflow movement");
+    await expect(confirm).toContainText("This action is recorded against your signed-in account"); // CHANGED BY p98 (I-152): the one step dialog has no "Workflow movement" caption; the from/to line stays
     await expect(confirm).toContainText("MOA Submitted");
     await expect(confirm).toContainText("MOA Under Review");
     await page.keyboard.press("Escape");
@@ -390,14 +393,14 @@ test.describe("Lifecycle workflow pages open with the shared header (I-063)", ()
 test.describe("Practicum board matches the other boards (I-089)", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
 
-  test("scope is a one-line note under the header, not a green banner", async ({ page }) => {
+  // CHANGED BY p98 (I-157): the scope note is a sentence of the page description, not a loose line under the header (no height check any more).
+  test("scope is part of the page description, not a green banner", async ({ page }) => {
     await page.goto("/workflow/practicum");
     await expect(main(page).getByRole("heading", { level: 1, name: "Practicum" })).toBeVisible();
     await expect(main(page).getByText("Program scope:")).toHaveCount(0);
     const note = main(page).getByText(/Practicum applies to Psychology and MSGC students only/);
     await expect(note).toBeVisible();
-    const box = await note.boundingBox();
-    expect(box.height, "the note is one line").toBeLessThan(28);
+    await expect(note, "it shares the paragraph with the page description").toContainText("Track practicum MOA receipt");
     const banner = await note.evaluate((node) => getComputedStyle(node.closest("div,p")).backgroundColor);
     expect(banner, "no green banner behind the note").not.toMatch(/rgb\((2[0-4]\d|[0-9]{1,2}), 2[0-5]\d, /);
   });
