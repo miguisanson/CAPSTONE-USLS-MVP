@@ -2,7 +2,7 @@
 
 ## PAUSED for 5-hour limit (2026-11-03) — exact next steps
 
-1. `pkt/fable2` (wt/fable2) may have finished: review + merge (frontend: I-211, I-212 ui, I-214, I-217; spec p105-fable-fixes).
+1. `pkt/fable2` is FINISHED (244dd5b) but NOT merged: merge conflict in `frontend/src/components/SubjectNeedsReport.jsx` (sweep2 and fable2 both changed its date formatting; keep one formatDateTime call), then merge; its run also left p103 ("N with Active standing" now "N active students") and p51 (first row not Hector Ong) to update. Then review + merge (frontend: I-211, I-212 ui, I-214, I-217; spec p105-fable-fixes).
 2. Start `pkt/fable1` (app.py): I-209 `DEMO_PASSWORD` env override in the seed (UAT.md: set it in .env, re-seed); I-212
    server flag `demo_account` on /api/auth/me + refuse change-password for seeded demo accounts in DEMO_MODE; I-213
    report tile texts (F-07..F-10); I-214 `actor_name` in histories; I-215 panel-matching Gemini cache + 1 retry; I-216
