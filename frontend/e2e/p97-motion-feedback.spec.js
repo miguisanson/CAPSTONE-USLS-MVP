@@ -10,8 +10,11 @@
 //     all of it off;
 //   - SkeletonBoard (columns with two card bars, aria-busy, label "Loading board") is in the gallery.
 import { test, expect } from "@playwright/test";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { AUTH_DIR } from "./support/paths.mjs";
+import { AUTH_DIR, SCREENS_DIR } from "./support/paths.mjs";
+
+const SHOTS = join(SCREENS_DIR, "..", "p97");
 
 test.use({ storageState: join(AUTH_DIR, "staff.json"), viewport: { width: 1366, height: 600 } });
 
@@ -91,6 +94,25 @@ test("a move waiting on its confirm dialog shows 'Moving to <column>' until Canc
   await expect(dialog).toHaveCount(0);
   await expect(card.getByText(/^Moving to /)).toHaveCount(0);
 });
+
+for (const width of [1366, 390]) {
+  test(`pending move at ${width} px: ringed card, no overflow (screenshot)`, async ({ page }) => {
+    mkdirSync(SHOTS, { recursive: true });
+    await page.setViewportSize({ width, height: 800 });
+    const { card } = await openBoard(page);
+    await card.getByRole("button", { name: /Move to/ }).click();
+    await page.getByRole("menuitem").and(page.locator('[aria-disabled="false"]')).first().click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(card.getByTestId("card-moving")).toBeVisible();
+    await page.waitForTimeout(400); // the dialog has finished animating in
+    await page.screenshot({ path: join(SHOTS, `pending-${width}.png`) });
+    await page.keyboard.press("Escape");
+    await expect(card.getByTestId("card-moving")).toHaveCount(0);
+    await card.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `board-${width}.png`) });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  });
+}
 
 test("reduced motion switches the new animations off", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });

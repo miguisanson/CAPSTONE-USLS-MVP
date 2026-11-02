@@ -63,9 +63,32 @@ export default {
           "0%": { opacity: "0", transform: "translateY(6px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        // Motion tokens (I-148/I-156). The global prefers-reduced-motion rule in index.css cuts every one of them.
+        "backdrop-in": { "0%": { opacity: "0" }, "100%": { opacity: "1" } },
+        "dialog-panel-in": {
+          "0%": { opacity: "0", transform: "scale(0.98)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        "drawer-in-right": { "0%": { transform: "translateX(100%)" }, "100%": { transform: "translateX(0)" } },
+        "drawer-in-left": { "0%": { transform: "translateX(-100%)" }, "100%": { transform: "translateX(0)" } },
+        "notice-in": {
+          "0%": { opacity: "0", transform: "translateY(-4px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        // A card that has just arrived in its column: a green ring that fades out.
+        "card-settle": {
+          "0%": { boxShadow: "0 0 0 3px rgba(63, 182, 115, 0.85)" },
+          "100%": { boxShadow: "0 0 0 3px rgba(63, 182, 115, 0)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.25s ease-out",
+        "backdrop-in": "backdrop-in 150ms ease-out",
+        "dialog-panel": "dialog-panel-in 180ms ease-out",
+        "drawer-right": "drawer-in-right 200ms ease-out",
+        "drawer-left": "drawer-in-left 200ms ease-out",
+        "notice-in": "notice-in 150ms ease-out",
+        "card-settle": "card-settle 1s ease-out",
       },
     },
   },

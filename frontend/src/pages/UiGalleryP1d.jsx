@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Inbox, Users } from "lucide-react";
-import { Button, DataTable, EmptyState, InlineNotice, Pagination, SearchInput, Skeleton, Spinner, StatusChip } from "../components/ui/index.js";
+import { Button, DataTable, EmptyState, InlineNotice, Pagination, SearchInput, Skeleton, SkeletonBoard, Spinner, StatusChip } from "../components/ui/index.js";
 
 function Group({ title, children }) {
   return (
@@ -175,6 +175,7 @@ export default function UiGalleryP1d() {
           <div className="rounded-xl border border-slate-200" data-case="spinner-sm"><Spinner size="sm" /></div>
           <div className="rounded-xl border border-slate-200" data-case="spinner-custom"><Spinner size="sm" label="Checking the roster…" /></div>
           <div className="rounded-xl border border-slate-200 p-4"><Skeleton data-case="skeleton" lines={4} /></div>
+          <div className="overflow-hidden rounded-xl border border-slate-200 p-4 sm:col-span-2" data-case="skeleton-board"><SkeletonBoard /></div>
         </div>
       </Group>
 
