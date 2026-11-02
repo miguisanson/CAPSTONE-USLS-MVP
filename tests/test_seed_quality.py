@@ -28,6 +28,7 @@ from app import (  # noqa: E402
     Faculty,
     PanelAssignment,
     Program,
+    SEEDED_HISTORY_SOURCE,
     Student,
     SubjectEnrollment,
     Task,
@@ -159,8 +160,12 @@ class SeedQualityTests(unittest.TestCase):
             self.assertGreaterEqual(len({d for d in due}), 3, "tasks are all due on the same day")
             self.assertGreater(len({v.strftime("%H:%M:%S") for v in verdicts if v}), 1, "all verdicts at the same clock time")
             oldest = self.today - timedelta(weeks=12, days=1)
-            for label, values in (("activity", logged), ("appointments", appointments)):
+            # I-197: activity rows tagged as deliberate history (seed_report_history) may be older, so the
+            # "compared with last term" reports have something to compare. Everything else stays in the window.
+            current_activity = [row.created_at for row in TransactionLog.query.all() if row.source_reference != SEEDED_HISTORY_SOURCE]
+            for label, values in (("activity", current_activity), ("appointments", appointments)):
                 self.assertTrue(all(oldest <= value.date() <= self.today for value in values if value), label)
+            self.assertTrue(all(value.date() <= self.today for value in logged if value), "history is in the past")
 
     # ------------------------------------------------------------------ I-094 (F-40)
     def test_default_student_has_nothing_to_withdraw_and_the_withdrawal_demo_students_have_subjects(self):

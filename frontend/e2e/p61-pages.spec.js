@@ -170,7 +170,7 @@ test.describe("Dashboard page", () => {
     for (const t of ["Students monitored", "At risk or delayed", "Your open tasks", "Confirmed defenses"]) {
       await expect(page.locator("main a", { hasText: t }).first(), t).toBeVisible();
     }
-    await expect(page.getByText(`${k.active_students} with Active standing`)).toBeVisible(); // I-193: says which "active"
+    await expect(page.getByText(`${k.active_students} active students`)).toBeVisible(); // I-193: the dashboard and Reports count the same active students
 
     // a tile navigates
     await link("/students").first().click();

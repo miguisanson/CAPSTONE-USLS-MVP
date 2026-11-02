@@ -249,7 +249,7 @@ export function officeStats({ role, own, waiting, kpis }) {
   if (kpis) {
     return [
       tasks,
-      { key: "students", label: "Students monitored", value: kpis.total_students, sub: `${kpis.active_students} with Active standing`, tone: "success", to: "/students" },
+      { key: "students", label: "Students monitored", value: kpis.total_students, sub: `${kpis.active_students} active students`, tone: "success", to: "/students" },
       { key: "risk", label: "At risk or delayed", value: kpis.at_risk, sub: `${kpis.high_risk} delayed`, tone: "warning", to: "/students?risk=At Risk of Delay/Delayed" },
       { key: "defenses", label: "Confirmed defenses", value: kpis.confirmed_schedules, sub: `${kpis.needs_availability} awaiting availability`, tone: "info", to: "/workflow/defense-scheduling" },
     ];

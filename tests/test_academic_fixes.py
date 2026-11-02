@@ -706,11 +706,10 @@ class AcademicFixTests(unittest.TestCase):
             term = db.session.get(AcademicTerm, self.term1_id)
             term.label = "AY 2026-2027 1st Semester"
             self.assertEqual(student_current_course_year(student, term), years_in_program(student, term=term))
-            with patch("app.date") as mocked:
-                mocked.today.return_value = date(2026, 12, 31)
-                mocked.side_effect = lambda *a, **k: date(*a, **k)
+            with patch("app.ph_today") as mocked:  # the app's one "today" (I-195)
+                mocked.return_value = date(2026, 12, 31)
                 self.assertEqual(years_in_program(student), 7)
-                mocked.today.return_value = date(2027, 1, 2)
+                mocked.return_value = date(2027, 1, 2)
                 self.assertEqual(years_in_program(student), 7)  # no flip on 1 January
                 self.assertEqual(residence_limits(student)["years_in_program"], 7)
 
