@@ -177,6 +177,20 @@ class Be6Tests(unittest.TestCase):
                 self.assertIn(student.current_stage, ("Coursework", "Admission"))
                 self.assertIsNone(app_module.ResearchCase.query.filter_by(student_id=student.id).first())
 
+    # ------------------------------------------------------------------ board statuses (e2e triage P1)
+    def test_every_case_on_every_staff_board_sits_in_one_of_its_columns(self):
+        """The board says "Showing N of N" from the list but draws only the cards a column maps (the same mapping the API counts with)."""
+        client = self._client("staff")
+        for slug in ("leave-of-absence", "readmission", "awol", "withdrawal"):
+            data = client.get(f"/api/process-cases?slug={slug}").get_json()
+            self.assertGreater(len(data["cases"]), 0, slug)
+            unmapped = sorted({c["status"] for c in data["cases"]} - {
+                status for column in data["vocabulary"]["columns"][slug] for status in column["statuses"]
+            })
+            self.assertEqual(unmapped, [], f"{slug}: statuses no column shows")
+            self.assertEqual(data["counts"].get("other", 0), 0, slug)
+            self.assertEqual(sum(data["counts"].values()), len(data["cases"]), slug)
+
 
 if __name__ == "__main__":
     unittest.main()
