@@ -1,4 +1,10 @@
-# State
+# State
+
+## ACTIVE RUN UPDATE (2026-11-02) - UAT hosting packet (pkt/uat, worktree CAPSTONE-USLS-MVP-wt/uat)
+
+- **Done:** `scripts/serve_uat.py` (`npm run uat`: ProxyFix + waitress 3.0.2 on FLASK_HOST/FLASK_PORT), `.env.example` (every env var; numeric settings stay commented because an empty `int("")` crashes), `setup-env.cjs` Google Calendar lines + `--uat`, `UAT.md` runbook, `deploy/cloudflared/config.yml.example`. Tests: `tests/test_uat_serving.py`, `scripts/setup-env.test.cjs`. `app.py` was not touched.
+- **Next:** the public-exposure audit findings (reported to the integrator) feed an app.py packet: empty-env tolerance, a UAT switch to hide the demo-accounts passwords, assistant rate limit, security headers, SQLite WAL.
+
 
 ## ACTIVE RUN UPDATE (2026-10-27) - faculty calendar UI refinement complete
 
