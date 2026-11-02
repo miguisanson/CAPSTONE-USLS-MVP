@@ -38910,6 +38910,21 @@ HISTORY_TURNAROUND_DAYS = {
     "recent": [1, 1, 2, 2, 3, 3, 3, 4, 5, 6, 8, 12, 19],
     "current": [1, 2, 2, 3, 4],
 }
+# Marks every activity-log row and schedule request that seed_report_history() writes. The seed-quality test lets only
+# rows with this mark be older than 12 weeks (deliberate history for the "compared with last term" reports, I-197).
+SEEDED_HISTORY_SOURCE = "Seeded history"
+# Activity-log process slug of each history process (adviser appointments have no queue slug).
+HISTORY_LOG_SLUGS = {
+    "leave": "leave-of-absence", "readmission": "readmission", "awol": "awol", "withdrawal": "withdrawal",
+    "practicum": "practicum", "graduation": "graduation",
+}
+# Held defenses of the two earlier terms: (defense type, result). Only students with no other story sit in them.
+HISTORY_DEFENSES = {
+    "older": [("Title Defense", VERDICT_PASSED), ("Title Defense", VERDICT_PASSED), ("Proposal Defense", VERDICT_MINOR),
+              ("Proposal Defense", VERDICT_FAILED)],
+    "recent": [("Title Defense", VERDICT_PASSED), ("Proposal Defense", VERDICT_PASSED), ("Proposal Defense", VERDICT_MINOR),
+               ("Final Defense", VERDICT_PASSED), ("Final Defense", VERDICT_FAILED)],
+}
 # (process, outcomes) per term; A = approved, D = denied, R = returned.
 HISTORY_PLAN = {
     "older": [("leave", "AADA"), ("readmission", "AA"), ("awol", "A"), ("withdrawal", "AADAA"), ("practicum", "AA"),
@@ -38925,8 +38940,9 @@ def seed_report_history(today: date | None = None) -> int:
     who was enrolled in each earlier term, so Reports show "vs previous term" on a fresh seed. Returns the cases made.
 
     Only students with no other story get a history (no case, task, log, message or defense of their own), so no demo
-    student changes. Dates sit inside the terms themselves; nothing is written to the activity log (that log is the
-    last 12 weeks only, see the seed-quality test), and nothing here is random.
+    student changes. Dates sit inside the terms themselves and nothing here is random. The two earlier terms also get
+    held defenses with verdicts and a two-entry activity-log trail per closed case (for the cycle-time report); those
+    log rows carry SEEDED_HISTORY_SOURCE, the only rows the seed-quality test lets be older than 12 weeks.
     """
     today = today or ph_today()
     active = get_active_term()
@@ -38967,6 +38983,20 @@ def seed_report_history(today: date | None = None) -> int:
             minutes = 9 * 60 + (index * 53) % 480
             decided = datetime.combine(term.start_date + timedelta(days=offset), time(minutes // 60, minutes % 60))
         return decided, decided - timedelta(days=days, hours=(index * 3) % 7)
+
+    def history_log(slug: str, student, submitted, decided, outcome: str) -> None:
+        """Submitted -> decided: the two entries the cycle-time report needs (the last names no next owner)."""
+        verdict = {"A": "Approved", "D": "Denied"}.get(outcome, "Returned")
+        for moment, role, result, owner, before, after in (
+            (submitted, "Student", "Request submitted", "Graduate School Staff", None, "Submitted"),
+            (decided, "Dean", f"{verdict} by the Dean", "None", "Dean Review", verdict),
+        ):
+            db.session.add(TransactionLog(
+                transaction_slug=slug, student_id=student.id, actor_role=role, action_type="status",
+                source_reference=SEEDED_HISTORY_SOURCE, result=result, next_owner=owner,
+                notes="Seeded history.", previous_status=before, new_status=after, created_at=moment,
+                reflected_in_aims=True, reflected_at=decided,
+            ))
 
     made = 0
     for kind, plan in HISTORY_PLAN.items():
@@ -39062,7 +39092,49 @@ def seed_report_history(today: date | None = None) -> int:
                     ))
                 else:
                     continue
+                if process in HISTORY_LOG_SLUGS and kind != "current":
+                    history_log(HISTORY_LOG_SLUGS[process], student, submitted, decided, outcome)
                 made += 1
+
+    # Held defenses with a verdict in the two earlier terms, so "defenses held" compares with the previous term.
+    faculty_rows = Faculty.query.filter_by(active=True).order_by(Faculty.id).all()
+    for kind in ("older", "recent"):
+        term = terms[kind]
+        span = max((term.end_date - term.start_date).days - 30, 1)
+        for index, (defense_type, result) in enumerate(HISTORY_DEFENSES[kind]):
+            student = next_student()
+            if student is None or not faculty_rows:
+                continue
+            gate = RESEARCH_DEFENSE_TYPES_TO_GATES[defense_type]
+            chair = faculty_rows[(index + (3 if kind == "recent" else 0)) % len(faculty_rows)]
+            day = min(term.start_date + timedelta(days=20 + (index * 29 + student.id * 7) % span), today - timedelta(days=1))
+            held_at = datetime.combine(day, time(9 + (index * 2) % 7, 30 if index % 2 else 0))
+            assignment = PanelAssignment(
+                student_id=student.id, faculty_id=chair.id, gate=gate, panel_role="Panel Chair", score=90,
+                eligibility_note=SEEDED_HISTORY_SOURCE, assigned_at=held_at - timedelta(days=14),
+            )
+            db.session.add(assignment)
+            db.session.add(PanelInvitation(  # answered long ago: a seat on a current gate always has an invitation
+                student_id=student.id, faculty_id=chair.id, gate=gate, panel_role="Panel Chair", status="Accepted",
+                invited_at=held_at - timedelta(days=14), responded_at=held_at - timedelta(days=12),
+            ))
+            request = ScheduleRequest(
+                student_id=student.id, preferred_date=day, preferred_end_date=day, start_time=held_at.time(),
+                end_time=(held_at + timedelta(hours=1, minutes=30)).time(), defense_type=defense_type, mode="In person",
+                venue="Graduate School Conference Room", status=HELD_DEFENSE_STATUS, matched_count=1,
+                panel_snapshot=json.dumps([{"faculty_id": chair.id, "name": chair.name, "role": "Panel Chair"}]),
+                required_forms_status="Complete", notes="Seeded history: defense held with a recorded verdict.",
+                created_at=held_at - timedelta(days=21), confirmed_at=held_at - timedelta(days=14),
+            )
+            db.session.add(request)
+            db.session.flush()
+            db.session.add(DefenseVerdict(
+                student_id=student.id, schedule_request_id=request.id, panel_assignment_id=assignment.id, faculty_id=chair.id,
+                gate=gate, defense_type=defense_type, chair_name=chair.name, result=result, remarks="Seeded history.",
+                defense_date=day, submitted_at=held_at + timedelta(hours=2),
+                revision_status=REVISION_CONFIRMED if result == VERDICT_MINOR else None,
+            ))
+            made += 1
     db.session.flush()
 
     # Who was enrolled in the two earlier terms: everyone in good standing whose cohort had already entered.
