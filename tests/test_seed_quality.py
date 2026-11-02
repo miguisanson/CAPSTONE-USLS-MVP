@@ -33,6 +33,8 @@ from app import (  # noqa: E402
     Task,
     TransactionLog,
     UserAccount,
+    WithdrawalApplication,
+    subject_withdrawal_window,
     adviser_max_advisees,
     app,
     compute_course_audit,
@@ -179,6 +181,32 @@ class SeedQualityTests(unittest.TestCase):
                     SubjectEnrollment.student_id == student.id,
                     SubjectEnrollment.status == "Enrolled",
                 ).count(), 1, number)
+
+    # ------------------------------------------------------------------ I-162 / I-164 (audit I-143)
+    def test_every_seeded_withdrawal_names_a_subject(self):
+        with app.app_context():
+            rows = WithdrawalApplication.query.all()
+            self.assertTrue(rows)
+            self.assertEqual([], [row.id for row in rows if not row.subject_enrollment_id])
+
+    def test_the_withdrawal_demo_students_are_inside_an_open_window_on_any_seed_day(self):
+        """The 14-day window must not depend on the calendar date the demo is seeded on (I-162)."""
+        with app.app_context():
+            account = UserAccount.query.filter_by(email="withdrawal.elena@usls.edu.ph").one()
+            subject = SubjectEnrollment.query.filter_by(student_id=account.student_id, status="Enrolled").first()
+            window = subject_withdrawal_window(subject)
+            self.assertTrue(window["eligible"], window)
+            self.assertEqual(10, window["fee_percent"], window)
+            # Still open for the next week of a demo or UAT.
+            self.assertTrue(subject_withdrawal_window(subject, self.today + timedelta(days=7))["eligible"])
+            joshua = Student.query.filter_by(student_number="GS-2026-WD-02").one()
+            joshua_subject = SubjectEnrollment.query.filter_by(student_id=joshua.id, status="Enrolled").first()
+            self.assertTrue(subject_withdrawal_window(joshua_subject)["eligible"])
+            subject_id, account_id = subject.id, account.id
+        client = self._client(account_id, "student")
+        response = client.post("/api/student-portal/requests/withdrawal", json={
+            "reason": "Work schedule clash.", "subject_enrollment_id": subject_id})
+        self.assertIn(response.status_code, (200, 201), response.get_json())
 
     # ------------------------------------------------------------------ I-095 (F-41)
     def test_terms_cover_only_the_current_year_plus_or_minus_two(self):

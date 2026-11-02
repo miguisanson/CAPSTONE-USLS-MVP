@@ -345,6 +345,24 @@ class StandaloneConsistencyTests(unittest.TestCase):
         detail = self.staff().get(f"/api/process-cases/withdrawal/{application_id}").get_json()["case"]
         self.assertGreaterEqual(len(detail["events"]), 3)
 
+    def test_a_withdrawal_with_no_subject_cannot_be_forwarded_to_the_dean(self):
+        """I-164: the Dean cannot approve a request that names no subject, so staff may not forward it."""
+        with app.app_context():
+            application = WithdrawalApplication(
+                student_id=self.students["withdrawal"], withdrawal_scope="Subject", reason="Moving away.",
+                effective_term="Running Term", status="Submitted to GS Staff", dean_decision="Pending",
+            )
+            db.session.add(application)
+            db.session.commit()
+            application_id = application.id
+        direct = self.staff().post("/api/transactions/withdrawal", json={
+            "student_id": self.students["withdrawal"], "workflow_action": "forward_to_dean"})
+        self.assertEqual(direct.status_code, 400, direct.get_json())
+        self.assertIn("subject", direct.get_json()["error"].lower())
+        self.assert_refused(self.move("withdrawal", application_id, "forward"), "subject")
+        with app.app_context():
+            self.assertEqual(db.session.get(WithdrawalApplication, application_id).status, "Submitted to GS Staff")
+
     def test_withdrawal_can_be_denied_with_a_reason_only(self):
         application_id = self.make_withdrawal(status="Dean Review")
         self.assert_refused(self.move("withdrawal", application_id, "deny", client=self.dean()), "reason")

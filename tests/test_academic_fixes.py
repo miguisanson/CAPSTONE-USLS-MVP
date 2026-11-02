@@ -628,6 +628,26 @@ class AcademicFixTests(unittest.TestCase):
             self.assertNotEqual(application.dean_decision, "Pending")
             self.assertIn("Dropped", application.staff_remarks)
 
+    def test_dropping_a_subject_closes_a_dean_approved_withdrawal_waiting_for_the_tag(self):
+        """I-163: the approved request must not stay stuck at 'Awaiting Subject Tag' once the subject is Dropped."""
+        with app.app_context():
+            enrollment = self._enroll_row(self.student_id, self.course_ids[0], self.term1_id)
+            db.session.flush()
+            application = WithdrawalApplication(
+                student_id=self.student_id, subject_enrollment_id=enrollment.id,
+                status="Approved - Awaiting Subject Tag", dean_decision="Approved",
+            )
+            db.session.add(application)
+            db.session.commit()
+            enrollment_id, application_id = enrollment.id, application.id
+        self.assertEqual(self._drop(enrollment_id, date.today().isoformat()).status_code, 200)
+        with app.app_context():
+            application = db.session.get(WithdrawalApplication, application_id)
+            self.assertEqual(application.status, "Cancelled")
+            self.assertIn("Dropped", application.staff_remarks)
+            self.assertTrue(TransactionLog.query.filter_by(
+                transaction_slug="withdrawal", student_id=self.student_id, new_status="Cancelled").count())
+
     # ======================================================================
     # EN-06  one demand definition
     # ======================================================================
