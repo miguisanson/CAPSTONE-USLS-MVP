@@ -46,7 +46,8 @@ function tileSub(tile) {
 
 function Tile({ tile, onOpen }) {
   const { trend, Icon, tone, words } = describeComparison(tile);
-  const unit = UNIT_TEXT[tile.unit] ? UNIT_TEXT[tile.unit].trim() : tile.unit;
+  const unit0 = UNIT_TEXT[tile.unit] ? UNIT_TEXT[tile.unit].trim() : tile.unit;
+  const unit = tile.value === 1 ? unit0.replace(/s$/, "") : unit0; // "1 student", not "1 students"
   const sub = tileSub(tile);
   return (
     <button
@@ -55,7 +56,7 @@ function Tile({ tile, onOpen }) {
       className="card flex h-full w-full cursor-pointer flex-col gap-1 p-4 text-left transition-colors hover:border-brand-200 hover:bg-brand-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     >
       <span className="text-xs font-semibold text-slate-600">{tile.label}</span>
-      <span className="text-3xl font-semibold leading-tight text-ink">
+      <span className="page-title">
         {tile.value == null ? "-" : tile.value}
         {tile.value != null && <span className="ml-1 text-sm font-medium text-slate-500">{unit}</span>}
       </span>

@@ -356,9 +356,11 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await shot(page, "history-390.png");
     await page.setViewportSize({ width: 1366, height: 768 });
 
-    // The analytics table now counts the approved batch under Approved / completed.
-    await page.goto("/dean/analytics");
-    const graduationRow = page.getByRole("main").getByRole("row").filter({ has: page.getByRole("link", { name: "Graduation Endorsement", exact: true }) });
-    expect(await numberIn(graduationRow.getByRole("cell").nth(2)), "graduation: approved / completed").toBeGreaterThanOrEqual(1);
+    // CHANGED BY p101 (I-141): the Outcomes tab (its table alternative) counts the approved batch under Approved.
+    await page.goto("/dean/analytics?report=outcomes");
+    const outcomes = page.getByRole("region", { name: "What was decided?" });
+    await outcomes.getByRole("button", { name: "Show as table" }).click();
+    const graduationRow = outcomes.getByRole("row").filter({ has: page.getByText("Graduation Endorsement", { exact: true }) });
+    expect(await numberIn(graduationRow.getByRole("cell").nth(1)), "graduation: approved").toBeGreaterThanOrEqual(1);
   });
 });
