@@ -14803,6 +14803,20 @@ def register_routes(app: Flask) -> None:
     def reports_graduation():
         return report_response("graduation", request.args)
 
+    # Reports v2 (I-141, AD10): the summary strip and the list behind each of its numbers.
+    @app.route("/api/reports/summary")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
+    def reports_summary():
+        return jsonify(report_summary(request.args))
+
+    @app.route("/api/reports/summary/<key>")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
+    def reports_summary_list(key: str):
+        listing = report_summary_list(key, request.args)
+        if listing is None:
+            return jsonify({"error": "There is no such summary number."}), 404
+        return jsonify(listing)
+
     # ---- BPMN 1 Admission: Dean onboarding gate --------------------------
     @app.route("/api/onboarding/reviews")
     @require_api_login("staff", "academic_coordinator", "dean")
@@ -23437,11 +23451,13 @@ def workflow_case_is_closed(slug: str, student_id: int, latest_entry: Transactio
     return record.status in WORKFLOW_FINAL_STATUSES.get(slug, ())
 
 
-def queue_aging_report(student_ids: list[int]) -> dict:
-    """Open case backlog per process area with age buckets (Table 13: aging)."""
-    if not student_ids:
-        return {"count": 0, "rows": [], "columns": QUEUE_AGING_COLUMNS, "totals": {}}
-    rows = []
+def queue_open_cases(student_ids: list[int]) -> list[dict]:
+    """Every open case: per process area and student, the latest log entry still names someone as next owner.
+
+    One row per case: {slug, label, student_id, age_days, next_owner}. The aging report counts these; the Reports
+    summary lists them.
+    """
+    cases = []
     for slug, label in QUEUE_PROCESS_AREAS:
         # The latest log entry per student for this process is the point the
         # case has been waiting from. A case is open when the last recorded
@@ -23456,11 +23472,22 @@ def queue_aging_report(student_ids: list[int]) -> dict:
         )
         for entry in query.all():
             latest[entry.student_id] = entry
-        ages = [
-            _days_since(entry.created_at)
+        cases.extend(
+            {"slug": slug, "label": label, "student_id": student_id, "age_days": _days_since(entry.created_at), "next_owner": entry.next_owner}
             for student_id, entry in latest.items()
             if not workflow_case_is_closed(slug, student_id, entry)
-        ]
+        )
+    return cases
+
+
+def queue_aging_report(student_ids: list[int]) -> dict:
+    """Open case backlog per process area with age buckets (Table 13: aging)."""
+    if not student_ids:
+        return {"count": 0, "rows": [], "columns": QUEUE_AGING_COLUMNS, "totals": {}}
+    open_cases = queue_open_cases(student_ids)
+    rows = []
+    for slug, label in QUEUE_PROCESS_AREAS:
+        ages = [case["age_days"] for case in open_cases if case["slug"] == slug]
         if not ages:
             continue
         buckets = {label_: 0 for _, _, label_ in AGE_BUCKETS}
@@ -24867,6 +24894,322 @@ def report_response(name: str, args):
     else:
         data, mime = report_pdf_bytes(result), "application/pdf"
     return Response(data, mimetype=mime, headers={"Content-Disposition": f'attachment; filename="{stem}.{fmt}"'})
+
+
+# ---------------------------------------------------------------------------
+# Reports v2 (I-141, AD10, spec research/REPORTS-SPEC-2026-11-02.md; payloads in research/REPORTS-API-2026-11-02.md)
+# One question per report, every number with a comparison, every count opens the list behind it. Reads only.
+# All endpoints take the filters program_id, cohort ("24-25" or "2024-2025") and term (a label; default the active term).
+# Payloads, so the frontend packet needs no reading of the code:
+#   GET /api/reports/summary  -> {filters, term:{label,start,end}|null, previous_term|null, tiles:[six, in order
+#       active, behind, waiting, decide_days, defenses, graduation]}; a tile is {key, label, value, unit, count?, of?,
+#       detail?, comparison, drill:{url:"/api/reports/summary/<key>", params}}; comparison is
+#       {kind:"previous_term", label, previous, delta, text} | {kind:"target", target, met, text} | {kind:"none", text}.
+#   GET /api/reports/summary/<key> -> {key, title, count, filters, columns, rows:[{student_id, student, student_number,
+#       program, stage, detail}]} (404 for an unknown key).
+# ---------------------------------------------------------------------------
+# Targets. The business-rules register (BusinessRule) holds policy rules the workflows enforce; these are
+# reporting goals the Graduate School has not set yet, so they are constants until it does.
+# shortcut: constants, not register rows; move them to the register once the Graduate School confirms them.
+REPORT_TARGET_BEHIND_PERCENT = 10  # share of active students behind schedule that is acceptable
+REPORT_TARGET_WAITING = 0  # requests waiting longer than REPORT_WAITING_DAYS
+REPORT_WAITING_DAYS = 7
+DEFENSE_LOOKAHEAD_DAYS = 30
+DEAN_AGE_BANDS = [(0, 3, "0-3 days"), (4, 7, "4-7 days"), (8, 14, "8-14 days"), (15, None, "15+ days")]
+
+# The processes that wait for a Dean decision, in the order the Dean pages list them.
+DECISION_PROCESSES = [
+    ("course-adjustments", "Course Adjustments"),
+    ("leave-of-absence", "Leave of Absence"),
+    ("readmission", "Readmission"),
+    ("awol", "AWOL & Residency"),
+    ("withdrawal", "Subject Withdrawal"),
+    ("practicum", "Practicum Reports"),
+    ("graduation", "Graduation Endorsement"),
+    ("adviser", "Adviser Designation"),
+    ("coursework", "Coursework Report"),
+    ("onboarding", "Onboarding Report"),
+]
+DECISION_PROCESS_LABELS = dict(DECISION_PROCESSES)
+
+
+def _percentile(values: list[float], pct: float) -> float | None:
+    """Nearest-rank percentile (the 90th of 10 values is the 9th smallest). None for no values."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    rank = max(math.ceil(pct / 100.0 * len(ordered)), 1)
+    return round(float(ordered[rank - 1]), 1)
+
+
+def _days_between(start, end) -> float:
+    return max((end - start).total_seconds() / 86400.0, 0.0)
+
+
+def _normal_cohort(label: str) -> str:
+    """'2024-2025' and '24-25' name the same entry cohort."""
+    label = (label or "").strip()
+    match = re.fullmatch(r"(\d{4})\s*-\s*(\d{4})", label)
+    return f"{match.group(1)[2:]}-{match.group(2)[2:]}" if match else label
+
+
+def report_scope(args) -> dict:
+    """The filters every Reports v2 endpoint shares: program, entry cohort and term (default: the active term)."""
+    program_id = safe_int(_filter_value(args, "program_id")) or None
+    cohort = _normal_cohort(_filter_value(args, "cohort"))
+    label = _filter_value(args, "term")
+    term = AcademicTerm.query.filter_by(label=label).first() if label else get_active_term()
+    previous = (
+        AcademicTerm.query.filter(AcademicTerm.end_date < term.start_date)
+        .order_by(AcademicTerm.end_date.desc()).first()
+        if term else None
+    )
+    query = Student.query.join(Program)
+    if program_id:
+        query = query.filter(Student.program_id == program_id)
+    students = [s for s in query.order_by(Student.id).all() if not cohort or _cohort_entry_label(s) == cohort]
+    return {
+        "filters": {"program_id": program_id, "cohort": cohort, "term": term.label if term else (label or None)},
+        "term": term, "previous": previous, "students": students,
+        "ids": {s.id for s in students}, "by_id": {s.id: s for s in students},
+    }
+
+
+def _term_range(term):
+    """(first day, last day) of a term; no term matches nothing."""
+    return (term.start_date, term.end_date) if term else (date.max, date.min)
+
+
+def _moment_in(moment, term) -> bool:
+    low, high = _term_range(term)
+    return moment is not None and low <= moment.date() <= high
+
+
+def _term_json(term):
+    return {"label": term.label, "start": term.start_date.isoformat(), "end": term.end_date.isoformat()} if term else None
+
+
+def _student_row(student: Student, detail: str, **extra) -> dict:
+    return {
+        "student_id": student.id, "student": student.name, "student_number": student.student_number,
+        "program": student.program.code if student.program else "", "stage": student.current_stage,
+        "detail": detail, **extra,
+    }
+
+
+def student_is_active(student: Student) -> bool:
+    return student.standing == "Active" and student.current_stage not in TERMINAL_STAGES
+
+
+def decision_cases() -> list[dict]:
+    """Every case that has gone to the Dean, open or decided, in one shape.
+
+    {process, student_id, program_id, title, started_at (when it was forwarded), decided_at (None while open),
+    outcome ('approved' / 'returned' / 'denied', None while open)}. Course plans, coursework and onboarding reports
+    belong to a program, not a student, so their student_id is None.
+    """
+    cases: list[dict] = []
+
+    def add(process, student_id, program_id, title, started_at, decided_at, outcome, is_open):
+        if started_at is None or not (is_open or decided_at is not None):
+            return
+        cases.append({
+            "process": process, "student_id": student_id, "program_id": program_id, "title": title,
+            "started_at": started_at, "decided_at": None if is_open else decided_at,
+            "outcome": None if is_open else outcome,
+        })
+
+    def outcome_of(word):
+        word = (word or "").lower()
+        return "denied" if word.startswith("denied") or word == "not approved" else "returned" if word.startswith("returned") else "approved"
+
+    students = {sid: pid for sid, pid in db.session.query(Student.id, Student.program_id).all()}
+    for item in LeaveCase.query.all():
+        add(SLUG_FOR_KIND.get(item.kind, "leave-of-absence"), item.student_id, students.get(item.student_id), KIND_LABELS.get(item.kind, item.kind),
+            item.forwarded_at or item.submitted_at, item.decided_at, outcome_of(item.status), item.status == "Dean Review")
+    for item in AwolCase.query.all():
+        is_open = item.status == "Dean Review" and item.dean_decision == "Pending"
+        done = item.dean_decision in ("Approved", "Denied", "Returned", "Approved for Re-enrollment Review")
+        if is_open or done:
+            add("awol", item.student_id, students.get(item.student_id), "Return from AWOL", item.return_requested_at or item.updated_at,
+                item.decided_at or item.updated_at, outcome_of(item.dean_decision), is_open)
+    for item in WithdrawalApplication.query.all():
+        is_open = item.status == "Dean Review" and item.dean_decision == "Pending"
+        done = item.dean_decision in ("Approved", "Denied", "Returned")
+        if is_open or done:
+            add("withdrawal", item.student_id, students.get(item.student_id), "Subject withdrawal", item.created_at,
+                item.decided_at or item.updated_at, outcome_of(item.dean_decision), is_open)
+    for item in PracticumRecord.query.all():
+        add("practicum", item.student_id, students.get(item.student_id), "Practicum status report", item.report_sent_at,
+            item.dean_reviewed_at, "approved", item.status == "Report Sent to Dean")
+    for item in GraduationEndorsement.query.all():
+        add("graduation", item.student_id, students.get(item.student_id), "Graduation endorsement", item.submitted_at,
+            item.dean_decision_at, outcome_of(item.endorsement_status), item.endorsement_status == "Ready for Dean Review")
+    for item in AdviserAppointment.query.all():
+        add("adviser", item.student_id, students.get(item.student_id), "Adviser designation", item.forwarded_at, item.decided_at,
+            outcome_of(item.status), item.status == ADVISER_STATUS_DELIBERATION)
+    program_ids = {code: pid for pid, code in db.session.query(Program.id, Program.code).all()}
+    for item in CourseworkReport.query.all():
+        add("coursework", None, item.program_id, f"Coursework report {item.term_label or ''}".strip(), item.sent_at,
+            item.dean_decision_at, outcome_of(item.dean_decision), item.sent_at is not None and item.dean_decision is None)
+    for item in OnboardingReview.query.all():
+        add("onboarding", None, program_ids.get(item.program_code), f"Onboarding report {item.program_code or ''}".strip(),
+            item.submitted_at, item.dean_decision_at, outcome_of(item.dean_decision), item.status == "Dean Review")
+    for item in CourseOfferingPlan.query.all():
+        if item.status in ("Submitted", "Approved", "Published", "Returned"):
+            add("course-adjustments", None, item.program_id, "Course offering plan", item.submitted_at,
+                item.approved_at or item.updated_at, outcome_of(item.status), item.status == "Submitted")
+    return cases
+
+
+def case_in_scope(case: dict, scope: dict) -> bool:
+    """A student's case follows the student filters; a program-level case follows the program filter only."""
+    if case["student_id"] is not None:
+        return case["student_id"] in scope["ids"]
+    return not scope["filters"]["cohort"] and (not scope["filters"]["program_id"] or case["program_id"] == scope["filters"]["program_id"])
+
+
+def _decision_days(cases: list[dict], term) -> list[float]:
+    return [_days_between(c["started_at"], c["decided_at"]) for c in cases if c["decided_at"] is not None and _moment_in(c["decided_at"], term)]
+
+
+def _compare_previous(value, previous_value, scope, unit_text: str = "", empty_text: str = "") -> dict:
+    """The 'compared with' line of a tile: last term's number, the change, or why there is none."""
+    if scope["previous"] is None:
+        return {"kind": "none", "text": "no earlier term yet"}
+    if previous_value is None or value is None:
+        return {"kind": "none", "text": empty_text or f"nothing recorded for {scope['previous'].label}"}
+    delta = round(value - previous_value, 1) if isinstance(value, float) or isinstance(previous_value, float) else value - previous_value
+    return {
+        "kind": "previous_term", "label": scope["previous"].label, "previous": previous_value, "delta": delta,
+        "text": f"{previous_value}{unit_text} in {scope['previous'].label}",
+    }
+
+
+def _target_comparison(value, target, unit: str = "") -> dict:
+    return {"kind": "target", "target": target, "met": value is not None and value <= target, "text": f"target {target}{unit}"}
+
+
+def summary_tiles(args) -> tuple[dict, list[dict]]:
+    """The six numbers (spec section 3). Each tile also carries `rows`, the students behind it."""
+    scope = report_scope(args)
+    term, previous = scope["term"], scope["previous"]
+    students = scope["students"]
+    active = [s for s in students if student_is_active(s)]
+    today = date.today()
+
+    # 1. Active students, against the students enrolled in the previous term.
+    enrolled_before = None
+    if previous is not None:
+        enrolled_before = len({
+            sid for (sid,) in db.session.query(TermEnrollment.student_id)
+            .filter(TermEnrollment.term_id == previous.id, TermEnrollment.status.in_(["Confirmed", "Enrolled"])).all()
+            if sid in scope["ids"]
+        }) or None
+    tile_active = {
+        "key": "active", "label": "Active students", "value": len(active), "unit": "students",
+        "comparison": _compare_previous(len(active), enrolled_before, scope, empty_text=f"no enrollment records for {previous.label}" if previous else ""),
+        "rows": [_student_row(s, f"{s.current_stage}, {s.risk_level}") for s in active],
+    }
+
+    # 2. Behind schedule: share of active students marked At Risk or Delayed.
+    behind = [s for s in active if s.risk_level in AT_RISK_LEVELS]
+    share = round(len(behind) / len(active) * 100.0, 1) if active else 0.0
+    tile_behind = {
+        "key": "behind", "label": "Behind schedule", "value": share, "unit": "%", "count": len(behind), "of": len(active),
+        "comparison": _target_comparison(share, REPORT_TARGET_BEHIND_PERCENT, "%"),
+        "rows": [_student_row(s, s.risk_level) for s in behind],
+    }
+
+    # 3. Requests waiting longer than a week (the open cases of queue_aging_report, one row per case).
+    waiting_cases = [c for c in queue_open_cases(sorted(scope["ids"])) if c["age_days"] > REPORT_WAITING_DAYS]
+    tile_waiting = {
+        "key": "waiting", "label": f"Requests waiting more than {REPORT_WAITING_DAYS} days", "value": len(waiting_cases), "unit": "requests",
+        "comparison": _target_comparison(len(waiting_cases), REPORT_TARGET_WAITING),
+        "rows": [
+            _student_row(scope["by_id"][c["student_id"]], f"{c['label']}: waiting {c['age_days']} days, next {c['next_owner'] or 'not named'}", age_days=c["age_days"])
+            for c in sorted(waiting_cases, key=lambda c: -c["age_days"])
+        ],
+    }
+
+    # 4. Median days from forwarding to the Dean's decision, decisions made in the term.
+    cases = [c for c in decision_cases() if case_in_scope(c, scope)]
+    days_now = _decision_days(cases, term)
+    days_before = _decision_days(cases, previous) if previous else []
+    median_now = round(_median(days_now), 1) if days_now else None
+    median_before = round(_median(days_before), 1) if days_before else None
+    tile_decide = {
+        "key": "decide_days", "label": "Median days to decide", "value": median_now, "unit": "days", "count": len(days_now),
+        "comparison": _compare_previous(median_now, median_before, scope, " days", f"no decisions in {previous.label}" if previous else ""),
+        "rows": [
+            {"student_id": c["student_id"], "student": scope["by_id"][c["student_id"]].name if c["student_id"] else c["title"],
+             "student_number": scope["by_id"][c["student_id"]].student_number if c["student_id"] else "", "program": "",
+             "stage": "", "detail": f"{DECISION_PROCESS_LABELS[c['process']]}: decided in {round(_days_between(c['started_at'], c['decided_at']), 1)} days ({c['outcome']})"}
+            for c in cases if c["decided_at"] is not None and _moment_in(c["decided_at"], term)
+        ],
+    }
+
+    # 5. Defenses held this term; with those in the next 30 days and those still waiting for a verdict.
+    def defense_rows(when, in_term=None):
+        params = {"program_id": scope["filters"]["program_id"] or "", "when": when, "term": in_term.label if in_term else ""}
+        return [r for r in report_defenses(params)["rows"] if r["student_id"] in scope["ids"]]
+
+    held = defense_rows("Held", term) if term else []
+    upcoming = [r for r in defense_rows("Upcoming") if r["date"] <= (today + timedelta(days=DEFENSE_LOOKAHEAD_DAYS)).isoformat()]
+    awaiting = defense_rows("Awaiting verdict")
+    held_before = len(defense_rows("Held", previous)) if previous else None
+    tile_defenses = {
+        "key": "defenses", "label": "Defenses held", "value": len(held), "unit": "defenses",
+        "detail": {"held": len(held), "next_30_days": len(upcoming), "awaiting_verdict": len(awaiting)},
+        "comparison": _compare_previous(len(held), held_before, scope),
+        "rows": [
+            _student_row(scope["by_id"][r["student_id"]], f"{label}: {r['defense_type']} on {r['date']}")
+            for label, group in (("Held", held), ("Next 30 days", upcoming), ("Awaiting verdict", awaiting)) for r in group
+        ],
+    }
+
+    # 6. Graduation: endorsements sent to the Dean in the term, and the candidates who are ready now.
+    endorsements = [e for e in GraduationEndorsement.query.all() if e.student_id in scope["ids"]]
+    endorsed_now = [e for e in endorsements if _moment_in(e.submitted_at, term)]
+    endorsed_before = len([e for e in endorsements if _moment_in(e.submitted_at, previous)]) if previous else None
+    endorsed_ids = {e.student_id for e in endorsements}
+    ready_now = [
+        s for s in students
+        if s.current_stage in GRADUATION_CANDIDATE_STAGES and s.id not in endorsed_ids and graduation_eligibility(s)["status"] == "Eligible"
+    ]
+    tile_graduation = {
+        "key": "graduation", "label": "Graduation-ready", "value": len(endorsed_now), "unit": "students",
+        "detail": {"endorsed_this_term": len(endorsed_now), "eligible_now": len(ready_now)},
+        "comparison": _compare_previous(len(endorsed_now), endorsed_before, scope),
+        "rows": [
+            _student_row(scope["by_id"][e.student_id], f"Endorsement {e.endorsement_status}, sent {e.submitted_at.date().isoformat()}")
+            for e in endorsed_now
+        ] + [_student_row(s, "Eligible, not yet endorsed") for s in ready_now],
+    }
+    return scope, [tile_active, tile_behind, tile_waiting, tile_decide, tile_defenses, tile_graduation]
+
+
+def report_summary(args) -> dict:
+    scope, tiles = summary_tiles(args)
+    public = []
+    for tile in tiles:
+        tile = {k: v for k, v in tile.items() if k != "rows"}
+        tile["drill"] = {"url": f"/api/reports/summary/{tile['key']}", "params": {k: v for k, v in scope["filters"].items() if v}}
+        public.append(tile)
+    return {"filters": scope["filters"], "term": _term_json(scope["term"]), "previous_term": _term_json(scope["previous"]), "tiles": public}
+
+
+def report_summary_list(key: str, args) -> dict | None:
+    scope, tiles = summary_tiles(args)
+    tile = next((t for t in tiles if t["key"] == key), None)
+    if tile is None:
+        return None
+    return {
+        "key": key, "title": tile["label"], "count": len(tile["rows"]), "filters": scope["filters"],
+        "columns": [{"key": k, "label": label} for k, label in (
+            ("student", "Student"), ("program", "Program"), ("stage", "Stage"), ("detail", "Why it is counted"))],
+        "rows": tile["rows"],
+    }
 
 
 # ---------------------------------------------------------------------------

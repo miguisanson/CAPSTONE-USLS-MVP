@@ -62,7 +62,7 @@ class SummaryBase(ReportsV2Base):
             db.session.add(TermEnrollment(student_id=s[name].id, term_id=prev.id, status="Confirmed"))
         # Open requests: a3 waits 20 days (Dean), a6 waits 9 days, a1 only 3 days; a2's was closed (next owner "None").
         for name, slug, days, owner in (
-            ("a3", "withdrawal", 20, "Dean"), ("a6", "enrollment", 9, "Academic Coordinator"),
+            ("a3", "readmission", 20, "Dean"), ("a6", "enrollment", 9, "Academic Coordinator"),
             ("a1", "enrollment", 3, "Graduate School Staff"), ("a2", "enrollment", 30, "None"),
         ):
             db.session.add(TransactionLog(
