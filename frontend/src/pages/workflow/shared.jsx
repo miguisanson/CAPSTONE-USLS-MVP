@@ -359,7 +359,7 @@ export function WorkflowFileHistory({ files = [] }) {
   );
 }
 
-export function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel, secondaryOptions = [], count, total, showAdvanced = true }) {
+export function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel, secondaryOptions = [], count, total, noun = "records", showAdvanced = true }) {
   const active = Object.entries(filters).filter(([key, value]) => Boolean(value) && !(key === "sort" && value === "newest")).length;
   const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
   const clearFilters = () => setFilters(Object.fromEntries(
@@ -393,7 +393,7 @@ export function RosterFilters({ filters, setFilters, programs, statuses, seconda
         )}
       </div>
       <div className="meta mt-2 flex flex-wrap items-center justify-between gap-2">
-        <span>Showing {count} of {total} records</span>
+        <span>Showing {count} of {total} {noun}</span>
         {active > 0 && (
           <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={clearFilters}>
             Clear {active} filter{active === 1 ? "" : "s"}
@@ -415,6 +415,13 @@ export function Detail({ label, value }) {
       <p className="mt-1 font-semibold text-slate-700">{value || "—"}</p>
     </div>
   );
+}
+
+/** Faculty ids in seat order: the member whose `panel_role` is each role. The server lists a panel in any order (I-185, J6). */
+export function panelSeatIds(roles, panel) {
+  if (!roles.length) return panel.map((member) => member.faculty_id);
+  const byRole = new Map(panel.map((member) => [member.panel_role, member.faculty_id]));
+  return roles.map((role) => byRole.get(role) || "");
 }
 
 export function shortDate(value) {

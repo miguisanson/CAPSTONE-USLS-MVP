@@ -7,7 +7,9 @@ import { Button, DataTable, EmptyState } from "../../components/ui/index.js";
 
 const AXIS_TICK = { fontSize: 12, fill: "#334155" };
 const tooltipStyle = { borderRadius: 12, border: "1px solid #e2e8f0", boxShadow: "0 6px 24px rgba(15,23,42,0.10)", fontSize: 13 };
-const LABEL_WIDTH = 150;
+const LABEL_MIN = 110;
+const LABEL_MAX = 300;
+const CHAR_PX = 7; // average width of a 12px label character
 const ROW_HEIGHT = 34;
 
 // Colours with a word beside them everywhere (legend, table headings), so none of them carries meaning alone.
@@ -17,20 +19,44 @@ export const ORANGE = "#ea7a1b";
 export const RED = "#dc2626";
 export const BLUE = "#138096";
 
+// A bar label drawn by hand: one line when it fits the label column, otherwise wrapped at word breaks (recharts' own wrap
+// broke a 36-character label in three at 1366 px, I-182).
+function CategoryTick({ x, y, payload, labelWidth }) {
+  const maxChars = Math.max(8, Math.floor((labelWidth - 8) / CHAR_PX));
+  const lines = [];
+  String(payload.value).split(" ").forEach((word) => {
+    const last = lines.length - 1;
+    if (last >= 0 && `${lines[last]} ${word}`.length <= maxChars) lines[last] += ` ${word}`;
+    else lines.push(word);
+  });
+  return (
+    <text x={x - 6} y={y} textAnchor="end" className="recharts-cartesian-axis-tick-value" fontSize={AXIS_TICK.fontSize} fill={AXIS_TICK.fill}>
+      {lines.map((line, index) => (
+        <tspan key={index} x={x - 6} dy={index === 0 ? `${0.35 - (lines.length - 1) * 0.55}em` : "1.1em"}>{line}</tspan>
+      ))}
+    </text>
+  );
+}
+
 /**
  * Horizontal bars, one row per category. `series` = [{ key, name, color, text }]; more than one series are stacked
  * unless `stacked` is false. `onSelect(row, seriesKey)` makes a bar clickable (the table or chips are the keyboard way).
  * `target` draws a dashed line at that value.
  */
 export function BarsChart({ data, categoryKey, series, stacked = true, onSelect, ariaLabel, target, targetLabel, unit = "" }) {
-  const height = data.length * (stacked ? ROW_HEIGHT : ROW_HEIGHT * series.length * 0.75) + (series.length > 1 ? 64 : 24);
+  const [width, setWidth] = useState(0);
+  // Wide enough for the longest label on one line; on a narrow card at most 45% of it, and the labels wrap with taller rows (I-182).
+  const wanted = Math.round(Math.max(0, ...data.map((row) => String(row[categoryKey] ?? "").length)) * CHAR_PX) + 20;
+  const labelWidth = Math.max(LABEL_MIN, Math.min(wanted, LABEL_MAX, width ? width * 0.45 : LABEL_MAX));
+  const rowHeight = labelWidth < wanted ? ROW_HEIGHT + 14 : ROW_HEIGHT;
+  const height = data.length * (stacked ? rowHeight : rowHeight * series.length * 0.75) + (series.length > 1 ? 64 : 24);
   const together = stacked && series.length > 1;
   return (
     <div role="img" aria-label={ariaLabel}>
-      <ResponsiveContainer width="100%" height={Math.max(height, 90)}>
+      <ResponsiveContainer width="100%" height={Math.max(height, 90)} onResize={(w) => setWidth(w)}>
         <BarChart data={data} layout="vertical" margin={{ left: 0, right: 28, top: 8, bottom: 4 }} barCategoryGap={6}>
           <XAxis type="number" allowDecimals={false} hide={!target} tick={AXIS_TICK} domain={[0, (max) => Math.max(max, target || 0)]} unit={unit} />
-          <YAxis type="category" dataKey={categoryKey} width={LABEL_WIDTH} interval={0} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+          <YAxis type="category" dataKey={categoryKey} width={labelWidth} interval={0} tick={<CategoryTick labelWidth={labelWidth} />} tickLine={false} axisLine={false} />
           <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f1f5f9" }} />
           {series.length > 1 && <Legend iconType="square" wrapperStyle={{ fontSize: 12 }} />}
           {target != null && <ReferenceLine x={target} stroke="#334155" strokeDasharray="5 4" label={{ value: targetLabel, position: "insideTopRight", fontSize: 11, fill: "#334155" }} />}

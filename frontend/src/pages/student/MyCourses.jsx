@@ -7,6 +7,9 @@ import { Button, EmptyState, InlineNotice, SectionCard, StatusChip } from "../..
 import { LeaveBanner, isOnLeaveOrAwol } from "./LeaveCaseCards";
 import { STUDENT_REQUEST_PATHS } from "./requestMeta";
 
+// Enrolled, completed or withdrawn subjects stay locked; a subject that is not offered this semester cannot be added.
+const isLocked = (subject) => subject.is_enrolled || subject.status === "Completed" || subject.status === "Withdrawn" || !subject.is_offered;
+
 export function MyCoursesPanel({ data, onSaved }) {
   const subjects = data.curriculum_subjects || [];
   const [selected, setSelected] = useState(() => new Set(subjects.filter((item) => item.is_enrolled).map((item) => item.id)));
@@ -25,7 +28,7 @@ export function MyCoursesPanel({ data, onSaved }) {
   }, [data.student.id, subjects.filter((item) => item.is_enrolled).map((item) => item.id).join(",")]);
 
   function toggle(subject) {
-    if (subject.is_enrolled || subject.status === "Completed" || !subject.is_offered) return;
+    if (isLocked(subject)) return;
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(subject.id)) next.delete(subject.id); else next.add(subject.id);
@@ -80,7 +83,7 @@ export function MyCoursesPanel({ data, onSaved }) {
             <div className="overflow-hidden rounded-xl border border-slate-200">
               {rows.map((subject) => {
                 const checked = selected.has(subject.id);
-                const disabled = subject.is_enrolled || subject.status === "Completed" || !subject.is_offered;
+                const disabled = isLocked(subject);
                 return <label key={subject.id} className={`flex items-start gap-3 border-b border-slate-100 p-3 last:border-b-0 ${disabled ? "cursor-not-allowed bg-slate-50/70" : "cursor-pointer transition-colors hover:bg-brand-50/40"}`}>
                   <input type="checkbox" checked={subject.status === "Completed" || checked} onChange={() => toggle(subject)} disabled={disabled} className="mt-1 h-4 w-4 accent-brand-600" aria-label={`Currently enrolled in ${subject.code}`} />
                   <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{subject.code} · {subject.title}</span><span className="meta mt-0.5 block">{subject.units} units · {subject.recommended_term || "No suggested semester"}</span></span>

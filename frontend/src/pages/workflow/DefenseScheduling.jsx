@@ -14,7 +14,7 @@ import SlotCheck, { useSlotCheck } from "../../components/scheduling/SlotCheck";
 import AvailabilityRequestPanel, { InvitationChip } from "../../components/scheduling/AvailabilityRequestPanel";
 import { availabilityLabel, isAvailabilityEntered } from "../../components/scheduling/dates";
 import { AvailabilityWorkspace } from "./AvailabilityWorkspace";
-import { WorkflowSubmitFeedback, shortDate, timeRange } from "./shared";
+import { WorkflowSubmitFeedback, panelSeatIds, shortDate, timeRange } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Defense Scheduling
@@ -126,10 +126,10 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
   }, [studentId, availability.window_start, availability.window_end, readiness.stage, context.defense_type]);
 
   useEffect(() => {
-    setPanelEditIds(panel.map((member) => member.faculty_id));
+    setPanelEditIds(panelSeatIds(panelRoleLabels, panel));
     setEditingPanel(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studentId, panel.map((member) => member.faculty_id).join(",")]);
+  }, [studentId, panel.map((member) => `${member.panel_role}:${member.faculty_id}`).join(",")]);
 
   const filteredSlots = useMemo(
     () =>
@@ -306,7 +306,7 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
             {facultyDirectory.length === 0 && <InlineNotice tone="warning">No faculty with an active login are available to assign yet.</InlineNotice>}
             <div className="flex flex-wrap items-center gap-2">
               <Button onClick={updatePanel} disabled={submitting || !panelSelectionValid}>{submitting ? "Updating…" : "Update panel"}</Button>
-              <Button variant="secondary" onClick={() => { setPanelEditIds(panel.map((member) => member.faculty_id)); setEditingPanel(false); }}>Cancel</Button>
+              <Button variant="secondary" onClick={() => { setPanelEditIds(panelSeatIds(panelRoleLabels, panel)); setEditingPanel(false); }}>Cancel</Button>
               {!panelSelectionValid && <span className="meta">Choose {requiredPanelCount} different faculty to enable Update.</span>}
             </div>
           </Card>
