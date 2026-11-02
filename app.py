@@ -35,7 +35,7 @@ from dotenv import load_dotenv
 from cryptography.fernet import Fernet, InvalidToken
 from flask import Flask, Response, has_app_context, has_request_context, jsonify, redirect, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import event, func, inspect, or_, text, true
+from sqlalchemy import and_, event, func, inspect, or_, text, true
 from sqlalchemy import event as _sa_event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, contains_eager
@@ -13089,17 +13089,7 @@ def register_routes(app: Flask) -> None:
         query = Student.query.join(Program).options(contains_eager(Student.program))
         q = request.args.get("q", "").strip()
         if q:
-            pattern = f"%{q}%"
-            query = query.filter(
-                or_(
-                    Student.student_number.ilike(pattern),
-                    Student.first_name.ilike(pattern),
-                    Student.last_name.ilike(pattern),
-                    Student.email.ilike(pattern),
-                    Program.code.ilike(pattern),
-                    Program.name.ilike(pattern),
-                )
-            )
+            query = query.filter(student_search_clause(q))
         stage = request.args.get("stage", "").strip()
         if stage:
             query = query.filter(Student.current_stage == stage)
@@ -23143,6 +23133,22 @@ def dean_returned_practicum_ids() -> list[int]:
         PracticumRecord.status == "Completed", PracticumRecord.student_id.in_(student_ids or [-1])).all()]
 
 
+def student_search_clause(q: str):
+    """Every word of the search must match one of the student's fields, so "Isabel Flores" and "Flores Isabel" both work.
+    The query must already join Program."""
+    return and_(*[
+        or_(*[column.ilike(f"%{word}%") for column in (
+            Student.student_number, Student.first_name, Student.last_name, Student.email, Program.code, Program.name)])
+        for word in q.split()
+    ])
+
+
+def student_matches_search(student: Student, q: str) -> bool:
+    """The same every-word rule for searches done in Python (name or student number)."""
+    text_value = f"{student.name} {student.student_number or ''}".lower()
+    return all(word in text_value for word in q.lower().split())
+
+
 def workflow_approvals_payload() -> dict:
     def eligible_graduation_rows(query) -> list[GraduationEndorsement]:
         return [item for item in query.all() if graduation_eligibility(item.student)["eligible"]]
@@ -30417,7 +30423,7 @@ def calendar_events(scope: dict, start: date, end: date, filters: dict) -> list[
             continue
         if filters.get("faculty_id") and filters["faculty_id"] not in schedule_panel_ids(schedule):
             continue
-        if needle and not (student and (needle in student.name.lower() or needle in (student.student_number or "").lower())):
+        if needle and not (student and student_matches_search(student, needle)):
             continue
         events.append(calendar_defense_event(schedule, scope, verdict_ids))
     return events
@@ -38866,6 +38872,188 @@ def spread_seed_history(today: date | None = None) -> int:
     return moved
 
 
+# ---------------------------------------------------------------------------
+# Report history (I-181): the Reports compare this term with the term before it, so a fresh seed needs one.
+# ---------------------------------------------------------------------------
+# Days from "forwarded to the Dean" to the decision: most are quick, a few are slow. Fixed lists, no randomness.
+HISTORY_TURNAROUND_DAYS = {
+    "older": [2, 3, 3, 4, 5, 5, 6, 7, 9, 11, 16, 27],
+    "recent": [1, 1, 2, 2, 3, 3, 3, 4, 5, 6, 8, 12, 19],
+    "current": [1, 2, 2, 3, 4],
+}
+# (process, outcomes) per term; A = approved, D = denied, R = returned.
+HISTORY_PLAN = {
+    "older": [("leave", "AADA"), ("readmission", "AA"), ("awol", "A"), ("withdrawal", "AADAA"), ("practicum", "AA"),
+              ("graduation", "AA"), ("adviser", "AADA")],
+    "recent": [("leave", "AAADA"), ("readmission", "AAD"), ("awol", "AA"), ("withdrawal", "AAAADA"), ("practicum", "AAA"),
+               ("graduation", "AAR"), ("adviser", "AAADA")],
+    "current": [("leave", "A"), ("withdrawal", "AD"), ("practicum", "A"), ("adviser", "AA")],
+}
+
+
+def seed_report_history(today: date | None = None) -> int:
+    """Two earlier terms and the first days of this one: decided cases in every Dean queue, with varied turnaround, and
+    who was enrolled in each earlier term, so Reports show "vs previous term" on a fresh seed. Returns the cases made.
+
+    Only students with no other story get a history (no case, task, log, message or defense of their own), so no demo
+    student changes. Dates sit inside the terms themselves; nothing is written to the activity log (that log is the
+    last 12 weeks only, see the seed-quality test), and nothing here is random.
+    """
+    today = today or date.today()
+    active = get_active_term()
+    recent_term = term_before(active) if active else None
+    older_term = term_before(recent_term) if recent_term else None
+    if not (active and recent_term and older_term):
+        return 0
+    terms = {"older": older_term, "recent": recent_term, "current": active}
+
+    busy: set[int] = set()
+    for model in (LeaveCase, AwolCase, WithdrawalApplication, GraduationEndorsement, PracticumRecord, AdviserAppointment,
+                  ScheduleRequest, DefenseVerdict, Task, TransactionLog, ResearchCase, WorkflowMessage):
+        busy |= {sid for (sid,) in db.session.query(model.student_id).distinct().all() if sid}
+    pool = [
+        s for s in Student.query.order_by(Student.id).all()
+        if s.id not in busy and s.standing == "Active" and s.enrollment_tag == "Enrolled"
+        and s.current_stage in ("Coursework", "Admission")
+    ]
+    practicum_pool = [s for s in pool if program_allows_practicum(s.program)]
+    pool = [s for s in pool if s not in practicum_pool]  # kept for the practicum reports
+    faculty_ids = [f.id for f in Faculty.query.filter_by(active=True).order_by(Faculty.id).all()]
+    taken: set[int] = set()
+
+    def next_student(practicum: bool = False):
+        for student in (practicum_pool if practicum else pool):
+            if student.id not in taken:
+                taken.add(student.id)
+                return student
+        return None
+
+    def spread(kind: str, term, index: int, days: int):
+        """(decided_at, forwarded_at): decided inside the term (just now for the running one), forwarded `days` before."""
+        if kind == "current":
+            decided = datetime.now() - timedelta(days=index % 3, hours=2 + index)
+        else:
+            span = max((term.end_date - term.start_date).days - 24, 1)
+            offset = 12 + (index * 37) % span
+            minutes = 9 * 60 + (index * 53) % 480
+            decided = datetime.combine(term.start_date + timedelta(days=offset), time(minutes // 60, minutes % 60))
+        return decided, decided - timedelta(days=days, hours=(index * 3) % 7)
+
+    made = 0
+    for kind, plan in HISTORY_PLAN.items():
+        term = terms[kind]
+        turnarounds = HISTORY_TURNAROUND_DAYS[kind]
+        index = 0
+        for process, outcomes in plan:
+            for outcome in outcomes:
+                index += 1
+                student = next_student(practicum=process == "practicum")
+                if student is None:
+                    continue
+                decided, forwarded = spread(kind, term, index, turnarounds[index % len(turnarounds)])
+                submitted = forwarded - timedelta(days=1)
+                approved = outcome == "A"
+                if process == "leave":
+                    db.session.add(LeaveCase(
+                        student_id=student.id, kind=KIND_LOA, source="demo", status="Closed" if approved else "Denied",
+                        start_term_id=term.id, end_term_id=term.id, start_label=term.label, end_label=term.label,
+                        reason_category="Medical / health", reason_text="Seeded history: recovery period.",
+                        prior_stage=student.current_stage, prior_enrollment_tag=student.enrollment_tag,
+                        submitted_at=submitted, forwarded_at=forwarded, decided_at=decided,
+                        started_at=decided if approved else None,
+                        closed_at=decided + timedelta(days=60) if approved else decided,
+                        closed_reason="Leave completed" if approved else "Denied by the Dean",
+                    ))
+                elif process == "readmission":
+                    db.session.add(LeaveCase(
+                        student_id=student.id, kind=KIND_READMISSION, source="demo", status="Closed" if approved else "Denied",
+                        target_term_id=term.id, target_label=term.label,
+                        return_intent="Seeded history: ready to resume studies.",
+                        submitted_at=submitted, forwarded_at=forwarded, decided_at=decided,
+                        closed_at=decided, closed_reason="Readmitted" if approved else "Denied by the Dean",
+                    ))
+                elif process == "awol":
+                    db.session.add(AwolCase(
+                        student_id=student.id, status="Return Approved" if approved else "Return Denied",
+                        dean_decision="Approved" if approved else "Denied", return_requested_at=forwarded,
+                        decided_at=decided, awol_effective_date=term.start_date - timedelta(days=100),
+                        last_enrolled_term=older_term.label, target_return_term=term.label,
+                        return_intent="Seeded history: written intention to return.",
+                        detection_source="Seeded history", policy_classification="Within Maximum Residence",
+                        updated_at=decided,
+                    ))
+                elif process == "withdrawal":
+                    courses = Course.query.filter_by(program_id=student.program_id).order_by(Course.id).all()
+                    if not courses:
+                        continue
+                    ledger = SubjectEnrollment(
+                        student_id=student.id, course_id=courses[index % len(courses)].id, term_id=term.id,
+                        status="Withdrawn" if approved else "Completed", source_reference="Seeded history",
+                        enrolled_at=forwarded - timedelta(days=20), status_changed_at=decided,
+                    )
+                    db.session.add(ledger)
+                    db.session.flush()
+                    db.session.add(WithdrawalApplication(
+                        student_id=student.id, subject_enrollment_id=ledger.id, effective_term=term.label,
+                        reason="Seeded history: work schedule clash.", fee_status="Settled", requirement_status="Complete",
+                        dean_decision="Approved" if approved else "Denied",
+                        registrar_status="Confirmed" if approved else "Not Applicable",
+                        status="Completed" if approved else "Denied", created_at=forwarded, decided_at=decided,
+                        completed_at=decided + timedelta(days=3), updated_at=decided,
+                    ))
+                elif process == "practicum":
+                    db.session.add(PracticumRecord(
+                        student_id=student.id, moa_status="Verified", moa_uploaded=True,
+                        practicum_site="Community Counselling Center", supervisor_name="Ms. Rina Lopez",
+                        required_hours=practicum_required_hours(), completed_hours=practicum_required_hours(),
+                        document_status="Verified", certificate_count=2, completion_status="Completed and accepted",
+                        status="Dean Reviewed", remarks="Seeded history.", report_sent_at=forwarded,
+                        dean_reviewed_at=decided, updated_at=decided,
+                    ))
+                elif process == "graduation":
+                    db.session.add(GraduationEndorsement(
+                        student_id=student.id, review_window=term.label, batch_name=f"Batch {index % 3 + 1} {decided:%B %Y}",
+                        coursework_status="Complete", research_status="Complete", practicum_status="Not Required",
+                        endorsement_status="Dean Approved" if approved else "Returned for Revision",
+                        registrar_status="Pending", submitted_at=forwarded, dean_decision_at=decided,
+                        updated_at=decided, dean_remarks="Seeded history.",
+                    ))
+                elif process == "adviser" and faculty_ids:
+                    db.session.add(AdviserAppointment(
+                        student_id=student.id, faculty_id=faculty_ids[index % len(faculty_ids)], kind="Initial",
+                        status=ADVISER_STATUS_ACCEPTED if approved else ADVISER_STATUS_NOT_APPROVED,
+                        adviser_response="Accepted" if approved else "Pending",
+                        # the seed-quality test wants every application inside the last 12 weeks
+                        applied_at=max(submitted, datetime.combine(today - timedelta(weeks=12) + timedelta(days=2), time(8, 0))),
+                        forwarded_at=forwarded, decided_at=decided, decided_by="Dean", decision_note="Seeded history.",
+                        # ended, so it neither counts toward an adviser's load nor gives the student an adviser
+                        ended_at=decided + timedelta(days=1) if approved else None,
+                        end_reason="Seeded history: the appointment ended." if approved else None,
+                        source="Seeded history", updated_at=decided,
+                    ))
+                else:
+                    continue
+                made += 1
+    db.session.flush()
+
+    # Who was enrolled in the two earlier terms: everyone in good standing whose cohort had already entered.
+    for term in (older_term, recent_term):
+        match = re.search(r"AY (\d{4})", term.label)
+        ay_start = int(match.group(1)) if match else term.start_date.year
+        have = {sid for (sid,) in db.session.query(TermEnrollment.student_id).filter_by(term_id=term.id).all()}
+        for student in Student.query.order_by(Student.id).all():
+            entry = re.match(r"\s*(\d{2,4})", student_academic_year_entry(student) or "")
+            entry_year = (int(entry.group(1)) + (2000 if len(entry.group(1)) == 2 else 0)) if entry else None
+            if student.id in have or student.standing != "Active" or entry_year is None or entry_year > ay_start:
+                continue
+            db.session.add(TermEnrollment(
+                student_id=student.id, term_id=term.id, status="Confirmed", source_reference="Seeded history (AIMS enrollment)",
+                confirmed_at=datetime.combine(term.start_date + timedelta(days=3), time(10, 0)),
+            ))
+    db.session.commit()
+    return made
+
+
 def seed_stage_events(today: date | None = None) -> int:
     """Give every demo student one stage event, so the stage clock has something to count from (B1).
 
@@ -40292,6 +40480,7 @@ def build_demo_database() -> dict:
         generate_reminders()  # the reminders that are due today (a page view no longer makes them)
         db.session.commit()
         spread_seed_history()  # history over the previous weeks
+        seed_report_history()  # two earlier terms of decided cases for the Reports (I-181)
         seed_stage_events()  # last: the stage clock, and the risk levels that read it
         return sync_result
 
