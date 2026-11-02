@@ -15330,7 +15330,7 @@ def register_routes(app: Flask) -> None:
 
     # Faculty reference endpoint for panels and scheduling.
     @app.route("/api/faculty")
-    @require_api_login("staff", "academic_coordinator")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def faculty_list():
         faculty = Faculty.query.order_by(Faculty.name).all()
         return jsonify({
@@ -15351,7 +15351,7 @@ def register_routes(app: Flask) -> None:
         })
 
     @app.route("/api/faculty/<int:faculty_id>")
-    @require_api_login("staff", "academic_coordinator")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def faculty_detail(faculty_id: int):
         faculty = Faculty.query.get_or_404(faculty_id)
         return jsonify({
@@ -24207,7 +24207,7 @@ ACCESS_CONTROL_SPEC = [
     ("Reports", "reports", {"staff", "academic_coordinator"}),
     ("Analytics", "reports_analytics", {"staff", "academic_coordinator"}),
     ("Students", "students_list", {"staff", "academic_coordinator", "research_coordinator"}),
-    ("Faculty", "faculty_list", {"staff", "academic_coordinator"}),
+    ("Faculty", "faculty_list", {"staff", "academic_coordinator", "research_coordinator"}),
     ("Monitoring sheet import", "student_handoff_import", {"staff"}),
     ("Recommendations", "decision_support", {"staff"}),
     ("Policy document library", "policy_documents", {"staff"}),
