@@ -14625,6 +14625,32 @@ def register_routes(app: Flask) -> None:
     def reports_analytics():
         return jsonify(analytics_payload(request.args))
 
+    # The five Reports (IM20): JSON for the screen, ?format=xlsx|pdf for the download of the same filtered rows.
+    @app.route("/api/reports/at-risk")
+    @require_api_login("staff", "academic_coordinator")
+    def reports_at_risk():
+        return report_response("at-risk", request.args)
+
+    @app.route("/api/reports/cohorts")
+    @require_api_login("staff", "academic_coordinator")
+    def reports_cohorts():
+        return report_response("cohorts", request.args)
+
+    @app.route("/api/reports/overdue")
+    @require_api_login("staff", "academic_coordinator")
+    def reports_overdue():
+        return report_response("overdue", request.args)
+
+    @app.route("/api/reports/defenses")
+    @require_api_login("staff", "academic_coordinator")
+    def reports_defenses():
+        return report_response("defenses", request.args)
+
+    @app.route("/api/reports/graduation")
+    @require_api_login("staff", "academic_coordinator")
+    def reports_graduation():
+        return report_response("graduation", request.args)
+
     # ---- BPMN 1 Admission: Dean onboarding gate --------------------------
     @app.route("/api/onboarding/reviews")
     @require_api_login("staff", "academic_coordinator", "dean")
@@ -24162,6 +24188,481 @@ def reports_payload(filters=None) -> dict:
         "open_overdue_tasks": task_section,
         "research_completion": research_section,
     }
+
+
+# ---------------------------------------------------------------------------
+# Reports (owner decision IM20): five real reports, each filterable and exportable
+# ---------------------------------------------------------------------------
+# 1. at-risk     students at risk / delayed: what is late, since when, the next owner
+# 2. cohorts     where each cohort (program x academic-year entry) is in the lifecycle
+# 3. overdue     overdue tasks and pending requests by office, with waiting time
+# 4. defenses    defenses held and upcoming, with the panel and the verdict
+# 5. graduation  graduation candidates: eligibility, what is missing, batch status
+# Every report is a plain function of the query string. ``format=xlsx`` / ``format=pdf`` returns the same
+# rows as a download. Reading writes nothing: no risk refresh, no sweeps, no audit row.
+REPORT_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+REPORT_FORMATS = ("json", "xlsx", "pdf")
+GRADUATION_CANDIDATE_STAGES = ("Writing", "Final Defense")
+NO_VERDICT_YET = "Not yet recorded"
+NOT_IN_A_BATCH = "Not in a batch"
+DEFENSE_REPORT_WHEN = ("Upcoming", "Awaiting verdict", "Held", "Deferred")
+GRADUATION_ELIGIBILITY_ORDER = {"Eligible": 0, "Needs verification": 1, "Not eligible": 2}
+REPORT_FILTER_LABELS = {
+    "program_id": "Program", "stage": "Stage", "term": "Term", "entry": "AY entry", "risk": "Risk",
+    "office": "Office", "kind": "Type", "when": "Status", "type": "Defense",
+    "eligibility": "Eligibility", "batch_status": "Batch status",
+}
+
+
+def _report_option_lists() -> dict:
+    return {
+        "programs": [{"id": p.id, "code": p.code, "name": p.name} for p in Program.query.order_by(Program.code).all()],
+        "stages": list(STAGES),
+        "terms": [t.label for t in AcademicTerm.query.order_by(AcademicTerm.start_date, AcademicTerm.id).all()],
+    }
+
+
+def _report_term_range(label: str):
+    """(first day, last day) of a term, or None when no term is chosen. A term that does not exist matches nothing."""
+    if not label:
+        return None
+    term = AcademicTerm.query.filter_by(label=label).first()
+    if term is None:
+        return (date.max, date.min)
+    return (term.start_date, term.end_date)
+
+
+def _in_term(day, term_range) -> bool:
+    return term_range is None or (day is not None and term_range[0] <= day <= term_range[1])
+
+
+def _report_students(args, **extra):
+    """The students a report is about: the shared program and stage filters (same meaning as every other screen)."""
+    values = {"program_id": _filter_value(args, "program_id"), "stage": _filter_value(args, "stage")}
+    values.update(extra)
+    return filtered_students_query(values)
+
+
+def _report_result(name: str, title: str, columns: list, rows: list, filters: dict, options: dict, empty: str) -> dict:
+    return {
+        "report": name,
+        "title": title,
+        "columns": [{"key": key, "label": label} for key, label in columns],
+        "rows": rows,
+        "count": len(rows),
+        "filters": {key: value for key, value in filters.items() if value},
+        "options": options,
+        "empty": empty,
+    }
+
+
+def report_at_risk(args) -> dict:
+    risk = _filter_value(args, "risk")
+    risk = risk if risk in AT_RISK_LEVELS else ""
+    filters = {"program_id": _filter_value(args, "program_id"), "stage": _filter_value(args, "stage"), "risk": risk}
+    students = (
+        _report_students(args, risk=risk or ",".join(AT_RISK_LEVELS))
+        .order_by(Student.last_name, Student.first_name)
+        .all()
+    )
+    today = date.today()
+    rows = []
+    for student in students:
+        advice = student_recommendations(student)
+        indicators, recommendations = advice["indicators"], advice["recommendations"]
+        overdue = (
+            Task.query.filter(Task.student_id == student.id, Task.status.in_(["Pending", "Overdue"]), Task.due_at < today)
+            .order_by(Task.due_at.asc())
+            .first()
+        )
+        last_update = (student.updated_at or student.created_at or now_utc()).date()
+        started = [overdue.due_at] if overdue else []
+        if indicators["days_in_stage"] >= STALL_WARN_DAYS and student.current_stage != "Completed":
+            started.append(last_update)
+        since = min(started) if started else last_update
+        if recommendations:
+            reason, owner = recommendations[0]["trigger"], recommendations[0]["owner"]
+        else:
+            assessment = student_delay_assessment(student)
+            reason = (
+                f"Marked {student.risk_level}; no specific cause on record"
+                if assessment["level"] == "On Track" else assessment["reason"]
+            )
+            owner = normalize_owner_label(indicators["next_owner"]) or STAFF_OWNER
+        rows.append({
+            "student_id": student.id,
+            "student": student.name,
+            "student_number": student.student_number,
+            "program": student.program.code,
+            "stage": student.current_stage,
+            "risk": student.risk_level,
+            "reason": reason,
+            "since": since.isoformat(),
+            "days_late": (today - since).days,
+            "owner": owner,
+        })
+    rows.sort(key=lambda row: (-row["days_late"], row["student"]))
+    columns = [
+        ("student", "Student"), ("program", "Program"), ("stage", "Stage"), ("risk", "Risk"),
+        ("reason", "What is late"), ("since", "Since"), ("days_late", "Days late"), ("owner", "Next owner"),
+    ]
+    options = _report_option_lists()
+    options["risks"] = list(AT_RISK_LEVELS)
+    return _report_result(
+        "at-risk", "Students at risk or delayed", columns, rows, filters, options,
+        "No student is marked at risk or delayed for these filters.",
+    )
+
+
+def _cohort_entry_label(student: Student) -> str:
+    """One spelling for the academic year a cohort entered: '2024-2025' and '24-25' are the same cohort."""
+    label = student_academic_year_entry(student)
+    match = re.fullmatch(r"(\d{4})\s*-\s*(\d{4})", label)
+    if match:
+        return f"{match.group(1)[2:]}-{match.group(2)[2:]}"
+    return label or "Not recorded"
+
+
+def _stage_key(stage: str) -> str:
+    return "s_" + re.sub(r"[^a-z0-9]+", "_", stage.lower()).strip("_")
+
+
+def report_cohorts(args) -> dict:
+    entry = _filter_value(args, "entry")
+    filters = {"program_id": _filter_value(args, "program_id"), "stage": _filter_value(args, "stage"), "entry": entry}
+    all_entries = sorted({_cohort_entry_label(s) for s in Student.query.all()})
+    students = [s for s in _report_students(args).all() if not entry or _cohort_entry_label(s) == entry]
+    cohorts: dict = {}
+    for student in students:
+        cohort = cohorts.setdefault((student.program.code, student.program_id, _cohort_entry_label(student)), {})
+        cohort[student.current_stage] = cohort.get(student.current_stage, 0) + 1
+    present = [stage for stage in STAGES if any(stage in cohort for cohort in cohorts.values())]
+    rows = []
+    for (code, program_id, label), counts in sorted(cohorts.items(), key=lambda item: (item[0][0], item[0][2])):
+        row = {"program": code, "program_id": program_id, "entry": label, "total": sum(counts.values())}
+        for stage in present:
+            row[_stage_key(stage)] = counts.get(stage, 0)
+        rows.append(row)
+    columns = [("program", "Program"), ("entry", "AY entry"), ("total", "Students")]
+    columns += [(_stage_key(stage), stage) for stage in present]
+    options = _report_option_lists()
+    options["entries"] = all_entries
+    return _report_result(
+        "cohorts", "Cohorts by lifecycle stage", columns, rows, filters, options,
+        "No student matches these filters.",
+    )
+
+
+def _latest_logs_by_student(slug: str, student_ids: list) -> dict:
+    latest = {}
+    query = (
+        TransactionLog.query.filter(TransactionLog.transaction_slug == slug, TransactionLog.student_id.in_(student_ids))
+        .order_by(TransactionLog.created_at.asc(), TransactionLog.id.asc())
+    )
+    for entry in query.all():
+        latest[entry.student_id] = entry
+    return latest
+
+
+def report_overdue(args) -> dict:
+    office, kind, term = _filter_value(args, "office"), _filter_value(args, "kind"), _filter_value(args, "term")
+    filters = {
+        "program_id": _filter_value(args, "program_id"), "stage": _filter_value(args, "stage"),
+        "term": term, "office": office, "kind": kind,
+    }
+    students = {student.id: student for student in _report_students(args).all()}
+    ids = list(students)
+    today = date.today()
+    found = []
+    if ids:
+        tasks = (
+            Task.query.filter(Task.student_id.in_(ids), Task.status.in_(["Pending", "Overdue"]), Task.due_at < today)
+            .order_by(Task.due_at.asc(), Task.id.asc())
+            .all()
+        )
+        for task in tasks:
+            found.append((students[task.student_id], "Overdue task", task.title,
+                          canonical_owner_role(task.owner_role) or task.owner_role, task.due_at, (today - task.due_at).days))
+        for slug, label in QUEUE_PROCESS_AREAS:
+            if slug == "student-handoff":
+                continue  # a monitoring-sheet import is a record of what happened, not a request anyone must answer
+            for student_id, entry in _latest_logs_by_student(slug, ids).items():
+                if workflow_case_is_closed(slug, student_id, entry):
+                    continue
+                owner = canonical_owner_role(entry.next_owner) or normalize_owner_label(entry.next_owner)
+                found.append((students[student_id], "Pending request", f"{label}: {entry.result}", owner,
+                              entry.created_at.date(), _days_since(entry.created_at)))
+    offices = sorted({item[3] for item in found if item[3]})
+    term_range = _report_term_range(term)
+    rows = []
+    for student, item_kind, item, item_office, since, waiting in found:
+        if (office and item_office != office) or (kind and item_kind != kind) or not _in_term(since, term_range):
+            continue
+        rows.append({
+            "student_id": student.id,
+            "student": student.name,
+            "student_number": student.student_number,
+            "program": student.program.code,
+            "stage": student.current_stage,
+            "kind": item_kind,
+            "item": item,
+            "office": item_office,
+            "since": since.isoformat(),
+            "days_waiting": waiting,
+        })
+    rows.sort(key=lambda row: (-row["days_waiting"], row["student"], row["item"]))
+    columns = [
+        ("student", "Student"), ("program", "Program"), ("kind", "Type"), ("item", "What is waiting"),
+        ("office", "Office"), ("since", "Since"), ("days_waiting", "Days waiting"),
+    ]
+    options = _report_option_lists()
+    options["offices"] = offices
+    options["kinds"] = ["Overdue task", "Pending request"]
+    return _report_result(
+        "overdue", "Overdue milestones and pending requests by office", columns, rows, filters, options,
+        "Nothing is overdue or waiting for these filters.",
+    )
+
+
+def _panel_text(snapshot_json: str | None) -> str:
+    try:
+        seats = json.loads(snapshot_json or "[]")
+    except (TypeError, json.JSONDecodeError):
+        seats = []
+    return "; ".join(
+        f"{seat.get('name')} ({seat.get('role')})" if seat.get("role") else str(seat.get("name"))
+        for seat in seats if seat.get("name")
+    )
+
+
+def report_defenses(args) -> dict:
+    when, defense_type, term = _filter_value(args, "when"), _filter_value(args, "type"), _filter_value(args, "term")
+    filters = {
+        "program_id": _filter_value(args, "program_id"), "stage": _filter_value(args, "stage"),
+        "term": term, "when": when, "type": defense_type,
+    }
+    students = {student.id: student for student in _report_students(args).all()}
+    today = date.today()
+    term_range = _report_term_range(term)
+    listed_statuses = ACTIVE_DEFENSE_STATUSES + (RECONFIRM_DEFENSE_STATUS, HELD_DEFENSE_STATUS, DEFERRED_DEFENSE_STATUS)
+    requests = (
+        ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(list(students)), ScheduleRequest.status.in_(listed_statuses)).all()
+        if students else []
+    )
+    rows = []
+    types = set()
+    for req in requests:
+        student = students[req.student_id]
+        gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(req.defense_type or "")
+        outcome = latest_defense_outcome(student, gate, req.id) if gate else None
+        if (outcome and outcome["result"] == VERDICT_DEFERRED) or req.status == DEFERRED_DEFENSE_STATUS:
+            state = "Deferred"
+        elif outcome or req.status == HELD_DEFENSE_STATUS:
+            state = "Held"
+        elif req.preferred_date >= today:
+            state = "Upcoming"
+        else:
+            state = "Awaiting verdict"
+        types.add(req.defense_type or "")
+        if (when and state != when) or (defense_type and req.defense_type != defense_type) or not _in_term(req.preferred_date, term_range):
+            continue
+        rows.append({
+            "student_id": student.id,
+            "student": student.name,
+            "student_number": student.student_number,
+            "program": student.program.code,
+            "defense_type": req.defense_type or "",
+            "date": req.preferred_date.isoformat(),
+            "when": state,
+            "panel": _panel_text(req.panel_snapshot),
+            "verdict": outcome["label"] if outcome else NO_VERDICT_YET,
+        })
+    rows.sort(key=lambda row: (row["date"], row["student"]), reverse=True)
+    columns = [
+        ("student", "Student"), ("program", "Program"), ("defense_type", "Defense"), ("date", "Date"),
+        ("when", "Status"), ("panel", "Panel"), ("verdict", "Verdict"),
+    ]
+    options = _report_option_lists()
+    options["whens"] = list(DEFENSE_REPORT_WHEN)
+    options["types"] = sorted(t for t in set(RESEARCH_GATE_DEFENSE_TYPES.values()) | types if t)
+    return _report_result(
+        "defenses", "Defenses held and upcoming", columns, rows, filters, options,
+        "No defense is held or scheduled for these filters.",
+    )
+
+
+def report_graduation(args) -> dict:
+    eligibility_filter, batch_filter = _filter_value(args, "eligibility"), _filter_value(args, "batch_status")
+    filters = {
+        "program_id": _filter_value(args, "program_id"), "stage": _filter_value(args, "stage"),
+        "eligibility": eligibility_filter, "batch_status": batch_filter,
+    }
+    in_a_batch = db.session.query(GraduationEndorsement.student_id)
+    students = (
+        _report_students(args)
+        .filter(or_(Student.current_stage.in_(GRADUATION_CANDIDATE_STAGES), Student.id.in_(in_a_batch)))
+        .order_by(Student.last_name, Student.first_name)
+        .all()
+    )
+    rows = []
+    batch_statuses = set()
+    for student in students:
+        eligibility = graduation_eligibility(student)
+        endorsement = (
+            GraduationEndorsement.query.filter_by(student_id=student.id)
+            .order_by(GraduationEndorsement.updated_at.desc(), GraduationEndorsement.id.desc())
+            .first()
+        )
+        status = graduation_display_status(endorsement) if endorsement else NOT_IN_A_BATCH
+        batch_statuses.add(status)
+        if (eligibility_filter and eligibility["status"] != eligibility_filter) or (batch_filter and status != batch_filter):
+            continue
+        missing = [
+            item["label"] + (" (to verify)" if item["passed"] is None else "")
+            for item in eligibility["checklist"]
+            if item["passed"] is not True
+        ]
+        rows.append({
+            "student_id": student.id,
+            "student": student.name,
+            "student_number": student.student_number,
+            "program": student.program.code,
+            "stage": student.current_stage,
+            "eligibility": eligibility["status"],
+            "missing": "; ".join(missing) if missing else "Nothing missing",
+            "review_window": (normalize_graduation_school_year(endorsement.review_window) or endorsement.review_window) if endorsement else "",
+            "batch_status": status,
+            "owner": eligibility["next_owner"],
+        })
+    rows.sort(key=lambda row: (GRADUATION_ELIGIBILITY_ORDER.get(row["eligibility"], 9), row["student"]))
+    columns = [
+        ("student", "Student"), ("program", "Program"), ("stage", "Stage"), ("eligibility", "Eligibility"),
+        ("missing", "What is missing"), ("review_window", "Review window"), ("batch_status", "Batch status"),
+        ("owner", "Next owner"),
+    ]
+    options = _report_option_lists()
+    options["eligibilities"] = list(GRADUATION_ELIGIBILITY_ORDER)
+    options["batch_statuses"] = sorted(batch_statuses | {NOT_IN_A_BATCH})
+    return _report_result(
+        "graduation", "Graduation candidates", columns, rows, filters, options,
+        "No student is a graduation candidate for these filters.",
+    )
+
+
+REPORT_BUILDERS = {
+    "at-risk": report_at_risk,
+    "cohorts": report_cohorts,
+    "overdue": report_overdue,
+    "defenses": report_defenses,
+    "graduation": report_graduation,
+}
+
+
+def _report_filter_text(result: dict) -> str:
+    programs = {str(item["id"]): item["code"] for item in result["options"].get("programs", [])}
+    parts = [
+        f"{REPORT_FILTER_LABELS.get(key, key)}: {programs.get(str(value), value) if key == 'program_id' else value}"
+        for key, value in result["filters"].items()
+    ]
+    return "; ".join(parts) if parts else "No filters (all rows)"
+
+
+def _report_cell(value):
+    """A cell value for a spreadsheet: text that starts like a formula is kept as text."""
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@"):
+        return "'" + value
+    return value
+
+
+def report_workbook_bytes(result: dict) -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = result["title"][:31]
+    width = max(len(result["columns"]), 1)
+    sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=width)
+    title = sheet["A1"]
+    title.value = f"USLS Graduate School - {result['title']}"
+    title.font = Font(name="Arial", size=14, bold=True, color="FFFFFF")
+    title.fill = PatternFill("solid", fgColor="166534")
+    title.alignment = Alignment(horizontal="center")
+    sheet.merge_cells(start_row=2, start_column=1, end_row=2, end_column=width)
+    note = sheet["A2"]
+    note.value = f"{_report_filter_text(result)}. {result['count']} row(s). Prepared {date.today().isoformat()}."
+    note.font = Font(name="Arial", size=10, italic=True, color="475569")
+    note.alignment = Alignment(wrap_text=True)
+    header_fill = PatternFill("solid", fgColor="DCFCE7")
+    for column, spec in enumerate(result["columns"], 1):
+        cell = sheet.cell(row=3, column=column, value=spec["label"])
+        cell.font = Font(name="Arial", size=10, bold=True, color="14532D")
+        cell.fill = header_fill
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
+    for row_number, row in enumerate(result["rows"], 4):
+        for column, spec in enumerate(result["columns"], 1):
+            cell = sheet.cell(row=row_number, column=column, value=_report_cell(row.get(spec["key"])))
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+    for column, spec in enumerate(result["columns"], 1):
+        longest = max([len(str(spec["label"]))] + [len(str(row.get(spec["key"]) or "")) for row in result["rows"]])
+        sheet.column_dimensions[sheet.cell(row=3, column=column).column_letter].width = min(max(longest + 2, 10), 60)
+    sheet.freeze_panes = "A4"
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+def report_pdf_bytes(result: dict) -> bytes:
+    """A landscape A4 PDF of the filtered rows (PyMuPDF lays the HTML table out)."""
+    try:
+        import pymupdf
+    except ImportError:  # older PyMuPDF
+        import fitz as pymupdf
+
+    def cell(tag: str, value) -> str:
+        return f"<{tag}>{html.escape('' if value is None else str(value))}</{tag}>"
+
+    head = "".join(cell("th", spec["label"]) for spec in result["columns"])
+    body = "".join(
+        "<tr>" + "".join(cell("td", row.get(spec["key"])) for spec in result["columns"]) + "</tr>"
+        for row in result["rows"]
+    ) or f"<tr><td colspan=\"{max(len(result['columns']), 1)}\">{html.escape(result['empty'])}</td></tr>"
+    page = (
+        f"<h1>{html.escape(result['title'])}</h1>"
+        f"<p>{html.escape(_report_filter_text(result))}. {result['count']} row(s). Prepared {date.today().isoformat()}.</p>"
+        f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+    )
+    css = (
+        "body{font-family:sans-serif;font-size:8pt;color:#172033}h1{font-size:15pt;color:#166534;margin:0 0 4pt}"
+        "p{color:#475569;margin:0 0 8pt}table{width:100%;border-collapse:collapse}"
+        "th{background-color:#dcfce7;color:#14532d;text-align:left;font-size:7.5pt;padding:3pt;border:0.5pt solid #94a3b8}"
+        "td{padding:3pt;border:0.5pt solid #cbd5e1;vertical-align:top}"
+    )
+    story = pymupdf.Story(html=page, user_css=css)
+    buffer = io.BytesIO()
+    writer = pymupdf.DocumentWriter(buffer)
+    media = pymupdf.paper_rect("a4-l")
+    where = media + (36, 36, -36, -36)
+    more = True
+    while more:
+        device = writer.begin_page(media)
+        more, _ = story.place(where)
+        story.draw(device)
+        writer.end_page()
+    writer.close()
+    return buffer.getvalue()
+
+
+def report_response(name: str, args):
+    fmt = (args.get("format") or "json").strip().lower()
+    if fmt not in REPORT_FORMATS:
+        return jsonify({"error": "Choose xlsx or pdf for an export."}), 400
+    result = REPORT_BUILDERS[name](args)
+    if fmt == "json":
+        return jsonify(result)
+    stem = f"usls-gs-report-{name}-{date.today().isoformat()}"
+    if fmt == "xlsx":
+        data, mime = report_workbook_bytes(result), REPORT_XLSX_MIME
+    else:
+        data, mime = report_pdf_bytes(result), "application/pdf"
+    return Response(data, mimetype=mime, headers={"Content-Disposition": f'attachment; filename="{stem}.{fmt}"'})
 
 
 # ---------------------------------------------------------------------------

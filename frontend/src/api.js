@@ -84,14 +84,12 @@ export const api = {
     return request(`/tasks${qs ? `?${qs}` : ""}`);
   },
   activity: () => request("/activity"),
-  reports: (params = {}) => {
+  // The five Reports (IM20): rows for the screen, and the address of the Excel / PDF download of the same filtered rows.
+  report: (id, params = {}) => {
     const qs = queryString(params);
-    return request(`/reports${qs ? `?${qs}` : ""}`);
+    return request(`/reports/${id}${qs ? `?${qs}` : ""}`);
   },
-  reportsAnalytics: (params = {}) => {
-    const qs = queryString(params);
-    return request(`/reports/analytics${qs ? `?${qs}` : ""}`);
-  },
+  reportDownloadUrl: (id, params = {}, format = "xlsx") => `${BASE}/reports/${id}?${queryString({ ...params, format })}`,
   // BPMN 1 Admission — Dean onboarding gate
   onboardingReviews: () => request("/onboarding/reviews"),
   submitOnboardingReview: (id) =>
