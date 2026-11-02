@@ -24,10 +24,14 @@
   AD11; seed dates the running semester from seed day - 3, so re-seed the morning UAT starts, UAT.md says so).
 - **GATE:** full e2e in wt/gate on 8f4ac38 (after stepdlg, before logic1): **656 passed, 0 failed, 2 skipped**.
   Mac Python gate after logic1 running -> `E:/Temp/claude/gate61/mac_logic1.txt`.
-- **In flight:** `pkt/deangrad` (D+G: Dean Graduation on the shared board, one decision UI, Tabs, "…", ErrorSummary);
-  `pkt/pm` (only app.py editor: I-145 per-student papers + "No paper on file", I-179 assistant text per role, I-175
-  drop/AWOL retrieval).
-- **app.py queue after pkt/pm:** Reports B1+B2 -> logic2 (I-165, I-166, I-168,
+- **MERGED since:** `pkt/deangrad` (D+G), `pkt/pm` (I-145/I-175/I-179: 44 distinct panel score vectors), `pkt/rep2`
+  (Reports backend B1 StudentStageEvent clock, B2 /api/reports/summary, B3 attention/stages/records-to-fix, B5
+  decisions/cycle-times). Subset e2e 59/59 (server-death at 20:07 was an external kill; helpers told: kill own PID only).
+- **In flight:** `pkt/repui` (Reports UI F1/F2/F4; it is also the only app.py editor for small term=all/previous
+  params); walkthrough rebuild (I-139, main checkout, scripts/docs/walkthrough + docx + archive shots, uncommitted until
+  reviewed); Mac gate on the rep2 merge -> `E:/Temp/claude/gate61/mac_rep2.txt`.
+- **Next:** logic2 app.py packet (I-165, I-166, I-168, I-169, I-171..I-173, I-177, I-180) after repui; full e2e in
+  wt/gate; persona-uat sweep (3 at a time); Fable full review; fix its findings.
   I-169, I-171..I-173). Frontend queue: E, C, D, F, G (consistency), Reports F1.
 - **Planned:** Reports per `research/REPORTS-SPEC-2026-11-02.md` (AD10; B1 stage clock first, after pkt/harden);
   `persona-uat` skill per `research/PERSONA-UAT-RESEARCH-2026-11-02.md` (I-142); walkthrough rebuild (I-139).
