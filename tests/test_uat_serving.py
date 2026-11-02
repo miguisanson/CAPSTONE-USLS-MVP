@@ -7,6 +7,9 @@ would be wrong. Uses its own temporary SQLite database, created before ``app`` i
 """
 import importlib.util
 import os
+import re
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -89,6 +92,46 @@ class ServeUatTests(unittest.TestCase):
         serve_uat = load_serve_uat()
         with self.assertRaises(SystemExit):
             serve_uat.read_settings({"FLASK_PORT": "not-a-number"})
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+ENV_EXAMPLE = REPO_ROOT / ".env.example"
+
+
+def env_example_names():
+    """(active, commented) variable names in .env.example."""
+    text = ENV_EXAMPLE.read_text(encoding="utf-8")
+    active = set(re.findall(r"^([A-Z][A-Z0-9_]*)=", text, re.M))
+    commented = set(re.findall(r"^# ([A-Z][A-Z0-9_]*)=", text, re.M))
+    return active, commented
+
+
+class EnvExampleTests(unittest.TestCase):
+    def test_lists_every_variable_the_code_reads(self):
+        source = (REPO_ROOT / "app.py").read_text(encoding="utf-8")
+        read = set(re.findall(r"(?:getenv|environ\.get|environ)\(?\[?[\"']([A-Z][A-Z0-9_]+)[\"']", source))
+        read.update({"UAT_THREADS", "UAT_MAX_BODY_MB"})  # read by scripts/serve_uat.py
+        active, commented = env_example_names()
+        self.assertEqual(sorted(read - active - commented), [], "variables the code reads but .env.example does not list")
+
+    def test_copying_it_verbatim_does_not_break_the_app(self):
+        # A numeric setting left empty would crash int(""), so only 'empty means unset' names may be active.
+        active, _ = env_example_names()
+        db = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
+        db.close()
+        env = dict(os.environ)
+        env.update({name: "" for name in active})
+        env["DATABASE_URL"] = f"sqlite:///{db.name}"
+        env["USLS_SKIP_STARTUP_TASKS"] = "1"
+        env["SECRET_KEY"] = "test-key"
+        code = "import app; assert app.LOGIN_THROTTLE.max_failures == 5; assert app.demo_mode_enabled()"
+        result = subprocess.run([sys.executable, "-c", code], cwd=REPO_ROOT, env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+
+    def test_gitignore_keeps_env_out_but_example_in(self):
+        ignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+        self.assertIn(".env", ignore)
+        self.assertIn("!.env.example", ignore)
 
 
 if __name__ == "__main__":
