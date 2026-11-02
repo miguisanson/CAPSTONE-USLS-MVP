@@ -7,11 +7,15 @@
 - **Merged on v6.1:** paused v5.3 packets `pkt/iso`, `pkt/conE`, `pkt/rep` (conflicts only in p51/p62 specs, resolved
   keeping both sides). Full Python gate on b629b82 running in `wt/gate` -> `E:/Temp/claude/gate61/merge3.txt`.
   Still to run on the merged code: `npm run e2e` (p93 reports + p95 + p51/p62/p96), `check:ui:strict`.
-- **In flight (max 3 agents, IM33):** `pkt/cal` in `wt/cal` (only app.py editor: calendar review fixes I-134..I-137);
-  `pkt/uat` in `wt/uat` (no app.py: waitress+ProxyFix entry `npm run uat`, `.env.example`, setup-env calendar lines,
-  `UAT.md`, cloudflared example, read-only public-exposure audit -> next app.py packet); dev-kit agent (Ponytail +
-  Caveman lite in the kit, Python/unittest support in `workers/` + `workers/projects/CAPSTONE-USLS-MVP.conf`, edits left
-  uncommitted in dev-kit).
+- **MERGED `pkt/cal`** (I-134..I-137, I-140): self-conflict, deferral cleanup, PATCH 404 recreate, invalid_grant ->
+  "Reconnect", token saved, hooks never fail a booking, fixed event ids + private, scope check, primary-calendar note.
+  29 targeted tests OK, build OK, check:ui strict 0.
+- **e2e after merges:** 603 passed, 8 failed. Fixed here: p72 (calendar link moved by v6.0), p51/p78 (hard-coded dates).
+  The other 5 fail alone too -> `pkt/e2efix` (wt/e2efix, no app.py).
+- **In flight:** `pkt/harden` (wt/harden, only app.py editor): DEMO_SHOW_ACCOUNTS, reset staff/admin only,
+  ASSISTANT_MAX_PER_HOUR, MAX_UPLOAD_MB, env_int, security headers, SQLite WAL/busy_timeout. `pkt/e2efix`. Dev-kit agent.
+- **Planned:** Reports per `research/REPORTS-SPEC-2026-11-02.md` (AD10; B1 stage clock first, after pkt/harden);
+  `persona-uat` skill per `research/PERSONA-UAT-RESEARCH-2026-11-02.md` (I-142); walkthrough rebuild (I-139).
 - **Auto-resume:** scheduled task `oathbound-keep-going` (every 30 min, while `E:/DevCache/dev-kit-workers/autopilot.on` exists) resumes session `local_51b87609-0806-4cf8-87f2-0c79290158d8` after a turn ending `PAUSED for 5-hour limit`; stop at 80% weekly with `WEEKLY BUDGET`, resumed after the weekly reset (Wed 2026-11-04 02:00 PH). Extra usage is OFF on the account (no charges).
 - **Machines:** Mac and Lenovo were OFFLINE on Tailscale at 2026-11-02 start; everything runs on this PC until they are on.
 - **MERGED `pkt/uat`** (I-138): `npm run uat` = waitress + ProxyFix (`scripts/serve_uat.py`, test `tests/test_uat_serving.py` 7/7), `.env.example`, setup-env `--uat`, `UAT.md`, `deploy/cloudflared/config.yml.example`. Its public-exposure audit -> next app.py packet `pkt/harden` (after pkt/cal): empty env values = unset, `DEMO_SHOW_ACCOUNTS` switch (demo-accounts endpoints publish the shared password + admin e-mail), demo reset staff/admin only, assistant per-account rate limit, `MAX_CONTENT_LENGTH`, security headers, SQLite WAL + busy_timeout.
