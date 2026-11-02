@@ -27,14 +27,17 @@
 - **MERGED since:** `pkt/deangrad` (D+G), `pkt/pm` (I-145/I-175/I-179: 44 distinct panel score vectors), `pkt/rep2`
   (Reports backend B1 StudentStageEvent clock, B2 /api/reports/summary, B3 attention/stages/records-to-fix, B5
   decisions/cycle-times). Subset e2e 59/59 (server-death at 20:07 was an external kill; helpers told: kill own PID only).
-- **In flight:** `pkt/repui` (Reports UI F1/F2/F4; it is also the only app.py editor for small term=all/previous
-  params); walkthrough rebuild (I-139, main checkout, scripts/docs/walkthrough + docx + archive shots, uncommitted until
-  reviewed); Mac gate on the rep2 merge: **822 passed / 0 failed** (17.5 min).
-- **Next:** logic2 app.py packet (I-165, I-166, I-168, I-169, I-171..I-173, I-177, I-180) after repui; full e2e in
-  wt/gate; persona-uat sweep (3 at a time); Fable full review; fix its findings.
-  I-169, I-171..I-173). Frontend queue: E, C, D, F, G (consistency), Reports F1.
-- **Planned:** Reports per `research/REPORTS-SPEC-2026-11-02.md` (AD10; B1 stage clock first, after pkt/harden);
-  `persona-uat` skill per `research/PERSONA-UAT-RESEARCH-2026-11-02.md` (I-142); walkthrough rebuild (I-139).
+- **MERGED since (evening 2026-11-02):** `pkt/repui` (Reports UI F1/F2/F4), walkthrough rebuilt in the team order (I-139,
+  `Documents/CAPSTONE_ONLY/CAP-2521-IT-WALKTHROUGH.docx`; case 20 Reports to re-capture), `pkt/e2efix2`, `pkt/polish`
+  (I-180..I-186), `pkt/logic2` (I-165..I-173, I-177, I-181 history, I-187, I-188 search), `pkt/deanux` (I-189..I-196).
+  Gates: Mac Python 822/0 after rep2; full e2e 680/2 after repui (both fixed). Persona runs: student-new, dean-phone,
+  staff-rushed (findings I-175..I-178, I-188..I-196).
+- **In flight:** `pkt/be6` (only app.py editor: I-183 seed inconsistencies, I-195 PH dates, I-193 one active count +
+  Dean roles on stages/attention, I-197 deliberate history); `pkt/staffux` (I-198 ?show=open on every board, I-199
+  every staff board as a card list on phones); Mac gate + full e2e on the logic2 merge -> gate61/mac_logic2.txt, e2e7.txt.
+- **Next:** merge be6 + staffux, gates; persona sweep 2 (student-leave, faculty-rare, coordinator-research) from wt/gate
+  (not while e2e runs there); walkthrough case 20 re-capture; **Fable full review at ~70% weekly** (63% at 22:45),
+  then fix its P1s; stop at 80% (`WEEKLY BUDGET`), auto-resume after the Wed 02:00 reset.
 - **Auto-resume:** scheduled task `oathbound-keep-going` (every 30 min, while `E:/DevCache/dev-kit-workers/autopilot.on` exists) resumes session `local_51b87609-0806-4cf8-87f2-0c79290158d8` after a turn ending `PAUSED for 5-hour limit`; stop at 80% weekly with `WEEKLY BUDGET`, resumed after the weekly reset (Wed 2026-11-04 02:00 PH). Extra usage is OFF on the account (no charges).
 - **Machines:** Mac online with Python 3.13 (brew); full Python gate on the Mac = 16 min: `bash E:/Github_Projects/dev-kit/workers/pc/run-job.sh --worker mac CAPSTONE-USLS-MVP <dir>` (conf `dev-kit/workers/projects/CAPSTONE-USLS-MVP.conf`, parser unittest). First Mac run on b629b82: 717 passed, 1 failed; PC gate same code: 718 ran, the same 1 error (test_reports_im20 shared-DB teardown, fixed in a later commit). Lenovo: no Python, not used. Dev-kit edits (Ponytail/Caveman, workers) are uncommitted in dev-kit (owner commits).
 - **MERGED `pkt/uat`** (I-138): `npm run uat` = waitress + ProxyFix (`scripts/serve_uat.py`, test `tests/test_uat_serving.py` 7/7), `.env.example`, setup-env `--uat`, `UAT.md`, `deploy/cloudflared/config.yml.example`. Its public-exposure audit -> next app.py packet `pkt/harden` (after pkt/cal): empty env values = unset, `DEMO_SHOW_ACCOUNTS` switch (demo-accounts endpoints publish the shared password + admin e-mail), demo reset staff/admin only, assistant per-account rate limit, `MAX_CONTENT_LENGTH`, security headers, SQLite WAL + busy_timeout.
