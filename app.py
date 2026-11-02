@@ -28,6 +28,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from urllib.parse import quote, quote_plus, urlencode
 from time import monotonic as _monotonic, sleep as _sleep
+from types import SimpleNamespace
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -24485,10 +24486,24 @@ def _report_term_range(label: str):
     """(first day, last day) of a term, or None when no term is chosen. A term that does not exist matches nothing."""
     if not label:
         return None
-    term = AcademicTerm.query.filter_by(label=label).first()
+    term = AcademicTerm.query.filter_by(label=label).first() or report_period(label)
     if term is None:
         return (date.max, date.min)
     return (term.start_date, term.end_date)
+
+
+def report_period(choice: str):
+    """A Reports period that is not an academic term: 'all' / 'All time', 'last-12-months' / 'Last 12 months', and the
+    12 months before it. Returns something shaped like a term (id None, label, start_date, end_date), else None."""
+    today = date.today()
+    key = (choice or "").strip().lower().replace(" ", "-")
+    made = {
+        "all": ("All time", date(2000, 1, 1), today),
+        "all-time": ("All time", date(2000, 1, 1), today),
+        "last-12-months": ("Last 12 months", today - timedelta(days=364), today),
+        "the-12-months-before": ("the 12 months before", today - timedelta(days=729), today - timedelta(days=365)),
+    }.get(key)
+    return SimpleNamespace(id=None, label=made[0], start_date=made[1], end_date=made[2]) if made else None
 
 
 def _in_term(day, term_range) -> bool:
@@ -24945,7 +24960,9 @@ def v2_list_response(payload: dict, title: str, columns: list, rows: list, args)
 # ---------------------------------------------------------------------------
 # Reports v2 (I-141, AD10, spec research/REPORTS-SPEC-2026-11-02.md; payloads in research/REPORTS-API-2026-11-02.md)
 # One question per report, every number with a comparison, every count opens the list behind it. Reads only.
-# All endpoints take the filters program_id, cohort ("24-25" or "2024-2025") and term (a label; default the active term).
+# All endpoints take the filters program_id, cohort ("24-25" or "2024-2025") and term (a label; default the active term;
+# also "previous" = the term before it, "all" = all time, "last-12-months" = the last 12 months, compared with the 12
+# months before). The summary also returns options.cohorts, the entry cohorts to offer in a filter.
 # Payloads, so the frontend packet needs no reading of the code:
 #   GET /api/reports/summary  -> {filters, term:{label,start,end}|null, previous_term|null, tiles:[six, in order
 #       active, behind, waiting, decide_days, defenses, graduation]}; a tile is {key, label, value, unit, count?, of?,
@@ -24999,17 +25016,34 @@ def _normal_cohort(label: str) -> str:
     return f"{match.group(1)[2:]}-{match.group(2)[2:]}" if match else label
 
 
+def term_before(term):
+    """The latest academic term that ended before `term` began."""
+    return AcademicTerm.query.filter(AcademicTerm.end_date < term.start_date).order_by(AcademicTerm.end_date.desc()).first()
+
+
+def resolve_report_term(label: str):
+    """What a Reports `term` choice means: empty = the active term, 'previous' = the term before it, else a term label
+    or one of the report_period choices. None when it matches nothing."""
+    if not label:
+        return get_active_term()
+    if label == "previous":
+        active = get_active_term()
+        return term_before(active) if active else None
+    return AcademicTerm.query.filter_by(label=label).first() or report_period(label)
+
+
 def report_scope(args) -> dict:
     """The filters every Reports v2 endpoint shares: program, entry cohort and term (default: the active term)."""
     program_id = safe_int(_filter_value(args, "program_id")) or None
     cohort = _normal_cohort(_filter_value(args, "cohort"))
     label = _filter_value(args, "term")
-    term = AcademicTerm.query.filter_by(label=label).first() if label else get_active_term()
-    previous = (
-        AcademicTerm.query.filter(AcademicTerm.end_date < term.start_date)
-        .order_by(AcademicTerm.end_date.desc()).first()
-        if term else None
-    )
+    term = resolve_report_term(label)
+    if term is None:
+        previous = None
+    elif term.id is None:  # a period, not a term: only the 12 months have an earlier period to compare with
+        previous = report_period("the-12-months-before") if term.label == "Last 12 months" else None
+    else:
+        previous = term_before(term)
     query = Student.query.join(Program)
     if program_id:
         query = query.filter(Student.program_id == program_id)
@@ -25242,7 +25276,11 @@ def report_summary(args) -> dict:
         tile = {k: v for k, v in tile.items() if k != "rows"}
         tile["drill"] = {"url": f"/api/reports/summary/{tile['key']}", "params": {k: v for k, v in scope["filters"].items() if v}}
         public.append(tile)
-    return {"filters": scope["filters"], "term": _term_json(scope["term"]), "previous_term": _term_json(scope["previous"]), "tiles": public}
+    cohorts = sorted({_cohort_entry_label(s) for s in Student.query.all()} - {"Not recorded"})
+    return {
+        "filters": scope["filters"], "term": _term_json(scope["term"]), "previous_term": _term_json(scope["previous"]),
+        "options": {"cohorts": cohorts}, "tiles": public,
+    }
 
 
 def report_summary_list(key: str, args) -> dict | None:
@@ -25470,7 +25508,7 @@ def report_decisions(args) -> dict:
 def report_cycle_times(args) -> dict:
     scope = report_scope(args)
     ids = sorted(scope["ids"])
-    chosen = AcademicTerm.query.filter_by(label=_filter_value(args, "term")).first() if _filter_value(args, "term") else None
+    chosen = resolve_report_term(_filter_value(args, "term")) if _filter_value(args, "term") else None
     aging = {row["process_area"]: row for row in queue_aging_report(ids)["rows"]} if ids else {}
     open_cases = queue_open_cases(ids) if ids else []
     rows = []
