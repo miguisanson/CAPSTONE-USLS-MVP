@@ -312,8 +312,26 @@ COLLEGES = [
 # ---------------------------------------------------------------------------
 # App configuration helpers
 # ---------------------------------------------------------------------------
-def now_utc() -> datetime:
-    return datetime.now()
+# Philippines time has no daylight saving. Every "now" and "today" in the app is Manila time, whatever zone the
+# server runs in: stored timestamps are naive Manila time, and "due today" is the Manila day (I-195).
+MANILA_TZ = timezone(timedelta(hours=8))
+
+
+def _clock_utc() -> datetime:
+    """The one place the real clock is read (tests freeze it)."""
+    return datetime.now(timezone.utc)
+
+
+def manila_now() -> datetime:
+    return _clock_utc().astimezone(MANILA_TZ).replace(tzinfo=None)
+
+
+def ph_today() -> date:
+    return manila_now().date()
+
+
+def now_utc() -> datetime:  # the name is old: it returns naive Manila time, what the columns store
+    return manila_now()
 
 
 def resolve_database_url() -> str:
@@ -1931,7 +1949,7 @@ def get_active_term() -> AcademicTerm | None:
     if active:
         return active
     # Date-aware "current semester": the one in session, else the next upcoming, else latest.
-    today = date.today()
+    today = ph_today()
     current = (
         AcademicTerm.query.filter(AcademicTerm.start_date <= today, AcademicTerm.end_date >= today)
         .order_by(AcademicTerm.start_date.desc())
@@ -1996,14 +2014,14 @@ def seed_semester_years(today: date | None = None) -> tuple[int, int]:
     The first semester of a year starts in August, so before August the current academic year
     began the year before. More semesters are added from the admin screen when they are needed.
     """
-    today = today or date.today()
+    today = today or ph_today()
     current = today.year if today.month >= 8 else today.year - 1
     return current - 2, current + 2
 
 
 def upcoming_semester_labels(count: int = 5, reference: date | None = None) -> list[str]:
     """The current and next few semesters (by label), for student/staff dropdowns."""
-    reference = reference or date.today()
+    reference = reference or ph_today()
     terms = AcademicTerm.query.order_by(AcademicTerm.start_date.asc()).all()
     upcoming = [t for t in terms if (t.end_date or t.start_date) >= reference]
     chosen = (upcoming or terms[-count:])[:count]
@@ -2012,7 +2030,7 @@ def upcoming_semester_labels(count: int = 5, reference: date | None = None) -> l
 
 def future_semester_labels(count: int = 5, reference: date | None = None) -> list[str]:
     """Semesters that have not begun yet, used for future-effective requests."""
-    reference = reference or date.today()
+    reference = reference or ph_today()
     terms = (
         AcademicTerm.query.filter(AcademicTerm.start_date > reference)
         .order_by(AcademicTerm.start_date.asc())
@@ -2067,7 +2085,7 @@ def graduation_school_year_options() -> list[str]:
 
     # New/test databases may not have an academic calendar yet. Keep the form
     # usable until staff configure terms, while still requiring an AY value.
-    today = date.today()
+    today = ph_today()
     start_year = today.year if today.month >= 6 else today.year - 1
     return [f"AY {start_year}-{start_year + 1}"]
 
@@ -3152,7 +3170,7 @@ def withdrawal_application_dict(application: WithdrawalApplication | None, inclu
     submission_date = (
         application.created_at.date()
         if application.created_at
-        else date.today()
+        else ph_today()
     )
     withdrawal_window = (
         subject_withdrawal_window(application.subject_enrollment, submission_date)
@@ -3376,7 +3394,7 @@ def task_dict(task: Task) -> dict:
         "due_at": iso(task.due_at),
         "status": task.status,
         "priority": task.priority,
-        "overdue": task.status != "Done" and task.due_at < date.today(),
+        "overdue": task.status != "Done" and task.due_at < ph_today(),
         "action_url": action_url,
         "action_label": action_label,
     }
@@ -3398,7 +3416,7 @@ def plan_publish_task_items(owner: str = "", status: str = "") -> list[dict]:
     for plan in approved_plans:
         approved_on = (plan.approved_at or plan.updated_at or now_utc()).date()
         due = approved_on + timedelta(days=3)
-        overdue = due < date.today()
+        overdue = due < ph_today()
         if status == "Overdue" and not overdue:
             continue
         items.append({
@@ -3876,7 +3894,7 @@ def subject_withdrawal_window(
     Eligibility is judged from the date the student submitted the request, so a
     request stays valid if reviewers act after the deadline.
     """
-    check_date = as_of or date.today()
+    check_date = as_of or ph_today()
     term = item.term
     window_days = rule_value("withdrawal.window_days", 14)
     first_week_days = rule_value("withdrawal.first_week_days", 7)
@@ -4312,7 +4330,7 @@ def subject_adjustment_window(term: AcademicTerm, change: bool = False, as_of: d
     """
     key = "course_adjustment.change_subject_window_days" if change else "course_adjustment.add_subject_window_days"
     days = rule_value(key, 7)
-    today = as_of or date.today()
+    today = as_of or ph_today()
     started = bool(term and term.start_date and today >= term.start_date)
     deadline = term.start_date + timedelta(days=days - 1) if term and term.start_date else None
     return {
@@ -4810,7 +4828,7 @@ def student_enrollment_snapshot(
 
 
 def default_academic_year_options() -> list[str]:
-    today_year = date.today().year
+    today_year = ph_today().year
     return [f"{year}-{year + 1}" for year in range(today_year, today_year - 5, -1)]
 
 
@@ -5228,10 +5246,10 @@ def student_indicators(student: Student) -> dict:
     open_tasks = Task.query.filter(
         Task.student_id == student.id, Task.status.in_(["Pending", "Overdue"])
     ).order_by(Task.due_at.asc()).all()
-    overdue = [t for t in open_tasks if t.due_at < date.today()]
-    max_overdue_days = max(((date.today() - t.due_at).days for t in overdue), default=0)
-    upcoming = [t for t in open_tasks if t.due_at >= date.today()]
-    next_due_days = min(((t.due_at - date.today()).days for t in upcoming), default=None)
+    overdue = [t for t in open_tasks if t.due_at < ph_today()]
+    max_overdue_days = max(((ph_today() - t.due_at).days for t in overdue), default=0)
+    upcoming = [t for t in open_tasks if t.due_at >= ph_today()]
+    next_due_days = min(((t.due_at - ph_today()).days for t in upcoming), default=None)
     next_upcoming_title = (
         sorted(upcoming, key=lambda t: t.due_at)[0].title if upcoming else None
     )
@@ -5493,7 +5511,7 @@ def refresh_risk_levels(force: bool = False) -> int:
     import time as _time
 
     now = _time.monotonic()
-    today = date.today()
+    today = ph_today()
     last = _RISK_REFRESH_STATE["at"]
     if (
         not force
@@ -5521,7 +5539,7 @@ def _portfolio_row(rec, student):
 
 def portfolio_recommendations(limit: int = 150) -> dict:
     """Action queue across the population, each item scored and specific (cheap queries)."""
-    today = date.today()
+    today = ph_today()
     rows: list[dict] = []
 
     for t in (
@@ -5786,7 +5804,7 @@ def loa_filing_check(start_term: AcademicTerm | None, as_of: date | None = None)
             "status": "Needs Review",
             "detail": "A valid start semester is required to check the filing date.",
         }
-    today = as_of or date.today()
+    today = as_of or ph_today()
     if start_term.end_date < today:
         return {
             "label": "Filing date",
@@ -6221,7 +6239,7 @@ def leave_close_tasks(case: LeaveCase, stages=LEAVE_WORK_STAGES, kinds=None) -> 
 
 def leave_open_task(case: LeaveCase, stage: str, owner: str, days: int = 3, priority: int = 55) -> None:
     title = LEAVE_TASKS[case.kind][stage]
-    ensure_task(case.student_id, title, owner, date.today() + timedelta(days=days), priority)
+    ensure_task(case.student_id, title, owner, ph_today() + timedelta(days=days), priority)
 
 
 def leave_notice(
@@ -6531,7 +6549,7 @@ def leave_file_loa(student: Student, data, account: UserAccount | None) -> Leave
                 409,
             )
         parent_end = leave_end_date(parent)
-        if parent_end and parent_end < date.today():
+        if parent_end and parent_end < ph_today():
             raise LeaveError(
                 "Your leave has already ended, so it can no longer be extended. File a readmission request "
                 "or contact Graduate School staff.",
@@ -6619,7 +6637,7 @@ def leave_file_readmission(student: Student, data, account: UserAccount | None) 
         )
     target_label = (data.get("target_return_term") or "").strip()
     target = leave_term(target_label)
-    if not target or target.start_date <= date.today():
+    if not target or target.start_date <= ph_today():
         raise LeaveError("Choose a valid future return semester.")
     return_intent = (data.get("return_intent") or "").strip()
     if not return_intent:
@@ -6992,7 +7010,7 @@ def leave_mark_subjects_withdrawn(case: LeaveCase, filed_second_half: bool) -> l
 
 def leave_apply_start(case: LeaveCase, *, today: date | None = None) -> list[str]:
     """The leave begins: remember the stage, go On Leave, record each covered semester."""
-    today = today or date.today()
+    today = today or ph_today()
     student = case.student
     if student.current_stage not in {"LOA", "AWOL", "Withdrawn"}:
         case.prior_stage = student.current_stage
@@ -7058,12 +7076,12 @@ def flag_booked_defenses(student: Student, word: str) -> int:
     booked = ScheduleRequest.query.filter(
         ScheduleRequest.student_id == student.id,
         ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
-        ScheduleRequest.preferred_date >= date.today(),
+        ScheduleRequest.preferred_date >= ph_today(),
     ).count()
     if booked:
         ensure_task(
             student.id, f"Booked defense for a student who is now {word}: keep, reschedule or cancel it",
-            "Research Coordinator", date.today() + timedelta(days=3), 80,
+            "Research Coordinator", ph_today() + timedelta(days=3), 80,
         )
     return booked
 
@@ -7098,7 +7116,7 @@ def leave_declare_awol(case: LeaveCase, account: UserAccount | None, comment: st
         db.session.add(awol)
     awol_remember_stage(awol, stage_before)
     awol.status = awol.status if awol.status in {"Return Submitted", "Returned for Revision", "Dean Review", "Re-enrollment Required"} else "AWOL Declared"
-    awol.awol_effective_date = awol.awol_effective_date or ((end_date + timedelta(days=1)) if end_date else date.today())
+    awol.awol_effective_date = awol.awol_effective_date or ((end_date + timedelta(days=1)) if end_date else ph_today())
     awol.last_enrolled_term = awol.last_enrolled_term or case.end_label or (case.end_term.label if case.end_term else None)
     awol.detection_source = "Leave of absence ended without a return"
     awol.automatically_flagged_at = awol.automatically_flagged_at or now_utc()
@@ -7109,7 +7127,7 @@ def leave_declare_awol(case: LeaveCase, account: UserAccount | None, comment: st
         student, "AWOL policy alert", detail, source="Leave of absence", source_reference=f"Leave case #{case.id}",
         account=account,
     )
-    ensure_task(student.id, "Review automatic AWOL policy alert", "Academic Coordinator", date.today(), 85)
+    ensure_task(student.id, "Review automatic AWOL policy alert", "Academic Coordinator", ph_today(), 85)
     add_log(
         "awol", student.id, leave_actor(account)["log_actor"], f"Leave case #{case.id}",
         "Student marked AWOL after a leave that ended with no return", "Academic Coordinator",
@@ -7127,7 +7145,7 @@ def leave_resolved_target(case: LeaveCase, move: dict) -> str:
         return target
     if case.kind == KIND_LOA:
         start = leave_start_date(case)
-        return "Leave Scheduled" if (start and start > date.today()) else "On Leave"
+        return "Leave Scheduled" if (start and start > ph_today()) else "On Leave"
     return "Approved"
 
 
@@ -7420,7 +7438,7 @@ def _leave_h_cancel(case, account, comment, data, move):
     leave_close_tasks(case, stages=tuple(LEAVE_TASKS[case.kind].keys()))
     if sent:
         ensure_task(case.student_id, "Tell the Registrar the approved leave was cancelled", LEAVE_STAFF,
-                    date.today() + timedelta(days=2), 60)
+                    ph_today() + timedelta(days=2), 60)
     else:
         case.registrar_status = "Not Ready"
     text = (
@@ -7439,7 +7457,7 @@ def _leave_h_cancel(case, account, comment, data, move):
 
 def _leave_h_start_leave(case, account, comment, data, move):
     previous = case.status
-    today = (data or {}).get("today") or date.today()
+    today = (data or {}).get("today") or ph_today()
     closed = leave_apply_start(case, today=today)
     case.status = "On Leave"
     leave_notice(
@@ -7481,7 +7499,7 @@ def _leave_h_confirm_awol(case, account, comment, data, move):
     end = leave_end_date(case)
     grace_days = int(rule_value("leave.return_grace_days", 14) or 14)
     # The sync proposes AWOL only after end + grace, so a proposal counts as proof that the period passed.
-    if not case.awol_proposed_at and end and date.today() <= end + timedelta(days=grace_days):
+    if not case.awol_proposed_at and end and ph_today() <= end + timedelta(days=grace_days):
         raise LeaveError(
             f"This leave runs until {end.isoformat()}. AWOL can be confirmed only after it ends and the "
             f"{grace_days}-day grace period has passed ({(end + timedelta(days=grace_days + 1)).isoformat()} at the earliest).",
@@ -7580,7 +7598,7 @@ def sync_leave_cases(today: date | None = None, commit: bool = False) -> dict:
 
     Safe to repeat. AWOL is only ever *proposed* here; a staff member confirms it.
     """
-    today = today or date.today()
+    today = today or ph_today()
     due_days = int(rule_value("leave.return_due_days", 30) or 30)
     grace_days = int(rule_value("leave.return_grace_days", 14) or 14)
     summary = {"started": 0, "return_due": 0, "awol_proposed": 0, "adopted": adopt_legacy_leave_logs()}
@@ -7686,7 +7704,7 @@ def leave_case_dict(case: LeaveCase, role: str = "staff", detail: bool = False) 
     student = case.student
     kind = case.kind
     info = STATUS_BY_KEY.get(case.status, {})
-    today = date.today()
+    today = ph_today()
     start, end = leave_start_date(case), leave_end_date(case)
     active_window = case.status in {"On Leave", "Return Due"}
     events = list(case.events)
@@ -7831,7 +7849,7 @@ def leave_student_overview(student: Student) -> dict:
     """What the student's pages need: their cases and what they may file now."""
     cases = leave_family_cases(student.id)
     active = active_leave_case(student.id)
-    today = date.today()
+    today = ph_today()
     blocked = leave_standing_block(student)
     open_loa = open_leave_case(student.id, (KIND_LOA, KIND_EXTENSION))
     open_read = open_leave_case(student.id, (KIND_READMISSION,))
@@ -8084,7 +8102,7 @@ def leave_registrar_export(slug: str, cases: list[LeaveCase], file_format: str, 
         payload = stream.getvalue().encode("utf-8-sig")
         mimetype = "text/csv"
     prefix = "approved-leaves-of-absence" if slug == SLUG_LOA else "approved-readmissions"
-    file_name = f"{prefix}-{date.today().isoformat()}.{file_format}"
+    file_name = f"{prefix}-{ph_today().isoformat()}.{file_format}"
     log = LeaveExportLog(
         slug=slug, file_name=file_name, file_format=file_format,
         case_ids_json=json.dumps([case.id for case in cases]), case_count=len(cases),
@@ -8330,7 +8348,7 @@ def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
         latest.status = latest.status if latest.status in {
             "Return Submitted", "Returned for Revision", "Dean Review", "Re-enrollment Required"
         } else "AWOL Declared"
-        latest.awol_effective_date = latest.awol_effective_date or effective_date or date.today()
+        latest.awol_effective_date = latest.awol_effective_date or effective_date or ph_today()
         latest.detection_source = source
         latest.automatically_flagged_at = latest.automatically_flagged_at or now_utc()
         latest.policy_classification = latest.policy_classification or "Awaiting structured return declaration"
@@ -8357,7 +8375,7 @@ def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
                 student.id,
                 "Review automatic AWOL policy alert",
                 "Academic Coordinator",
-                date.today(),
+                ph_today(),
                 85,
             )
             workflow_message_record(
@@ -8773,7 +8791,7 @@ def withdrawal_process_case(application: WithdrawalApplication, role: str = "sta
     term_label = application.effective_term or (subject.term.label if subject and subject.term else "")
     subject_text = f"{course.code} - {course.title}" if course else "Subject pending"
     window = (
-        subject_withdrawal_window(subject, application.created_at.date() if application.created_at else date.today())
+        subject_withdrawal_window(subject, application.created_at.date() if application.created_at else ph_today())
         if subject else None
     )
     logs = [
@@ -10977,7 +10995,7 @@ def _plain_date(value) -> str:
 
 def student_assistant_record(student: Student) -> dict:
     """Facts from ONE student's own record that the assistant may use. Read-only; no names or numbers."""
-    today = date.today()
+    today = ph_today()
     case = ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
     indicators = student_indicators(student)
     audit = compute_course_audit(student)
@@ -11117,7 +11135,7 @@ def student_record_answer(record: dict) -> str:
 def account_assistant_queue(account: UserAccount) -> dict:
     """What is waiting on the signed-in staff member, coordinator, dean or faculty member."""
     role = account.role
-    today = date.today()
+    today = ph_today()
     items: list[dict] = []
     extras: list[str] = []
     if role == "faculty":
@@ -11869,7 +11887,7 @@ def _graduation_forecast_report() -> dict:
     if not next_term:
         next_term = (
             AcademicTerm.query
-            .filter(AcademicTerm.start_date > date.today())
+            .filter(AcademicTerm.start_date > ph_today())
             .order_by(AcademicTerm.start_date.asc())
             .first()
         )
@@ -12888,8 +12906,8 @@ def register_routes(app: Flask) -> None:
         # latest one on file, with the standard 1st-Sem (Aug) / 2nd-Sem (Jan) calendar.
         latest = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).first()
         if not latest or not latest.start_date:
-            start = date(date.today().year, 8, 1)
-            label = academic_semester_label(date.today().year, 0)
+            start = date(ph_today().year, 8, 1)
+            label = academic_semester_label(ph_today().year, 0)
         else:
             sd = latest.start_date
             if sd.month >= 8:  # latest is a 1st Semester -> next is that AY's 2nd Semester
@@ -13764,7 +13782,7 @@ def register_routes(app: Flask) -> None:
         standing_block = student_enrollment_block_reason(student, term)
         if standing_block:
             return jsonify({"error": standing_block}), 409
-        if term.end_date and term.end_date < date.today():
+        if term.end_date and term.end_date < ph_today():
             return jsonify({
                 "error": f"{term.label} has already ended. Ask the Academic Coordinator to record a past semester."
             }), 409
@@ -13964,7 +13982,7 @@ def register_routes(app: Flask) -> None:
         return_reason = (data.get("return_reason") or "").strip()
         target_term = AcademicTerm.query.filter_by(label=target_return_term).first()
         last_term = AcademicTerm.query.filter_by(label=last_enrolled_term).first()
-        if not target_term or target_term.start_date <= date.today():
+        if not target_term or target_term.start_date <= ph_today():
             return jsonify({"error": "Choose a valid future semester when you intend to return."}), 400
         if last_enrolled_term and not last_term:
             return jsonify({"error": "Choose a valid last enrolled semester."}), 400
@@ -13979,7 +13997,7 @@ def register_routes(app: Flask) -> None:
             item = AwolCase(
                 student_id=student.id,
                 status="AWOL Declared",
-                awol_effective_date=date.today(),
+                awol_effective_date=ph_today(),
                 last_enrolled_term=last_enrolled_term or None,
             )
             db.session.add(item)
@@ -14191,7 +14209,7 @@ def register_routes(app: Flask) -> None:
         application.registrar_report_generated_at = None
         application.registrar_sent_at = None
         application.registrar_confirmed_at = None
-        application.effective_date = date.today()
+        application.effective_date = ph_today()
         application.status = "Submitted to GS Staff"
         application.decided_at = None
         application.completed_at = None
@@ -14354,7 +14372,7 @@ def register_routes(app: Flask) -> None:
             )
         workbook_bytes = withdrawal_registrar_workbook(applications)
         db.session.commit()
-        filename = f"approved-subject-withdrawals-{date.today().isoformat()}.xlsx"
+        filename = f"approved-subject-withdrawals-{ph_today().isoformat()}.xlsx"
         return Response(
             workbook_bytes,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -14589,7 +14607,7 @@ def register_routes(app: Flask) -> None:
                 day = date.fromisoformat(preferred_date)
             except ValueError:
                 return jsonify({"error": "Enter the preferred date as YYYY-MM-DD."}), 400
-            if day <= date.today():
+            if day <= ph_today():
                 return jsonify({"error": "The preferred date must be a future date."}), 400
         if not active_panel_assignments(student, stage_progress["gate"]):
             return jsonify({"error": "Panel matching must be completed before requesting a defense schedule."}), 400
@@ -14835,7 +14853,7 @@ def register_routes(app: Flask) -> None:
         if owner:
             query = query.filter(owner_task_clause(owner))
         if status == "Overdue":
-            query = query.filter(Task.due_at < date.today(), Task.status != "Done")
+            query = query.filter(Task.due_at < ph_today(), Task.status != "Done")
         page, page_size = page_arguments(request.args, default_size=50, max_size=200)
         total = query.count()
         tasks = (
@@ -14911,7 +14929,7 @@ def register_routes(app: Flask) -> None:
         return jsonify(report_summary(request.args))
 
     @app.route("/api/reports/attention")
-    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
     def reports_attention():
         payload = report_attention(request.args)
         return v2_list_response(payload, "Students who need attention", [
@@ -14919,7 +14937,7 @@ def register_routes(app: Flask) -> None:
             ("days_in_stage", "Days in stage"), ("owner", "Next owner")], payload["rows"], request.args)
 
     @app.route("/api/reports/stages")
-    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
     def reports_stages():
         payload = report_stages(request.args)
         return v2_list_response(payload, "Where students get stuck", [
@@ -15187,7 +15205,7 @@ def register_routes(app: Flask) -> None:
         # so the coordinator can update the official system manually.
         raw = (request.args.get("date") or "").strip()
         try:
-            target = parse_date(raw) if raw else date.today()
+            target = parse_date(raw) if raw else ph_today()
         except ValueError:
             return jsonify({"error": "Use a valid date (YYYY-MM-DD)."}), 400
         rows = (
@@ -15437,8 +15455,8 @@ def register_routes(app: Flask) -> None:
                     year = int(raw_year)
                 except (TypeError, ValueError):
                     return {}, "Year must be a whole number."
-                if year < 1950 or year > date.today().year + 1:
-                    return {}, f"Year must be between 1950 and {date.today().year + 1}."
+                if year < 1950 or year > ph_today().year + 1:
+                    return {}, f"Year must be between 1950 and {ph_today().year + 1}."
                 cleaned["year"] = year
         return cleaned, None
 
@@ -15726,7 +15744,7 @@ def register_routes(app: Flask) -> None:
         upcoming = (
             FacultyAvailability.query.filter(
                 FacultyAvailability.faculty_id == faculty.id,
-                FacultyAvailability.available_date >= date.today(),
+                FacultyAvailability.available_date >= ph_today(),
             )
             .order_by(FacultyAvailability.available_date, FacultyAvailability.start_time)
             .limit(20)
@@ -15906,7 +15924,7 @@ def register_routes(app: Flask) -> None:
         if not google_calendar_configured(faculty):
             return jsonify({"error": "Connect Google Calendar before checking availability."}), 409
 
-        today = date.today()
+        today = ph_today()
         result = google_freebusy_lookup(faculty, today, today + timedelta(days=35))
         event_result = sync_faculty_defense_events(faculty) if not result.get("error") else {"errors": []}
         event_error = event_result.get("errors", [{}])[0].get("error") if event_result.get("errors") else None
@@ -17861,7 +17879,7 @@ def register_routes(app: Flask) -> None:
                 if subject_enrollment.status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
                     return jsonify({"error": f"The selected subject is already {subject_enrollment.status}."}), 409
                 application.effective_date = application.effective_date or (
-                    application.created_at.date() if application.created_at else date.today()
+                    application.created_at.date() if application.created_at else ph_today()
                 )
                 application.status = "Approved - Awaiting Subject Tag"
                 application.requirement_status = "Not Applicable"
@@ -18541,7 +18559,7 @@ def register_routes(app: Flask) -> None:
         return Response(
             monitoring_export_workbook(program),
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f'attachment; filename="monitoring-{program.code}-{date.today().isoformat()}.xlsx"'},
+            headers={"Content-Disposition": f'attachment; filename="monitoring-{program.code}-{ph_today().isoformat()}.xlsx"'},
         )
 
     @app.route("/api/student-portal/monitoring")
@@ -18809,7 +18827,7 @@ def register_routes(app: Flask) -> None:
                 if not document:
                     return jsonify({"error": "That policy document no longer exists."}), 400
                 policy_document_id = document.id
-        effective_date = date.today()
+        effective_date = ph_today()
         if data.get("effective_date"):
             try:
                 effective_date = date.fromisoformat(str(data["effective_date"]))
@@ -19927,7 +19945,7 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         if problems:
             schedule.conflict_reason = (
-                f"Re-confirmation refused on {date.today().isoformat()}: " + "; ".join(problems)
+                f"Re-confirmation refused on {ph_today().isoformat()}: " + "; ".join(problems)
                 + ". Change the panel again or reschedule."
             )
             db.session.commit()
@@ -19972,7 +19990,7 @@ def register_routes(app: Flask) -> None:
         summary["other_windows"] = [
             {"date": iso(slot.available_date), "start": slot.start_time.strftime("%H:%M"), "end": slot.end_time.strftime("%H:%M")}
             for slot in FacultyAvailability.query.filter(
-                FacultyAvailability.faculty_id == faculty.id, FacultyAvailability.available_date >= date.today(),
+                FacultyAvailability.faculty_id == faculty.id, FacultyAvailability.available_date >= ph_today(),
             ).order_by(FacultyAvailability.available_date, FacultyAvailability.start_time).limit(30).all()
         ]
         return summary
@@ -20019,7 +20037,7 @@ def register_routes(app: Flask) -> None:
             return None, "The last date cannot be before the first date."
         if (end_date - start_date).days > 366:
             return None, "A single entry can cover at most one year."
-        if end_date < date.today():
+        if end_date < ph_today():
             return None, "That date is already in the past."
         if bool(start) != bool(end):
             return None, "Give both a start and an end time, or leave both empty for the whole day."
@@ -20391,8 +20409,8 @@ def register_routes(app: Flask) -> None:
                 )}), 400
             row.cap_exception = True
         row.associate_dean_name = re.sub(r"\s+", " ", str(data.get("associate_dean") or "")).strip()[:160] or None
-        row.form31_issued_on = date.today()
-        row.contract_due_on = date.today() + timedelta(days=adviser_contract_days())
+        row.form31_issued_on = ph_today()
+        row.contract_due_on = ph_today() + timedelta(days=adviser_contract_days())
         if row.kind == "Change":
             previous = db.session.get(AdviserAppointment, row.replaces_id)
             if previous and previous.status == ADVISER_STATUS_ACCEPTED:
@@ -20466,7 +20484,7 @@ def register_routes(app: Flask) -> None:
         ).first():
             return adviser_conflict("This student has an open adviser application; finish or withdraw it first.")
         try:
-            appointed_on = parse_date(str(data["appointed_on"])) if data.get("appointed_on") else date.today()
+            appointed_on = parse_date(str(data["appointed_on"])) if data.get("appointed_on") else ph_today()
         except ValueError:
             return jsonify({"error": "Enter the appointment date as YYYY-MM-DD."}), 400
         note = re.sub(r"\s+", " ", str(data.get("note") or "")).strip()[:500]
@@ -20626,7 +20644,7 @@ def register_routes(app: Flask) -> None:
         if not student:
             return jsonify({"error": "This account is not linked to a student record."}), 400
         scope = calendar_scope(account)
-        today = date.today()
+        today = ph_today()
         nxt = next_defense_event(scope)
         if nxt:
             nxt["countdown_days"] = (parse_date(nxt["date"]) - today).days
@@ -21360,14 +21378,14 @@ def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
         task_query = task_query.filter(owner_task_clause(owner))
 
     total_students = len(student_ids)
-    active_students = students_scope().filter(Student.standing == "Active").count()
+    active_students = students_scope().filter(active_student_clause()).count()  # the same students Reports counts (I-193)
     on_leave = students_scope().filter(on_leave_clause()).count()
     completed = students_scope().filter(Student.current_stage == "Completed").count()
     at_risk = students_scope().filter(at_risk_clause()).count()
     high_risk = students_scope().filter(Student.risk_level == "Delayed").count()
     withdrawn = students_scope().filter(Student.standing == "Withdrawn").count()
     pending_tasks = task_query.count()
-    overdue_tasks = task_query.filter(Task.due_at < date.today(), Task.status != "Done").count()
+    overdue_tasks = task_query.filter(Task.due_at < ph_today(), Task.status != "Done").count()
     confirmed_schedules = scoped(ScheduleRequest).filter(ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES)).count()
     needs_availability = scoped(ScheduleRequest).filter(ScheduleRequest.status.in_(PENDING_DEFENSE_STATUSES)).count()
     practicum_records = (
@@ -21890,7 +21908,7 @@ def withdrawal_notes(application: WithdrawalApplication) -> str:
     window = (
         subject_withdrawal_window(
             subject,
-            application.created_at.date() if application.created_at else date.today(),
+            application.created_at.date() if application.created_at else ph_today(),
         )
         if subject
         else None
@@ -21979,7 +21997,7 @@ def apply_approved_subject_withdrawal(application: WithdrawalApplication) -> Non
         )
 
     effective_date = application.effective_date or (
-        application.created_at.date() if application.created_at else date.today()
+        application.created_at.date() if application.created_at else ph_today()
     )
     changed_at = now_utc()
     enrollment.status = "Withdrawn"
@@ -22088,7 +22106,7 @@ def withdrawal_registrar_workbook(applications: list[WithdrawalApplication]) -> 
         enrollment = application.subject_enrollment
         if not enrollment or not enrollment.course or not enrollment.term:
             continue
-        request_date = application.created_at.date() if application.created_at else date.today()
+        request_date = application.created_at.date() if application.created_at else ph_today()
         window = subject_withdrawal_window(enrollment, request_date)
         values = [
             application.id,
@@ -23840,7 +23858,7 @@ def owner_workload_report(student_ids: list[int]) -> dict:
     """Workload and turnaround per owning role (Module 5: who is loaded?)."""
     if not student_ids:
         return {"count": 0, "rows": [], "columns": OWNER_WORKLOAD_COLUMNS}
-    today = date.today()
+    today = ph_today()
     workload: dict[str, dict] = {}
 
     def slot(owner: str) -> dict:
@@ -24708,7 +24726,7 @@ def _report_term_range(label: str):
 def report_period(choice: str):
     """A Reports period that is not an academic term: 'all' / 'All time', 'last-12-months' / 'Last 12 months', and the
     12 months before it. Returns something shaped like a term (id None, label, start_date, end_date), else None."""
-    today = date.today()
+    today = ph_today()
     key = (choice or "").strip().lower().replace(" ", "-")
     made = {
         "all": ("All time", date(2000, 1, 1), today),
@@ -24752,7 +24770,7 @@ def report_at_risk(args) -> dict:
         .order_by(Student.last_name, Student.first_name)
         .all()
     )
-    today = date.today()
+    today = ph_today()
     rows = []
     for student in students:
         advice = student_recommendations(student)
@@ -24859,7 +24877,7 @@ def report_overdue(args) -> dict:
     }
     students = {student.id: student for student in _report_students(args).all()}
     ids = list(students)
-    today = date.today()
+    today = ph_today()
     found = []
     if ids:
         tasks = (
@@ -24929,7 +24947,7 @@ def report_defenses(args) -> dict:
         "term": term, "when": when, "type": defense_type,
     }
     students = {student.id: student for student in _report_students(args).all()}
-    today = date.today()
+    today = ph_today()
     term_range = _report_term_range(term)
     listed_statuses = ACTIVE_DEFENSE_STATUSES + (RECONFIRM_DEFENSE_STATUS, HELD_DEFENSE_STATUS, DEFERRED_DEFENSE_STATUS)
     requests = (
@@ -25074,7 +25092,7 @@ def report_workbook_bytes(result: dict) -> bytes:
     title.alignment = Alignment(horizontal="center")
     sheet.merge_cells(start_row=2, start_column=1, end_row=2, end_column=width)
     note = sheet["A2"]
-    note.value = f"{_report_filter_text(result)}. {result['count']} row(s). Prepared {date.today().isoformat()}."
+    note.value = f"{_report_filter_text(result)}. {result['count']} row(s). Prepared {ph_today().isoformat()}."
     note.font = Font(name="Arial", size=10, italic=True, color="475569")
     note.alignment = Alignment(wrap_text=True)
     header_fill = PatternFill("solid", fgColor="DCFCE7")
@@ -25113,7 +25131,7 @@ def report_pdf_bytes(result: dict) -> bytes:
     ) or f"<tr><td colspan=\"{max(len(result['columns']), 1)}\">{html.escape(result['empty'])}</td></tr>"
     page = (
         f"<h1>{html.escape(result['title'])}</h1>"
-        f"<p>{html.escape(_report_filter_text(result))}. {result['count']} row(s). Prepared {date.today().isoformat()}.</p>"
+        f"<p>{html.escape(_report_filter_text(result))}. {result['count']} row(s). Prepared {ph_today().isoformat()}.</p>"
         f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
     )
     css = (
@@ -25144,7 +25162,7 @@ def report_response(name: str, args):
     result = REPORT_BUILDERS[name](args)
     if fmt == "json":
         return jsonify(result)
-    stem = f"usls-gs-report-{name}-{date.today().isoformat()}"
+    stem = f"usls-gs-report-{name}-{ph_today().isoformat()}"
     if fmt == "xlsx":
         data, mime = report_workbook_bytes(result), REPORT_XLSX_MIME
     else:
@@ -25165,7 +25183,7 @@ def v2_list_response(payload: dict, title: str, columns: list, rows: list, args)
         "options": {"programs": [{"id": p.id, "code": p.code} for p in Program.query.all()]},
         "empty": "Nothing to list for these filters.",
     }
-    stem = f"usls-gs-report-{re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')}-{date.today().isoformat()}"
+    stem = f"usls-gs-report-{re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')}-{ph_today().isoformat()}"
     data, mime = (report_workbook_bytes(result), REPORT_XLSX_MIME) if fmt == "xlsx" else (report_pdf_bytes(result), "application/pdf")
     return Response(data, mimetype=mime, headers={"Content-Disposition": f'attachment; filename="{stem}.{fmt}"'})
 
@@ -25291,7 +25309,13 @@ def _student_row(student: Student, detail: str, **extra) -> dict:
 
 
 def student_is_active(student: Student) -> bool:
+    """An active student: Active standing and not yet Completed or Withdrawn. The staff dashboard and Reports both use
+    this definition (active_student_clause is the same rule as a SQL filter), so their counts agree (I-193)."""
     return student.standing == "Active" and student.current_stage not in TERMINAL_STAGES
+
+
+def active_student_clause():
+    return and_(Student.standing == "Active", or_(Student.current_stage.is_(None), Student.current_stage.notin_(TERMINAL_STAGES)))
 
 
 def decision_cases() -> list[dict]:
@@ -25389,7 +25413,7 @@ def summary_tiles(args) -> tuple[dict, list[dict]]:
     term, previous = scope["term"], scope["previous"]
     students = scope["students"]
     active = [s for s in students if student_is_active(s)]
-    today = date.today()
+    today = ph_today()
 
     # 1. Active students, against the students enrolled in the previous term.
     enrolled_before = None
@@ -25418,6 +25442,7 @@ def summary_tiles(args) -> tuple[dict, list[dict]]:
     waiting_cases = [c for c in queue_open_cases(sorted(scope["ids"])) if c["age_days"] > REPORT_WAITING_DAYS]
     tile_waiting = {
         "key": "waiting", "label": f"Requests waiting more than {REPORT_WAITING_DAYS} days", "value": len(waiting_cases), "unit": "requests",
+        "scope": "all offices",  # the Dean's own home counts only the Dean's queue; this counts every office
         "comparison": _target_comparison(len(waiting_cases), REPORT_TARGET_WAITING),
         "rows": [
             _student_row(scope["by_id"][c["student_id"]], f"{c['label']}: waiting {c['age_days']} days, next {c['next_owner'] or 'not named'}", age_days=c["age_days"])
@@ -26047,7 +26072,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 "adviser_name": (research_case.adviser_name if research_case else None) or selected_student.adviser_name,
             }
             participants = defense_participants(selected_student, assignments) if assignments else []
-            today = date.today()
+            today = ph_today()
             stage_defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(progress["gate"])
             lead_days = defense_lead_days(stage_defense_type or progress["stage"])
             window_start, lead_reference, lead_reference_label = student_earliest_defense_date(
@@ -26501,7 +26526,7 @@ def add_task(student_id: int, title: str, owner: str, days: int, priority: int =
         student_id=student_id,
         title=title,
         owner_role=normalize_owner_label(owner),
-        due_at=date.today() + timedelta(days=days),
+        due_at=ph_today() + timedelta(days=days),
         priority=priority,
         status=status,
     )
@@ -26523,7 +26548,7 @@ def ensure_task(student_id: int, title: str, owner: str, due_at: date, priority:
     if existing:
         existing.due_at = min(existing.due_at, due_at)
         existing.priority = max(existing.priority or 0, priority)
-        if status == "Overdue" or existing.due_at < date.today():
+        if status == "Overdue" or existing.due_at < ph_today():
             existing.status = "Overdue"
         return existing
     task = Task(
@@ -26926,7 +26951,7 @@ def _entry_year_from_ay(ay: str) -> int:
     """'23-24' -> 2023, '2023-2024' -> 2023, fallback to current year."""
     m = re.search(r"(\d{2,4})", ay or "")
     if not m:
-        return date.today().year
+        return ph_today().year
     n = int(m.group(1))
     return n if n >= 1900 else 2000 + n
 
@@ -26936,7 +26961,7 @@ def academic_year_start(term: AcademicTerm | None = None) -> int:
     match = re.search(r"(\d{4})\s*-\s*\d{4}", term.label if term else "")
     if match:
         return int(match.group(1))
-    today = date.today()
+    today = ph_today()
     return today.year if today.month >= 6 else today.year - 1
 
 
@@ -26956,7 +26981,7 @@ def years_in_program(student: Student, as_of: date | None = None, term: Academic
     entry_year = int(student.entry_year or _entry_year_from_ay(student.academic_year_entry or "") or 0)
     if not entry_year:
         return None
-    start = academic_year_start(term) if term is not None else academic_year_start_on(as_of or date.today())
+    start = academic_year_start(term) if term is not None else academic_year_start_on(as_of or ph_today())
     return max(1, start - entry_year + 1)
 
 
@@ -28675,7 +28700,7 @@ def handle_student_handoff(data: MultiDict) -> int:
         last_name=last_name,
         email=(data.get("email") or "").strip().lower() or unique_student_email(first_name, last_name, student_number),
         program_id=program.id,
-        entry_year=int(data.get("entry_year") or date.today().year),
+        entry_year=int(data.get("entry_year") or ph_today().year),
         current_stage="Admission",
         standing="Active",
         risk_level="Not Yet Assessed",
@@ -29133,7 +29158,7 @@ def flag_schedule_after_panel_change(student: Student, gate: str, actor: str, re
     schedule.status = RECONFIRM_DEFENSE_STATUS
     recheck = "; ".join(problems) if problems else "the new panel is free at the booked time"
     schedule.conflict_reason = (
-        f"Panel changed by {actor} on {date.today().isoformat()}: {reason or 'no reason recorded'}. "
+        f"Panel changed by {actor} on {ph_today().isoformat()}: {reason or 'no reason recorded'}. "
         f"Availability recheck: {recheck}. Re-confirm the schedule or reschedule it."
     )
     ensure_open_task(student.id, f"Re-confirm {defense_type} schedule after panel change", "Research Coordinator", 2, 50)
@@ -29488,7 +29513,7 @@ def book_defense_schedule(
 
     received_raw = (data.get("manuscript_received_on") or "").strip() if isinstance(data.get("manuscript_received_on"), str) else ""
     received_on = parse_date(received_raw) if received_raw else None
-    if received_on and received_on > date.today():
+    if received_on and received_on > ph_today():
         raise ValueError("The date the panel received the manuscript cannot be in the future.")
     if defense_type == "Title Defense":
         received_on = None
@@ -29522,7 +29547,7 @@ def book_defense_schedule(
     action_label = "Rescheduled" if replaces else "Scheduled"
     if replaces and replaces.status in SLOT_HOLDING_DEFENSE_STATUSES:
         replaces.status = RESCHEDULED_DEFENSE_STATUS
-        replaces.conflict_reason = f"Replaced by a rescheduled booking on {date.today().isoformat()}: {change_reason}"
+        replaces.conflict_reason = f"Replaced by a rescheduled booking on {ph_today().isoformat()}: {change_reason}"
     schedule = ScheduleRequest(
         student_id=student.id,
         preferred_date=preferred_date,
@@ -29585,7 +29610,7 @@ def cancel_defense_schedule(schedule: ScheduleRequest, account: UserAccount, rea
     schedule.cancelled_at = now_utc()
     schedule.change_reason = reason
     schedule.requested_by = requested_by or schedule.requested_by
-    schedule.conflict_reason = f"Cancelled on {date.today().isoformat()}: {reason}"
+    schedule.conflict_reason = f"Cancelled on {ph_today().isoformat()}: {reason}"
     ensure_open_task(student.id, f"Reschedule cancelled {schedule.defense_type}", "Research Coordinator", 3, 50)
     add_log(
         "defense-scheduling", student.id, workflow_actor_label(account), schedule.defense_type or "",
@@ -29976,7 +30001,7 @@ def adviser_contract_info(row: AdviserAppointment) -> dict:
         status = "Received"
     elif row.contract_submitted_at:
         status = "Submitted"
-    elif row.contract_due_on < date.today():
+    elif row.contract_due_on < ph_today():
         status = "Overdue"
     else:
         status = "Pending"
@@ -29987,7 +30012,7 @@ def adviser_contract_info(row: AdviserAppointment) -> dict:
         "received_at": iso(row.contract_received_at),
         "received_by": row.contract_received_by,
         "note": row.contract_note,
-        "days_left": (row.contract_due_on - date.today()).days,
+        "days_left": (row.contract_due_on - ph_today()).days,
     }
 
 
@@ -30308,7 +30333,7 @@ def schedule_in_scope(scope: dict, schedule: ScheduleRequest) -> bool:
 
 
 def parse_calendar_range(args) -> tuple[date, date]:
-    today = date.today()
+    today = ph_today()
     try:
         start = parse_date(args.get("start")) if args.get("start") else today - timedelta(days=7)
         end = parse_date(args.get("end")) if args.get("end") else start + timedelta(days=CALENDAR_DEFAULT_SPAN_DAYS)
@@ -30364,7 +30389,7 @@ def calendar_defense_event(schedule: ScheduleRequest, scope: dict, verdict_ids: 
     has_verdict = schedule.id in verdict_ids
     overdue = bool(
         schedule.status in ACTIVE_DEFENSE_STATUSES and not has_verdict
-        and date.today() > next_working_day(schedule.preferred_date)
+        and ph_today() > next_working_day(schedule.preferred_date)
     )
     return {
         "id": f"defense-{schedule.id}",
@@ -30434,7 +30459,7 @@ def calendar_events(scope: dict, start: date, end: date, filters: dict) -> list[
 def deadline_urgency(due: date, done: bool) -> str:
     if done:
         return "done"
-    days = (due - date.today()).days
+    days = (due - ph_today()).days
     return "overdue" if days < 0 else "soon" if days <= 3 else "later"
 
 
@@ -31018,7 +31043,7 @@ def calendar_feed_dict(row: CalendarToken | None) -> dict | None:
 def calendar_feed_for_account(account: UserAccount) -> str:
     """Defenses and deadlines for one person, exactly what their calendar page shows."""
     scope = calendar_scope(account)
-    today = date.today()
+    today = ph_today()
     events = calendar_events(scope, today - timedelta(days=30), today + timedelta(days=200), {})
     deadlines = [
         item for item in calendar_deadlines(scope, today - timedelta(days=3), today + timedelta(days=200)) if not item["done"]
@@ -32113,7 +32138,7 @@ def faculty_profile_dict(faculty: Faculty, include_calendar_events: bool = False
     upcoming = (
         FacultyAvailability.query.filter(
             FacultyAvailability.faculty_id == faculty.id,
-            FacultyAvailability.available_date >= date.today(),
+            FacultyAvailability.available_date >= ph_today(),
         )
         .order_by(FacultyAvailability.available_date, FacultyAvailability.start_time)
         .limit(12)
@@ -32172,9 +32197,9 @@ def faculty_profile_dict(faculty: Faculty, include_calendar_events: bool = False
     payload["calendar_events"] = []
     payload["calendar_event_status"] = None
     if include_calendar_events:
-        window_end = date.today() + timedelta(days=35)
+        window_end = ph_today() + timedelta(days=35)
         if payload["calendar"]["connected"]:
-            google_result = google_freebusy_lookup(faculty, date.today(), window_end)
+            google_result = google_freebusy_lookup(faculty, ph_today(), window_end)
             payload["calendar_event_status"] = (
                 google_result.get("error")
                 or "Live Google Calendar busy periods loaded"
@@ -32187,15 +32212,15 @@ def faculty_profile_dict(faculty: Faculty, include_calendar_events: bool = False
                     "status": "busy",
                     "source": "google_calendar",
                 }
-                for day_offset in range((window_end - date.today()).days + 1)
+                for day_offset in range((window_end - ph_today()).days + 1)
                 for busy in google_busy_payload_for_day(
                     google_result.get("busy", []),
-                    date.today() + timedelta(days=day_offset),
+                    ph_today() + timedelta(days=day_offset),
                 )
             ]
         else:
             payload["calendar_event_status"] = "Profile schedule is active"
-            payload["calendar_events"] = faculty_calendar_blocks(faculty, date.today(), window_end)
+            payload["calendar_events"] = faculty_calendar_blocks(faculty, ph_today(), window_end)
     return payload
 
 
@@ -32210,7 +32235,7 @@ def faculty_calendar_ics(faculty: Faculty) -> str:
     Someone who has entered nothing produces an empty calendar, never an assumed one.
     """
     bundle = faculty_availability_bundle(faculty)
-    today = date.today()
+    today = ph_today()
     blocks = []
     for offset in range(46):
         day = today + timedelta(days=offset)
@@ -33307,7 +33332,7 @@ def defense_faculty_directory() -> list[dict]:
             "college": faculty.college,
             "upcoming_windows": FacultyAvailability.query.filter(
                 FacultyAvailability.faculty_id == faculty.id,
-                FacultyAvailability.available_date >= date.today(),
+                FacultyAvailability.available_date >= ph_today(),
             ).count(),
             "workload": PanelAssignment.query.filter_by(faculty_id=faculty.id).count(),
             "availability_entered": faculty_availability_entered(faculty),
@@ -33323,7 +33348,7 @@ def split_items(value: str) -> list[str]:
 
 def parse_date(value: str | None) -> date:
     if not value:
-        return date.today()
+        return ph_today()
     return datetime.strptime(value, "%Y-%m-%d").date()
 
 
@@ -33445,14 +33470,6 @@ RESEARCH_VOCABULARY = {
         "Defense Deferred", "Complete",
     ],
 }
-
-# Philippines time has no daylight saving; used wherever "now" must mean Manila.
-MANILA_TZ = timezone(timedelta(hours=8))
-
-
-def manila_now() -> datetime:
-    return datetime.now(MANILA_TZ).replace(tzinfo=None)
-
 
 def normalize_verdict_result(value) -> str | None:
     """Return the canonical verdict word, or None when the word is unknown."""
@@ -34047,7 +34064,7 @@ def sync_faculty_defense_events(faculty: Faculty) -> dict:
     """Retry future active defense-event sync for one faculty member."""
     totals = {"created": 0, "updated": 0, "removed": 0, "errors": []}
     schedules = ScheduleRequest.query.filter(
-        ScheduleRequest.preferred_date >= date.today(),
+        ScheduleRequest.preferred_date >= ph_today(),
         ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
     ).all()
     for schedule in schedules:
@@ -35318,7 +35335,7 @@ def close_research_tasks(student_id: int, *titles: str, prefix: str | None = Non
 
 def ensure_open_task(student_id: int, title: str, owner: str, days: int, priority: int = 20) -> Task:
     """Like add_task but never creates a duplicate open task."""
-    return ensure_task(student_id, title, owner, date.today() + timedelta(days=days), priority)
+    return ensure_task(student_id, title, owner, ph_today() + timedelta(days=days), priority)
 
 
 ETHICS_APPLICATION_TASK = "Submit Form 5.1 and the ethics review application (Form 5.2)"
@@ -35337,7 +35354,7 @@ def after_defense_cleared(student: Student, gate: str, verdict: DefenseVerdict) 
         # Protocol: the ethics review application (Form 5.2, with Form 5.1) is due within one month.
         ensure_task(
             student.id, ETHICS_APPLICATION_TASK, "Student",
-            (verdict.defense_date or date.today()) + timedelta(days=ETHICS_APPLICATION_WINDOW_DAYS), 45,
+            (verdict.defense_date or ph_today()) + timedelta(days=ETHICS_APPLICATION_WINDOW_DAYS), 45,
         )
 
 
@@ -35461,14 +35478,14 @@ def earliest_defense_date(defense_type: str, reference_date: date | None = None)
     """First date that satisfies the defense type's notice, counted from
     reference_date (the Form 1 endorsement date for a title defense, the date
     the panel received the manuscript for proposal/final; default today)."""
-    return (reference_date or date.today()) + timedelta(days=defense_lead_days(defense_type))
+    return (reference_date or ph_today()) + timedelta(days=defense_lead_days(defense_type))
 
 
 def student_earliest_defense_date(
     student: Student, defense_type: str, manuscript_received_on: date | None = None
 ) -> tuple[date, date, str]:
     """(earliest allowed date, reference date, what the reference is) for one student."""
-    today = date.today()
+    today = ph_today()
     if defense_type == "Title Defense":
         endorsement = Form1Endorsement.query.filter_by(student_id=student.id).first()
         reference = endorsement.endorsed_at.date() if endorsement and endorsement.endorsed_at else today
@@ -36361,7 +36378,7 @@ def panel_matching_result(student: Student, profile: dict | None = None) -> dict
         if item.get("faculty_id") and profile.get("rag_mode") == "document-rag"
     }
 
-    today = date.today()
+    today = ph_today()
     rows = []
     for faculty in Faculty.query.filter_by(active=True).all():
         if faculty.id in advisers:
@@ -37302,7 +37319,7 @@ def ensure_upcoming_defense_demo() -> int:
     bases = {item["student_number"]: item for item in PANEL_MATCHING_DEMO_STUDENTS}
     gate = RESEARCH_GATE_PROPOSAL
     defense_type = RESEARCH_GATE_DEFENSE_TYPES[gate]
-    today = date.today()
+    today = ph_today()
     changed = 0
     for item in UPCOMING_DEFENSE_DEMO:
         base = bases.get(item["base"])
@@ -37435,7 +37452,7 @@ def _seed_panel_demo_research(student: Student, spec: dict, adviser: Faculty) ->
         db.session.add(assignment)
         assignments.append(assignment)
     db.session.flush()
-    defense_day = date.today() - timedelta(days=75)
+    defense_day = ph_today() - timedelta(days=75)
     schedule = ScheduleRequest(
         student_id=student.id, preferred_date=defense_day, preferred_end_date=defense_day,
         start_time=time(9, 0), end_time=time(10, 30), defense_type=RESEARCH_GATE_DEFENSE_TYPES[title_gate],
@@ -37493,7 +37510,7 @@ def ensure_panel_matching_demo_data() -> dict[str, int]:
         return changes
 
     slot_days = []
-    candidate_day = date.today() + timedelta(days=14)
+    candidate_day = ph_today() + timedelta(days=14)
     while len(slot_days) < 8:
         if candidate_day.weekday() < 5:
             slot_days.append(candidate_day)
@@ -37510,7 +37527,7 @@ def ensure_panel_matching_demo_data() -> dict[str, int]:
         target_count = profile["availability_windows"]
         current_count = FacultyAvailability.query.filter(
             FacultyAvailability.faculty_id == faculty.id,
-            FacultyAvailability.available_date >= date.today(),
+            FacultyAvailability.available_date >= ph_today(),
         ).count()
         for slot_day in slot_days:
             if current_count >= target_count:
@@ -37815,7 +37832,7 @@ def seed_maed_personas() -> None:
 
         if not completed or not assignments:
             return
-        defense_date = date.today() - timedelta(days=days_ago)
+        defense_date = ph_today() - timedelta(days=days_ago)
         schedule = ScheduleRequest.query.filter_by(
             student_id=student.id,
             defense_type=defense_type,
@@ -38051,7 +38068,7 @@ def seed_maed_personas() -> None:
             case = AwolCase(
                 student_id=returning.id,
                 status="Return Submitted",
-                awol_effective_date=date.today() - timedelta(days=200),
+                awol_effective_date=ph_today() - timedelta(days=200),
                 last_enrolled_term="AY 2025-2026 1st Semester",
                 return_requested_at=now_utc() - timedelta(days=3),
                 target_return_term=term_label,
@@ -38256,7 +38273,7 @@ def seed_maed_personas() -> None:
             db.session.add(AwolCase(
                 student_id=declared_awol.id,
                 status="AWOL Declared",
-                awol_effective_date=date.today() - timedelta(days=60),
+                awol_effective_date=ph_today() - timedelta(days=60),
                 last_enrolled_term="AY 2025-2026 2nd Semester",
                 years_in_program=3,
                 normal_residence_years=5,
@@ -38352,7 +38369,7 @@ def seed_database() -> None:
         terms.append(term)
     # I-162 (IM16): the 14-day withdrawal window of the running semester must be open on any seed day, or the
     # withdrawal demo cannot run. The running semester is dated as if it began 3 days ago; its end date stays.
-    today = date.today()
+    today = ph_today()
     running = next((t for t in terms if t.start_date <= today <= t.end_date), None)
     if running and (today - running.start_date).days > 3:
         running.start_date = today - timedelta(days=3)
@@ -38516,7 +38533,7 @@ def seed_dean_review_cases() -> int:
         ensure_term_enrollment(student, active_term, "AWOL", "Dean queue demo")
         db.session.add(AwolCase(
             student_id=student.id, status="Dean Review", dean_decision="Pending",
-            awol_effective_date=date.today() - timedelta(days=150),
+            awol_effective_date=ph_today() - timedelta(days=150),
             last_enrolled_term="AY 2025-2026 2nd Semester",
             return_requested_at=now_utc(), target_return_term=upcoming[0],
             return_intent="I intend to resume enrollment in the selected semester.",
@@ -38824,7 +38841,7 @@ def spread_seed_history(today: date | None = None) -> int:
     nothing else is touched. Raw SQL, so no "updated_at" is stamped by the write. Returns the
     number of values moved.
     """
-    today = today or date.today()
+    today = today or ph_today()
     day = today.isoformat()
     connection = db.session.connection()
     step_hours = 8.0
@@ -38911,7 +38928,7 @@ def seed_report_history(today: date | None = None) -> int:
     student changes. Dates sit inside the terms themselves; nothing is written to the activity log (that log is the
     last 12 weeks only, see the seed-quality test), and nothing here is random.
     """
-    today = today or date.today()
+    today = today or ph_today()
     active = get_active_term()
     recent_term = term_before(active) if active else None
     older_term = term_before(recent_term) if recent_term else None
@@ -38943,7 +38960,7 @@ def seed_report_history(today: date | None = None) -> int:
     def spread(kind: str, term, index: int, days: int):
         """(decided_at, forwarded_at): decided inside the term (just now for the running one), forwarded `days` before."""
         if kind == "current":
-            decided = datetime.now() - timedelta(days=index % 3, hours=2 + index)
+            decided = now_utc() - timedelta(days=index % 3, hours=2 + index)
         else:
             span = max((term.end_date - term.start_date).days - 24, 1)
             offset = 12 + (index * 37) % span
@@ -39075,7 +39092,7 @@ def seed_stage_events(today: date | None = None) -> int:
     (yellow) for about one in twelve and over 210 (red) for about one in forty, so the stage reports
     show every zone. Returns the number of events written.
     """
-    today = today or date.today()
+    today = today or ph_today()
     StudentStageEvent.query.delete()
     count = 0
     for student in Student.query.order_by(Student.id).all():
@@ -39517,7 +39534,7 @@ def ensure_demo_leave_case(student: Student, demo_config: dict | None) -> LeaveC
     # The leave must still be running on the day the seed is built: sync_leave_cases flips a leave to
     # "Return Due" within leave.return_due_days of its end, so move the end to a later term if needed.
     due_days = int(rule_value("leave.return_due_days", 30) or 30)
-    while end_term and end_term.end_date - timedelta(days=due_days) <= date.today():
+    while end_term and end_term.end_date - timedelta(days=due_days) <= ph_today():
         following = (
             AcademicTerm.query.filter(AcademicTerm.start_date > end_term.start_date)
             .order_by(AcademicTerm.start_date).first()
@@ -39895,7 +39912,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
                 item = AwolCase(student_id=student.id)
                 db.session.add(item)
             item.status = "AWOL Declared"
-            item.awol_effective_date = date.today() - timedelta(days=120)
+            item.awol_effective_date = ph_today() - timedelta(days=120)
             item.last_enrolled_term = "AY 2025-2026 2nd Semester"
             item.policy_classification = "Awaiting return intent"
             item.dean_decision = "Not Submitted"
