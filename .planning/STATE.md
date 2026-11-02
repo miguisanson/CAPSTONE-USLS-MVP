@@ -12,12 +12,13 @@
   29 targeted tests OK, build OK, check:ui strict 0.
 - **e2e after merges:** 603 passed, 8 failed. Fixed here: p72 (calendar link moved by v6.0), p51/p78 (hard-coded dates).
   The other 5 fail alone too -> `pkt/e2efix` (wt/e2efix, no app.py).
-- **In flight:** `pkt/harden` (wt/harden, only app.py editor): DEMO_SHOW_ACCOUNTS, reset staff/admin only,
+- **MERGED `pkt/e2efix`** (p33 batch month, p86 follow-up count + Hazel Flores at Dean Review); Therese's seed leave -> item 8 of pkt/harden.
+- **In flight:** read-only audits I-143 (process logic vs policy) and I-144 (cross-process UI consistency + motion); `pkt/harden` (wt/harden, only app.py editor): DEMO_SHOW_ACCOUNTS, reset staff/admin only,
   ASSISTANT_MAX_PER_HOUR, MAX_UPLOAD_MB, env_int, security headers, SQLite WAL/busy_timeout. `pkt/e2efix`. Dev-kit agent.
 - **Planned:** Reports per `research/REPORTS-SPEC-2026-11-02.md` (AD10; B1 stage clock first, after pkt/harden);
   `persona-uat` skill per `research/PERSONA-UAT-RESEARCH-2026-11-02.md` (I-142); walkthrough rebuild (I-139).
 - **Auto-resume:** scheduled task `oathbound-keep-going` (every 30 min, while `E:/DevCache/dev-kit-workers/autopilot.on` exists) resumes session `local_51b87609-0806-4cf8-87f2-0c79290158d8` after a turn ending `PAUSED for 5-hour limit`; stop at 80% weekly with `WEEKLY BUDGET`, resumed after the weekly reset (Wed 2026-11-04 02:00 PH). Extra usage is OFF on the account (no charges).
-- **Machines:** Mac and Lenovo were OFFLINE on Tailscale at 2026-11-02 start; everything runs on this PC until they are on.
+- **Machines:** Mac online with Python 3.13 (brew); full Python gate on the Mac = 16 min: `bash E:/Github_Projects/dev-kit/workers/pc/run-job.sh --worker mac CAPSTONE-USLS-MVP <dir>` (conf `dev-kit/workers/projects/CAPSTONE-USLS-MVP.conf`, parser unittest). First Mac run on b629b82: 717 passed, 1 failed (test_reports_im20 shared-DB teardown, fixed). Lenovo: no Python, not used. Dev-kit edits (Ponytail/Caveman, workers) are uncommitted in dev-kit (owner commits).
 - **MERGED `pkt/uat`** (I-138): `npm run uat` = waitress + ProxyFix (`scripts/serve_uat.py`, test `tests/test_uat_serving.py` 7/7), `.env.example`, setup-env `--uat`, `UAT.md`, `deploy/cloudflared/config.yml.example`. Its public-exposure audit -> next app.py packet `pkt/harden` (after pkt/cal): empty env values = unset, `DEMO_SHOW_ACCOUNTS` switch (demo-accounts endpoints publish the shared password + admin e-mail), demo reset staff/admin only, assistant per-account rate limit, `MAX_CONTENT_LENGTH`, security headers, SQLite WAL + busy_timeout.
 - **pkt/a11y2** (I-120) still has only a stash in `wt/a11y2`; redo it later from the brief.
 - **Next after the three land:** review + merge pkt/cal then pkt/uat; app.py packet for the public-exposure audit
