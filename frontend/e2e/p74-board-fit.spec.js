@@ -208,7 +208,9 @@ test.describe("P7.4 filter bar (I-108)", () => {
 test.describe("P7.4 phone width", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 390, height: 844 } });
 
-  for (const [slug, label] of BOARDS) {
+  // CHANGED BY p104 (I-199): on a phone the Graduation board is the stacked list, with its own region name.
+  for (const [slug, boardLabel] of BOARDS) {
+    const label = slug === "graduation" ? "Graduation candidates by stage" : boardLabel;
     test(`${slug}: the filter bar and the Board/Table toggle wrap the same way at 390 (I-106)`, async ({ page }) => {
       await page.goto(`/workflow/${slug}`);
       await expect(page.getByRole("region", { name: label })).toBeVisible();
@@ -219,8 +221,9 @@ test.describe("P7.4 phone width", () => {
     });
   }
 
-  for (const [slug, label] of BOARDS) {
-    test(`${slug}: the board scrolls inside itself, the page does not`, async ({ page }) => {
+  for (const [slug, boardLabel] of BOARDS) {
+    const label = slug === "graduation" ? "Graduation candidates by stage" : boardLabel;
+    test(`${slug}: the page does not scroll sideways`, async ({ page }) => {
       await page.goto(`/workflow/${slug}`);
       await expect(page.getByRole("region", { name: label })).toBeVisible();
       await page.waitForTimeout(400);

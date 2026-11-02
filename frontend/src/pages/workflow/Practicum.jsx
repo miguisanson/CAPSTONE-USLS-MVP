@@ -6,6 +6,7 @@ import WorkflowTimeline from "../../components/WorkflowTimeline";
 import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
+import { useOpenFilters } from "../leave/useOpenFilter";
 import { formatDate } from "../../lib/format";
 import { CaseMessageHistory, DemoResetButton, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, uniqueValues, useDemoCaseReset } from "./shared";
 
@@ -108,7 +109,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
     setSelectedStudentId(null);
   }, [reset.resetMessage, reset.resetError]); // eslint-disable-line react-hooks/exhaustive-deps
   const rows = (context.roster || []).filter((row) => row.eligibility?.eligible === true);
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filters, setFilters] = useOpenFilters(EMPTY_FILTERS);
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
   const statusOptions = useMemo(() => uniqueValues(rows.map((row) => row.record?.status || "Not Submitted")).map((value) => ({ value, label: value })), [rows]);
   // Newest activity first, like the other boards.
@@ -116,7 +117,8 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
     const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.record?.practicum_site || ""}`.toLowerCase();
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || row.student.program_code === filters.program)
-      && (!filters.status || (row.record?.status || "Not Submitted") === filters.status);
+      && (!filters.status || (row.record?.status || "Not Submitted") === filters.status)
+      && (!filters.open || (Boolean(row.record) && row.record.status !== "Dean Reviewed")); // open: filed and not yet reviewed by the Dean
   }).sort((left, right) => new Date(right.last_activity_at || right.record?.updated_at || 0).getTime() - new Date(left.last_activity_at || left.record?.updated_at || 0).getTime()), [rows, filters]);
 
   function actionFor(row) {

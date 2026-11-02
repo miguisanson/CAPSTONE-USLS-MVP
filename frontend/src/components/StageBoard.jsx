@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Inbox, Loader2, Lock, Move } from "lucide-react";
+import { useIsPhone } from "../hooks";
 import { EmptyState, InlineNotice } from "./ui/index.js";
 
 /**
@@ -32,9 +33,13 @@ import { EmptyState, InlineNotice } from "./ui/index.js";
  *   emptyText      text for an empty column (shown with the shared EmptyState)
  *   columnClassName  classes for each column (width etc.); the default is a narrow column so more stages fit
  *
+ * On a phone (below 640 px) every board is the same stacked list instead: one group per stage that has cards, in the
+ * board's order, each card with the same "Move to..." menu or lock reason and no dragging (I-199, IM24).
+ *
  * When the stages are wider than the screen the board says so: a line above it ("3 more stages to the right"),
  * "Scroll board left/right" buttons (keyboard reachable) and a soft fade at the cut edge. Column titles wrap, never cut.
  *   ariaLabel      label for the scrolling region
+ *   phoneAriaLabel label of the stacked list a phone gets instead (default: ariaLabel)
  *   readOnly       turns drag and the menu off
  *   boardNotice    the result of useBoardNotice() when the page reports other things (a dialog, a group step) in the same
  *                  place. The board shows it above its columns; a page renders <BoardNotice> itself only when it shows no
@@ -56,9 +61,11 @@ export default function StageBoard({
   emptyText = "Nothing here",
   columnClassName = "w-[248px]",
   ariaLabel = "Stage board",
+  phoneAriaLabel = ariaLabel,
   readOnly = false,
   boardNotice = null,
 }) {
+  const phone = useIsPhone();
   const [dragging, setDragging] = useState(null); // { id, from }
   const [hoverColumn, setHoverColumn] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -162,7 +169,7 @@ export default function StageBoard({
       window.removeEventListener("resize", measureHidden);
       if (observer) observer.disconnect();
     };
-  }, [measureHidden, columns.length]);
+  }, [measureHidden, columns.length, phone]);
 
   const scrollBoard = useCallback((direction) => {
     const region = regionRef.current;
@@ -253,8 +260,76 @@ export default function StageBoard({
     if (item) attemptMove(item, column.key);
   }
 
+  // One card with its drag handle, "Moving to ..." line and move menu (or lock reason): the same on the board and in the phone list.
+  function renderItem(item, column) {
+    const id = String(getItemId(item));
+    const movable = !readOnly && canDrag(item);
+    const draggable = movable && !phone; // a phone moves a card with "Move to...", never by dragging
+    return (
+      <div
+        key={id}
+        draggable={draggable}
+        onDragStart={draggable ? (event) => onDragStart(event, item) : undefined}
+        onDragEnd={onDragEnd}
+        data-card-id={id}
+        aria-busy={busyId === id}
+        data-locked={!readOnly && !movable ? "true" : undefined}
+        className={`rounded-xl transition-[opacity,transform] duration-150 ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
+          dragging?.id === id ? "scale-95 opacity-60" : busyId === id ? "opacity-60" : ""
+        } ${pending?.id === id ? "ring-2 ring-brand-400" : ""} ${settledId === id ? "animate-card-settle" : ""}`}
+      >
+        {renderCard(item)}
+        {pending?.id === id && (
+          <p data-testid="card-moving" className="mt-1.5 flex items-center justify-end gap-1.5 px-2 text-xs font-semibold text-brand-700">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            <span>{`Moving to ${pending.label}`}</span>
+          </p>
+        )}
+        {!readOnly && !movable ? (
+          <LockedNote reason={lockText(item)} />
+        ) : !readOnly && showMoveMenu(item) && (
+          <MoveMenu
+            item={item}
+            columns={columns}
+            fromKey={column.key}
+            verdict={verdict}
+            busy={busyId === id}
+            onPick={(toKey) => attemptMove(item, toKey)}
+          />
+        )}
+      </div>
+    );
+  }
+
   const draggedItem = dragging ? itemById.get(dragging.id) : null;
   const hoverVerdict = draggedItem && hoverColumn ? verdict(draggedItem, hoverColumn) : null;
+
+  if (phone) {
+    const groups = columns.map((column) => ({ column, columnItems: items.filter((item) => getColumnKey(item) === column.key) })).filter((group) => group.columnItems.length);
+    return (
+      <div data-testid="stage-board">
+        <BoardNotice notice={activeNotice.notice} onDismiss={activeNotice.dismiss} />
+        <div ref={regionRef} role="region" aria-label={phoneAriaLabel} className="space-y-5">
+          {groups.length ? (
+            groups.map(({ column, columnItems }) => (
+              <section key={column.key} aria-label={column.label} className="space-y-3">
+                <header className="flex items-center justify-between gap-2">
+                  <h3 className="section-title min-w-0 break-words">{column.label}</h3>
+                  <span data-testid="stage-count" className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">{columnItems.length}</span>
+                </header>
+                <div className="space-y-3">{columnItems.map((item) => renderItem(item, column))}</div>
+                {renderColumnFooter ? renderColumnFooter(column, columnItems) : null}
+              </section>
+            ))
+          ) : (
+            <div data-testid="board-empty">
+              <EmptyState size="sm" icon={Inbox} title={emptyText} className="px-1" />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div data-testid="stage-board">
@@ -319,44 +394,7 @@ export default function StageBoard({
                 )}
                 <div className="flex-1 space-y-3">
                   {columnItems.length ? (
-                    columnItems.map((item) => {
-                      const id = String(getItemId(item));
-                      const draggable = !readOnly && canDrag(item);
-                      return (
-                        <div
-                          key={id}
-                          draggable={draggable}
-                          onDragStart={draggable ? (event) => onDragStart(event, item) : undefined}
-                          onDragEnd={onDragEnd}
-                          data-card-id={id}
-                          aria-busy={busyId === id}
-                          data-locked={!readOnly && !draggable ? "true" : undefined}
-                          className={`rounded-xl transition-[opacity,transform] duration-150 ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
-                            dragging?.id === id ? "scale-95 opacity-60" : busyId === id ? "opacity-60" : ""
-                          } ${pending?.id === id ? "ring-2 ring-brand-400" : ""} ${settledId === id ? "animate-card-settle" : ""}`}
-                        >
-                          {renderCard(item)}
-                          {pending?.id === id && (
-                            <p data-testid="card-moving" className="mt-1.5 flex items-center justify-end gap-1.5 px-2 text-xs font-semibold text-brand-700">
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                              <span>{`Moving to ${pending.label}`}</span>
-                            </p>
-                          )}
-                          {!readOnly && !draggable ? (
-                            <LockedNote reason={lockText(item)} />
-                          ) : !readOnly && showMoveMenu(item) && (
-                            <MoveMenu
-                              item={item}
-                              columns={columns}
-                              fromKey={column.key}
-                              verdict={verdict}
-                              busy={busyId === id}
-                              onPick={(toKey) => attemptMove(item, toKey)}
-                            />
-                          )}
-                        </div>
-                      );
-                    })
+                    columnItems.map((item) => renderItem(item, column))
                   ) : (
                     <div data-testid="board-empty">
                       {column.empty ? (
@@ -437,13 +475,14 @@ export function boardSummaryLine(columns, totals, noun) {
 }
 
 export function BoardSummary({ line, windowName = "request window", actions = null, showHint = true }) {
+  const phone = useIsPhone(); // a phone has "Move to..." on every card and no dragging, so the hint has nothing to say
   return (
     <div className="flex flex-wrap items-start justify-between gap-3" data-testid="board-summary">
       <div className="min-w-0">
         <p data-summary-line className="text-base font-semibold text-ink" aria-live="polite">
           {line}
         </p>
-        {showHint && (
+        {showHint && !phone && (
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
             Dragging a card to another column does the same as the buttons in its {windowName}. On a keyboard or phone, use
             &quot;Move to…&quot; on the card.

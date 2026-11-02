@@ -54,7 +54,7 @@ test.describe("staff boards on a phone (I-199)", () => {
         const card = cards.nth(i);
         await expect(card.getByRole("button", { name: /^View details for / }), `card ${i}: View details`).toHaveCount(1);
         const move = await card.getByRole("button", { name: /Move to/ }).count();
-        const lock = await card.getByText(/Waiting for|Open the case to|cannot be moved|Not movable/i).count();
+        const lock = await card.locator(":scope > p").count(); // the lock note under a card that cannot move: its reason in plain text
         expect(move + lock, `card ${i}: either Move to... or the reason it cannot move`).toBeGreaterThan(0);
       }
       // a group's heading carries its count

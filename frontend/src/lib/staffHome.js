@@ -83,9 +83,10 @@ export const canOpen = (to, role) => {
   return pages.has(path) || (path.startsWith("/students/") && pages.has("/students"));
 };
 
-// A Leave of Absence task opens the board on the open requests, with that filter showing (I-196); the board drops it on request.
-const LEAVE_BOARD = "/workflow/leave-of-absence";
-const onOpenRequests = (to) => (to === LEAVE_BOARD ? `${to}?show=open` : to);
+// A task that opens a process board opens it on the open requests, with that filter showing (I-196, I-198); the board
+// drops it on request. Research Gate, Defense Scheduling and the like are not request boards and keep their plain link.
+const OPEN_REQUEST_BOARDS = new Set(["leave-of-absence", "readmission", "awol", "withdrawal", "practicum", "graduation"].map((slug) => `/workflow/${slug}`));
+const onOpenRequests = (to) => (OPEN_REQUEST_BOARDS.has(to) ? `${to}?show=open` : to);
 
 /**
  * Where "Open" leads for one of the viewer's own tasks: the task's own action_url, else the workflow page its title
