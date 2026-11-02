@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FileCheck,
   FileText,
@@ -12,14 +12,14 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { formatDate } from "../../lib/format";
-import { Button, DataTable, EmptyState, InlineNotice, StatusChip } from "../../components/ui/index.js";
+import { Button, DataTable, EmptyState, StatusChip } from "../../components/ui/index.js";
 import WorkflowTimeline, { graduationTimelineSteps } from "../../components/WorkflowTimeline";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
-import StageBoard, { BoardSummary, boardSummaryLine } from "../../components/StageBoard";
+import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
 import { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { GraduationBatchModal } from "./GraduationBatchModal";
 import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchCurrentStage, graduationBatchGroups, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, sortSelectedWorkflowRows } from "./graduationShared";
-import { CaseMessageHistory, DemoResetButton, DemoResetFeedback, Detail, RosterFilters, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, WorkflowSubmitFeedback, uniqueValues, useDemoCaseReset } from "./shared";
+import { CaseMessageHistory, DemoResetButton, Detail, RosterFilters, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, uniqueValues, useDemoCaseReset } from "./shared";
 
 function graduationBatchSelectionState(group, selectedIds) {
   const selectedCount = group.rows.filter((row) => selectedIds.has(row.student.id)).length;
@@ -401,19 +401,24 @@ function GraduationSelectionBar({ count, onCreateBatch, stepLabel, onStep, note,
   );
 }
 
-export function GraduationRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
+export function GraduationRoster({ context, submitting, refreshing, clearSubmitFeedback, refetch, accountRole }) {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [messageRow, setMessageRow] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
-  const [messageNotice, setMessageNotice] = useState("");
+  const boardNotice = useBoardNotice(); // the one place this board says what happened
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [batchOpen, setBatchOpen] = useState(false);
   const [view, setView] = useState("board");
   const [stageGroupId, setStageGroupId] = useState(null);
   const [exportingBatchId, setExportingBatchId] = useState("");
-  const [exportError, setExportError] = useState("");
   const [exportNotice, setExportNotice] = useState(null);
   const reset = useDemoCaseReset("graduation", refetch);
+  // A reset answers in the board notice too. The case window closes so the notice is not hidden behind it.
+  useEffect(() => {
+    if (!reset.resetMessage && !reset.resetError) return;
+    boardNotice.show(reset.resetError ? "error" : "success", reset.resetError || reset.resetMessage);
+    setSelectedStudentId(null);
+  }, [reset.resetMessage, reset.resetError]); // eslint-disable-line react-hooks/exhaustive-deps
   const rows = context.roster || [];
   const canTickBatches = ["staff", "academic_coordinator", "research_coordinator"].includes(accountRole); // the Dean uses the step buttons
   // `secondary` is the completed-course filter (one more control in the shared toolbar).
@@ -560,7 +565,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
     } else {
       processBatchGroup(item.group);
     }
-    return { message: "Confirm the step in the dialog to finish moving it." };
+    return undefined; // the dialog is open; the card says "Moving to ..." until it closes
   }
   function renderGraduationBoardCard(item) {
     if (item.kind === "student") {
@@ -599,15 +604,14 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
   }
   async function exportApprovedBatch(group) {
     setExportingBatchId(group.id);
-    setExportError("");
     try {
       const endorsementIds = group.rows.map((row) => row.endorsement?.id).filter(Boolean);
       const exportResult = await api.exportGraduationCsv("", endorsementIds);
       setExportNotice({ filename: exportResult.filename, batchLabel: group.label });
-      setMessageNotice(`${group.label} exported as ${exportResult.filename}. The Dean must email the file to the Registrar and wait for acknowledgement.`);
+      boardNotice.show("success", `${group.label} exported as ${exportResult.filename}. The Dean must email the file to the Registrar and wait for acknowledgement.`);
       await refetch();
     } catch (error) {
-      setExportError(error.message || "Could not export the Dean-approved graduation list.");
+      boardNotice.show("error", error.message || "Could not export the Dean-approved graduation list.");
     } finally {
       setExportingBatchId("");
     }
@@ -689,11 +693,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
 
   return (
     <div className="space-y-4">
-      {/* No card title: the page header already says "Graduation Endorsement" (consistency finding 11); who does what stays as a line. */}
-      <p className="text-sm text-slate-500">{`${WORKFLOW_ROLE_LABELS[accountRole]} view · AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns the endorsement export`}</p>
-      {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
-      {exportError && <InlineNotice tone="danger">{exportError}</InlineNotice>}
-      <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
+      {/* No card title and no loose line under the header: the page header says it all, with who does what in its description (finding 11, I-157). */}
       <BoardSummary line={summaryLine} windowName="details window" />
       <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
         <RosterFilters
@@ -718,8 +718,10 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
           onClear={() => setSelectedIds(new Set())}
         />
       )}
+      {view !== "board" && <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />}
       {view === "board" ? (
         <StageBoard
+          boardNotice={boardNotice}
           ariaLabel="Graduation workflow Kanban board"
           columns={GRADUATION_ALL_BOARD_COLUMNS}
           items={boardItems}
@@ -752,7 +754,7 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
           onClose={() => setStageGroupId(null)}
           onOpenStudent={openCase}
           onMessageStudent={setMessageRow}
-          onProcessBatch={(group) => { setStageGroupId(null); processBatchGroup(group); }}
+          onProcessBatch={processBatchGroup}
           onExportBatch={accountRole === "dean" ? (group) => { setStageGroupId(null); exportApprovedBatch(group); } : null}
           exporting={exportingBatchId === stageGroup.id}
         />
@@ -782,8 +784,6 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
           )}
         >
           <div className="space-y-4">
-            <WorkflowSubmitFeedback result={result} error={submitError} />
-            <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
             <div className="grid gap-3 sm:grid-cols-2"><Detail label="Program" value={selectedRow.student.program_name} /><Detail label="Batch" value={selectedEndorsement?.batch_name || "No batch assigned"} /></div>
             {selectedEndorsement?.request_attachment?.file_exists !== false && selectedEndorsement?.request_attachment?.url && (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
@@ -807,8 +807,8 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
           </div>
         </WorkflowCaseModal>
       )}
-      {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
-      {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} accountRole={accountRole} reviewWindows={context.graduation_review_windows || []} defaultReviewWindow={context.graduation_default_review_window || ""} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { setMessageNotice(batchResult.message); setSelectedIds(new Set()); await refetch(); }} />}
+      {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { boardNotice.show("success", message || "Message sent."); setSelectedStudentId(null); await refetch(); }} />}
+      {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} accountRole={accountRole} reviewWindows={context.graduation_review_windows || []} defaultReviewWindow={context.graduation_default_review_window || ""} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { boardNotice.show("success", batchResult.message || "Saved."); setSelectedIds(new Set()); setStageGroupId(null); setSelectedStudentId(null); await refetch(); }} />}
       {exportNotice && (
         <ExportFollowUpModal
           id="graduation-export-follow-up"

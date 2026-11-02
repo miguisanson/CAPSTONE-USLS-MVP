@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { FileCheck, Briefcase, CheckSquare, BookOpenCheck } from "lucide-react";
 import { api } from "../../api";
-import { Field, InlineNotice, Input, Select, Textarea } from "../../components/ui/index.js";
+import { Field, Input, Select } from "../../components/ui/index.js";
+import StepDialog from "../../components/StepDialog";
 import HistoryDisclosure from "../../components/HistoryDisclosure";
 import { GRADUATION_STAGE_ACTIONS, GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchGroups, graduationStageSelection } from "./graduationShared";
-import { WorkflowCaseModal } from "./shared";
 
 const GRADUATION_BATCH_MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -48,21 +48,15 @@ export function GraduationBatchModal({ rows, accountRole, reviewWindows, default
     disabled: schoolYear !== activeReviewWindow,
   }));
   const [form, setForm] = useState({
-    comment: "",
     review_window: selectedReviewWindow,
     ...defaultBatch,
   });
-  const [deanActionId, setDeanActionId] = useState("approve");
-  const action = accountRole === "dean" && stageAction?.id === "approve"
-    ? GRADUATION_STAGE_ACTIONS[deanActionId]
-    : stageAction;
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const action = stageAction;
+  const deanDecides = accountRole === "dean" && stageAction?.id === "approve"; // approve or return, chosen by the button
   const [expandedDetailKeys, setExpandedDetailKeys] = useState(() => new Set());
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
   const batchName = graduationBatchName(form);
   const showBatchFields = action?.batchRequired || (action?.id === "send_to_dean" && selection.processableRows.some((row) => !row.endorsement?.batch_name));
-  const requiresComment = Boolean(action?.requiresComment);
   const selectedGroups = graduationBatchGroups(selection.processableRows.length ? selection.processableRows : rows);
   const modalActionLabel = action
     ? showBatchFields
@@ -85,63 +79,55 @@ export function GraduationBatchModal({ rows, accountRole, reviewWindows, default
     });
   }
 
-  async function confirm(event) {
-    event.preventDefault();
-    if (!action) {
-      setError(selection.mixed ? "Select candidates from one review stage at a time." : "No group action is currently due for this selection.");
-      return;
-    }
-    if (requiresComment && !form.comment.trim()) {
-      setError("Enter the required message before applying this action.");
-      return;
-    }
-    setBusy(true);
-    setError("");
+  // Batch number and year used to be native `required`; now the dialog says what is missing.
+  function problemWith() {
+    if (!showBatchFields) return "";
+    if (!String(form.batch_no).trim() || !String(form.batch_year).trim()) return "Enter the batch number and the year.";
+    return "";
+  }
+
+  // `key` is the button pressed: the step itself, or approve / return for the Dean.
+  async function confirm(key, comment) {
+    const chosen = deanDecides ? GRADUATION_STAGE_ACTIONS[key] : action;
+    const { batch_no, batch_month, batch_year, ...baseForm } = form;
+    const payload = {
+      ...baseForm,
+      comment,
+      stage_action: chosen.id,
+      action: chosen.id,
+      ...(showBatchFields ? { batch_no, batch_month, batch_year, batch_name: batchName } : {}),
+    };
     try {
-      const { batch_no, batch_month, batch_year, ...baseForm } = form;
-      const payload = {
-        ...baseForm,
-        stage_action: action.id,
-        action: action.id,
-        ...(showBatchFields ? { batch_no, batch_month, batch_year, batch_name: batchName } : {}),
-      };
       const result = await api.graduationBatchAction({ student_ids: selection.processableRows.map((row) => row.student.id), ...payload });
       await onSaved(result);
       onClose();
     } catch (err) {
-      setError(err.message || "Could not apply the graduation group action.");
-    } finally {
-      setBusy(false);
+      throw new Error(err.message || "Could not apply the graduation group action.");
     }
   }
 
+  const actions = !action
+    ? []
+    : deanDecides
+      ? [
+          { key: "approve", label: GRADUATION_STAGE_ACTIONS.approve.label, tone: "approve", icon: CheckSquare },
+          { key: "return", label: GRADUATION_STAGE_ACTIONS.return.label, tone: "return", requireComment: true },
+        ]
+      : [{ key: action.id, label: modalActionLabel, tone: action.requiresComment ? "return" : "approve", icon: CheckSquare, requireComment: Boolean(action.requiresComment) }];
+
   return (
-    <WorkflowCaseModal
-      id="graduation-batch-action"
-      title={modalActionLabel}
+    <StepDialog
+      title={deanDecides ? "Dean decision" : modalActionLabel}
       subtitle={action ? `${action.movement}` : "Selection needs one review stage"}
-      onClose={onClose}
-      size="wide"
-      footer={<button type="submit" form="graduation-batch-form" disabled={busy || !action} className="btn-primary cursor-pointer px-4 py-2"><CheckSquare className="h-4 w-4" /> {busy ? "Applying..." : action ? modalActionLabel : "No action available"}</button>}
+      size="xl"
+      actions={actions}
+      onConfirm={confirm}
+      onCancel={onClose}
+      validate={problemWith}
+      withReason={Boolean(action)}
+      reasonLabel={deanDecides ? "Dean comment" : action?.commentLabel || "Comment"}
     >
-      <form id="graduation-batch-form" onSubmit={confirm} className="space-y-4">
-        {error && <InlineNotice tone="danger">{error}</InlineNotice>}
-        {accountRole === "dean" && stageAction?.id === "approve" && (
-          <Field label="Dean decision" required>
-            <Select
-              value={deanActionId}
-              onChange={(event) => {
-                setDeanActionId(event.target.value);
-                setForm((current) => ({ ...current, comment: "" }));
-              }}
-              options={[
-                { value: "approve", label: "Approve endorsement list" },
-                { value: "return", label: "Return endorsement list for revision" },
-              ]}
-              placeholder=""
-            />
-          </Field>
-        )}
+      <div className="space-y-4">
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="eyebrow">Selected action</p>
           {action ? (
@@ -156,15 +142,14 @@ export function GraduationBatchModal({ rows, accountRole, reviewWindows, default
         {showBatchFields && (
           <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50/40 p-4">
             <div className="grid gap-3 sm:grid-cols-4">
-              <Field label="Batch No."><Input value={form.batch_no} onChange={update("batch_no")} inputMode="numeric" required /></Field>
+              <Field label="Batch No."><Input value={form.batch_no} onChange={update("batch_no")} inputMode="numeric" /></Field>
               <Field label="Month"><select value={form.batch_month} onChange={update("batch_month")} className="field-input cursor-pointer">{GRADUATION_BATCH_MONTHS.map((month) => <option key={month}>{month}</option>)}</select></Field>
-              <Field label="Year"><Input value={form.batch_year} onChange={update("batch_year")} inputMode="numeric" required /></Field>
-              <Field label="Graduation school year" hint={`Only ${activeReviewWindow || "the active school year"} can be selected.`}><Select value={form.review_window} onChange={update("review_window")} options={reviewWindowOptions} placeholder="" required /></Field>
+              <Field label="Year"><Input value={form.batch_year} onChange={update("batch_year")} inputMode="numeric" /></Field>
+              <Field label="Graduation school year" hint={`Only ${activeReviewWindow || "the active school year"} can be selected.`}><Select value={form.review_window} onChange={update("review_window")} options={reviewWindowOptions} placeholder="" /></Field>
             </div>
             <p className="text-sm font-semibold text-brand-800">Batch label: {batchName}</p>
           </div>
         )}
-        {action && <Field label={action.commentLabel || "Comment"} required={requiresComment}><Textarea value={form.comment} onChange={update("comment")} required={requiresComment} /></Field>}
         {!showBatchFields && selectedGroups.length > 0 && (
           <HistoryDisclosure label="View stage history" hideLabel="Hide stage history" count={selectedGroups.length}>
             <div className="grid w-full grid-cols-1 gap-3">
@@ -245,7 +230,7 @@ export function GraduationBatchModal({ rows, accountRole, reviewWindows, default
             })}
           </ul>
         </div>
-      </form>
-    </WorkflowCaseModal>
+      </div>
+    </StepDialog>
   );
 }

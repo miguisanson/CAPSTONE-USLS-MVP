@@ -21,6 +21,8 @@ const json = (route, body) => route.fulfill({ status: 200, contentType: "applica
 const BATCH = "Batch 1 October 2026";
 
 test.beforeAll(() => mkdirSync(SHOTS, { recursive: true }));
+// A refetch answered through page.route can still be in flight when a test ends; let it go quietly.
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: "ignoreErrors" }); });
 
 /** The same checks on every step dialog: heading, a reason box, the refusal in words, the focus back on the opener. */
 async function emptyReasonIsRefused(page, { opener, confirmName }) {
@@ -103,6 +105,8 @@ test.describe("one step dialog, staff", () => {
     await expect(page.getByRole("dialog")).toHaveCount(2);
     await emptyReasonIsRefused(page, { opener, confirmName: "Return to student" });
     await opener.click();
+    await expect(page.getByRole("dialog")).toHaveCount(2);
+    await page.waitForTimeout(400); // the dialog has finished animating in
     await page.screenshot({ path: join(SHOTS, "step-dialog-1366.png") });
     await page.getByRole("dialog").last().getByRole("textbox").fill("The MOA is missing a signature.");
     await page.getByRole("dialog").last().getByRole("button", { name: "Return to student", exact: true }).last().click();
@@ -157,7 +161,7 @@ test.describe("one step dialog, staff", () => {
   });
 
   for (const [label, pattern, path] of [
-    ["process board", /\/api\/process-cases\/leave-of-absence(\?|$)/, "/workflow/leave-of-absence"],
+    ["process board", /\/api\/process-cases\?slug=leave-of-absence/, "/workflow/leave-of-absence"],
     ["Practicum", /\/api\/transactions\/practicum\/context/, "/workflow/practicum"],
     ["Graduation", /\/api\/transactions\/graduation\/context/, "/workflow/graduation"],
   ]) {
@@ -230,5 +234,30 @@ test.describe("one step dialog, Dean", () => {
     await step.getByRole("button", { name: "Return", exact: true }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(decided).toMatchObject({ decision: "return", remarks: "Check the MAED rows again." });
+  });
+});
+
+test.describe("at 390 px", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 390, height: 844 } });
+
+  test("the step dialog and the board fit the phone screen", async ({ page }) => {
+    await withOneCase(page);
+    await page.goto("/workflow/practicum");
+    await expect(page.getByTestId("stage-board")).toBeVisible();
+    const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+    expect(await fits(), "board").toBe(true);
+    await page.screenshot({ path: join(SHOTS, "board-390.png") });
+    await page.getByRole("button", { name: "View details for Andrea Villanueva", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: /Message \/ Return/ }).click();
+    const step = page.getByRole("dialog").last();
+    await expect(step.getByRole("heading", { level: 2 }).first()).toBeVisible();
+    const box = await step.boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390.5);
+    expect(await fits(), "dialog").toBe(true);
+    await step.getByRole("button", { name: "Return to student", exact: true }).last().click();
+    await expect(step.getByRole("alert").filter({ hasText: /required/i })).toBeVisible();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: join(SHOTS, "step-dialog-390.png") });
   });
 });

@@ -1,68 +1,46 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, Eye, MessageSquare } from "lucide-react";
-import { Button, DataTable, EmptyState, Field, InlineNotice, StatCard, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, DataTable, EmptyState, StatCard, StatusChip } from "../../components/ui/index.js";
+import StepDialog from "../../components/StepDialog";
 import WorkflowTimeline from "../../components/WorkflowTimeline";
-import StageBoard, { BoardSummary, boardSummaryLine } from "../../components/StageBoard";
+import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
 import { formatDate } from "../../lib/format";
-import { CaseMessageHistory, DemoResetButton, DemoResetFeedback, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, WorkflowSubmitFeedback, uniqueValues, useDemoCaseReset } from "./shared";
+import { CaseMessageHistory, DemoResetButton, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, uniqueValues, useDemoCaseReset } from "./shared";
 
-function WorkflowTransitionModal({ slug, student, action, busy, onClose, onConfirm }) {
-  const [comment, setComment] = useState(action.reason || "");
-  const [error, setError] = useState("");
+// The confirm window of a practicum step: the one StepDialog. `onConfirm(payload)` throws to refuse (the message is shown inside).
+function WorkflowTransitionModal({ slug, student, action, onClose, onConfirm }) {
   const requiresReason = Boolean(action.requireReason);
   const requiresComment = requiresReason || Boolean(action.requireComment);
   const showsTransitionComment = requiresComment || ["practicum", "withdrawal", "graduation"].includes(slug);
 
-  async function confirm(event) {
-    event.preventDefault();
-    const cleanComment = comment.trim();
-    if (requiresComment && !cleanComment) {
-      setError(action.commentRequiredError || (requiresReason ? "Enter the exact reason before moving this request." : "Enter the required follow-through details before moving this request."));
-      return;
-    }
-    setError("");
+  async function confirm(_key, comment) {
     const payload = {
       ...action.payload,
-      ...(cleanComment ? { workflow_comment: cleanComment } : {}),
-      ...(requiresReason ? {
-        return_reason: cleanComment,
-        staff_remarks: cleanComment,
-      } : {}),
+      ...(comment ? { workflow_comment: comment } : {}),
+      ...(requiresReason ? { return_reason: comment, staff_remarks: comment } : {}),
     };
-    const saved = await onConfirm(payload);
-    if (saved) onClose();
+    await onConfirm(payload);
   }
 
   return (
-    <WorkflowCaseModal
-      id={`${slug}-confirm-transition-${student.id}`}
+    <StepDialog
       title={`Confirm: ${action.label}`}
       subtitle={`${student.name} · ${student.student_number} · ${slug}`}
-      onClose={onClose}
-      size={["practicum", "graduation"].includes(slug) ? "wide" : "default"}
-      footer={<Button type="submit" form={`${slug}-confirm-transition-form`} variant={action.destructive ? "danger" : "primary"} loading={busy}>{busy ? "Saving…" : action.label}</Button>}
-    >
-      <form id={`${slug}-confirm-transition-form`} onSubmit={confirm} className="space-y-4">
-        {error && <InlineNotice tone="danger">{error}</InlineNotice>}
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="eyebrow">Workflow movement</p>
-          <p className="mt-2 text-sm font-semibold text-ink">{action.fromStatus || "Current stage"} <span className="mx-1 text-slate-400">→</span> {action.toStatus || action.label}</p>
-          <p className="meta mt-1">This action is recorded against your signed-in account and preserves the submitted fields and files.</p>
-        </div>
-        {showsTransitionComment && (
-          <Field label={action.commentLabel || (requiresReason ? "Message / reason" : "Comment sent with this action")} required={requiresComment}>
-            <Textarea
-              value={comment}
-              onChange={(event) => setComment(event.target.value)}
-              required={requiresComment}
-              placeholder={action.commentPlaceholder || (requiresReason ? "Tell the student what to correct or upload next." : "Add instructions or context for the next reviewer. Leave blank if there is nothing to add.")}
-            />
-          </Field>
-        )}
-      </form>
-    </WorkflowCaseModal>
+      from={action.fromStatus || "Current stage"}
+      to={action.toStatus || action.label}
+      explanation="This action is recorded against your signed-in account and preserves the submitted fields and files."
+      actions={[{ key: "confirm", label: action.label, tone: action.destructive ? "reject" : "approve", requireComment: requiresComment }]}
+      onConfirm={confirm}
+      onCancel={onClose}
+      withReason={showsTransitionComment}
+      initialReason={action.reason || ""}
+      reasonLabel={action.commentLabel || (requiresReason ? "Message / reason" : "Comment sent with this action")}
+      reasonHint={requiresComment ? "Required for this step." : "Optional. Leave blank if there is nothing to add."}
+      reasonPlaceholder={action.commentPlaceholder || (requiresReason ? "Tell the student what to correct or upload next." : "Add instructions or context for the next reviewer. Leave blank if there is nothing to add.")}
+      requiredMessage={action.commentRequiredError || (requiresReason ? "Enter the exact reason before moving this request." : "Enter the required follow-through details before moving this request.")}
+    />
   );
 }
 
@@ -114,15 +92,21 @@ function PracticumBoardCard({ row, onOpen }) {
   );
 }
 
-export function PracticumRoster({ context, submit, submitting, refreshing, result, submitError, clearSubmitFeedback, refetch, accountRole }) {
+export function PracticumRoster({ context, submit, submitting, refreshing, clearSubmitFeedback, refetch, accountRole }) {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [messageRow, setMessageRow] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
-  const [messageNotice, setMessageNotice] = useState("");
+  const boardNotice = useBoardNotice(); // the one place this board says what happened
   const [viewMode, setViewMode] = useState("board");
   const [pendingAction, setPendingAction] = useState(null);
   const [moveRow, setMoveRow] = useState(null); // the card a drop or "Move to..." opened the confirm window for
   const reset = useDemoCaseReset("practicum", refetch);
+  // A reset answers in the board notice too. The case window closes so the notice is not hidden behind it.
+  useEffect(() => {
+    if (!reset.resetMessage && !reset.resetError) return;
+    boardNotice.show(reset.resetError ? "error" : "success", reset.resetError || reset.resetMessage);
+    setSelectedStudentId(null);
+  }, [reset.resetMessage, reset.resetError]); // eslint-disable-line react-hooks/exhaustive-deps
   const rows = (context.roster || []).filter((row) => row.eligibility?.eligible === true);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
@@ -192,6 +176,15 @@ export function PracticumRoster({ context, submit, submitting, refreshing, resul
     return undefined;
   }
 
+  // A confirmed step: the dialogs and the case window close, the board says what happened.
+  async function confirmStep(payload) {
+    const saved = await submit(payload, { strict: true });
+    setPendingAction(null);
+    setMoveRow(null);
+    setSelectedStudentId(null);
+    boardNotice.show("success", saved?.message || "Saved.");
+  }
+
   function openCase(studentId) {
     clearSubmitFeedback();
     reset.clearResetFeedback();
@@ -210,15 +203,11 @@ export function PracticumRoster({ context, submit, submitting, refreshing, resul
 
   return (
     <div className="page-stack">
-      {messageNotice && <InlineNotice tone="success" onDismiss={() => setMessageNotice("")}>{messageNotice}</InlineNotice>}
-      <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
       <BoardSummary line={summaryLine} windowName="case window" />
       <BoardFilterRow toggle={<ViewToggle value={viewMode} onChange={setViewMode} />}>
         <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={filteredRows.length} total={rows.length} noun="students" />
       </BoardFilterRow>
-      {filteredRows.length === 0 ? (
-        <EmptyState title="No recent practicum submissions match the filters." hint={rows.length ? "Clear a filter to see more." : "No eligible Psychology or MSGC practicum students found."} />
-      ) : viewMode === "board" ? (
+      {viewMode === "board" ? (
         <StageBoard
           ariaLabel="Practicum workflow board"
           columns={PRACTICUM_STAGE_COLUMNS}
@@ -230,9 +219,17 @@ export function PracticumRoster({ context, submit, submitting, refreshing, resul
           lockReason={practicumLockReason}
           checkMove={practicumCheckMove}
           onMove={movePracticumRow}
-          emptyText="No requests here"
+          emptyText="No practicum students here"
+          boardNotice={boardNotice}
         />
+      ) : filteredRows.length === 0 ? (
+        <>
+          <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />
+          <EmptyState title="No students match these filters" hint={rows.length ? "Clear a filter to see more." : "No eligible Psychology or MSGC practicum students found."} />
+        </>
       ) : (
+        <>
+        <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />
         <DataTable
           caption="Practicum students"
           rows={filteredRows}
@@ -270,10 +267,11 @@ export function PracticumRoster({ context, submit, submitting, refreshing, resul
             {
               key: "action",
               header: "Action",
-              cell: (row) => <Button variant="secondary" size="sm" icon={Eye} onClick={() => openCase(row.student.id)}>Open case</Button>,
+              cell: (row) => <Button variant="secondary" size="sm" icon={Eye} onClick={() => openCase(row.student.id)} aria-label={`View details for ${row.student.name}`}>View</Button>,
             },
           ]}
         />
+        </>
       )}
       {selectedRow && (
         <WorkflowCaseModal
@@ -301,16 +299,14 @@ export function PracticumRoster({ context, submit, submitting, refreshing, resul
           )}
         >
           <div className="space-y-4">
-            <WorkflowSubmitFeedback result={result} error={submitError} />
-            <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />
             <PracticumCaseDetails row={selectedRow} />
             <CaseMessageHistory messages={selectedRow.messages} onReply={(message) => { setReplyTo(message); setMessageRow(selectedRow); }} />
             <WorkflowActivityList logs={selectedRow.history || []} />
           </div>
         </WorkflowCaseModal>
       )}
-      {messageRow && <WorkflowMessageModal slug="practicum" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { setMessageNotice(message); await refetch(); }} />}
-      {pendingAction && (moveRow || selectedRow) && <WorkflowTransitionModal slug="practicum" student={(moveRow || selectedRow).student} action={pendingAction} busy={submitting || refreshing} onClose={() => { setPendingAction(null); setMoveRow(null); }} onConfirm={submit} />}
+      {messageRow && <WorkflowMessageModal slug="practicum" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { boardNotice.show("success", message || "Message sent."); setSelectedStudentId(null); await refetch(); }} />}
+      {pendingAction && (moveRow || selectedRow) && <WorkflowTransitionModal slug="practicum" student={(moveRow || selectedRow).student} action={pendingAction} onClose={() => { setPendingAction(null); setMoveRow(null); }} onConfirm={confirmStep} />}
     </div>
   );
 }

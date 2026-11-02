@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Eye, FileCheck, Info, RotateCcw, Send, SlidersHorizontal, XCircle } from "lucide-react";
 import { api } from "../../api";
 import { Button, Card, EmptyState, Field, HistoryList, HistoryPanel, InlineNotice, Input, Modal, SearchInput, Select, StatCard, StatusChip, Textarea } from "../../components/ui/index.js";
+import StepDialog from "../../components/StepDialog";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { formatDateTime } from "../../lib/format";
 import { useAuth } from "../../auth";
@@ -230,12 +231,9 @@ export function WorkflowMessageModal({ slug, row, context, replyTo = null, onClo
     recipient_role: replyTo?.sender_role || "Student",
     visibility: replyTo?.visibility || "student_visible",
     template: remarksOnly ? "Remarks" : replyTo ? "Other / Custom comment" : context?.message_templates?.[0] || "Missing required document",
-    comment: "",
     reply_to_message_id: replyTo?.id || null,
     require_document_resubmission: false,
   });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const commentRequired = remarksOnly || Boolean(replyTo) || form.action_type === "return" || form.template === "Other / Custom comment";
   const canRequireGraduationDocument = (
     !replyTo
@@ -247,84 +245,81 @@ export function WorkflowMessageModal({ slug, row, context, replyTo = null, onClo
   const returningToStudent = !replyTo && form.action_type === "return" && form.recipient_role === "Student";
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
 
-  async function save(event) {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
+  // The reason box belongs to the StepDialog; a refusal from the server is thrown back into the dialog.
+  async function save(_key, comment) {
     try {
-      const result = await api.sendWorkflowMessage(slug, { student_id: student.id, ...form });
+      const result = await api.sendWorkflowMessage(slug, { student_id: student.id, ...form, comment });
       await onSaved(result.message);
       onClose();
     } catch (err) {
-      setError(err.message || "Could not save the workflow message.");
-    } finally {
-      setBusy(false);
+      throw new Error(err.message || "Could not save the workflow message.");
     }
   }
 
   return (
-    <WorkflowCaseModal
+    <StepDialog
       title={replyTo ? "Reply in case discussion" : "Message / return for clarification"}
       subtitle={`${student.name} · ${student.student_number}`}
-      onClose={onClose}
-      size={["practicum", "graduation"].includes(slug) ? "wide" : "default"}
-      footer={<Button type="submit" form={`${slug}-message-form-${student.id}`} variant={returningToStudent ? "danger" : "primary"} icon={Send} loading={busy}>{busy ? "Saving…" : returningToStudent ? "Return to student" : "Send message"}</Button>}
-    >
-      <form id={`${slug}-message-form-${student.id}`} onSubmit={save} className="space-y-4">
-        {error && <InlineNotice tone="danger">{error}</InlineNotice>}
-        {replyTo && (
-          <InlineNotice tone="success" title={`Replying to ${replyTo.sender_name || replyTo.sender_role}${replyTo.sender_name && replyTo.sender_role ? ` (${replyTo.sender_role})` : ""} → ${replyTo.recipient_role}`}>
-            {replyTo.comment}
-          </InlineNotice>
-        )}
-        {!replyTo && <>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Action">
-            <Select
-              value={form.action_type}
-              onChange={(event) => setForm((current) => ({ ...current, action_type: event.target.value, require_document_resubmission: false }))}
-              placeholder=""
-              options={[{ value: "return", label: "Return for clarification" }, { value: "note", label: "Send note to current reviewer" }]}
-            />
-          </Field>
-          <Field label="Recipient / next stage">
-            <Select value={form.recipient_role} onChange={(event) => setForm((current) => ({ ...current, recipient_role: event.target.value, visibility: event.target.value === "Student" ? "student_visible" : "internal", require_document_resubmission: event.target.value === "Student" ? current.require_document_resubmission : false }))} placeholder="" options={context?.message_recipients || ["Student", "Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean"]} />
-          </Field>
-        </div>
-        <Field label="Visibility">
-          <Select
-            value={form.visibility}
-            onChange={update("visibility")}
-            disabled={form.recipient_role === "Student"}
-            className="disabled:cursor-not-allowed disabled:bg-slate-100"
-            placeholder=""
-            options={[{ value: "student_visible", label: "Visible to student" }, { value: "internal", label: "Internal reviewers only" }]}
+      size="lg"
+      explanation={replyTo ? "Your reply is added chronologically to this case discussion and routed to the original sender." : "Returning the case moves it back to the selected recipient's stage and requires a reason. Use the case action button for normal forward approval; a note keeps the current stage unchanged."}
+      actions={[{ key: "send", label: returningToStudent ? "Return to student" : "Send message", icon: Send, tone: returningToStudent ? "reject" : "approve", requireComment: commentRequired }]}
+      onConfirm={save}
+      onCancel={onClose}
+      reasonLabel={replyTo ? "Reply" : remarksOnly ? "Remarks" : form.action_type === "return" || form.template === "Other / Custom comment" ? "Comment / reason" : "Optional details"}
+      reasonHint={commentRequired ? "Required for this step." : "Kept with this message."}
+      reasonPlaceholder={remarksOnly ? "Type your remarks or message." : "Add the exact file, record, or detail that needs attention."}
+      requiredMessage={replyTo ? "Write your reply first. It is required." : remarksOnly ? "Write your remarks first. They are required to return the case." : undefined}
+      extra={canRequireGraduationDocument && (
+        <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${form.require_document_resubmission ? "border-red-300 bg-red-50" : "border-slate-200 bg-white hover:border-red-200 hover:bg-red-50/40"}`}>
+          <input
+            type="checkbox"
+            checked={form.require_document_resubmission}
+            onChange={(event) => setForm((current) => ({ ...current, require_document_resubmission: event.target.checked }))}
+            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300 text-red-600 focus:ring-red-500"
           />
-        </Field>
-        {!remarksOnly && <Field label="Message template">
-          <Select value={form.template} onChange={update("template")} placeholder="" options={context?.message_templates || []} />
-        </Field>}
-        </>}
-        {canRequireGraduationDocument && (
-          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${form.require_document_resubmission ? "border-red-300 bg-red-50" : "border-slate-200 bg-white hover:border-red-200 hover:bg-red-50/40"}`}>
-            <input
-              type="checkbox"
-              checked={form.require_document_resubmission}
-              onChange={(event) => setForm((current) => ({ ...current, require_document_resubmission: event.target.checked }))}
-              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300 text-red-600 focus:ring-red-500"
+          <span>
+            <span className="block text-sm font-semibold text-slate-900">Have student resubmit document</span>
+            <span className="meta mt-1 block leading-relaxed text-slate-600">When checked, Graduation Step 1 is reset. The existing PDF stays in file history, but the student must upload a new PDF before resubmitting.</span>
+          </span>
+        </label>
+      )}
+    >
+      {replyTo && (
+        <InlineNotice tone="success" title={`Replying to ${replyTo.sender_name || replyTo.sender_role}${replyTo.sender_name && replyTo.sender_role ? ` (${replyTo.sender_role})` : ""} → ${replyTo.recipient_role}`}>
+          {replyTo.comment}
+        </InlineNotice>
+      )}
+      {!replyTo && (
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Action">
+              <Select
+                value={form.action_type}
+                onChange={(event) => setForm((current) => ({ ...current, action_type: event.target.value, require_document_resubmission: false }))}
+                placeholder=""
+                options={[{ value: "return", label: "Return for clarification" }, { value: "note", label: "Send note to current reviewer" }]}
+              />
+            </Field>
+            <Field label="Recipient / next stage">
+              <Select value={form.recipient_role} onChange={(event) => setForm((current) => ({ ...current, recipient_role: event.target.value, visibility: event.target.value === "Student" ? "student_visible" : "internal", require_document_resubmission: event.target.value === "Student" ? current.require_document_resubmission : false }))} placeholder="" options={context?.message_recipients || ["Student", "Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean"]} />
+            </Field>
+          </div>
+          <Field label="Visibility">
+            <Select
+              value={form.visibility}
+              onChange={update("visibility")}
+              disabled={form.recipient_role === "Student"}
+              className="disabled:cursor-not-allowed disabled:bg-slate-100"
+              placeholder=""
+              options={[{ value: "student_visible", label: "Visible to student" }, { value: "internal", label: "Internal reviewers only" }]}
             />
-            <span>
-              <span className="block text-sm font-semibold text-slate-900">Have student resubmit document</span>
-              <span className="meta mt-1 block leading-relaxed text-slate-600">When checked, Graduation Step 1 is reset. The existing PDF stays in file history, but the student must upload a new PDF before resubmitting.</span>
-            </span>
-          </label>
-        )}
-        <Field label={replyTo ? "Reply" : remarksOnly ? "Remarks" : form.action_type === "return" || form.template === "Other / Custom comment" ? "Comment / reason" : "Optional details"} required={commentRequired}>
-          <Textarea value={form.comment} onChange={update("comment")} required={commentRequired} placeholder={remarksOnly ? "Type your remarks or message." : "Add the exact file, record, or detail that needs attention."} />
-        </Field>
-        <p className="meta leading-relaxed">{replyTo ? "Your reply is added chronologically to this case discussion and routed to the original sender." : "Returning the case moves it back to the selected recipient's stage and requires a reason. Use the case action button for normal forward approval; a note keeps the current stage unchanged."}</p>
-      </form>
-    </WorkflowCaseModal>
+          </Field>
+          {!remarksOnly && <Field label="Message template">
+            <Select value={form.template} onChange={update("template")} placeholder="" options={context?.message_templates || []} />
+          </Field>}
+        </div>
+      )}
+    </StepDialog>
   );
 }
 

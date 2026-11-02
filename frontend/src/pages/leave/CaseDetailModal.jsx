@@ -13,7 +13,7 @@ import { CaseHistory, CaseSummary, ChecklistView, EarlierCases, FileList, Follow
  * `version` changes (the board bumps it after any step). Every button at the bottom
  * hands the action to `onAction`, which opens the same confirm box as "Move to...".
  */
-export default function CaseDetailModal({ caseId, slug, vocabulary, version, onClose, onAction, onTransition, onNoteSent }) {
+export default function CaseDetailModal({ caseId, slug, vocabulary, version, onClose, onAction, onNoteSent }) {
   const [loaded, setLoaded] = useState(null);
   const [error, setError] = useState("");
 
@@ -71,7 +71,7 @@ export default function CaseDetailModal({ caseId, slug, vocabulary, version, onC
             <StudentSummary detail={detail} />
             <EarlierCases detail={detail} />
           </div>
-          <CaseConversation slug={slug} detail={detail} onTransition={onTransition} onNoteSent={onNoteSent} />
+          <CaseConversation slug={slug} detail={detail} onNoteSent={onNoteSent} />
           <FileList files={detail.files} />
           <FollowUpBlock detail={detail} />
           <CaseHistory detail={detail} vocabulary={vocabulary} />

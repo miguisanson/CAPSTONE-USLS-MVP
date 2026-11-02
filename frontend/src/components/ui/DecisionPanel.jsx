@@ -69,6 +69,7 @@ const joinOr = (words) => (words.length > 1 ? `${words.slice(0, -1).join(", ")} 
  * @param commentLabel       label of the box (default "Comment for the student", or "Note (optional)" if no action needs one)
  * @param commentHint        help text under the box (default names the actions that need a comment)
  * @param commentRequiredMessage  the field error (default "Add a comment so the student knows what to fix.")
+ * @param commentAutoFocus  inside a Modal, the dialog puts the cursor in the comment box when it opens (default: the first control)
  * @param minCommentLength   shortest accepted comment for an action that needs one (default 1)
  * @param validate           (key, comment) => string | falsy; a text blocks the decision and is shown as a notice
  * @param onCancel, cancelLabel   adds a Cancel button (for a panel inside a dialog)
@@ -92,6 +93,7 @@ export function DecisionPanel({
   commentRequiredMessage = "Add a comment so the student knows what to fix.",
   minCommentLength = 1,
   commentPlaceholder,
+  commentAutoFocus = false,
   commentRows = 3,
   maxLength = 2000,
   validate,
@@ -207,6 +209,7 @@ export function DecisionPanel({
             rows={commentRows}
             maxLength={maxLength}
             placeholder={commentPlaceholder}
+            data-autofocus={commentAutoFocus ? "" : undefined}
             disabled={working}
             onChange={(event) => setText(event.target.value)}
           />

@@ -47,7 +47,7 @@ const open = async (page, name) => {
   return { opener, dialog };
 };
 
-// The case window's own step buttons sit in the footer, after the "Return to student" form button in the body.
+// The case window's own step buttons sit in the footer (the old inline "Return to student" form in the body is gone, p98).
 const footerAction = (dialog, name) => dialog.getByRole("button", { name, exact: true }).last();
 
 /** The newest dialog (the decision box over the case window). */
@@ -218,9 +218,9 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       const { dialog } = await open(page, "Benjamin Santos");
       await dialog.getByRole("button", { name: "Save note", exact: true }).click();
       await expect(dialog.getByText("Write the note first.")).toBeVisible();
-      // the return form in the Messages block
-      await dialog.getByRole("button", { name: "Return to student", exact: true }).first().click();
-      await expect(dialog.getByText("Tell the student what to fix. A reason is required.")).toBeVisible();
+      // CHANGED BY p98 (I-152): the inline "Return to student" form in the Messages block is gone; the return is the footer
+      // step, which opens the one step dialog (its empty-reason refusal is pinned by the tests above and by p98).
+      await expect(dialog.getByText("Tell the student what to fix. A reason is required.")).toHaveCount(0);
       await expect(page.getByRole("dialog")).toHaveCount(1);
 
       // history: both lists open and the count bubble matches the rows
