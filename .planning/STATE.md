@@ -13,6 +13,7 @@
   Caveman lite in the kit, Python/unittest support in `workers/` + `workers/projects/CAPSTONE-USLS-MVP.conf`, edits left
   uncommitted in dev-kit).
 - **Machines:** Mac and Lenovo were OFFLINE on Tailscale at 2026-11-02 start; everything runs on this PC until they are on.
+- **MERGED `pkt/uat`** (I-138): `npm run uat` = waitress + ProxyFix (`scripts/serve_uat.py`, test `tests/test_uat_serving.py` 7/7), `.env.example`, setup-env `--uat`, `UAT.md`, `deploy/cloudflared/config.yml.example`. Its public-exposure audit -> next app.py packet `pkt/harden` (after pkt/cal): empty env values = unset, `DEMO_SHOW_ACCOUNTS` switch (demo-accounts endpoints publish the shared password + admin e-mail), demo reset staff/admin only, assistant per-account rate limit, `MAX_CONTENT_LENGTH`, security headers, SQLite WAL + busy_timeout.
 - **pkt/a11y2** (I-120) still has only a stash in `wt/a11y2`; redo it later from the brief.
 - **Next after the three land:** review + merge pkt/cal then pkt/uat; app.py packet for the public-exposure audit
   findings; e2e on merged code; then IMPROVE.md loop (ISSUES P1/P2, consistency sweep, UI/database improvements);
