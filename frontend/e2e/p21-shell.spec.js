@@ -116,6 +116,7 @@ const EXPECTED_LINKS = {
     "/assistant | Policy Assistant",
     "/business-rules | Business Rules",
     "/monitoring-sheet | Monitoring Sheet",
+    "/reports | Reports & Analytics", // CHANGED BY p101 (I-141): the Research Coordinator has Reports (three views)
     "/work-queue | Work Queue",
     "/workflow/defense-scheduling | 7 · Defense Scheduling",
     "/workflow/graduation | 9 · Graduation Endorsement",

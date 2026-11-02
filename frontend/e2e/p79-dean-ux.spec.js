@@ -87,13 +87,6 @@ async function leaveToDean(playwright) {
   await student.dispose();
 }
 
-/** A decided case as /api/approvals lists it (only the fields the Dean pages read). */
-const decided = (type, id, status, student) => ({
-  type, id, title: `${type} #${id}`, subtitle: student, status, workflow_status: status,
-  submitted_at: new Date(Date.now() - 86400000).toISOString(), last_activity_at: new Date().toISOString(),
-  student: { id: 9000 + id, name: student, student_number: `99${id}`, program_code: "MAED" },
-});
-
 /** Open the Approvals Queue and hand back what the page itself loaded. */
 async function openQueue(page) {
   const approvals = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/approvals");
@@ -106,49 +99,24 @@ async function openQueue(page) {
 test.describe("P7.9 Dean pages", () => {
   test.use({ storageState: authFile("dean"), viewport: VIEWS[0] });
 
-  test("I-074: the home and Reports & Analytics count the same decisions this week", async ({ page }) => {
+  // CHANGED BY p101 (I-141): Reports & Analytics is rebuilt on the server's own counts (/api/reports/decisions). The two I-074
+  // tests that pinned "Decided this week", "Approval share" and the old "Decisions by process" table (the second one by
+  // rewriting /api/approvals in the browser) are replaced by one test of the same rule on the figure the new page shows:
+  // the home and Reports & Analytics count the same waiting decisions. The server's counting of outcomes (a scheduled
+  // leave is approved, a denial is a denial) is pinned by tests/test_reports_decisions.py.
+  test("I-074: the home and Reports & Analytics count the same decisions waiting", async ({ page }) => {
     await page.goto("/dean");
     await expect(page.getByRole("heading", { level: 1, name: /^Welcome, / })).toBeVisible();
-    const homeValue = statValue(page, "Decided this week");
+    const homeValue = statValue(page, "Decisions waiting");
     await expect(homeValue).toBeVisible();
     const home = Number((await homeValue.innerText()).trim());
     expect(Number.isFinite(home), "the home shows a number").toBe(true);
 
     await page.goto("/dean/analytics");
     await expect(page.getByRole("heading", { level: 1, name: "Reports & Analytics" })).toBeVisible();
-    const analyticsValue = statValue(page, "Decided this week");
+    const analyticsValue = statValue(page, "Decisions waiting");
     await expect(analyticsValue, "Reports & Analytics has the same figure").toBeVisible();
-    const analytics = Number((await analyticsValue.innerText()).trim());
-    expect(analytics, "the same decisions are counted on both pages").toBe(home);
-
-    // The table and the share come from the same decisions: not 0 and "-" while decisions exist.
-    const rows = main(page).getByRole("row").filter({ has: page.getByRole("link") });
-    let outcomes = 0;
-    for (let i = 0; i < (await rows.count()); i++) {
-      const cells = rows.nth(i).getByRole("cell");
-      for (const c of [2, 3, 4]) outcomes += Number(((await cells.nth(c).innerText()).match(/\d+/) || [0])[0]);
-    }
-    if (home > 0) {
-      expect(outcomes, "decisions exist, so the table shows some outcome").toBeGreaterThanOrEqual(home);
-      await expect(statValue(page, "Approval share"), "the share is a percentage").toHaveText(/^\d+%$/);
-    }
-  });
-
-  test("I-074: with a scheduled leave and a denial this week both pages count two, and the table splits them", async ({ page }) => {
-    await page.route(/\/api\/approvals$/, async (route) => {
-      const response = await route.fetch();
-      const json = await response.json();
-      const recent = [decided("leave-of-absence", 9101, "Leave Scheduled", "Test Leave"), decided("withdrawal", 9102, "Denied", "Test Withdrawal")];
-      await route.fulfill({ response, json: { ...json, recent: [], workflow_recent: recent, workflow_overview: recent } });
-    });
-    await page.goto("/dean");
-    await expect(statValue(page, "Decided this week")).toHaveText("2");
-    await page.goto("/dean/analytics");
-    await expect(statValue(page, "Decided this week"), "Reports & Analytics counts the same two").toHaveText("2");
-    const cellOf = (process, column) => main(page).getByRole("row").filter({ has: page.getByRole("link", { name: process, exact: true }) }).getByRole("cell").nth(column);
-    await expect(cellOf("Leave of Absence", 2), "a scheduled leave is an approved decision").toHaveText("1");
-    await expect(cellOf("Subject Withdrawal", 4), "a denial is a denial").toHaveText("1");
-    await expect(statValue(page, "Approval share")).toHaveText("50%");
+    expect(Number((await analyticsValue.innerText()).trim()), "the same decisions are counted on both pages").toBe(home);
   });
 
   test("I-084: the Approvals Queue lists what waits and one line for what does not", async ({ page, playwright }) => {

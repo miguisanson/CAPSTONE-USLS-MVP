@@ -71,7 +71,7 @@ const COORDINATOR_PAGES = Object.freeze({
     "/workflow/graduation", "/workflow/awol", "/work-queue",
   ]),
   research_coordinator: new Set([
-    "/", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation",
+    "/", "/reports", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation",
     "/monitoring-sheet", "/work-queue",
   ]),
 });

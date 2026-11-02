@@ -50,10 +50,6 @@ export const api = {
     const qs = queryString(params);
     return request(`/dashboard${qs ? `?${qs}` : ""}`);
   },
-  dashboardDrilldown: (params = {}) => {
-    const qs = queryString(params);
-    return request(`/dashboard/drilldown${qs ? `?${qs}` : ""}`);
-  },
   students: (params = {}) => {
     const qs = queryString(params);
     return request(`/students${qs ? `?${qs}` : ""}`);
@@ -90,6 +86,10 @@ export const api = {
     return request(`/reports/${id}${qs ? `?${qs}` : ""}`);
   },
   reportDownloadUrl: (id, params = {}, format = "xlsx") => `${BASE}/reports/${id}?${queryString({ ...params, format })}`,
+  // Reports v2 (I-141): `name` is the path after /reports/ (summary, summary/<key>, attention, stages, records-to-fix,
+  // decisions, cycle-times); the download address carries the same filters plus `format`.
+  reportV2: (name, params = {}) => request(`/reports/${name}?${queryString(params)}`),
+  reportV2Url: (name, params = {}, format = "xlsx") => `${BASE}/reports/${name}?${queryString({ ...params, format })}`,
   // BPMN 1 Admission — Dean onboarding gate
   onboardingReviews: () => request("/onboarding/reviews"),
   submitOnboardingReview: (id) =>
