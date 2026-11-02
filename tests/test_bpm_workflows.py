@@ -4273,6 +4273,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertIsNone(schedule.google_calendar_event_ids)
 
     # ---- Google Calendar hardening (pkt/cal review items 2-8) ----------------
+    _ids = iter(range(1, 10**6))
     GOOGLE_TOKEN_ENV = {
         "GOOGLE_CALENDAR_CLIENT_ID": "client-id.apps.googleusercontent.com",
         "GOOGLE_CALENDAR_CLIENT_SECRET": "client-secret",
@@ -4488,7 +4489,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         with app.app_context():
             faculty = Faculty(
                 name="Scope Faculty", college="Graduate School", role="Panel Member",
-                specialization="Research methods", email="scope-faculty@example.test", active=True,
+                specialization="Research methods", email=f"scope-faculty-{next(self._ids)}@example.test", active=True,
             )
             db.session.add(faculty)
             db.session.flush()
