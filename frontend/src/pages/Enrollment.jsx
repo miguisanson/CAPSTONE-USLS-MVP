@@ -25,6 +25,7 @@ import { toneOf } from "../lib/tone";
 import ClassListPreviewDialog from "./enrollment/ClassListPreviewDialog.jsx";
 import SubjectStatusDialog from "./enrollment/SubjectStatusDialog.jsx";
 import { integrityNotes } from "./enrollment/integrity.js";
+import { todayISO } from "../lib/format";
 import {
   ConflictNotice,
   EnrollmentHistory,
@@ -255,7 +256,7 @@ export default function Enrollment() {
       studentName: data?.selected_student?.name || "Student",
       termLabel: data?.term?.label || "",
       status: "",
-      effectiveDate: new Date().toISOString().slice(0, 10),
+      effectiveDate: todayISO(),
       note: "",
       unexcusedAbsencePercent: "",
     });

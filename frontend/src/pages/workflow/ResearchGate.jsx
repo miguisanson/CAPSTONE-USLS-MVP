@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, CheckCircle2, Clock, FileCheck, UserRoundCheck } from "lucide-react";
 import { Button, Card, Field, Input, SectionTitle, Select, StatCard, Stepper, StatusChip } from "../../components/ui/index.js";
-import { formatDate } from "../../lib/format";
+import { formatDate, todayISO } from "../../lib/format";
 import { toneOf } from "../../lib/tone";
 import { useAuth } from "../../auth";
 import { Form1EndorsementQueue } from "../Form1Endorsements";
@@ -18,7 +18,7 @@ export function ResearchGateForm({ context, studentId, submit, submitting, resul
   const progress = context.research_progress || {};
   const milestone = context.current_milestone || progress.milestone || {};
   const requirements = milestone.requirements || [];
-  const [ethicsReview, setEthicsReview] = useState({ status: "Cleared", date: new Date().toISOString().slice(0, 10) });
+  const [ethicsReview, setEthicsReview] = useState({ status: "Cleared", date: todayISO() });
   const completed = requirements.filter((item) => item.status === "Complete");
   const pending = requirements.filter((item) => item.status !== "Complete");
   const panel = context.panel_status || {};

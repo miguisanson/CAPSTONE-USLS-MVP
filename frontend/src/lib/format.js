@@ -6,6 +6,11 @@ export function formatDate(value, opts = { month: "short", day: "numeric", year:
   return d.toLocaleDateString(undefined, opts);
 }
 
+/** Today's date (YYYY-MM-DD) in Philippine time, the same day the server's ph_today() uses (I-200). */
+export function todayISO(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
 export function formatDateTime(value) {
   if (!value) return "—";
   const d = new Date(value);

@@ -5,16 +5,11 @@ import { Link } from "react-router-dom";
 import { CheckSquare, Download, FileText, Printer, RefreshCw, Square } from "lucide-react";
 import { api } from "../../api";
 import { Button, DataTable, InlineNotice, Input, SectionCard, Spinner, StatCard, StatusChip } from "../../components/ui/index.js";
-import { csvCell, downloadBlob } from "../../lib/format";
+import { csvCell, downloadBlob, todayISO } from "../../lib/format";
 import { printDataTable } from "../../lib/print";
 
 function downloadCsv(filename, lines) {
   downloadBlob(new Blob([lines.join("\n")], { type: "text/csv" }), filename);
-}
-
-function todayISO() {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
 function changeText(item) {
