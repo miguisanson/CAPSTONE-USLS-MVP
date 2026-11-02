@@ -4,6 +4,7 @@ import { AlertTriangle, BookOpenCheck, CalendarCheck, CheckCircle2, UserX, Users
 import { Button, Card, Field, InlineNotice, Input, SectionTitle, Select, StatCard, StatusChip } from "../../components/ui/index.js";
 import { Pill } from "../../components/ui/Pill.jsx";
 import { toneOf } from "../../lib/tone";
+import { panelSeatIds } from "./shared";
 
 const PANEL_MATCHING_DEFAULT_LIMIT = 15;
 
@@ -140,11 +141,11 @@ export function PanelMatchingForm({ context, studentId, submit, submitting, refe
   const profileTone = toneOf(profile.ready ? "success" : "warning").notice;
 
   useEffect(() => {
-    const finalizedIds = finalizedPanel.map((item) => item.faculty_id).filter(Boolean);
+    const finalizedIds = panelSeatIds(roles, finalizedPanel);
     const byRole = new Map(suggested.map((item) => [item.role, item.faculty_id]));
     const suggestedSeats = roles.map((role) => byRole.get(role) || "");
-    setSelectedIds(finalizedIds.length === roles.length ? finalizedIds : suggestedSeats);
-  }, [studentId, roles.join("|"), suggestedKey, finalizedPanel.map((item) => item.faculty_id).join(",")]);
+    setSelectedIds(finalizedIds.length === roles.length && finalizedIds.every(Boolean) ? finalizedIds : suggestedSeats);
+  }, [studentId, roles.join("|"), suggestedKey, finalizedPanel.map((item) => `${item.panel_role}:${item.faculty_id}`).join(",")]);
 
   function onSubmit(e) {
     e.preventDefault();

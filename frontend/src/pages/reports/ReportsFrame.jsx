@@ -53,7 +53,7 @@ function Tile({ tile, onOpen }) {
     <button
       type="button"
       onClick={() => onOpen(tile)}
-      className="card flex h-full w-full cursor-pointer flex-col gap-1 p-4 text-left transition-colors hover:border-brand-200 hover:bg-brand-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      className="card flex h-full w-full cursor-pointer flex-col gap-1 p-3 text-left sm:p-4 transition-colors hover:border-brand-200 hover:bg-brand-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     >
       <span className="text-xs font-semibold text-slate-600">{tile.label}</span>
       <span className="page-title">
@@ -121,7 +121,7 @@ export default function ReportsFrame({ title, description, icon, actions, tabs, 
 
       {showScope && (
         <Card>
-          <div role="group" aria-label="Report filters" className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div role="group" aria-label="Report filters" className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 max-sm:[&>label:last-child]:col-span-2">
             <Field label="Program">
               <Select placeholder="All programs" value={params.get("program_id") || ""} onChange={(e) => setParam("program_id", e.target.value)} options={programs.map((p) => ({ value: String(p.id), label: p.code }))} />
             </Field>
@@ -142,7 +142,7 @@ export default function ReportsFrame({ title, description, icon, actions, tabs, 
         ) : !summary ? (
           <Skeleton lines={4} />
         ) : (
-          <div role="group" aria-label="Summary numbers" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+          <div role="group" aria-label="Summary numbers" className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 2xl:grid-cols-6">
             {summary.tiles.map((tile) => <Tile key={tile.key} tile={tile} onOpen={setOpen} />)}
           </div>
         )

@@ -473,6 +473,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
     () => graduationBatchGroups(visibleBatchedRows, selectedIds),
     [visibleBatchedRows, selectedIds],
   );
+  const allBatchCount = useMemo(() => graduationBatchGroups(rows.filter((row) => Boolean(row.endorsement?.batch_name))).length, [rows]);
   const boardColumns = batchesOnly ? GRADUATION_BATCH_COLUMNS : GRADUATION_ALL_BOARD_COLUMNS;
   const boardItems = useMemo(
     () => [
@@ -711,8 +712,9 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           statuses={statuses}
           secondaryLabel="completed courses"
           secondaryOptions={completedCourseOptions}
-          count={filteredRows.length}
-          total={rows.length}
+          count={batchesOnly ? visibleBatchGroups.length : filteredRows.length}
+          total={batchesOnly ? allBatchCount : rows.length}
+          noun={batchesOnly ? "batches" : "records"}
           showAdvanced={false}
         />
       </BoardFilterRow>
