@@ -94,12 +94,13 @@ export default function Login() {
   const [resetBusy, setResetBusy] = useState("");
   const [openDemoGroup, setOpenDemoGroup] = useState("");
 
-  // Ask the server whether demo mode is on. With it off, this page is only the form.
+  // Ask the server whether to list the demo logins. With it off (demo mode off, or DEMO_SHOW_ACCOUNTS=0
+  // on a public site), this page is only the form.
   useEffect(() => {
     let active = true;
     api.authConfig()
       .then((result) => {
-        if (active) setDemoMode(Boolean(result.demo_mode));
+        if (active) setDemoMode(Boolean(result.show_accounts));
       })
       .catch(() => {
         if (active) setDemoMode(false);
@@ -182,12 +183,11 @@ export default function Login() {
     setDemoNotice("");
     setResetBusy(student.key);
     try {
-      // The server only resets for a signed-in session, so sign in first (as the student, or as a
-      // demo staff account if the student's password was changed), reset, then sign out again.
-      const signInOptions = [
-        { email: student.email, password: student.password },
-        ...demoAccounts.filter((account) => account.role === "staff").map(({ email, password }) => ({ email, password })),
-      ];
+      // The server only resets for Graduate School staff, so sign in as a demo staff account first,
+      // reset, then sign out again.
+      const signInOptions = demoAccounts
+        .filter((account) => account.role === "staff")
+        .map(({ email, password }) => ({ email, password }));
       let signedIn = false;
       for (const credentials of signInOptions) {
         if (!credentials.email || !credentials.password) continue;

@@ -6,6 +6,7 @@ import random
 import re
 import secrets
 import shutil
+import sqlite3
 import sys
 import tempfile
 import json
@@ -35,6 +36,7 @@ from flask import Flask, Response, has_app_context, has_request_context, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event, func, inspect, or_, text, true
 from sqlalchemy import event as _sa_event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, contains_eager
 from sqlalchemy.orm.attributes import get_history as _sa_get_history
 from werkzeug.exceptions import NotFound
@@ -55,7 +57,31 @@ def generate_password_hash(password, method="pbkdf2:sha256", salt_length=16):
 
 load_dotenv()
 
+
+def env_int(name: str, default: int) -> int:
+    """An integer setting; an empty value (``NAME=`` in .env) means "not set"."""
+    raw = os.getenv(name)
+    return int(raw) if raw is not None and raw.strip() else default
+
+
+def env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    return float(raw) if raw is not None and raw.strip() else default
+
+
 db = SQLAlchemy()
+
+
+@event.listens_for(Engine, "connect")
+def _sqlite_connection_settings(dbapi_connection, _record):
+    """Waitress runs several threads on one SQLite file: WAL lets readers and one writer overlap,
+    and the busy timeout makes a second writer wait instead of failing with "database is locked"."""
+    if not isinstance(dbapi_connection, sqlite3.Connection):
+        return
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.close()
 
 FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
 # All user files live under one root. Tests (and seeding scripts) set USLS_UPLOAD_DIR to a temp
@@ -102,10 +128,10 @@ _RAG_TERMS_CACHE: dict[int, list[str]] = {}
 _RAG_VECTOR_STATE: dict = {"path": None, "signature": None, "vectors": {}}
 _RAG_EMBED_COOLDOWN_UNTIL = 0.0
 _RAG_BACKGROUND_THREAD = None
-ASSISTANT_MAX_QUESTION_LENGTH = int(os.getenv("ASSISTANT_MAX_QUESTION_LENGTH", "1500"))
-PDF_OCR_MIN_WORDS = int(os.getenv("PDF_OCR_MIN_WORDS", "30"))
-PDF_OCR_MAX_PAGES = int(os.getenv("PDF_OCR_MAX_PAGES", "8"))
-PDF_OCR_DPI = int(os.getenv("PDF_OCR_DPI", "200"))
+ASSISTANT_MAX_QUESTION_LENGTH = env_int("ASSISTANT_MAX_QUESTION_LENGTH", 1500)
+PDF_OCR_MIN_WORDS = env_int("PDF_OCR_MIN_WORDS", 30)
+PDF_OCR_MAX_PAGES = env_int("PDF_OCR_MAX_PAGES", 8)
+PDF_OCR_DPI = env_int("PDF_OCR_DPI", 200)
 POLICY_DOCUMENT_TYPES = {
     ".pdf": "application/pdf",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -318,6 +344,12 @@ def demo_mode_enabled() -> bool:
     return os.getenv("DEMO_MODE", "1").strip().lower() not in {"0", "false", "no", "off"}
 
 
+def demo_accounts_listing_enabled() -> bool:
+    """DEMO_SHOW_ACCOUNTS (default ON, needs DEMO_MODE): may the public sign-in page list the demo
+    logins and the shared password? A public UAT site turns this OFF and hands logins out privately."""
+    return demo_mode_enabled() and os.getenv("DEMO_SHOW_ACCOUNTS", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
 def demo_password_hint() -> str:
     """The shared default password, but only while DEMO_MODE is on."""
     return SIM_STUDENT_PASSWORD if demo_mode_enabled() else ""
@@ -362,7 +394,18 @@ def create_app() -> Flask:
     app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes", "on"}
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # Oversize uploads are refused with a JSON 413 before anything is saved.
+    app.config["MAX_CONTENT_LENGTH"] = env_int("MAX_UPLOAD_MB", 30) * 1024 * 1024
     db.init_app(app)
+
+    @app.after_request
+    def add_security_headers(response):
+        # shortcut: no Content-Security-Policy yet (the SPA's inline styles/scripts make it risky
+        # right before UAT); add one after testing it against every page.
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        return response
 
     register_json_error_handling(app)
     register_routes(app)
@@ -4886,6 +4929,36 @@ WORKFLOW_RECIPIENTS = {
 }
 
 
+class SlidingWindowLimit:
+    """At most ``limit`` hits per key within ``window`` seconds.
+
+    shortcut: the counts live in this process's memory, so they reset on restart and are per
+    worker; the single waitress process of the UAT site is fine, several workers would need the
+    database."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._hits: dict = {}
+
+    def allow(self, key, limit: int, window: float = 3600.0) -> bool:
+        now = _monotonic()
+        with self._lock:
+            hits = [t for t in self._hits.get(key, []) if now - t < window]
+            allowed = len(hits) < limit
+            if allowed:
+                hits.append(now)
+            self._hits[key] = hits
+            return allowed
+
+    def reset(self) -> None:
+        with self._lock:
+            self._hits.clear()
+
+
+ASSISTANT_LIMITER = SlidingWindowLimit()
+ASSISTANT_RATE_LIMIT_MESSAGE = "You have asked many questions in the last hour. Please try again later."
+
+
 class LoginThrottle:
     """Per-process brake on repeated failed sign-ins: a short, growing delay, never a lock.
 
@@ -4901,11 +4974,11 @@ class LoginThrottle:
     def __init__(self, clock=None):
         from time import monotonic
 
-        self.max_failures = int(os.getenv("LOGIN_MAX_FAILURES", "5"))
-        self.ip_max_failures = int(os.getenv("LOGIN_IP_MAX_FAILURES", "40"))
-        self.window_seconds = int(os.getenv("LOGIN_FAILURE_WINDOW_SECONDS", "900"))
-        self.base_delay_seconds = int(os.getenv("LOGIN_BASE_DELAY_SECONDS", "2"))
-        self.lockout_seconds = int(os.getenv("LOGIN_LOCKOUT_SECONDS", "30"))  # the longest single wait
+        self.max_failures = env_int("LOGIN_MAX_FAILURES", 5)
+        self.ip_max_failures = env_int("LOGIN_IP_MAX_FAILURES", 40)
+        self.window_seconds = env_int("LOGIN_FAILURE_WINDOW_SECONDS", 900)
+        self.base_delay_seconds = env_int("LOGIN_BASE_DELAY_SECONDS", 2)
+        self.lockout_seconds = env_int("LOGIN_LOCKOUT_SECONDS", 30)  # the longest single wait
         self.clock = clock or monotonic
         self._lock = threading.Lock()
         self._failures: dict[tuple, list[float]] = {}
@@ -5287,7 +5360,7 @@ def ensure_delay_status_consistency() -> int:
 # stale on a server that stays up. Every screen that counts or filters by risk calls
 # refresh_risk_levels() first; it recomputes through student_priority() (the one definition) at most
 # once per RISK_REFRESH_SECONDS and whenever the day changes.
-RISK_REFRESH_SECONDS = max(int(os.getenv("USLS_RISK_REFRESH_SECONDS", "60") or 60), 0)
+RISK_REFRESH_SECONDS = max(env_int("USLS_RISK_REFRESH_SECONDS", 60), 0)
 _RISK_REFRESH_STATE: dict = {"at": None, "day": None}
 
 
@@ -9077,7 +9150,7 @@ POLICY_DOCUMENT_CATEGORIES = ["Handbook", "Research Protocol", "Operations Manua
 POLICY_DOCUMENT_STATUSES = ["active", "draft", "archived"]
 POLICY_SECTIONS_VERSION = 4
 import policy_rag as _prag  # noqa: E402  (key-free retrieval and answers for the Policy Assistant)
-POLICY_OCR_MAX_PAGES = int(os.getenv("POLICY_OCR_MAX_PAGES", "40"))
+POLICY_OCR_MAX_PAGES = env_int("POLICY_OCR_MAX_PAGES", 40)
 _WML = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 # Display names for the stakeholder files that ship with the project. Anything
 # else gets a title made from its file name.
@@ -9118,7 +9191,7 @@ def _file_sha256(path: Path) -> str:
 
 def _policy_max_upload_mb() -> int:
     try:
-        return max(1, int(os.getenv("POLICY_DOCUMENT_MAX_MB", "20")))
+        return max(1, env_int("POLICY_DOCUMENT_MAX_MB", 20))
     except ValueError:
         return 20
 
@@ -9732,8 +9805,8 @@ def _rag_index_signature(sources: list) -> dict:
         })
     return {
         "files": files,
-        "chunk_size": int(os.getenv("RAG_CHUNK_SIZE", "180")),
-        "chunk_overlap": int(os.getenv("RAG_CHUNK_OVERLAP", "30")),
+        "chunk_size": env_int("RAG_CHUNK_SIZE", 180),
+        "chunk_overlap": env_int("RAG_CHUNK_OVERLAP", 30),
         "parser": f"{POLICY_SECTIONS_VERSION}.{_prag.CHUNK_VERSION}",
     }
 
@@ -9741,8 +9814,8 @@ def _rag_index_signature(sources: list) -> dict:
 # --- chunking ----------------------------------------------------------------
 def _rag_split_words(text: str) -> list[str]:
     words = (text or "").split()
-    chunk_size = max(100, int(os.getenv("RAG_CHUNK_SIZE", "180")))
-    overlap = min(chunk_size // 3, max(0, int(os.getenv("RAG_CHUNK_OVERLAP", "30"))))
+    chunk_size = max(100, env_int("RAG_CHUNK_SIZE", 180))
+    overlap = min(chunk_size // 3, max(0, env_int("RAG_CHUNK_OVERLAP", 30)))
     bodies = []
     start = 0
     while start < len(words):
@@ -10206,9 +10279,9 @@ def _gemini_generate(prompt: str) -> str:
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model_name}:generateContent"
     )
-    timeout = max(3.0, float(os.getenv("RAG_REQUEST_TIMEOUT_SECONDS", "18")))
-    budget = max(256, int(os.getenv("RAG_MAX_OUTPUT_TOKENS", "1024")))
-    thinking: dict | None = {"thinkingBudget": max(0, int(os.getenv("RAG_THINKING_BUDGET", "0")))}
+    timeout = max(3.0, env_float("RAG_REQUEST_TIMEOUT_SECONDS", 18))
+    budget = max(256, env_int("RAG_MAX_OUTPUT_TOKENS", 1024))
+    thinking: dict | None = {"thinkingBudget": max(0, env_int("RAG_THINKING_BUDGET", 0))}
     answer, cut_off, grown = "", False, False
     for _attempt in range(3):
         config: dict = {"maxOutputTokens": budget}
@@ -10268,8 +10341,8 @@ def _gemini_embed_texts(texts: list[str], purpose: str, timeout: float | None = 
     model_name = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-2").removeprefix("models/")
     if not re.fullmatch(r"[A-Za-z0-9._-]+", model_name):
         raise RuntimeError("The configured Gemini embedding model name is invalid.")
-    dimensions = max(128, min(3072, int(os.getenv("RAG_EMBEDDING_DIMENSIONS", "768"))))
-    batch_size = max(1, min(50, int(os.getenv("RAG_EMBEDDING_BATCH_SIZE", "20"))))
+    dimensions = max(128, min(3072, env_int("RAG_EMBEDDING_DIMENSIONS", 768)))
+    batch_size = max(1, min(50, env_int("RAG_EMBEDDING_BATCH_SIZE", 20)))
     instruction = {
         "document": "Represent this USLS Graduate School policy passage for semantic document retrieval.",
         "query": "Retrieve USLS Graduate School policy passages that answer this question.",
@@ -10279,7 +10352,7 @@ def _gemini_embed_texts(texts: list[str], purpose: str, timeout: float | None = 
         f"{model_name}:batchEmbedContents"
     )
     vectors: list[list[float]] = []
-    timeout = timeout or max(5.0, float(os.getenv("RAG_EMBEDDING_TIMEOUT_SECONDS", "45")))
+    timeout = timeout or max(5.0, env_float("RAG_EMBEDDING_TIMEOUT_SECONDS", 45))
     for start in range(0, len(texts), batch_size):
         batch = texts[start:start + batch_size]
         body = json.dumps({
@@ -10317,7 +10390,7 @@ def _gemini_embed_texts(texts: list[str], purpose: str, timeout: float | None = 
 def _rag_vector_signature() -> dict:
     return {
         "model": os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-2").removeprefix("models/"),
-        "dimensions": max(128, min(3072, int(os.getenv("RAG_EMBEDDING_DIMENSIONS", "768")))),
+        "dimensions": max(128, min(3072, env_int("RAG_EMBEDDING_DIMENSIONS", 768))),
         "prompt_version": 2,
     }
 
@@ -10367,7 +10440,7 @@ def _rag_save_vector_store() -> None:
 
 
 def _rag_embedding_cooldown() -> float:
-    return max(0.0, float(os.getenv("RAG_EMBED_COOLDOWN_SECONDS", "60")))
+    return max(0.0, env_float("RAG_EMBED_COOLDOWN_SECONDS", 60))
 
 
 def _rag_embedding_failed() -> None:
@@ -10447,8 +10520,8 @@ def _load_rag_vector_index(chunks: list[dict]) -> dict[str, list[float]]:
     """Vectors for the current corpus; small changes are embedded on the spot."""
     return _ensure_rag_vectors(
         chunks,
-        inline_limit=max(1, int(os.getenv("RAG_INLINE_EMBED_LIMIT", "40"))),
-        timeout=max(3.0, float(os.getenv("RAG_INLINE_EMBED_TIMEOUT_SECONDS", "12"))),
+        inline_limit=max(1, env_int("RAG_INLINE_EMBED_LIMIT", 40)),
+        timeout=max(3.0, env_float("RAG_INLINE_EMBED_TIMEOUT_SECONDS", 12)),
     )
 
 
@@ -10458,7 +10531,7 @@ def _embed_rag_query(question: str) -> list[float]:
     try:
         return _gemini_embed_texts(
             [question], "query",
-            timeout=max(3.0, float(os.getenv("RAG_INLINE_EMBED_TIMEOUT_SECONDS", "12"))),
+            timeout=max(3.0, env_float("RAG_INLINE_EMBED_TIMEOUT_SECONDS", 12)),
         )[0]
     except Exception:
         _rag_embedding_failed()
@@ -10600,7 +10673,7 @@ def _retrieve_rag_document_chunks(
     A passage that only the keyword search finds (an exact rule name, a form number, a figure) is never lost
     because the embedding missed it, and vice versa. Without embeddings the keyword ranking stands alone.
     """
-    limit = limit or max(1, int(os.getenv("RAG_TOP_K", "3")))
+    limit = limit or max(1, env_int("RAG_TOP_K", 3))
     try:
         vectors = _load_rag_vector_index(chunks)
         query_vector = _embed_rag_query(question)
@@ -11005,7 +11078,7 @@ def _retrieval_strength(chunks: list[dict]) -> dict:
     words, rare words weighing more, and most of the question's words occur somewhere in the library), or the
     embedding puts a passage at cosine similarity >= RAG_MIN_SIMILARITY (default 0.60) to the question.
     """
-    minimum = float(os.getenv("RAG_MIN_SIMILARITY", "0.60"))
+    minimum = env_float("RAG_MIN_SIMILARITY", 0.60)
     keyword_ok = any(chunk.get("_relevant") for chunk in chunks)
     similarities = [chunk.get("_score") or 0.0 for chunk in chunks if chunk.get("_retrieval") == "vector"]
     best_similarity = max(similarities) if similarities else None
@@ -11037,7 +11110,7 @@ def call_document_rag(
     (no student record, no curated snippets).
     """
     document_chunks = _load_rag_document_index()
-    retrieved_chunks = _retrieve_rag_document_chunks(question, document_chunks, max(4, int(os.getenv("RAG_TOP_K", "3"))))
+    retrieved_chunks = _retrieve_rag_document_chunks(question, document_chunks, max(4, env_int("RAG_TOP_K", 3)))
     if not retrieved_chunks:
         raise PolicyPassageNotFound("No matching policy passage was found.")
     strength = _retrieval_strength(retrieved_chunks)
@@ -11401,10 +11474,10 @@ def call_local_document_rag(question: str) -> tuple[str, list[dict]]:
     so plainly instead of showing an unrelated passage.
     """
     document_chunks = _load_rag_document_index()
-    passages = search_policy_passages(question, max(3, int(os.getenv("RAG_TOP_K", "3"))))
+    passages = search_policy_passages(question, max(3, env_int("RAG_TOP_K", 3)))
     _assistant_trace(retrieval=_retrieval_strength(passages))
     composed = _prag.compose_answer(
-        question, passages, document_chunks, max(400, int(os.getenv("LOCAL_RAG_MAX_ANSWER_CHARS", "900"))),
+        question, passages, document_chunks, max(400, env_int("LOCAL_RAG_MAX_ANSWER_CHARS", 900)),
     )
     if not composed:
         raise PolicyAnswerNotFound("The policy documents do not answer this question.")
@@ -12171,7 +12244,7 @@ def _rag_cache_set(key: tuple, value: tuple[str, list[dict]]) -> None:
     with _RAG_RESPONSE_CACHE_LOCK:
         _RAG_RESPONSE_CACHE[key] = value
         _RAG_RESPONSE_CACHE.move_to_end(key)
-        while len(_RAG_RESPONSE_CACHE) > max(1, int(os.getenv("RAG_RESPONSE_CACHE_SIZE", "128"))):
+        while len(_RAG_RESPONSE_CACHE) > max(1, env_int("RAG_RESPONSE_CACHE_SIZE", 128)):
             _RAG_RESPONSE_CACHE.popitem(last=False)
 
 
@@ -12457,34 +12530,37 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/auth/config")
     def auth_config():
         """Tell the sign-in page whether to offer the demo panel. Public, no secrets."""
-        return no_store(jsonify({"demo_mode": demo_mode_enabled()}))
+        return no_store(jsonify({"demo_mode": demo_mode_enabled(), "show_accounts": demo_accounts_listing_enabled()}))
 
     @app.route("/api/auth/demo-accounts")
     def auth_demo_accounts():
         """Ready-made staff/faculty/dean/student logins for the presenter's
         expandable "Demo accounts" panel. Demo mode only; an account whose
-        password has been changed is never listed."""
-        if not demo_mode_enabled():
+        password has been changed is never listed. Also hidden by DEMO_SHOW_ACCOUNTS=0."""
+        if not demo_accounts_listing_enabled():
             return demo_mode_off_response()
         return no_store(jsonify({"items": demo_accounts_payload()}))
 
     @app.route("/api/auth/demo-students")
     def auth_demo_students():
         """Expose only the purpose-built quick-login demo identities (demo mode only)."""
-        if not demo_mode_enabled():
+        if not demo_accounts_listing_enabled():
             return demo_mode_off_response()
         return no_store(jsonify({"items": workflow_demo_students_payload()}))
 
     @app.route("/api/auth/demo-students/<demo_key>/reset", methods=["POST"])
     def auth_demo_student_reset(demo_key: str):
-        """Reset a whitelisted demo student (demo mode only; a signed-in session is required).
+        """Reset a whitelisted demo student (demo mode only; Graduate School staff or admin only).
 
-        The sign-in page signs in first, then calls this, so a stranger on the same network
-        cannot wipe a presenter's case."""
+        The sign-in page signs in as demo staff first, then calls this, so a stranger on the same
+        network cannot wipe a presenter's case."""
         if not demo_mode_enabled():
             return demo_mode_off_response()
-        if not current_account():
+        account = current_account()
+        if not account:
             return no_store(jsonify({"error": "Please sign in to continue."})), 401
+        if account.role not in {"staff", "admin"}:
+            return jsonify({"error": "Only Graduate School staff can reset a demo case."}), 403
         config = WORKFLOW_DEMO_STUDENTS.get(demo_key)
         if not config:
             return jsonify({"error": "Demo student not found."}), 404
@@ -18700,6 +18776,12 @@ def register_routes(app: Flask) -> None:
     # RAG-style policy/case guidance endpoint. Every signed-in role may ask
     # policy questions; only Graduate School staff and admins also get answers
     # built from student records, and a student stays in the student sandbox.
+    def assistant_rate_limited(account):
+        """The 429 response when this account has used its ASSISTANT_MAX_PER_HOUR questions."""
+        if ASSISTANT_LIMITER.allow(account.id, env_int("ASSISTANT_MAX_PER_HOUR", 30)):
+            return None
+        return jsonify({"error": ASSISTANT_RATE_LIMIT_MESSAGE}), 429
+
     @app.route("/api/assistant", methods=["POST"])
     @require_api_login()
     def assistant():
@@ -18708,6 +18790,9 @@ def register_routes(app: Flask) -> None:
         if not question:
             return jsonify({"error": "Ask a question to get started."}), 400
         account = current_account()
+        limited = assistant_rate_limited(account)
+        if limited:
+            return limited
         student_id = data.get("student_id")
         try:
             student_id = int(student_id) if student_id else None
@@ -18759,6 +18844,9 @@ def register_routes(app: Flask) -> None:
         if not question:
             return jsonify({"error": "Ask a question to get started."}), 400
         account = current_account()
+        limited = assistant_rate_limited(account)
+        if limited:
+            return limited
         student = Student.query.get_or_404(account.student_id)
         _assistant_trace_reset()
         return jsonify(finish_assistant_payload(generate_student_answer(question, student)))
@@ -38112,6 +38200,17 @@ def ensure_demo_leave_case(student: Student, demo_config: dict | None) -> LeaveC
         "AY 2026-2027 1st Semester", "AY 2026-2027 1st Semester",
     ))
     start_term, end_term = leave_term(start_label), leave_term(end_label)
+    # The leave must still be running on the day the seed is built: sync_leave_cases flips a leave to
+    # "Return Due" within leave.return_due_days of its end, so move the end to a later term if needed.
+    due_days = int(rule_value("leave.return_due_days", 30) or 30)
+    while end_term and end_term.end_date - timedelta(days=due_days) <= date.today():
+        following = (
+            AcademicTerm.query.filter(AcademicTerm.start_date > end_term.start_date)
+            .order_by(AcademicTerm.start_date).first()
+        )
+        if not following:
+            break
+        end_term, end_label = following, following.label
     case = (
         LeaveCase.query.filter_by(student_id=student.id, kind=KIND_LOA, source="demo")
         .order_by(LeaveCase.id.desc()).first()
@@ -39116,7 +39215,7 @@ if __name__ == "__main__":
             print("Compare this with a teammate's to check you have the same data.")
         raise SystemExit(0)
 
-    port = int(os.getenv("FLASK_PORT", "5000"))
+    port = env_int("FLASK_PORT", 5000)
     if (
         os.getenv("RAG_PREWARM", "1").strip().lower() not in {"0", "false", "no"}
         and (os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY"))

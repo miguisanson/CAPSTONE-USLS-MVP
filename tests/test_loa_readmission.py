@@ -992,7 +992,12 @@ class LeaveCaseTests(unittest.TestCase):
             self.assertEqual((leave.status, leave.start_label, leave.end_label),
                              ("On Leave", "AY 2026-2027 1st Semester", "AY 2026-2027 2nd Semester"))
         # Reset gives her the starting point again: still on her leave, no readmission request.
-        reset = login("readmission-therese").post("/api/auth/demo-students/readmission-therese/reset")
+        # Only Graduate School staff can reset a demo case.
+        staff = app.test_client()
+        self.assertEqual(staff.post("/api/auth/login", json={
+            "email": "staff@usls.edu.ph", "password": by_key["readmission-therese"]["password"]}).status_code, 200)
+        self.assertEqual(login("readmission-therese").post("/api/auth/demo-students/readmission-therese/reset").status_code, 403)
+        reset = staff.post("/api/auth/demo-students/readmission-therese/reset")
         self.assertEqual(reset.status_code, 200, reset.get_json())
         with app.app_context():
             therese = Student.query.filter_by(student_number="GS-2026-READ-01").one()
@@ -1033,7 +1038,7 @@ class LeaveCaseTests(unittest.TestCase):
         with app.app_context():
             self.assertEqual(SubjectEnrollment.query.filter_by(student_id=student_id, status="Enrolled").count(), 0)
             self.assertEqual(db.session.get(Student, student_id).standing, "On Leave")
-        reset = client.post("/api/auth/demo-students/leave-of-absence-maureen/reset")
+        reset = self._client(staff_id, "staff").post("/api/auth/demo-students/leave-of-absence-maureen/reset")
         self.assertEqual(reset.status_code, 200, reset.get_json())
         with app.app_context():
             self.assertEqual(LeaveCase.query.filter_by(student_id=student_id).count(), 0)
