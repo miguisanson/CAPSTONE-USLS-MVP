@@ -302,7 +302,18 @@ test.describe("Dean reports", () => {
     await expect(outcomes.getByRole("table", { name: /What was decided/ }).locator("tbody tr")).toHaveCount(data.outcomes.rows.length);
     await shot(page, "dean-outcomes-1366.png");
 
-    // The previous term had no decisions: the chart says so instead of drawing nothing.
+    // A period with no decisions: the chart says so instead of drawing nothing. The seeded history decides cases in the previous
+    // term, so that one answer is the real one with every decision taken out (what a term nobody decided in looks like).
+    await page.route("**/api/reports/decisions?*term=previous*", async (route) => {
+      const body = await (await route.fetch()).json();
+      const none = { count: 0, median_days: null, p90_days: null };
+      for (const row of body.speed.rows) Object.assign(row, { this_term: { ...none }, last_term: null, change_days: null });
+      Object.assign(body.speed.overall, { this_term: { ...none }, last_term: null });
+      for (const row of body.outcomes.rows) Object.assign(row, { approved: 0, returned: 0, denied: 0, total: 0 });
+      Object.assign(body.outcomes.totals, { approved: 0, returned: 0, denied: 0, total: 0 });
+      body.cases = body.cases.filter((c) => c.state !== "decided");
+      await route.fulfill({ json: body });
+    });
     await field(page, "Period").selectOption("previous");
     await expect(outcomes.getByText("No decisions in this period")).toBeVisible();
     await tab(page, "How fast decisions are made").click();

@@ -583,7 +583,8 @@ test.describe("I-117: Course Adjustments lists each subject once", () => {
       const line = rowOf(page, table, row.course.code);
       const mine = byCourse.get(row.course.id);
       const cells = line.locator("td");
-      await expect(cells.nth(1), `${row.course.code} needing next term`).toHaveText(new RegExp("^\\s*" + (mine ? mine.need_count : 0) + "(\\D|$)"));
+      // the cell is the figure plus, when there are any, a "N retakes" note beside it (the seeded history has retakes): read the figure alone
+      await expect(cells.nth(1).locator("span").first(), `${row.course.code} needing next term`).toHaveText(String(mine ? mine.need_count : 0));
       await expect(cells.nth(2), `${row.course.code} not taken yet`).toHaveText(new RegExp("^\\s*" + (mine ? mine.not_taken_count : 0) + "(\\D|$)"));
     }
     // the report's other parts: summary figures and the download

@@ -120,6 +120,10 @@ async function mockGraduation(page, { approved = true } = {}) {
   await page.route(/\/api\/transactions\/graduation\/context/, async (route) => {
     const response = await route.fetch();
     const body = await response.json();
+    // The seeded history approves other batches too: take them out of "approved" so Isabel's is the only one, whatever the seed holds.
+    for (const row of body.roster) {
+      if (row.endorsement?.endorsement_status === "Dean Approved") row.endorsement = { ...row.endorsement, endorsement_status: "Ready for Dean Review", display_status: "Ready for Dean Review" };
+    }
     const isabel = body.roster.find((row) => row.student.name === "Isabel Flores");
     const status = approved ? "Dean Approved" : "Ready for Dean Review";
     isabel.endorsement = { ...isabel.endorsement, id: 987100, batch_name: BATCH, endorsement_status: status, display_status: status, registrar_status: "Pending" };
