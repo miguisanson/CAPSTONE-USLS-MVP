@@ -931,7 +931,7 @@ class LeaveCaseTests(unittest.TestCase):
         overview = self.student_client().get("/api/student-portal/context").get_json()["leave_overview"]
         self.assertFalse(overview["can_file"]["readmission"]["allowed"])
         ext_id = self.case()
-        self.assertEqual(self.act(self.student_client(), ext_id, "withdraw").status_code, 200)
+        self.assertEqual(self.student_client().post(f"/api/student-portal/leave-cases/{ext_id}/withdraw").status_code, 200)
         self.assertEqual(self.student_client().post("/api/student-portal/requests/readmission", json=body).status_code, 200)
         again = self.file_loa("Term One", "Term Two")
         self.assertEqual(again.status_code, 409, again.get_json())

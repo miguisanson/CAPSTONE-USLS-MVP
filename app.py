@@ -796,6 +796,7 @@ class AwolCase(db.Model):
     policy_classification = db.Column(db.String(100))
     refresher_required = db.Column(db.Boolean, default=False)
     full_reenrollment_required = db.Column(db.Boolean, default=False)
+    prior_stage = db.Column(db.String(60))  # the stage before AWOL, restored when the student returns
     dean_decision = db.Column(db.String(40), nullable=False, default="Not Submitted")
     staff_notes = db.Column(db.Text)
     decided_at = db.Column(db.DateTime)
@@ -6464,6 +6465,11 @@ def leave_file_loa(student: Student, data, account: UserAccount | None) -> Leave
                 f"({STATUS_BY_KEY[open_case.status]['label'].lower()}). Wait for the decision or withdraw it first.",
                 409,
             )
+    if kind == KIND_EXTENSION and open_leave_case(student.id, (KIND_READMISSION,)):
+        raise LeaveError(
+            "A readmission request is already in progress. Wait for its decision or withdraw it before asking "
+            "for more leave.", 409,
+        )
     fields = leave_case_fields_from_payload(data, kind)
     start_term, end_term, duration = fields["start_term"], fields["end_term"], fields["duration"]
     max_total = rule_value("loa.max_total_semesters", 4)
@@ -6554,6 +6560,11 @@ def leave_file_readmission(student: Student, data, account: UserAccount | None) 
                 f"({STATUS_BY_KEY[open_case.status]['label'].lower()}). Wait for the decision or withdraw it first.",
                 409,
             )
+    if open_leave_case(student.id, (KIND_EXTENSION,)):
+        raise LeaveError(
+            "A leave extension request is already in progress. Wait for its decision or withdraw it before "
+            "asking to be readmitted.", 409,
+        )
     if active and active.status == "Leave Scheduled":
         raise LeaveError(
             "Your leave has not started yet. Cancel the leave instead of asking to be readmitted.", 409,
@@ -6997,9 +7008,20 @@ def leave_end_leave_for_readmission(case: LeaveCase, linked: LeaveCase | None) -
     recompute_risk(student)
 
 
+def awol_remember_stage(awol: AwolCase, stage: str | None) -> None:
+    """Keep the stage the student had before AWOL (first writer wins; never a standing stage)."""
+    if not awol.prior_stage and stage and stage not in {"LOA", "AWOL", "Withdrawn", "Admission"}:
+        awol.prior_stage = stage
+
+
+def awol_return_stage(awol: AwolCase) -> str:
+    return awol.prior_stage or "Coursework"
+
+
 def leave_declare_awol(case: LeaveCase, account: UserAccount | None, comment: str = "") -> AwolCase:
     """Staff confirmed that the leave ended with no return: the student is AWOL."""
     student = case.student
+    stage_before = case.prior_stage or student.current_stage
     student.standing = "AWOL"
     student.current_stage = "AWOL"
     student.enrollment_tag = "AWOL"
@@ -7013,6 +7035,7 @@ def leave_declare_awol(case: LeaveCase, account: UserAccount | None, comment: st
     if not awol or awol.status not in {"AWOL Declared", "Return Submitted", "Returned for Revision", "Dean Review", "Re-enrollment Required"}:
         awol = AwolCase(student_id=student.id)
         db.session.add(awol)
+    awol_remember_stage(awol, stage_before)
     awol.status = awol.status if awol.status in {"Return Submitted", "Returned for Revision", "Dean Review", "Re-enrollment Required"} else "AWOL Declared"
     awol.awol_effective_date = awol.awol_effective_date or ((end_date + timedelta(days=1)) if end_date else date.today())
     awol.last_enrolled_term = awol.last_enrolled_term or case.end_label or (case.end_term.label if case.end_term else None)
@@ -7394,6 +7417,15 @@ def _leave_h_mark_return_due(case, account, comment, data, move):
 
 
 def _leave_h_confirm_awol(case, account, comment, data, move):
+    end = leave_end_date(case)
+    grace_days = int(rule_value("leave.return_grace_days", 14) or 14)
+    # The sync proposes AWOL only after end + grace, so a proposal counts as proof that the period passed.
+    if not case.awol_proposed_at and end and date.today() <= end + timedelta(days=grace_days):
+        raise LeaveError(
+            f"This leave runs until {end.isoformat()}. AWOL can be confirmed only after it ends and the "
+            f"{grace_days}-day grace period has passed ({(end + timedelta(days=grace_days + 1)).isoformat()} at the earliest).",
+            409,
+        )
     previous = case.status
     case.status = "Expired"
     case.closed_at = now_utc()
@@ -7771,8 +7803,12 @@ def leave_student_overview(student: Student) -> dict:
             can_ext = {"allowed": True, "reason": "", "parent_case_id": active.id, "remaining_semesters": max_total - used}
     elif open_loa and open_loa.kind == KIND_EXTENSION and open_loa.status == "Returned":
         can_ext = {"allowed": True, "reason": "", "parent_case_id": open_loa.linked_case_id}
+    if can_ext["allowed"] and open_read and open_read.status != "Returned":
+        can_ext = {"allowed": False, "reason": "A readmission request is in progress. Wait for its decision or withdraw it first."}
     if student.standing == "AWOL" or student.enrollment_tag == "AWOL":
         can_read = {"allowed": False, "reason": "Your record is marked AWOL. Use Return from AWOL instead."}
+    elif open_loa and open_loa.kind == KIND_EXTENSION:
+        can_read = {"allowed": False, "reason": "A leave extension request is in progress. Wait for its decision or withdraw it first."}
     elif open_read and open_read.status != "Returned":
         can_read = {"allowed": False, "reason": f"A readmission request is already in progress ({STATUS_BY_KEY[open_read.status]['label'].lower()})."}
     elif active and active.status == "Leave Scheduled":
@@ -8241,6 +8277,7 @@ def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
         latest.updated_at = now_utc()
 
         previous_status = student.enrollment_tag or student.standing
+        awol_remember_stage(latest, student.current_stage)
         student.standing = "AWOL"
         student.current_stage = "AWOL"
         student.enrollment_tag = "AWOL"
@@ -17808,7 +17845,7 @@ def register_routes(app: Flask) -> None:
                     item.dean_decision = "Approved"
                     result = "AWOL return approved with graded 6-unit refresher requirement"
                     student.standing = "Active"
-                    student.current_stage = "Coursework"
+                    student.current_stage = awol_return_stage(item)
                     student.enrollment_tag = "Not Enrolled"
                     add_task(student.id, "Review graded 6-unit refresher enrollment", "Academic Coordinator", 7, 75)
                 else:
@@ -17816,7 +17853,7 @@ def register_routes(app: Flask) -> None:
                     item.dean_decision = "Approved"
                     result = "AWOL return approved by Dean"
                     student.standing = "Active"
-                    student.current_stage = "Coursework"
+                    student.current_stage = awol_return_stage(item)
                     student.enrollment_tag = "Not Enrolled"
                     add_task(student.id, "Review AWOL return study plan and enrollment", "Academic Coordinator", 5, 45)
                 next_owner = "Academic Coordinator"
@@ -31124,7 +31161,7 @@ def handle_awol(data: MultiDict) -> int:
         item.staff_notes = "\n".join(part for part in [item.staff_notes, staff_notes] if part) or None
         item.updated_at = now_utc()
         student.standing = "Active"
-        student.current_stage = "Coursework"
+        student.current_stage = awol_return_stage(item)
         student.enrollment_tag = "Not Enrolled"
         student.updated_at = now_utc()
         for flag in StudentMonitoringFlag.query.filter_by(
