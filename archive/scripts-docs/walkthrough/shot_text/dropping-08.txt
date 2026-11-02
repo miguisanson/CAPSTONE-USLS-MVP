@@ -1,0 +1,1049 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+AWOL & Residency
+
+MONITORING & SUPPORT
+
+Work Queue
+Policy Assistant
+Business Rules
+
+Academic Coordinator
+
+Figures are computed live from recorded transactions.
+
+Academic Coordinator Portal
+Monitoring Sheet
+Dr. Ramon Alvarez · Academic Coordinator
+DR
+Monitoring Sheet
+
+Curriculum progress for each student. Add students and edit subject rows here, or upload a workbook under Student Handoff.
+
+Export workbook
+Add student
+DPSY — Doctor of Philosophy in Psychology
+MAPSY — Master of Arts in Psychology
+MASS — Master of Arts in Social Sciences
+DBA — Doctor of Business Administration
+MBA — Master of Business Administration
+EDD — Doctor of Education
+MAED — Master of Arts in Education
+MSGC — Master of Science in Guidance and Counseling
+MIT — Master in Information Technology
+MSCS — Master of Science in Computer Science
+MAN — Master of Arts in Nursing
+MSN — Master of Science in Nursing
+AY 2026-2027 2nd Semester (Next)
+AY 2026-2027 1st Semester (Current)
+AY 2025-2026 2nd Semester (Previous)
+All progress
+Not started
+In progress
+All subjects complete
+Eligible for compre
+All risk
+On Track
+At Risk of Delay
+Delayed
+Not Yet Assessed
+At Risk of Delay/Delayed
+All enrollment
+LOA
+AWOL
+LOA or AWOL
+Enrolled
+Withdrawn
+Sort: Last name
+Sort: AY Entry newest
+Sort: AY Entry oldest
+Sort: Completed subjects most
+Sort: Completed subjects least
+Sort: Completed units most
+Sort: Highest risk
+Export CSV
+
+Select a subject cell or the pencil beside a name to add or edit a row.
+
+Everything you type is marked Manual entry with your name and the time, and is kept in the change history. Imported values are never overwritten silently: a later upload that disagrees with a portal entry is held for review. Grades are not entered here.
+2 enrollment/profile inconsistency item(s) found
+Officially completed
+Taken
+Enrolled
+Failed
+Dropped
+Planned
+INC
+Withdrawn
+Not taken
+Manual entry
+Curriculum progress of each student, one column per subject
+STUDENT	AY ENTRY	YR	BASIC	MAJOR	COGNATE	COMPRE EXAM	RESEARCH
+MAED-FED	MAED-MOR	MAED-STAT	MAED-MAJ1	MAED-MAJ2	MAED-MAJ3	MAED-MAJ4	MAED-MAJ5	MAED-COG1	MAED-COG10	MAED-COG2	MAED-COG3	MAED-COG4	MAED-COG5	MAED-COG6	MAED-COG7	MAED-COG8	MAED-COG9	Title	Proposal	Ethics	Final
+
+Aquino, Roberto
+IDNO GS-2026-CA-02
+On Track
+	2026-2027	Year 1	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+R
+	
+R
+	
+R
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Not eligible
+	-	-	-	-
+
+Bautista, Anton
+IDNO GS-2026-HO-02
+Not Enrolled
+On Track
+	2026-2027	Year 1	
+	
+	
+	
+R
+	
+R
+	
+R
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Passed
+	-	-	-	-
+
+Castillo, Maureen
+IDNO GS-2026-LOA-01
+On Track
+	2026-2027	Year 1	
+C
+	
+C
+	
+C
+	
+R
+	
+R
+	
+R
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Cruz, Daniel
+IDNO 2560001
+Not Yet Assessed
+	25-26	2	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Dela Cruz, Clarissa
+IDNO GS-2026-ENR-01
+Not Enrolled
+On Track
+	2026-2027	Year 1	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Dela Cruz, Maria
+IDNO 2460009
+LOA
+On Track
+	24-25	3	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Domingo, Gabriel
+IDNO GS-2026-READ-02
+LOA
+On Track
+	2026-2027	Year 1	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Passed
+	-	-	-	-
+
+Fernandez, Daniel
+IDNO GS-2026-LOA-02
+On Track
+	2026-2027	Year 1	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Flores, Isabel
+IDNO 2260007
+Completed
+On Track
+	22-23	5	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Passed
+	
+	
+	
+	
+
+
+1
+Garcia, Paulo
+IDNO 2360010
+AWOL
+Delayed
+	23-24	4	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Gonzales, Martin
+IDNO GS-2026-ENR-02
+Not Enrolled
+On Track
+	2026-2027	Year 1	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Lacson, Therese
+IDNO GS-2026-READ-01
+LOA
+On Track
+	2026-2027	Year 1	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Passed
+	-	-	-	-
+
+Lim, Adrian
+IDNO 2360006
+On Track
+	23-24	4	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+R
+	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Lim, Joshua
+IDNO GS-2026-WD-02
+On Track
+	2026-2027	Year 1	
+	
+	
+	
+	
+D
+	
+	
+R
+	
+	
+	
+	
+R
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Mendoza, Carlo
+IDNO GS-2026-GRAD-02
+Completed
+On Track
+	2024-2025	Completed Coursework	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Passed
+	
+	
+	
+	
+
+
+Mendoza, Elena
+IDNO 2260011
+Residency
+On Track
+	22-23	5	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Passed
+	
+	-	-	-
+
+Mercado, Lianne
+IDNO GS-2026-CA-01
+Not Enrolled
+On Track
+	2026-2027	Year 1	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Navarro, Elena
+IDNO GS-2026-WD-01
+On Track
+	2026-2027	Year 1	
+	
+	
+	
+W
+	
+	
+R
+	
+	
+	
+R
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Ong, Hector
+IDNO 2360008
+On Track
+	23-24	4	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Passed
+	
+	
+	
+	
+
+
+Reyes, Grace
+IDNO 2560002
+On Track
+	25-26	2	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Reyes, Sofia
+IDNO GS-2026-HO-01
+Not Enrolled
+Not Yet Assessed
+	2026-2027	Year 1	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Passed
+	-	-	-	-
+
+Santos, Benjamin
+IDNO 2460003
+On Track
+	24-25	3	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Santos, Bianca
+IDNO GS-2026-GRAD-01
+Completed
+On Track
+	2024-2025	Completed Coursework	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Passed
+	
+	
+	
+	
+
+
+1
+Tan, Clarisse
+IDNO 2460005
+AWOL
+Delayed
+	24-25	3	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+1
+Torres, Maya
+IDNO GS-2026-AWOL-01
+AWOL
+Delayed
+	2026-2027	Year 1	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Passed
+	-	-	-	-
+
+Valdez, Nicolas
+IDNO GS-2026-RES-01
+Not Enrolled
+On Track
+	2026-2027	Year 1	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Passed
+	
+	
+	
+	-
+
+Yu, Miguel
+IDNO 2260004
+On Track
+	22-23	Completed Coursework	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Passed
+	
+	
+	
+	

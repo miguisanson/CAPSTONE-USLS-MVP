@@ -1,0 +1,867 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+
+RECORDS
+
+Monitoring Sheet
+
+LIFECYCLE WORKFLOWS
+
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+9 · Graduation Endorsement
+
+MONITORING & SUPPORT
+
+Work Queue
+Policy Assistant
+Business Rules
+
+Research Coordinator
+
+Figures are computed live from recorded transactions.
+
+Research Coordinator Portal
+Research Gate
+Dr. Sofia Mendoza · Research Coordinator
+DS
+Research Gate
+
+Check Form 1, Form 4, or completion evidence and set readiness or revision state. The Academic Coordinator endorses Form 1; the panel chair records each defense verdict.
+
+How this works
+View recent activity
+Rules applied on this screen
+8 rules from the Graduate School policies · 1 needs review
+Research Gate
+Adviser designation
+
+Form 3 → Academic Coordinator notes → Research Coordinator sends to the Dean → Dean, Associate Dean or Research Coordinator approves (Form 3.1) → adviser accepts → student sends Forms 3.2 and 3.3 within 5 days.
+
+Record an adviser appointed outside the portal
+For students imported from the monitoring sheet who already have an adviser.
+Needs my action
+In progress
+Accepted - contract
+All
+28 appointments, newest first.
+
+Nicolas Valdez
+
+GS-2026-RES-01 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Celeste Tan · Arts and Sciences
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Maya Torres
+
+GS-2026-AWOL-01 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Liwayway Bautista · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Gabriel Domingo
+
+GS-2026-READ-02 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Liwayway Bautista · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Therese Lacson
+
+GS-2026-READ-01 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Liwayway Bautista · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Daniel Fernandez
+
+GS-2026-LOA-02 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Teodoro Ramos · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Maureen Castillo
+
+GS-2026-LOA-01 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Teodoro Ramos · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Roberto Aquino
+
+GS-2026-CA-02 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Patricia Salvador · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Lianne Mercado
+
+GS-2026-CA-01 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Patricia Salvador · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Anton Bautista
+
+GS-2026-HO-02 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Patricia Salvador · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Sofia Reyes
+
+GS-2026-HO-01 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Patricia Salvador · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Martin Gonzales
+
+GS-2026-ENR-02 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Patricia Salvador · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Clarissa Dela Cruz
+
+GS-2026-ENR-01 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Marlon Geronimo · Education
+
+4 of 5 advisees
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Joshua Lim
+
+GS-2026-WD-02 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Marlon Geronimo · Education
+
+4 of 5 advisees
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Elena Navarro
+
+GS-2026-WD-01 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Marlon Geronimo · Education
+
+4 of 5 advisees
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Carlo Mendoza
+
+GS-2026-GRAD-02 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Teodoro Ramos · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Bianca Santos
+
+GS-2026-GRAD-01 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Teodoro Ramos · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Paolo Ramirez
+
+GS-2026-PRAC-02 · MSGC · Project Paper
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Celeste Tan · Arts and Sciences
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Andrea Villanueva
+
+GS-2026-PRAC-01 · MAPSY · Project Paper
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Celeste Tan · Arts and Sciences
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Nico Baltazar
+
+GS-2026-PM-07 · MBA · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Angela Cruz · Business
+
+2 of 5 advisees
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Liza Marquez
+
+GS-2026-PM-06 · DBA · Dissertation
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Benjamin Reyes · Business
+
+1 of 5 advisees
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Miko Almario
+
+GS-2026-PM-05 · MBA · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Paolo Navarro · Business
+
+1 of 5 advisees
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Bea Fontanilla
+
+GS-2026-PM-04 · MBA · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Angela Cruz · Business
+
+2 of 5 advisees
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Jasper Lorenzo
+
+GS-2026-PM-03 · MSCS · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Marlon Geronimo · Education
+
+4 of 5 advisees
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Rafael Ocampo
+
+GS-2026-PM-02 · MAPSY · Project Paper
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Liwayway Bautista · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Camille Dizon
+
+GS-2026-PM-01 · MSN · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Teodoro Ramos · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Hector Ong
+
+2360008 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Celeste Tan · Arts and Sciences
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Miguel Yu
+
+2260004 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Celeste Tan · Arts and Sciences
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1
+
+Isabel Flores
+
+2260007 · MAED · Thesis
+
+Recorded
+Accepted
+
+NOMINATED ADVISER
+
+Dr. Liwayway Bautista · Education
+
+5 of 5 advisees - at the limit
+
+PROGRESS
+
+Complete:
+Form 3 submitted
+2
+Current:
+Academic Coordinator notes the application
+3
+Upcoming:
+Research Coordinator sends it to the Dean
+4
+Upcoming:
+Dean, Associate Dean and Research Coordinator approve (Form 3.1 issued)
+Complete:
+Adviser accepts Form 3.1

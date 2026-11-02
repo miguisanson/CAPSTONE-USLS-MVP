@@ -1,0 +1,327 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Business Rules
+Grace Fernandez · Graduate School Staff
+1
+GF
+Business Rules
+
+The rules the workflows follow, each with the handbook or protocol page it comes from. The Graduate School Handbook 2022-2023 is in force; where the system and the handbook disagree, the handbook wins. Rules set by the Handbook or the Research Protocol are locked: they change only when the Graduate School issues a new policy (upload it under Policy Documents). Prototype rules awaiting Graduate School validation can be adjusted; every change is recorded with your reason.
+
+RULES IN THE REGISTER
+
+65
+
+ENFORCED BY THE SYSTEM
+
+47
+
+DOCUMENTED ONLY
+
+18
+
+NEED REVIEW
+
+12
+
+All rules
+Enforced by the system
+Documented only
+Needs review
+Official (locked)
+Pending validation
+Search rules
+Leave of absence
+
+Minimum semesters completed before a leave
+
+The student must have completed at least one semester before filing a leave.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+loa.min_completed_semesters
+
+1 semesters
+Confirm or adjust
+Change history
+0
+
+A leave is marked Return Due this many days before it ends
+
+Graduate School staff see the leave as Return Due, and the student is reminded to file a readmission request or ask for an extension, this many days before the leave ends.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+leave.return_due_days
+
+30 days
+Confirm or adjust
+Change history
+0
+
+Days after a leave ends before AWOL is proposed
+
+If a leave has ended and no readmission was filed after this many days, the system proposes AWOL. A Graduate School staff member confirms it; nothing changes automatically.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+leave.return_grace_days
+
+14 days
+Confirm or adjust
+Change history
+0
+Research requirements
+
+Adviser signature waiting: remind after 3 days
+
+An adviser is reminded when an advisee's manuscript or endorsement has waited for their signature this many days.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+research.signature_reminder_days
+
+3 days
+Confirm or adjust
+Change history
+0
+Defense scheduling and panels
+
+Defense reminders: 14, 7, 2 and 1 day before
+
+The student, the adviser and the panel get an in-app reminder this many days before a confirmed defense (the first is also the 14-Day Rule check that the panel has the manuscript).
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+defense.reminder_days
+
+14,7,2,1
+Confirm or adjust
+Change history
+0
+
+Panelist with no availability: remind within 3 days of the request
+
+A panelist whose availability is still not entered this many days after staff asked for it is reminded again.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+defense.availability_reminder_days
+
+3 days
+Confirm or adjust
+Change history
+0
+Practicum
+
+Practicum hours required
+
+The number of practicum hours a student must complete before the practicum is marked complete.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+practicum.required_hours
+
+200 hours
+Confirm or adjust
+Change history
+0
+
+Practicum eligibility: Basic units
+
+Basic-course units a student must have completed before starting the practicum.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+practicum.required_units_basic
+
+6 units
+Confirm or adjust
+Change history
+0
+
+Practicum eligibility: Major units
+
+Major-course units a student must have completed before starting the practicum.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+practicum.required_units_major
+
+9 units
+Confirm or adjust
+Change history
+0
+
+Practicum eligibility: Cognate units
+
+Cognate-course units a student must have completed before starting the practicum.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+practicum.required_units_cognate
+
+6 units
+Confirm or adjust
+Change history
+0
+
+Practicum eligibility: total units
+
+Total course units a student must have completed before starting the practicum.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+practicum.required_units_total
+
+21 units
+Confirm or adjust
+Change history
+0
+Faculty
+
+Faculty teaching load limit
+
+The most teaching units a faculty member can be assigned in one semester when course offerings are matched to faculty.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+faculty.teaching_load_limit_units
+
+24 units
+Confirm or adjust
+Change history
+0

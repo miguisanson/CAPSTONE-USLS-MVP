@@ -1,10 +1,10 @@
-"""Case 10 - Leave of Absence (Daniel Fernandez) on the staged board with real drag and drop."""
+"""Case 10 - Leave of Absence (Daniel Fernandez) on the shared staged board (drag and drop works in the real UI)."""
 from __future__ import annotations
 
 import re
 
 from .common import main_text
-from .helpers_a3 import dean_board_decision, center_text, column_holds, drag_card, frame_board, open_link
+from .helpers_a3 import column_holds, drag_card, open_link
 
 KEY = "leave-of-absence-daniel"
 EMAIL = "loa.daniel@usls.edu.ph"
@@ -16,9 +16,35 @@ STAFF_NOTE = "Two semesters is within the handbook limit and no earlier leave is
 DEAN_COMMENT = "Approved for two semesters. The student is to file a readmission request before the leave ends."
 
 
-def _scroll_to_text(page, pattern: str) -> None:
-    page.get_by_text(re.compile(pattern, re.I)).first.scroll_into_view_if_needed()
-    page.wait_for_timeout(400)
+def search(page, rt, text: str) -> None:
+    page.locator("input[type=search]").first.fill(text)
+    rt.settle(page, 800)
+
+
+def frame(page, first_column: str | None = None, up: int = 110) -> None:
+    """Scroll so the search row and the board columns show together, first_column left-most."""
+    page.evaluate(
+        """([first, up]) => {
+            const region = document.querySelector('[role=region][aria-label*="board" i]');
+            if (!region) return;
+            const box = document.querySelector('input[type=search]');
+            (box || region).scrollIntoView({block: 'start'});
+            window.scrollBy(0, -up); // the page itself scrolls (no inner scroller)
+            if (first) {
+                const sec = [...region.querySelectorAll('section[aria-label]')].find(x => x.getAttribute('aria-label') === first);
+                if (sec) region.scrollLeft += sec.getBoundingClientRect().left - region.getBoundingClientRect().left - 8;
+            }
+        }""",
+        [first_column, up],
+    )
+    page.wait_for_timeout(600)
+
+
+def close_details(page) -> None:
+    btn = page.get_by_role("button", name="Close details")
+    if btn.count():
+        btn.first.click()
+        page.wait_for_timeout(500)
 
 
 def run(rt):
@@ -57,11 +83,15 @@ def run(rt):
 
     def student_submit():
         student.get_by_role("button", name=re.compile("Submit leave request")).click()
-        rt.settle(student, 2000)
+        student.wait_for_timeout(800)
+        rt.shot(student, f"{S}-04")  # the "Send this request?" box
+        dlg = student.locator("[role=dialog]").last
+        dlg.get_by_role("button", name="Send request").click()
+        rt.settle(student, 2200)
         student.evaluate("window.scrollTo(0,0)")
-        rt.shot(student, f"{S}-04")
+        rt.shot(student, f"{S}-05", full=True)
 
-    rt.step("student submits", student_submit)
+    rt.step("student sends the request", student_submit)
     print(main_text(student, 900).replace("\n", " | "))
 
     # ---- Part B: staff on the Leave of Absence board ---------------------------------
@@ -69,118 +99,134 @@ def run(rt):
 
     def staff_open():
         open_link(rt, staff, "Leave of Absence", f"/workflow/{SLUG}")
-        rt.shot(staff, f"{S}-05")
+        search(staff, rt, WHO)
+        frame(staff, "Submitted")
+        rt.shot(staff, f"{S}-06")
 
-    rt.step("staff opens the Leave of Absence board", staff_open)
-
-    def staff_rules():
-        staff.get_by_text("Rules applied on this screen").first.click()
-        staff.wait_for_timeout(600)
-        rt.shot(staff, f"{S}-06", full=True)
-        staff.get_by_text("Rules applied on this screen").first.click()
-        staff.wait_for_timeout(400)
-
-    rt.step("staff reads the rules panel", staff_rules)
-
-    def staff_search():
-        staff.get_by_placeholder("Search name").fill(WHO)
-        rt.settle(staff, 800)
-        frame_board(staff, "Submitted")
-        rt.shot(staff, f"{S}-07")
-
-    rt.step("staff finds Daniel in Submitted", staff_search)
+    rt.step("staff opens the Leave of Absence board and finds Daniel", staff_open)
 
     def staff_drag():
         drag_card(rt, staff, WHO, "In staff review")
         assert column_holds(staff, "In staff review", WHO), "card did not land in In staff review"
-        frame_board(staff, "Submitted")
-        rt.shot(staff, f"{S}-08")
+        frame(staff, "Submitted")
+        rt.shot(staff, f"{S}-07")
 
     rt.step("staff drags the card to In staff review", staff_drag)
 
+    def staff_table():
+        staff.get_by_role("button", name="Table").click()
+        rt.settle(staff, 800)
+        staff.get_by_role("table").first.evaluate("el => el.scrollIntoView({block: 'center'})")
+        staff.wait_for_timeout(400)
+        rt.shot(staff, f"{S}-08")
+        staff.get_by_role("button", name="Board").click()
+        rt.settle(staff, 600)
+
+    rt.step("staff switches to Table and back to Board", staff_table)
+
     def staff_details():
-        staff.get_by_role("button", name="View details").first.click()
-        rt.settle(staff, 1200)
+        frame(staff, "Submitted")
+        staff.get_by_role("button", name=re.compile("View details for Daniel")).first.click()
+        rt.settle(staff, 1500)
         rt.shot(staff, f"{S}-09")
-        _scroll_to_text(staff, r"^Policy check$|Advice for staff")
+        staff.get_by_text("Policy check", exact=True).first.evaluate("el => el.scrollIntoView({block: 'start'})")
+        staff.wait_for_timeout(500)
         rt.shot(staff, f"{S}-10")
 
     rt.step("staff opens the request and reads the policy check", staff_details)
 
     def staff_forward():
-        staff.get_by_role("button", name="Forward to Dean").last.click()
-        staff.wait_for_timeout(800)
+        staff.locator("[role=dialog]").last.get_by_role("button", name="Forward to Dean").click()
+        staff.wait_for_timeout(1200)
         dlg = staff.locator("[role=dialog]").last
         dlg.locator("textarea").first.fill(STAFF_NOTE)
+        rt.note("forward dialog: " + " | ".join(dlg.inner_text().split("\n"))[:700])
         rt.shot(staff, f"{S}-11")
-        dlg.get_by_role("button", name="Forward to Dean").click()
-        rt.settle(staff, 1500)
-
-    rt.step("staff forwards to the Dean", staff_forward)
-
-    def staff_after_forward():
-        # the request window may still be open: close it and show the board
-        for name in ("Close details",):
-            btn = staff.get_by_role("button", name=name)
-            if btn.count():
-                btn.first.click()
-                staff.wait_for_timeout(500)
-        frame_board(staff, "Returned to student")
+        dlg.get_by_role("button", name="Forward to Dean", exact=True).click()
+        rt.settle(staff, 1800)
+        close_details(staff)
+        frame(staff, "Submitted")
         rt.shot(staff, f"{S}-12")
 
-    rt.step("board shows With the Dean", staff_after_forward)
+    rt.step("staff forwards to the Dean", staff_forward)
 
     # ---- Part C: Dean decides ---------------------------------------------------------
     dean = rt.new_page("dean@usls.edu.ph")
 
     def dean_decide():
-        dean_board_decision(rt, dean, r"^Leave of Absence", WHO, "Leave scheduled", DEAN_COMMENT,
-                            (f"{S}-13", f"{S}-14", f"{S}-15"))
+        dean.get_by_role("link", name=re.compile(r"^Leave of Absence")).first.click()
+        rt.settle(dean, 2500)
+        search(dean, rt, WHO)
+        frame(dean, "With the Dean")
+        rt.shot(dean, f"{S}-13")
+        drag_card(rt, dean, WHO, "Leave scheduled")
+        dean.wait_for_timeout(800)
+        dlg = dean.locator("[role=dialog]").last
+        dlg.locator("textarea").first.fill(DEAN_COMMENT)
+        rt.note("dean dialog: " + " | ".join(dlg.inner_text().split("\n"))[:600])
+        rt.shot(dean, f"{S}-14")
+        dlg.get_by_role("button", name="Approve", exact=True).click()
+        rt.settle(dean, 2200)
+        frame(dean, "With the Dean")
+        rt.shot(dean, f"{S}-15")
 
-    rt.step("Dean drags the card to Leave scheduled and confirms", dean_decide)
+    rt.step("Dean drags the card to Leave scheduled and approves", dean_decide)
 
     # ---- staff starts the leave, Registrar list ---------------------------------------
     def staff_board_again():
         rt.go(staff, f"/workflow/{SLUG}")
-        staff.get_by_placeholder("Search name").fill(WHO)
-        rt.settle(staff, 800)
-        frame_board(staff, "With the Dean")
-        rt.shot(staff, f"{S}-17")
+        search(staff, rt, WHO)
+        frame(staff, "With the Dean")
+        rt.shot(staff, f"{S}-16")
 
     rt.step("staff sees the approved request in Leave scheduled", staff_board_again)
 
     def staff_start():
-        staff.get_by_role("button", name="View details").first.click()
-        rt.settle(staff, 1200)
-        staff.get_by_role("button", name=re.compile("Start the leave now")).last.click()
+        drag_card(rt, staff, WHO, "On leave")
         staff.wait_for_timeout(800)
-        rt.shot(staff, f"{S}-18")
         dlg = staff.locator("[role=dialog]").last
-        dlg.get_by_role("button", name=re.compile("Start the leave now")).click()
+        rt.note("start dialog: " + " | ".join(dlg.inner_text().split("\n"))[:500])
+        rt.shot(staff, f"{S}-17")
+        dlg.get_by_role("button", name="Start the leave now", exact=True).click()
         rt.settle(staff, 1800)
+        frame(staff, "With the Dean")
+        rt.shot(staff, f"{S}-18")
 
-    rt.step("staff starts the leave now", staff_start)
+    rt.step("staff drags the card to On leave and starts the leave", staff_start)
 
     def staff_registrar():
-        btn = staff.get_by_role("button", name="Close details")
-        if btn.count():
-            btn.first.click()
-            staff.wait_for_timeout(500)
-        frame_board(staff, "Leave scheduled")
+        staff.get_by_role("heading", name="Registrar list").first.evaluate("el => el.scrollIntoView({block: 'start'})")
+        staff.wait_for_timeout(600)
         rt.shot(staff, f"{S}-19")
-        staff.locator("tr").filter(has_text="Daniel").first.evaluate("el => el.scrollIntoView({block: 'center'})")
-        staff.wait_for_timeout(500)
-        rt.shot(staff, f"{S}-20")
 
-    rt.step("staff sees On leave and the Registrar list", staff_registrar)
+    rt.step("staff sees the Registrar list", staff_registrar)
 
     def staff_download():
         with staff.expect_download(timeout=20000) as info:
             staff.get_by_role("button", name=re.compile(r"Download list \(CSV\)")).click()
-        name = info.value.suggested_filename
-        rt.note(f"downloaded {name}")
-        staff.wait_for_timeout(1200)
-        staff.locator("tr").filter(has_text="Daniel").first.evaluate("el => el.scrollIntoView({block: 'center'})")
-        rt.shot(staff, f"{S}-21")
+        rt.note(f"downloaded {info.value.suggested_filename}")
+        staff.wait_for_timeout(1500)
+        rt.shot(staff, f"{S}-20")
+        rt.note("export dialog: " + " | ".join(staff.locator("[role=dialog]").last.inner_text().split("\n"))[:600])
 
     rt.step("staff downloads the Registrar list (CSV)", staff_download)
+
+    def staff_mark():
+        dlg = staff.locator("[role=dialog]")
+        if dlg.count():
+            dlg.last.get_by_role("button", name=re.compile("Close|Done|OK", re.I)).first.click()
+            staff.wait_for_timeout(600)
+        staff.get_by_role("checkbox", name=re.compile("Tick Daniel")).check()
+        staff.get_by_role("button", name="Mark as sent").click()
+        rt.settle(staff, 1500)
+        staff.get_by_role("heading", name="Registrar list").first.evaluate("el => el.scrollIntoView({block: 'start'})")
+        staff.wait_for_timeout(500)
+        rt.shot(staff, f"{S}-21")
+
+    rt.step("staff marks the list as sent", staff_mark)
+
+    def student_result():
+        rt.go(student, f"/student/requests/{SLUG}")
+        rt.shot(student, f"{S}-22")
+
+    rt.step("student sees the leave", student_result)

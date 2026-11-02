@@ -1,0 +1,143 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Reports & Analytics
+Grace Fernandez · Graduate School Staff
+1
+GF
+Reports & Analytics
+
+Who is late, where each cohort stands, what is waiting, defenses and graduation. Filter, sort, and download Excel or PDF.
+
+Back to dashboard
+Students at risk
+Cohorts by stage
+Overdue and pending
+Defenses
+Graduation candidates
+Registrar changes
+Analytics
+Program
+Any program
+DBA
+DPSY
+EDD
+MAED
+MAN
+MAPSY
+MASS
+MBA
+MIT
+MSCS
+MSGC
+MSN
+Stage
+Any stage
+Admission
+Coursework
+Comprehensive Exam
+Proposal Development
+Proposal Defense
+Data Collection
+Writing
+Final Defense
+LOA
+AWOL
+Withdrawal In Progress
+Withdrawn
+Completed
+AY entry
+Any entry year
+22-23
+23-24
+24-25
+25-26
+26-27
+Cohorts by lifecycle stage
+
+How many students of each program and entry year are at each lifecycle stage.
+
+Download Excel
+Download PDF
+
+44 rows
+
+Cohorts by lifecycle stage
+PROGRAM
+	AY ENTRY
+	STUDENTS
+	ADMISSION
+	COURSEWORK
+	PROPOSAL DEVELOPMENT
+	PROPOSAL DEFENSE
+	DATA COLLECTION
+	WRITING
+	FINAL DEFENSE
+	LOA
+	AWOL
+	COMPLETED
+
+DBA	23-24	3	0	2	0	0	1	0	0	0	0	0
+DBA	24-25	5	0	2	0	3	0	0	0	0	0	0
+DBA	25-26	2	1	1	0	0	0	0	0	0	0	0
+EDD	22-23	3	0	2	0	1	0	0	0	0	0	0
+EDD	23-24	4	0	3	0	0	1	0	0	0	0	0
+EDD	24-25	1	0	0	1	0	0	0	0	0	0	0
+EDD	25-26	1	0	1	0	0	0	0	0	0	0	0
+MAED	22-23	3	0	0	1	0	0	0	1	0	0	1
+MAED	23-24	3	0	1	0	0	0	0	0	0	1	1
+MAED	24-25	5	0	1	0	0	0	0	0	1	1	2
+
+Showing 1–10 of 44
+
+Previous
+Page 1 of 5
+Next

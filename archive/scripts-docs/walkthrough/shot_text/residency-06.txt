@@ -1,0 +1,273 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+AWOL & Residency
+Grace Fernandez · Graduate School Staff
+1
+GF
+AWOL & Residency
+
+Automatically flag policy-backed AWOL cases, review structured return declarations, and record valid residency enrollment without subjects.
+
+How this works
+View recent activity
+Rules applied on this screen
+9 rules from the Graduate School policies
+
+2 AWOL, 1 Return review, 1 With the Dean, 2 Residency
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Record residency
+Search requests by name, student number or program
+All programs
+MAED
+MAN
+All statuses
+Return filed
+With the Dean
+AWOL (flagged by the system)
+Residency active
+All types
+Return from AWOL
+Residency
+Showing 1 of 6 cases
+Clear 1 filter
+Board
+Table
+
+← 4 stages to the left
+
+AWOL
+0 of 2
+
+Flagged from source records. Waiting for the student's written return.
+
+No cases here
+
+Return review
+0 of 1
+
+Staff check the written return against the residence limits, then forward it.
+
+No cases here
+
+With the Dean
+0 of 1
+
+Waiting for the Dean's decision.
+
+No cases here
+
+Re-enrollment
+0
+
+The Dean endorsed a full re-enrollment. Mark it complete when the courses are re-enrolled.
+
+No cases here
+
+Back in the program
+0
+
+The return was approved or the re-enrollment is done. The student is active again.
+
+No cases here
+
+Not approved
+0
+
+The Dean denied the return. The student stays AWOL.
+
+No cases here
+
+Residency
+1 of 2
+
+Active no-subject residency semesters.
+
+Nicolas Valdez
+
+GS-2026-RES-01 · MAED
+
+Thesis / dissertation work
+
+AY 2026-2027 1st Semester
+
+Next: Graduate School Staff
+
+Eligible for Residency
+View details
+Move to…
+Residency closed
+0
+
+Residency semesters that were closed.
+
+No cases here
+
+Registrar list
+
+Approved returns and residency semesters go to the Registrar. The portal does not send any email: download the report and email it through the official channel. Enrollment itself stays a separate Academic Coordinator step.
+
+2 reports available.
+
+Reports for the Registrar
+STUDENT	TYPE
+	STATUS
+	
+REPORT
+
+
+
+Nicolas Valdez
+
+GS-2026-RES-01 · MAED
+
+	Residency	Residency active	
+Download report
+
+
+Elena Mendoza
+
+2260011 · MAED
+
+	Residency	Residency active	
+Download report
+Nicolas Valdez
+Residency active
+
+Residency · GS-2026-RES-01 · MAED
+
+WHERE THIS REQUEST IS
+
+1
+Current:
+Residency recorded
+2
+Upcoming:
+Residency closed
+THE REQUEST
+STUDENT
+Nicolas Valdez
+GS-2026-RES-01 · Master of Arts in Education
+TYPE
+Residency
+SEMESTER
+AY 2026-2027 1st Semester
+PURPOSE
+Thesis / dissertation work
+POLICY RESULT WHEN RECORDED
+Eligible for Residency
+RECORDED
+Nov 2, 2026
+CLOSED
+—
+STAFF NOTES
+Thesis writing continues without subject enrollment; adviser confirmed progress this semester.
+POLICY CHECK
+
+Advice for staff - the Dean decides.
+
+Eligible for Residency
+Suggested for the Dean: Record Residency
+
+The student matches the handbook conditions for residency without subjects.
+
+No subject enrollment
+
+No current/enrolled subjects are recorded.
+
+Pass
+
+Permitted residency purpose
+
+Course audit has 0 missing/incomplete subject(s).
+
+Pass
+
+Not an LOA substitute
+
+The recorded work supports residency.
+
+Pass
+EARLIER REQUESTS BY THIS STUDENT
+
+No earlier requests in this process.
+
+MESSAGES
+
+Notes and returns about this request, newest at the bottom.
+
+No messages yet.
+
+Write a note
+Who is it for?
+The student (they can read it)
+The Dean (staff only)
+Graduate School staff (internal note)
+Note
+Save note
+FILES
+
+No files were uploaded for this request.
+
+REGISTRAR FOLLOW-UP
+
+The term enrollment and monitoring records were updated when staff recorded this residency.
+
+Residency report for the Registrar (CSV)
+HISTORY
+Who did what
+1
+Activity log
+1
+Close details
+Close the residency

@@ -1,0 +1,594 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Faculty
+Grace Fernandez · Graduate School Staff
+2
+GF
+Faculty
+
+Search the faculty directory, then open a profile to review expertise, login email, panel load, and the availability the faculty member has entered.
+
+Add faculty
+Search faculty
+All departments
+Arts and Sciences
+Business
+Education
+Engineering and Technology
+Nursing
+All availability
+Available
+Unavailable
+Not entered
+Google Calendar connected
+
+Showing 12 of 12 faculty
+
+Select a faculty member to open their profile
+
+Faculty directory
+FACULTY
+	DEPARTMENT / SPECIALIZATION
+	STATUS	AVAILABILITY
+	PANEL LOAD
+	ACTIONS
+
+DA
+Dr. Adriana Santos
+
+Adviser / Panel · adriana.santos@usls.edu.ph
+
+	
+
+Nursing
+
+Health informatics, public health, and medical systems
+
+	
+Active
+Active login
+	
+Available
+	0	
+Edit
+
+DA
+Dr. Angela Cruz
+
+Adviser / Panel · angela.cruz@usls.edu.ph
+
+	
+
+Business
+
+Strategic management, entrepreneurship, organizational innovation, and family business
+
+	
+Active
+Active login
+	
+Available
+	8	
+Edit
+
+DB
+Dr. Benjamin Reyes
+
+Adviser / Panel · benjamin.reyes@usls.edu.ph
+
+	
+
+Business
+
+Finance, business analytics, accounting, and financial technology
+
+	
+Active
+Active login
+	
+Available
+	5	
+Edit
+
+DC
+Dr. Celeste Tan
+
+Adviser / Panel · celeste.tan@usls.edu.ph
+
+	
+
+Arts and Sciences
+
+Psychology, student well-being, and behavioral research
+
+	
+Active
+Active login
+	
+Available
+updated Nov 2, 2026
+	3	
+Edit
+
+DD
+Dr. Daniel Uy
+
+Adviser / Panel · daniel.uy@usls.edu.ph
+
+	
+
+Engineering and Technology
+
+Engineering systems, automation, data modeling, and predictive analytics
+
+	
+Active
+Active login
+	
+Available
+	0	
+Edit
+
+DL
+Dr. Liwayway Bautista
+
+Adviser / Panel · liwayway.bautista@usls.edu.ph
+
+	
+
+Education
+
+Learning analytics, online learning, and student engagement in graduate education
+
+	
+Active
+Active login
+	
+Available
+updated Nov 2, 2026
+	4	
+Edit
+
+DM
+Dr. Marco Villanueva
+
+Adviser / Panel · marco.villanueva@usls.edu.ph
+
+	
+
+Business
+
+Operations management, supply chain analytics, quality systems, and process improvement
+
+	
+Active
+Active login
+	
+Available
+	8	
+Edit
+
+DM
+Dr. Marlon Geronimo
+
+Adviser / Panel · marlon.geronimo@usls.edu.ph
+
+	
+
+Education
+
+Machine learning, educational data analytics, and predicting student performance
+
+	
+Active
+Active login
+	
+Available
+updated Nov 2, 2026
+	6	
+Edit
+
+DP
+Dr. Paolo Navarro
+
+Adviser / Panel · paolo.navarro@usls.edu.ph
+
+	
+
+Business
+
+Human resource management, organizational behavior, leadership, and workplace research
+
+	
+Active
+Active login
+	
+Available
+updated Nov 2, 2026
+	3	
+Edit
+
+DP
+Dr. Patricia Salvador
+
+Adviser / Panel · patricia.salvador@usls.edu.ph
+
+	
+
+Education
+
+Online learning, learning management systems, education technology, and curriculum development
+
+	
+Active
+Active login
+	
+Available
+updated Nov 2, 2026
+	7	
+Edit
+
+DT
+Dr. Teodoro Ramos
+
+Adviser / Panel · teodoro.ramos@usls.edu.ph
+
+	
+
+Education
+
+Learning analytics, online learning assessment, and educational data science
+
+	
+Active
+Active login
+	
+Available
+updated Nov 2, 2026
+	15	
+Edit
+
+DT
+Dr. Teresa Lim
+
+Adviser / Panel · teresa.lim@usls.edu.ph
+
+	
+
+Business
+
+Marketing strategy, consumer behavior, digital commerce, and brand analytics
+
+	
+Active
+Active login
+	
+Available
+	3	
+Edit
+DT
+Dr. Teresa Lim
+Available
+3 panel assignments
+
+Adviser / Panel
+Business
+
+Specialization
+
+Marketing strategy, consumer behavior, digital commerce, and brand analytics
+
+brand
+marketing
+online
+strategy
+consumer
+behavior
+digital
+commerce
+
+Panel Matching compares the student's paper with this text and with the expertise records below.
+
+Open CV reference assistant
+Preferred teaching subjects
+
+These choices are ranked first when course assignments are generated. Availability and the 24-unit ceiling are still enforced.
+
+DBA-COG1
+Entrepreneurship · 3 units
+DBA-COG10
+Management Decision Models · 3 units
+DBA-COG2
+Business Ethics and Governance · 3 units
+DBA-COG3
+Human Resource Management · 3 units
+DBA-COG4
+Corporate Finance · 3 units
+DBA-COG5
+Supply Chain Management · 3 units
+DBA-COG6
+Consumer Behavior · 3 units
+DBA-COG7
+Leadership Theory and Practice · 3 units
+DBA-COG8
+Managerial Economics · 3 units
+DBA-COG9
+International Business · 3 units
+DBA-FED
+Foundations of Management · 3 units
+DBA-MAJ1
+Strategic Management · 3 units
+DBA-MAJ2
+Organizational Behavior · 3 units
+DBA-MAJ3
+Financial Management · 3 units
+DBA-MAJ4
+Marketing Management · 3 units
+DBA-MAJ5
+Operations Management · 3 units
+DBA-MOR
+Business Research Methods · 3 units
+DBA-STAT
+Business Statistics · 3 units
+MBA201
+Statistical Methods · 3 units
+MBA202
+Methods of Research · 3 units
+MBA203
+Organizational Development · 3 units
+MBA204
+Compensation Management · 3 units
+MBA205
+Economics for Decision-Making · 3 units
+MBA206
+Managing and Developing Human Resources · 3 units
+MBA207
+Labor Relations and Conflict Resolution · 3 units
+MBA208
+Group Process/Human Dynamics · 3 units
+MBA209
+Advanced Operations Management · 3 units
+MBA210
+Management of Human Behavior in Organization · 3 units
+MBA211
+Entrepreneurship · 3 units
+MBA212
+Philippine Business Environment · 3 units
+MBA213
+Management Decision Models · 3 units
+MBA214
+Business Ethics and Corporate Social Responsibility · 3 units
+MBA215
+E-Commerce and Internet Marketing · 3 units
+MBA216
+Consumer Behavior and Marketing Research · 3 units
+MBA217
+Seminar in Project/Event Management · 3 units
+MBA218
+Strategic Management (Required) · 3 units
+MBA219
+Managerial Psychology · 3 units
+MBA220
+Project Paper · 3 units
+Save preferences
+Contact
+teresa.lim@usls.edu.ph
+
+FACULTY LOGIN
+
+teresa.lim@usls.edu.ph
+
+Current assignments
+Teaching load
+0/24 units
+
+Bea Salonga
+
+Content Specialist 2
+
+Governance and Continuity Planning in Second-Generation Family Enterprises
+
+Bea Salonga
+
+Content Specialist 2
+
+Governance and Continuity Planning in Second-Generation Family Enterprises
+
+Liza Marquez
+
+Content Specialist 2
+
+Succession Planning and Firm Continuity in Philippine Family Enterprises
+
+Calendar connection
+
+Google Calendar
+
+Entered working hours and availability exceptions are used until a calendar is connected.
+
+Not connected
+
+This faculty member must connect Google Calendar from their own Faculty Portal. Until then, only the hours they enter in their own portal are used.
+
+View availability feed
+Expertise records
+8
+
+Research interests, publications, past advisee and panel titles, and degrees. Panel Matching reads all of them, so the more accurate they are the better the panel recommendations. Records marked Demo data are sample entries; editing one turns it into a manual entry.
+
+Research interest
+Demo data
+
+Digital marketing, social media engagement, and brand positioning
+
+Research interest
+Demo data
+
+Consumer behavior, electronic commerce, and online purchase intention
+
+Publication
+2023
+Demo data
+
+Influencer credibility and purchase intention on short-video platforms
+
+Publication
+2021
+Demo data
+
+Brand equity and customer loyalty in online retail
+
+Past advisee title
+2022
+Demo data
+
+Social Media Advertising Effectiveness for Local Coffee Shops
+
+Past advisee title
+2021
+Demo data
+
+Branding Strategy of Family-Owned Retail Businesses
+
+Past panel title
+2024
+Demo data
+
+Customer Experience Journey in Online Grocery Shopping
+
+Degree
+Demo data
+
+DBA in Marketing
+
+Research interest
+Publication
+Past advisee title
+Past panel title
+Degree
+Add record
+Weekly availability & schedule
+
+Weekly hours the faculty member entered. Nothing is assumed.
+
+Today
+
+Nov 2 – Nov 8, 2026
+
+Weekly hours entered
+Blocked / busy
+
+MON
+
+Nov 2
+
+TUE
+
+Nov 3
+
+WED
+
+Nov 4
+
+THU
+
+Nov 5
+
+FRI
+
+Nov 6
+
+SAT
+
+Nov 7
+
+SUN
+
+Nov 8
+
+8 AM
+9 AM
+10 AM
+11 AM
+12 PM
+1 PM
+2 PM
+3 PM
+4 PM
+5 PM
+6 PM
+
+Weekly hours
+
+08:00–17:00
+
+Weekly hours
+
+08:00–17:00
+
+Weekly hours
+
+08:00–17:00
+
+Weekly hours
+
+08:00–17:00
+
+Weekly hours
+
+08:00–17:00
+
+No hours
+
+No hours
+
+Times are Philippine time.

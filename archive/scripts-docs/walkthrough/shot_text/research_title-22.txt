@@ -1,0 +1,622 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Faculty
+Grace Fernandez · Graduate School Staff
+1
+GF
+Faculty
+
+Search the faculty directory, then open a profile to review expertise, login email, panel load, and the availability the faculty member has entered.
+
+Add faculty
+Search faculty
+All departments
+Arts and Sciences
+Business
+Education
+Engineering and Technology
+Nursing
+All availability
+Available
+Unavailable
+Not entered
+Google Calendar connected
+
+Showing 12 of 12 faculty
+
+Select a faculty member to open their profile
+
+Faculty directory
+FACULTY
+	DEPARTMENT / SPECIALIZATION
+	STATUS	AVAILABILITY
+	PANEL LOAD
+	ACTIONS
+
+DA
+Dr. Adriana Santos
+
+Adviser / Panel · adriana.santos@usls.edu.ph
+
+	
+
+Nursing
+
+Health informatics, public health, and medical systems
+
+	
+Active
+Active login
+	
+Available
+	0	
+Edit
+
+DA
+Dr. Angela Cruz
+
+Adviser / Panel · angela.cruz@usls.edu.ph
+
+	
+
+Business
+
+Strategic management, entrepreneurship, organizational innovation, and family business
+
+	
+Active
+Active login
+	
+Available
+	8	
+Edit
+
+DB
+Dr. Benjamin Reyes
+
+Adviser / Panel · benjamin.reyes@usls.edu.ph
+
+	
+
+Business
+
+Finance, business analytics, accounting, and financial technology
+
+	
+Active
+Active login
+	
+Available
+	5	
+Edit
+
+DC
+Dr. Celeste Tan
+
+Adviser / Panel · celeste.tan@usls.edu.ph
+
+	
+
+Arts and Sciences
+
+Psychology, student well-being, and behavioral research
+
+	
+Active
+Active login
+	
+Available
+	3	
+Edit
+
+DD
+Dr. Daniel Uy
+
+Adviser / Panel · daniel.uy@usls.edu.ph
+
+	
+
+Engineering and Technology
+
+Engineering systems, automation, data modeling, and predictive analytics
+
+	
+Active
+Active login
+	
+Available
+	0	
+Edit
+
+DL
+Dr. Liwayway Bautista
+
+Adviser / Panel · liwayway.bautista@usls.edu.ph
+
+	
+
+Education
+
+Learning analytics, online learning, and student engagement in graduate education
+
+	
+Active
+Active login
+	
+Available
+	3	
+Edit
+
+DM
+Dr. Marco Villanueva
+
+Adviser / Panel · marco.villanueva@usls.edu.ph
+
+	
+
+Business
+
+Operations management, supply chain analytics, quality systems, and process improvement
+
+	
+Active
+Active login
+	
+Available
+	8	
+Edit
+
+DM
+Dr. Marlon Geronimo
+
+Adviser / Panel · marlon.geronimo@usls.edu.ph
+
+	
+
+Education
+
+Machine learning, educational data analytics, and predicting student performance
+
+	
+Active
+Active login
+	
+Available
+	6	
+Edit
+
+DP
+Dr. Paolo Navarro
+
+Adviser / Panel · paolo.navarro@usls.edu.ph
+
+	
+
+Business
+
+Human resource management, organizational behavior, leadership, and workplace research
+
+	
+Active
+Active login
+	
+Available
+	3	
+Edit
+
+DP
+Dr. Patricia Salvador
+
+Adviser / Panel · patricia.salvador@usls.edu.ph
+
+	
+
+Education
+
+Online learning, learning management systems, education technology, and curriculum development
+
+	
+Active
+Active login
+	
+Available
+	6	
+Edit
+
+DT
+Dr. Teodoro Ramos
+
+Adviser / Panel · teodoro.ramos@usls.edu.ph
+
+	
+
+Education
+
+Learning analytics, online learning assessment, and educational data science
+
+	
+Active
+Active login
+	
+Available
+	14	
+Edit
+
+DT
+Dr. Teresa Lim
+
+Adviser / Panel · teresa.lim@usls.edu.ph
+
+	
+
+Business
+
+Marketing strategy, consumer behavior, digital commerce, and brand analytics
+
+	
+Active
+Active login
+	
+Available
+	3	
+Edit
+DL
+Dr. Liwayway Bautista
+Available
+3 panel assignments
+
+Adviser / Panel
+Education
+
+Specialization
+
+Learning analytics, online learning, and student engagement in graduate education
+
+online
+engagement
+analytics
+dashboards
+feedback
+participation
+courses
+blended
+
+Panel Matching compares the student's paper with this text and with the expertise records below.
+
+Open CV reference assistant
+Preferred teaching subjects
+
+These choices are ranked first when course assignments are generated. Availability and the 24-unit ceiling are still enforced.
+
+EDD-COG1
+Teaching Strategies in Higher Education · 3 units
+EDD-COG10
+Seminar on Contemporary Issues in Education · 3 units
+EDD-COG2
+Learning Analytics · 3 units
+EDD-COG3
+Inclusive Education · 3 units
+EDD-COG4
+Action Research in the Classroom · 3 units
+EDD-COG5
+School Administration and Supervision · 3 units
+EDD-COG6
+Educational Policy and Planning · 3 units
+EDD-COG7
+Guidance and Student Development · 3 units
+EDD-COG8
+Instructional Design · 3 units
+EDD-COG9
+Language and Literacy Education · 3 units
+EDD-FED
+Foundations of Education · 3 units
+EDD-MAJ1
+Curriculum Development and Evaluation · 3 units
+EDD-MAJ2
+Educational Leadership and Management · 3 units
+EDD-MAJ3
+Assessment of Learning · 3 units
+EDD-MAJ4
+Educational Technology and Instruction · 3 units
+EDD-MAJ5
+Philosophy of Education · 3 units
+EDD-MOR
+Methods of Educational Research · 3 units
+EDD-STAT
+Statistics in Education · 3 units
+MAED-COG1
+Teaching Strategies in Higher Education · 3 units
+MAED-COG10
+Seminar on Contemporary Issues in Education · 3 units
+MAED-COG2
+Learning Analytics · 3 units
+MAED-COG3
+Inclusive Education · 3 units
+MAED-COG4
+Action Research in the Classroom · 3 units
+MAED-COG5
+School Administration and Supervision · 3 units
+MAED-COG6
+Educational Policy and Planning · 3 units
+MAED-COG7
+Guidance and Student Development · 3 units
+MAED-COG8
+Instructional Design · 3 units
+MAED-COG9
+Language and Literacy Education · 3 units
+MAED-FED
+Foundations of Education · 3 units
+MAED-MAJ1
+Curriculum Development and Evaluation · 3 units
+MAED-MAJ2
+Educational Leadership and Management · 3 units
+MAED-MAJ3
+Assessment of Learning · 3 units
+MAED-MAJ4
+Educational Technology and Instruction · 3 units
+MAED-MAJ5
+Philosophy of Education · 3 units
+MAED-MOR
+Methods of Educational Research · 3 units
+MAED-STAT
+Statistics in Education · 3 units
+MSGC-COG1
+Family Counseling · 3 units
+MSGC-COG10
+Counseling Supervision · 3 units
+MSGC-COG2
+Crisis Intervention · 3 units
+MSGC-COG3
+Counseling Children and Adolescents · 3 units
+MSGC-COG4
+Multicultural Counseling · 3 units
+MSGC-COG5
+School Counseling · 3 units
+MSGC-COG6
+Substance Abuse Counseling · 3 units
+MSGC-COG7
+Ethics in Counseling · 3 units
+MSGC-COG8
+Rehabilitation Counseling · 3 units
+MSGC-COG9
+Play Therapy · 3 units
+MSGC-FED
+Foundations of Guidance and Counseling · 3 units
+MSGC-MAJ1
+Theories of Counseling · 3 units
+MSGC-MAJ2
+Group Counseling and Process · 3 units
+MSGC-MAJ3
+Career Development and Counseling · 3 units
+MSGC-MAJ4
+Assessment in Guidance · 3 units
+MSGC-MAJ5
+Guidance Program Management · 3 units
+MSGC-MOR
+Methods of Research in Counseling · 3 units
+MSGC-STAT
+Statistics in Guidance and Counseling · 3 units
+Save preferences
+Contact
+liwayway.bautista@usls.edu.ph
+
+FACULTY LOGIN
+
+liwayway.bautista@usls.edu.ph
+
+Current assignments
+Teaching load
+0/24 units
+
+MIT-FED · 3 units
+
+AY 2026-2027 2nd Semester · Proposed
+
+MSN-FED · 3 units
+
+AY 2026-2027 2nd Semester · Proposed
+
+Hector Ong
+
+Content Specialist
+
+Reflective Practice Models for Graduate Educators
+
+Hector Ong
+
+Content Specialist
+
+Reflective Practice Models for Graduate Educators
+
+Hector Ong
+
+Content Specialist
+
+Reflective Practice Models for Graduate Educators
+
+Calendar connection
+
+Google Calendar
+
+Entered working hours and availability exceptions are used until a calendar is connected.
+
+Not connected
+
+This faculty member must connect Google Calendar from their own Faculty Portal. Until then, only the hours they enter in their own portal are used.
+
+View availability feed
+Expertise records
+7
+
+Research interests, publications, past advisee and panel titles, and degrees. Panel Matching reads all of them, so the more accurate they are the better the panel recommendations. Records marked Demo data are sample entries; editing one turns it into a manual entry.
+
+Research interest
+Demo data
+
+Learning analytics dashboards that give graduate students feedback on their participation in online courses
+
+Research interest
+Demo data
+
+Student engagement, motivation, and persistence in online and blended graduate programs
+
+Publication
+2022
+Demo data
+
+Dashboard feedback, self-regulated learning, and engagement in online graduate courses: a mixed-method study
+
+Publication
+2020
+Demo data
+
+Interaction traces from a learning management system as indicators of student participation
+
+Past advisee title
+2023
+Demo data
+
+Learning Analytics Adoption among Graduate School Instructors
+
+Past panel title
+2024
+Demo data
+
+Blended Learning Engagement of Working Graduate Students
+
+Degree
+Demo data
+
+PhD in Educational Technology
+
+Research interest
+Publication
+Past advisee title
+Past panel title
+Degree
+Add record
+Weekly availability & schedule
+
+Weekly hours the faculty member entered. Nothing is assumed.
+
+Today
+
+Nov 2 – Nov 8, 2026
+
+Weekly hours entered
+Blocked / busy
+
+MON
+
+Nov 2
+
+TUE
+
+Nov 3
+
+WED
+
+Nov 4
+
+THU
+
+Nov 5
+
+FRI
+
+Nov 6
+
+SAT
+
+Nov 7
+
+SUN
+
+Nov 8
+
+8 AM
+9 AM
+10 AM
+11 AM
+12 PM
+1 PM
+2 PM
+3 PM
+4 PM
+5 PM
+6 PM
+
+Weekly hours
+
+08:00–17:00
+
+Weekly hours
+
+08:00–17:00
+
+Weekly hours
+
+08:00–17:00
+
+Weekly hours
+
+08:00–17:00
+
+Weekly hours
+
+08:00–17:00
+
+No hours
+
+No hours
+
+Times are Philippine time.

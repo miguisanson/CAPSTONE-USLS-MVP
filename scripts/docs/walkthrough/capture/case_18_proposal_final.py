@@ -1,9 +1,13 @@
 """Case 18 - Miguel Yu: Title Defense verdict, then Proposal Defense and Final Defense through graduation eligibility.
 
 Miguel is advanced with the minimum of scheduling/verdict work (the scheduling and verdict screens are the subject of
-another case). The app only accepts a verdict after the defense start time, and refuses past slots, so each defense is
+other cases). The app only accepts a verdict after the defense start time, and refuses past slots, so each defense is
 booked a couple of minutes ahead of the real clock (with the staff "warning override" for the 14-day lead time) and the
 capture waits for the start time to pass before the panel chair submits the verdict.
+
+The app also refuses a slot outside the hours a panelist (or the adviser) entered. Seeded faculty work Mon-Fri 08:00-17:00,
+so in the evening every person on the defense first enters "available only these hours" for today in My Availability
+(Specific dates), through the real screen, before the booking. Panels are the ones Panel Matching suggests (nothing hard-coded).
 
 Facts read off screens go to shots/_facts_18.json.
 """
@@ -18,11 +22,22 @@ from . import helpers_a4 as h
 from .common import SHOTS, main_text
 
 SLUG = "proposal_final"
+
+
+def shot(rt, page, shot_id: str, **kw):
+    """rt.shot with a retry: Windows now and then refuses a write to a png ([Errno 22]); a second try works."""
+    for attempt in range(4):
+        try:
+            return rt.shot(page, shot_id, **kw)
+        except OSError:
+            page.wait_for_timeout(1500)
+    return rt.shot(page, shot_id, **kw)
 FACTS: dict = {}
-# Dr. Teodoro Ramos (the suggested Method Specialist) is double-booked by other demo defenses today, so Dr. Daniel Uy takes that seat.
-PANEL_SEATS = {"Content Specialist": "Patricia Salvador", "Method Specialist": "Daniel Uy"}
-# Proposal panel (four seats): the suggested Method, Content and External members are booked elsewhere today, so these seats are chosen by staff.
-PROPOSAL_SEATS = {"Panel Chair": "Patricia Salvador", "Content Specialist": "Celeste Tan", "Method Specialist": "Daniel Uy", "External Panel": "Adriana Santos"}
+ROLE_ORDER = ("Panel Chair", "Content Specialist", "Method Specialist", "External Panel")
+ADVISER = "Dr. Celeste Tan"  # adviser of Miguel Yu (panel_demo_data.DEMO_STUDENT_ADVISERS)
+PANEL: dict = {}  # role -> faculty name of the panel in force
+HOURS_DONE: set = set()
+LAST_END: list = []
 
 
 def sid(n: int) -> str:
@@ -44,7 +59,7 @@ class Ctx:
 
     def shot(self, page, full: bool = False) -> str:
         self.n += 1
-        return self.rt.shot(page, sid(self.n), full=full)
+        return shot(self.rt, page, sid(self.n), full=full)
 
     def close(self):
         for page in self.pages.values():
@@ -54,19 +69,100 @@ class Ctx:
                 pass
 
 
-def book_defense_soon(ctx: Ctx, staff, *, reason_text: str, defense_label: str, manuscript_received: bool, shots: bool = True):
-    """Staff: Defense Scheduling > pick Miguel > set a slot that starts about two minutes from now (override of lead time)."""
+def read_seats(page) -> dict:
+    """Panel Matching: the faculty chosen in each seat list, by role."""
+    seats = {}
+    for role in ROLE_ORDER:
+        sel = page.locator("label", has_text=role).locator("select")
+        if sel.count():
+            text = sel.first.evaluate("e => e.options[e.selectedIndex].text")
+            seats[role] = re.search(r"(Dr\. .+?) - \d", text).group(1)
+    return seats
+
+
+def finalize_panel(rt, page) -> dict:
+    """Panel Matching for Miguel: keep the suggested panel and finalize it. Returns {role: name}."""
+    rt.go(page, "/workflow/panel-matching")
+    h.pick_student(page, "2260004", "Miguel Yu")
+    page.wait_for_timeout(2000)
+    seats = read_seats(page)
+    page.get_by_role("button", name=re.compile("Finalize selected panel|Update final panel")).click()
+    rt.settle(page)
+    return seats
+
+
+def prepare_title_panel(rt) -> None:
+    """Reset Miguel and run the case 12/13 steps without screenshots: package, verify, endorse, panel, invitations."""
+    rt.reset("research-miguel")
+    stu = rt.new_page("student@usls.edu.ph")
+    h.upload_title_package(rt, stu)
+    stu.context.close()
+    st = rt.new_page("staff@usls.edu.ph")
+    h.staff_verify(rt, st)
+    ac = rt.new_page("academic@usls.edu.ph")
+    h.coordinator_endorse(rt, ac)
+    ac.context.close()
+    seats = finalize_panel(rt, st)
+    st.context.close()
+    PANEL.clear()
+    PANEL.update(seats)
+    FACTS["title_panel"] = dict(seats)
+    h.accept_pending_invitations(rt, [h.faculty_email(n) for n in seats.values()])
+
+
+def set_today_hours(ctx: "Ctx", names: list[str], shot: bool = False) -> None:
+    """Each person on the defense: My Availability > Specific dates > 'available ONLY these hours' for today (00:00-23:59)."""
     rt = ctx.rt
+    now = datetime.now()
+    if now.hour == 23 and now.minute >= 30:
+        raise RuntimeError(f"Too late in the day to book a same-day defense: {now:%H:%M}")
+    today = now.strftime("%Y-%m-%d")
+    for name in names:
+        email = h.faculty_email(name)
+        if email in HOURS_DONE:
+            continue
+        fac = rt.new_page(email)
+        try:
+            rt.go(fac, "/faculty-portal/availability")
+            form = fac.locator("form[aria-label='Add a specific date']")
+            form.get_by_text("I am available ONLY these hours").click()
+            form.get_by_label("First date").fill(today)
+            form.get_by_label("From (Philippine time)").fill("00:00")
+            form.get_by_label("To (Philippine time)").fill("23:59")
+            if shot and not FACTS.get("hours_shown"):
+                h.scroll_to(fac, form, 90)
+                ctx.shot(fac)
+            form.get_by_role("button", name="Add date").click()
+            rt.settle(fac)
+            fac.get_by_text("Date saved.").wait_for()
+            if shot and not FACTS.get("hours_shown"):
+                h.scroll_to(fac, fac.get_by_role("heading", name="Your dates"), 120)
+                ctx.shot(fac)
+                FACTS["hours_shown"] = True
+            HOURS_DONE.add(email)
+        finally:
+            fac.context.close()
+
+
+def book_defense_soon(ctx: Ctx, staff, *, reason_text: str, defense_label: str, manuscript_received: bool, shots: bool = True):
+    """Staff: Defense Scheduling > pick Miguel > set a 5-minute slot that starts about two minutes from now (override of lead time)."""
+    rt = ctx.rt
+    set_today_hours(ctx, [ADVISER] + list(PANEL.values()), shot=not FACTS.get("hours_shown"))
     rt.go(staff, "/workflow/defense-scheduling")
     h.pick_student(staff, "2260004", "Miguel Yu")
     staff.wait_for_timeout(2500)
     if shots:
-        ctx.shot(staff)  # readiness and panel
+        ctx.shot(staff)  # readiness
+        h.scroll_to(staff, staff.get_by_text("Panel members", exact=True), 80)
+        ctx.shot(staff)  # the panel with invitation status and availability entered
     now = datetime.now()
     start = (now + timedelta(minutes=2)).replace(second=0, microsecond=0)
-    end = start + timedelta(hours=2)
-    if end.hour > 17 or (end.hour == 17 and end.minute > 0) or start.weekday() >= 5 or start.hour < 8:
-        raise RuntimeError(f"Outside the panel's entered hours (weekdays 8:00-17:00): now is {now:%a %H:%M}")
+    if LAST_END and start < LAST_END[-1]:
+        start = LAST_END[-1]
+    end = start + timedelta(minutes=5)
+    if end.date() != start.date() or end.hour == 23 and end.minute > 55:
+        raise RuntimeError(f"Too late in the day for a same-day slot: now is {now:%H:%M}")
+    LAST_END.append(end)
     date_str, start_str, end_str = start.strftime("%Y-%m-%d"), start.strftime("%H:%M"), end.strftime("%H:%M")
     h.scroll_to(staff, staff.get_by_text("Final schedule", exact=True), 80)
     staff.get_by_label(re.compile("Selected date")).fill(date_str)
@@ -76,12 +172,14 @@ def book_defense_soon(ctx: Ctx, staff, *, reason_text: str, defense_label: str, 
         staff.get_by_label(re.compile("Date the panel received the manuscript")).fill((now - timedelta(days=20)).strftime("%Y-%m-%d"))
     staff.get_by_label(re.compile("Venue")).fill("GS Conference Room")
     staff.wait_for_timeout(1500)
-    override = staff.get_by_label(re.compile("Warning override"))
-    if override.count() and not override.first.is_checked():
-        override.first.check()
-    reason = staff.get_by_label(re.compile("Reason for the staff override"))
-    if reason.count():
-        reason.first.fill(reason_text)
+    # Only when the screen shows a warning ("Needs a reason": the Title Defense lead time) is the override ticked, as a user must.
+    needs_override = staff.get_by_text("Needs a reason").count() > 0
+    FACTS.setdefault("override_needed", {})[defense_label] = needs_override
+    if needs_override:
+        override = staff.get_by_label(re.compile("Warning override"))
+        if not override.first.is_checked():
+            override.first.check()
+        staff.get_by_label(re.compile("Reason for the staff override")).first.fill(reason_text)
     if shots:
         h.scroll_to(staff, staff.get_by_text("Final schedule", exact=True), 60)
         ctx.shot(staff)
@@ -151,7 +249,7 @@ def student_id(number: str = "2260004") -> int:
 def run_phases(rt, ctx: Ctx):
     from .case_14_panel_matching import WIDE, snap  # noqa: PLC0415
 
-    rt.step("prepare Miguel up to an accepted title-defense panel (cases 13 and 14, no screenshots)", lambda: h.prepare_miguel_to_panel(rt, seats=PANEL_SEATS, accepters=("Dr. Marlon Geronimo", "Dr. Patricia Salvador", "Dr. Daniel Uy")))
+    rt.step("prepare Miguel up to an accepted title-defense panel (cases 13 and 14, no screenshots)", lambda: prepare_title_panel(rt))
     staff = ctx.page("staff", "staff@usls.edu.ph")
     holder: dict = {}
     override_text = "Demonstration run: booked the same day so that the verdict can follow"
@@ -163,7 +261,7 @@ def run_phases(rt, ctx: Ctx):
     rt.step("staff: book the Title Defense", title_book)
     if "start" in holder:
         wait_until(holder["start"], rt)
-    rt.step("panel chair: Title Defense verdict", lambda: chair_verdict(ctx, h.faculty_email("Dr. Marlon Geronimo"), title=h.MIGUEL_TITLE, remarks="Title approved as submitted."))
+    rt.step("panel chair: Title Defense verdict", lambda: chair_verdict(ctx, h.faculty_email(PANEL["Panel Chair"]), title=h.MIGUEL_TITLE, remarks="Title approved as submitted."))
 
     def after_title():
         stu = ctx.page("student", "student@usls.edu.ph")
@@ -200,17 +298,23 @@ def run_phases(rt, ctx: Ctx):
         FACTS["proposal_table"] = table.inner_text()[:2500]
         ctx.n += 1
         snap(rt, wide, sid(ctx.n))
-        for role, who in PROPOSAL_SEATS.items():
-            seat = wide.locator("label", has_text=role).locator("select")
-            seat.select_option(value=seat.locator("option", has_text=who).get_attribute("value"))
+        seats = read_seats(wide)  # the suggested panel is kept
+        FACTS["proposal_panel"] = dict(seats)
         h.scroll_to(wide, wide.get_by_text("Review and adjust the panel set"), 70)
         ctx.n += 1
         snap(rt, wide, sid(ctx.n))
         wide.get_by_role("button", name=re.compile("Finalize selected panel")).click()
         rt.settle(wide)
-        ctx.n += 1
-        snap(rt, wide, sid(ctx.n))
-        h.accept_pending_invitations(rt, [h.faculty_email(n) for n in ("Dr. Patricia Salvador", "Dr. Celeste Tan", "Dr. Daniel Uy", "Dr. Adriana Santos")])
+        # Not Panel Matching itself: after finalizing, its seat lists show the saved panel in list order, not by role (BUG in the report).
+        # Research Gate shows the final panel instead.
+        rc = ctx.page("rc-panel", "staff@usls.edu.ph")
+        rt.go(rc, "/workflow/research-gate")
+        h.pick_student(rc, "2260004", "Miguel Yu")
+        h.scroll_to(rc, rc.get_by_text("System-generated from the active paper body"), 300)
+        ctx.shot(rc)
+        PANEL.clear()
+        PANEL.update(seats)
+        h.accept_pending_invitations(rt, [h.faculty_email(n) for n in seats.values()])
 
     rt.step("staff: Panel Matching for the proposal (four seats) and invitations", proposal_panel)
 
@@ -222,7 +326,7 @@ def run_phases(rt, ctx: Ctx):
     rt.step("staff: book the Proposal Defense", proposal_book)
     if "start" in holder:
         wait_until(holder["start"], rt)
-    rt.step("panel chair: Proposal Defense verdict", lambda: chair_verdict(ctx, h.faculty_email("Dr. Patricia Salvador"), remarks="Proposal approved."))
+    rt.step("panel chair: Proposal Defense verdict", lambda: chair_verdict(ctx, h.faculty_email(PANEL["Panel Chair"]), remarks="Proposal approved."))
 
     # ----- after the proposal defense: Form 5.1, ethics clearance (Form 5.2) -----
     rt.step("student: upload Form 5.1 and the ethics clearance (Form 5.2)", lambda: upload_stage_files(ctx, [
@@ -270,7 +374,7 @@ def run_phases(rt, ctx: Ctx):
     rt.step("staff: book the Final Defense (the proposal panel carries over)", final_book)
     if "start" in holder:
         wait_until(holder["start"], rt)
-    rt.step("panel chair: Final Defense verdict with evaluation score", lambda: chair_verdict(ctx, h.faculty_email("Dr. Patricia Salvador"), remarks="Final defense passed.", score="92"))
+    rt.step("panel chair: Final Defense verdict with evaluation score", lambda: chair_verdict(ctx, h.faculty_email(PANEL["Panel Chair"]), remarks="Final defense passed.", score="92"))
 
     # ================= Part D: completion evidence and graduation eligibility =================
     rt.step("student: upload the completion documents and submit", lambda: upload_stage_files(ctx, [
@@ -291,14 +395,19 @@ def run_phases(rt, ctx: Ctx):
     def graduation_view():
         gs = ctx.page("staff", "staff@usls.edu.ph")
         rt.go(gs, "/workflow/graduation")
-        gs.wait_for_timeout(2000)
-        card = gs.get_by_text("Miguel Yu", exact=True).first
-        h.scroll_to(gs, card, 260)
-        ctx.shot(gs)
+        gs.wait_for_timeout(1500)
+        gs.get_by_label(re.compile("Search list")).fill("Miguel")
+        gs.wait_for_timeout(800)
+        h.scroll_to(gs, gs.get_by_text("Academically eligible", exact=True).first, 200)
+        ctx.shot(gs)  # the board with Miguel in Academically eligible
+        gs.get_by_role("button", name="View details").first.click()
+        gs.wait_for_timeout(1200)
+        ctx.shot(gs)  # his details window
+        gs.get_by_role("button", name="Close details").click()
         sp = ctx.page("student", "student@usls.edu.ph")
         rt.go(sp, "/student/graduation")
         sp.wait_for_timeout(1500)
-        h.scroll_to(sp, sp.get_by_text("Monitoring eligibility recommendation"), 120)
+        h.scroll_to(sp, sp.get_by_text("Monitoring eligibility recommendation"), 430)
         ctx.shot(sp)
 
     rt.step("staff and student: graduation eligibility", graduation_view)
@@ -332,8 +441,13 @@ def upload_stage_files(ctx: Ctx, items: list[tuple[str, str]], submit_label: str
         btn = stu.get_by_role("button", name=re.compile(submit_label))
         btn.scroll_into_view_if_needed()
         btn.click()
+        send = stu.get_by_role("button", name="Send request")
+        send.wait_for()
+        if shots:
+            ctx.shot(stu)  # the "Send this request?" dialog
+        send.click()
         rt.settle(stu)
-        stu.get_by_role("button", name=re.compile(submit_label)).scroll_into_view_if_needed()
+        h.scroll_to(stu, stu.get_by_text("Request sent", exact=True), 140)  # the notice sits at the top of the page
         if shots:
             ctx.shot(stu)
     return stu
@@ -341,13 +455,15 @@ def upload_stage_files(ctx: Ctx, items: list[tuple[str, str]], submit_label: str
 
 def adviser_sign_all(ctx: Ctx, shots: bool = True):
     rt = ctx.rt
-    adv = ctx.page("adviser", "liwayway.bautista@usls.edu.ph")
+    adv = ctx.page("adviser", h.faculty_email(ADVISER))
     rt.go(adv, "/faculty-portal/signatures")
+    mine = adv.get_by_role("button").filter(has_text="Miguel Yu")
+    pending = mine.filter(has_text="Needs signature")
     if shots:
-        ctx.shot(adv)
+        h.scroll_to(adv, pending.first, 120)
+        ctx.shot(adv)  # the unsigned documents of Miguel in the list
     signed = 0
     for _ in range(8):
-        pending = adv.get_by_role("button").filter(has_text="Needs signature")
         if not pending.count():
             break
         pending.first.click()
@@ -358,12 +474,13 @@ def adviser_sign_all(ctx: Ctx, shots: bool = True):
             fin.first.click()
             adv.wait_for_timeout(300)
         if shots and signed == 0:
-            ctx.shot(adv)
+            ctx.shot(adv)  # signature drawn on the selected document
         adv.get_by_role("button", name=re.compile("Sign this document")).click()
         rt.settle(adv)
         adv.wait_for_timeout(500)
         signed += 1
     if shots:
+        h.scroll_to(adv, mine.filter(has_text="Signed by").first, 120)
         ctx.shot(adv)
     FACTS.setdefault("signed_documents", []).append(signed)
     return signed

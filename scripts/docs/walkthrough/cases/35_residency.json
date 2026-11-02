@@ -1,0 +1,120 @@
+{
+ "slug": "residency",
+ "title": "Residency - active without subject enrollment (reference)",
+ "kind": "reference",
+ "part": "Ref",
+ "presenter": "-",
+ "owner": "GS Staff",
+ "duration": "4 min",
+ "story": [
+  "Nicolas Valdez is a Master of Arts in Education student in the writing stage who is not enrolled in any subject this semester. Residency keeps such a student active while he completes allowed academic work. It is separate from AWOL, Leave of Absence, withdrawal and completed standing.",
+  "Graduate School Staff open **Record residency** on the **AWOL & Residency** board, pick the student, choose a handbook purpose and the semester, run the residency policy checker and, when the checker clears the case, record the residency. There is no staff override: the handbook has none, so if the checker says a case needs human review the **Record residency** button stays disabled and staff fix the record or use Leave of Absence instead. Nicolas's demo record has no missing course-audit subjects, so the checker clears him."
+ ],
+ "accounts": [
+  [
+   "Graduate School Staff",
+   "staff@usls.edu.ph",
+   "Residency checker and record on AWOL & Residency"
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   "same for every demo account"
+  ]
+ ],
+ "data": [
+  [
+   "Student",
+   "Nicolas Valdez, GS-2026-RES-01, MAED (demo group AWOL & Residency)"
+  ],
+  [
+   "Residency purpose",
+   "Thesis / dissertation work (other choices: Practicum / internship completion, Comprehensive examination, Awaiting research publication)"
+  ],
+  [
+   "Semester",
+   "AY 2026-2027 1st Semester"
+  ],
+  [
+   "Staff notes",
+   "Thesis writing continues without subject enrollment; adviser confirmed progress this semester."
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Check and record the Residency",
+   "intro": "Nicolas's demo record is reset first (the Reset button for him in the Demo accounts panel on the sign-in page, group AWOL & Residency; see {case:reset-demo}).",
+   "steps": [
+    {
+     "text": "Sign in as **staff@usls.edu.ph** and open **AWOL & Residency** under **Standalone Processes**. The page has the buttons **How this works** and **View recent activity**, a collapsed panel **Rules applied on this screen**, a summary line with the counts per column, the button **Record residency**, the search and filters, and the **Board** / **Table** toggle. The board runs left to right (AWOL, Return review, With the Dean, Re-enrollment, Back in the program, Not approved, Residency, Residency closed); the two residency columns are at the far right.",
+     "shots": [
+      {
+       "id": "residency-01",
+       "caption": "AWOL & Residency board with the Record residency button."
+      }
+     ]
+    },
+    {
+     "text": "Select **Record residency**. A window opens with a warning (**AWOL cannot be declared manually**) and the fields **Student**, **Residency purpose**, **Semester** and **Staff notes**. In the student box (placeholder: Search all students by name, number, or program) type Valdez and select **Nicolas Valdez**; the box turns into **Selected student**. Choose the purpose **Thesis / dissertation work**, check the semester **AY 2026-2027 1st Semester** and type the staff note.",
+     "shots": [
+      {
+       "id": "residency-02",
+       "caption": "Record residency window with Nicolas selected."
+      }
+     ]
+    },
+    {
+     "text": "Select **Run residency policy checker**. The residency policy review appears under the form with the result **Eligible for Residency** (Suggested: Record Residency) and three checks, each marked Pass: **No subject enrollment**, **Permitted residency purpose** (the course audit has 0 missing or incomplete subjects) and **Not an LOA substitute**. The button **Record residency** in the window footer is now active.",
+     "shots": [
+      {
+       "id": "residency-03",
+       "caption": "Residency policy review inside the window: Eligible for Residency, three checks passed (window enlarged to show all of it)."
+      }
+     ]
+    },
+    {
+     "text": "Select **Record residency** in the window. The page confirms **Saved. The student record, queue, and monitoring indicators were updated.** and the summary line gains one Residency.",
+     "shots": [
+      {
+       "id": "residency-04",
+       "caption": "Residency recorded."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - Where the record shows",
+   "intro": null,
+   "steps": [
+    {
+     "text": "Type Nicolas in the board search. His card is in the **Residency** column (Active no-subject residency semesters): Nicolas Valdez, GS-2026-RES-01 · MAED, the purpose, the semester, Next: Graduate School Staff and the chip **Eligible for Residency**. Select **View details**: the window shows the title **Residency active**, the tracker (**Residency recorded**, **Residency closed**), the request (student, type Residency, semester, purpose, policy result, date recorded, staff notes) and the policy check, with the buttons **Close details** and **Close the residency**. This walkthrough does not close the residency.",
+     "shots": [
+      {
+       "id": "residency-05",
+       "caption": "Residency card for Nicolas."
+      },
+      {
+       "id": "residency-06",
+       "caption": "Residency case window."
+      }
+     ]
+    },
+    {
+     "text": "Open **Students** and search Valdez. The directory row shows Nicolas with the stage Writing, enrollment **Residency**, standing **Active** and the compre exam result Passed.",
+     "shots": [
+      {
+       "id": "residency-07",
+       "caption": "Students directory after the Residency was recorded."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "Residency is an active no-subject enrollment state for approved academic work. A student with remaining course units who will stop studying should use Leave of Absence instead; the third check, Not an LOA substitute, says so.",
+  "The checker decides: residency is recorded only when it returns Eligible for Residency. If a student's course audit still has missing subjects the checker asks for human review and the Record residency button stays disabled (the handbook has no staff override).",
+  "The Residency case window can also be closed when the period ends (Close the residency); that was not done in this walkthrough."
+ ]
+}

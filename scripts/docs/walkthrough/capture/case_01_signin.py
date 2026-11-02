@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import time
 
 from .common import BASE, PASSWORD, Runtime
 from .helpers_a1 import body, wait_loaded, safe_notes
@@ -24,7 +25,28 @@ LANDINGS = [
 ]
 
 
+def harden(rt: Runtime) -> None:
+    """Retry the file writes of rt.shot / rt.write_log: on this machine Windows sometimes refuses a write into the shots
+    folder for a moment (OSError 22) while other processes work there. Shared by the six reference cases."""
+    if getattr(rt, "_ref_hardened", False):
+        return
+    def retrying(fn):
+        def wrapper(*args, **kwargs):
+            for attempt in range(8):
+                try:
+                    return fn(*args, **kwargs)
+                except OSError:
+                    if attempt == 7:
+                        raise
+                    time.sleep(1.5)
+        return wrapper
+    rt.shot = retrying(rt.shot)
+    rt.write_log = retrying(rt.write_log)
+    rt._ref_hardened = True
+
+
 def run(rt: Runtime) -> None:
+    harden(rt)
     safe_notes(rt)
     page = rt.new_page()
 

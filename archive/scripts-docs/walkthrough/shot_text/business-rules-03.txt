@@ -1,0 +1,279 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Business Rules
+Grace Fernandez · Graduate School Staff
+1
+GF
+Business Rules
+
+The rules the workflows follow, each with the handbook or protocol page it comes from. The Graduate School Handbook 2022-2023 is in force; where the system and the handbook disagree, the handbook wins. Rules set by the Handbook or the Research Protocol are locked: they change only when the Graduate School issues a new policy (upload it under Policy Documents). Prototype rules awaiting Graduate School validation can be adjusted; every change is recorded with your reason.
+
+RULES IN THE REGISTER
+
+65
+
+ENFORCED BY THE SYSTEM
+
+47
+
+DOCUMENTED ONLY
+
+18
+
+NEED REVIEW
+
+12
+
+All rules
+Enforced by the system
+Documented only
+Needs review
+Official (locked)
+Pending validation
+Search rules
+Course adjustments (add or change a subject)
+
+Adding a subject: first week of classes only
+
+Adding subjects is allowed during the first week of classes (7 calendar days from the start of classes) with the written approval of the Associate Dean. After that, an addition is flagged on the enrollment preview and can only be saved with a documented exception (the Associate Dean's written approval).
+
+Source: Graduate School Handbook 2022-2023, p. 49 · Registration - Adding of Subject/s
+
+Enforced by the system
+Official — Handbook p. 49
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 49. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+course_adjustment.add_subject_window_days
+
+7 days
+Change history
+0
+
+Changing one subject for another: first week of classes only
+
+Changing one subject for another is allowed during the first week of classes (7 calendar days from the start of classes) only if the original subject was dissolved, the student has a schedule conflict, or the student failed the prerequisite subject.
+
+Source: Graduate School Handbook 2022-2023, pp. 48-49 · Registration - Change of Subject
+
+Enforced by the system
+Official — Handbook pp. 48-49
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 48-49. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+course_adjustment.change_subject_window_days
+
+7 days
+Change history
+0
+Subject withdrawal
+
+Subject withdrawal window
+
+A student may withdraw subjects until the end of the second week from the start of classes (14 calendar days), whether or not classes were attended. The request needs the Dean's approval. It is not free: the fee consequence below applies. After the window a single subject can no longer be withdrawn; the student may still withdraw from all subjects (paying the full fees for the semester) or file a Leave of Absence.
+
+Source: Graduate School Handbook 2022-2023, p. 49 · Registration - Withdrawal of Subject
+
+Enforced by the system
+Official — Handbook p. 49
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 49. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+withdrawal.window_days
+
+14 days
+Change history
+0
+
+First week of classes (fee tier boundary)
+
+Withdrawals filed within the first 7 calendar days of classes fall in the first-week fee tier; days 8 to 14 fall in the second-week tier.
+
+Source: Graduate School Handbook 2022-2023, pp. 50-51 · Fees and Expenses - Refund of Fees
+
+Enforced by the system
+Official — Handbook pp. 50-51
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 50-51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+withdrawal.first_week_days
+
+7 days
+Change history
+0
+
+Fee charged for a first-week withdrawal
+
+10% of the total amount due for the term is charged when the subject is withdrawn within the first week of classes, regardless of whether classes were attended.
+
+Source: Graduate School Handbook 2022-2023, pp. 49, 51 · Registration - Withdrawal of Subject; Fees - Refund of Fees
+
+Documented only
+Official — Handbook pp. 49, 51
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 49, 51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+withdrawal.fee_percent_first_week
+
+10 percent
+Change history
+0
+
+Fee charged for a second-week withdrawal
+
+20% of the total amount due for the term is charged when the subject is withdrawn within the second week of classes.
+
+Source: Graduate School Handbook 2022-2023, pp. 49, 51 · Registration - Withdrawal of Subject; Fees - Refund of Fees
+
+Documented only
+Official — Handbook pp. 49, 51
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 49, 51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+withdrawal.fee_percent_second_week
+
+20 percent
+Change history
+0
+
+Fee charged after the second week
+
+After the second week the student may still withdraw all subjects at any time of the semester but pays the full enrollment fees for the semester (a justifiable reason limits the charge to the last month of attendance).
+
+Source: Graduate School Handbook 2022-2023, p. 51 · Fees and Expenses - Refund of Fees
+
+Documented only
+Official — Handbook p. 51
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+withdrawal.fee_percent_after_window
+
+100 percent
+Change history
+0
+Leave of absence
+
+No leave within two weeks before the last day of classes
+
+No leave of absence is granted during a semester within two weeks (14 days) before the last day of classes.
+
+Source: Graduate School Handbook 2022-2023, p. 53 · Attendance - Leave of Absence, guideline 3
+
+Enforced by the system
+Official — Handbook p. 53
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 53. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+loa.no_filing_days_before_term_end
+
+14 days
+Change history
+0
+Defense scheduling and panels
+
+Title defense: apply at least 2 weeks before
+
+Form 1 with the three concept papers must reach the Academic Coordinator, and be endorsed to the Research Coordinator, at least two weeks (14 days) before the scheduled title defense. A title defense cannot be scheduled sooner than this.
+
+Source: Graduate School Research Protocol AY 2024-2025 · Title Defense - I. Application for Title Defense
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Title Defense - I. Application for Title Defense). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.title_lead_days
+
+14 days
+Change history
+0
+
+Proposal defense: endorse at least 2 weeks before
+
+Form 4 is endorsed at least two weeks (14 days) before the proposal defense; the panel members receive the manuscript two weeks before to review it (the 14-Day Rule).
+
+Source: Graduate School Research Protocol AY 2024-2025 · Proposal Defense - I. Application for Proposal Defense
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Proposal Defense - I. Application for Proposal Defense). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.proposal_lead_days
+
+14 days
+Change history
+0
+
+Closed-door final defense: endorse at least 2 weeks before
+
+Form 4 and the manuscript are endorsed at least two weeks (14 days) before the closed-door final defense, following the 14-Day Rule (14 days, weekends included, from the day the panel receives the manuscript).
+
+Source: Graduate School Research Protocol AY 2024-2025 · Closed-door Final Defense - I. Application
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Closed-door Final Defense - I. Application). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.final_lead_days
+
+14 days
+Change history
+0

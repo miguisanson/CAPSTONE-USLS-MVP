@@ -1,0 +1,144 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Readmission
+Grace Fernandez · Graduate School Staff
+4
+GF
+Readmission
+
+Record a return request after LOA, route the Dean decision, and reactivate approved students.
+
+How this works
+View recent activity
+Rules applied on this screen
+1 rule from the Graduate School policies
+
+3 With the Dean
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Refresh leave dates
+Search requests by name, student number or program
+All programs
+MAED
+MIT
+All statuses
+With the Dean
+Showing 1 of 3 requests
+Clear 1 filter
+Board
+Table
+Therese Lacson: Forwarded to the Dean.
+
+2 more stages to the right →
+
+Submitted
+0
+
+Waiting for Graduate School staff to start.
+
+No requests here
+
+In staff review
+0
+
+Staff are checking the return checklist.
+
+No requests here
+
+Returned to student
+0
+
+Waiting for the student to correct and resend.
+
+No requests here
+
+With the Dean
+1 of 3
+
+Waiting for the Dean's decision.
+
+Therese Lacson
+
+GS-2026-READ-01 · MAED
+
+Returning: AY 2026-2027 2nd Semester
+
+Next: Dean
+
+View details
+
+Waiting for: Dean
+
+Approved - back in the program
+0
+
+The student is active again. The Academic Coordinator plans the enrollment.
+
+No requests here
+
+Not approved
+0
+
+Denied or taken back by the student.
+
+No requests here
+
+Registrar list
+
+Dean-approved requests that go to the Registrar. The portal does not send any email: download the list, email it yourself, then mark it as sent. Mark it as acknowledged when the Registrar confirms.
+
+Nothing to send to the Registrar yet
+
+Approved requests appear here after the Dean decides.
+
+Export history

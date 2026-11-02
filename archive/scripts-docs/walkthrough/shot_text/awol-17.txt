@@ -1,0 +1,316 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+AWOL & Residency
+Grace Fernandez · Graduate School Staff
+4
+GF
+AWOL & Residency
+
+Automatically flag policy-backed AWOL cases, review structured return declarations, and record valid residency enrollment without subjects.
+
+How this works
+View recent activity
+Rules applied on this screen
+9 rules from the Graduate School policies
+
+1 AWOL, 1 Return review, 1 With the Dean, 1 Back in the program, 1 Residency
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Record residency
+Search requests by name, student number or program
+All programs
+MAED
+MAN
+All statuses
+Return approved
+Return filed
+With the Dean
+AWOL (flagged by the system)
+Residency active
+All types
+Return from AWOL
+Residency
+Showing 1 of 5 cases
+Clear 1 filter
+Board
+Table
+
+2 more stages to the right → · 2 to the left
+
+AWOL
+0 of 1
+
+Flagged from source records. Waiting for the student's written return.
+
+No cases here
+
+Return review
+0 of 1
+
+Staff check the written return against the residence limits, then forward it.
+
+No cases here
+
+With the Dean
+0 of 1
+
+Waiting for the Dean's decision.
+
+No cases here
+
+Re-enrollment
+0
+
+The Dean endorsed a full re-enrollment. Mark it complete when the courses are re-enrolled.
+
+No cases here
+
+Back in the program
+1
+
+The return was approved or the re-enrollment is done. The student is active again.
+
+Maya Torres
+
+GS-2026-AWOL-01 · MAED
+
+Within Maximum Residence
+
+Returning: AY 2026-2027 2nd Semester · AWOL since 2026-07-05
+
+Next: Academic Coordinator
+
+Demo imported AWOL standing
+View details
+
+Waiting for: Academic Coordinator
+
+Not approved
+0
+
+The Dean denied the return. The student stays AWOL.
+
+No cases here
+
+Residency
+0 of 1
+
+Active no-subject residency semesters.
+
+No cases here
+
+Residency closed
+0
+
+Residency semesters that were closed.
+
+No cases here
+
+Registrar list
+
+Approved returns and residency semesters go to the Registrar. The portal does not send any email: download the report and email it through the official channel. Enrollment itself stays a separate Academic Coordinator step.
+
+2 reports available.
+
+Reports for the Registrar
+STUDENT	TYPE
+	STATUS
+	
+REPORT
+
+
+
+Maya Torres
+
+GS-2026-AWOL-01 · MAED
+
+	Return from AWOL	Return approved	
+Download report
+
+
+Elena Mendoza
+
+2260011 · MAED
+
+	Residency	Residency active	
+Download report
+Maya Torres
+Return approved
+
+Return from AWOL · GS-2026-AWOL-01 · MAED
+
+WHERE THIS REQUEST IS
+
+Complete:
+AWOL flagged
+Complete:
+Return filed
+Complete:
+Dean decision
+Complete:
+Back in the program
+THE REQUEST
+STUDENT
+Maya Torres
+GS-2026-AWOL-01 · Master of Arts in Education
+TYPE
+Return from AWOL
+AWOL EFFECTIVE DATE
+Jul 5, 2026
+DETECTION SOURCE
+Demo imported AWOL standing
+LAST ENROLLED SEMESTER
+AY 2025-2026 2nd Semester
+RETURNING IN
+AY 2026-2027 2nd Semester
+POLICY CLASSIFICATION
+Within Maximum Residence
+YEARS IN THE PROGRAM
+1
+RESIDENCE LIMITS
+5 normal / 7 absolute
+STUDENT'S WRITTEN INTENTION
+I intend to resume my enrollment and complete my thesis.
+REASON FOR RETURN
+I have resolved the family matter that kept me away and I am ready to continue.
+DEAN DECISION
+Approved
+DEAN DECIDED
+Nov 2, 2026
+STAFF NOTES
+Within the normal residence period for a master's student. Forwarded for the Dean's decision.
+Dean: Approved. Return in the stated semester; the Academic Coordinator will plan the enrollment.
+POLICY CHECK
+
+Advice for staff - the Dean decides.
+
+Needs Human Review
+Suggested for the Dean: Return for Missing Information
+
+Return classification: Within Maximum Residence. The Dean must endorse the written intent before registration privileges are restored.
+
+Current AWOL status
+
+Current status is Active/Not Enrolled.
+
+Needs Review
+
+Written intent to enroll
+
+Structured portal return declaration
+
+Present
+
+Maximum residence
+
+1 year(s) in program; normal Master's limit is 5 years.
+
+Pass
+THE STUDENT SO FAR
+
+1 year in the program
+
+Normal length 5 years. The most allowed is 7 years.
+
+EARLIER REQUESTS BY THIS STUDENT
+
+No earlier requests in this process.
+
+MESSAGES
+
+Notes and returns about this request, newest at the bottom.
+
+G
+
+Grace Fernandez (Graduate School Staff) → Student
+
+Student visible
+Sent
+
+Policy classification: Within Maximum Residence. The Dean will decide the return endorsement.
+
+Nov 2, 2026, 8:37 PM
+D
+
+Dr. Manuel Villaruz (Dean) → Student
+
+Student visible
+Sent
+
+Approved. Return in the stated semester; the Academic Coordinator will plan the enrollment.
+
+Nov 2, 2026, 8:37 PM
+Write a note
+Who is it for?
+The student (they can read it)
+The Dean (staff only)
+Graduate School staff (internal note)
+Note
+Save note
+FILES
+
+No files were uploaded for this request.
+
+REGISTRAR FOLLOW-UP
+
+After the Dean approves a return, staff download the return report and send it to the Registrar through the official channel. Enrollment itself stays a separate Academic Coordinator step.
+
+AWOL return report for the Registrar (CSV)
+HISTORY
+Who did what
+3
+Activity log
+3
+Close details
+
+No step is open right now.

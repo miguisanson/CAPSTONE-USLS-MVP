@@ -1,0 +1,130 @@
+{
+ "slug": "reset-demo",
+ "title": "Reset Demo - putting a demo student back to the start",
+ "kind": "live",
+ "part": "2a",
+ "presenter": "Myrine",
+ "owner": "Anyone on the sign-in page; GS Staff for the in-page button",
+ "duration": "3 min",
+ "story": [
+  "Most live cases use up the demo student they run on: once a student has sent a request and staff have acted on it, the same student cannot show the first step again. Reset puts one demo student back at the start of their own workflow so the case can be shown again from the beginning.",
+  "There are two places to press it. On the sign-in page, every student in the **Demo accounts** panel has a red **Reset** button (this is the one the team uses before a run). Inside the **Practicum** and **Graduation Endorsement** case windows, staff also have a **Reset demo case** button. Both only exist in demo mode, and they change one student at a time."
+ ],
+ "accounts": [
+  [
+   "No sign-in needed",
+   "-",
+   "The sign-in page and its Demo accounts panel"
+  ],
+  [
+   "Graduate School Staff",
+   "staff@usls.edu.ph",
+   "Owns the Reset demo case button inside the case window"
+  ],
+  [
+   "Student demo (Practicum)",
+   "practicum.andrea@usls.edu.ph",
+   "Andrea Villanueva, the student whose MOA is reset in Part B"
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   "same for every demo account"
+  ]
+ ],
+ "data": [
+  [
+   "Part A student",
+   "Anton Bautista (GS-2026-HO-02), listed under 1 · Student Handoff"
+  ],
+  [
+   "Part B student",
+   "Andrea Villanueva (GS-2026-PRAC-01), listed under 8 · Practicum"
+  ],
+  [
+   "Needs",
+   "Demo mode on (DEMO_MODE, on by default on this computer)"
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Reset from the sign-in page",
+   "steps": [
+    {
+     "text": "On the sign-in page, open the amber **Demo accounts** panel. Under the list of staff, Dean, faculty and student logins is a second list, **Student workflow demos**, arranged in the order of the lifecycle: 1 · Student Handoff, 2 · Course Adjustments, 3 · Enrollment, 5-7 · Research, Panel & Defense, 8 · Practicum and 9 · Graduation, then **Standalone processes** (Leave of Absence, Readmission, AWOL & Residency and Withdrawal). Each student is ready for the first step of their own workflow.",
+     "shots": [
+      {
+       "id": "reset-demo-01",
+       "caption": "The Demo accounts panel with the Student workflow demos groups."
+      }
+     ]
+    },
+    {
+     "text": "Open a group, for example **1 · Student Handoff**. Each student shows the name, student number and a green line saying where the student starts. At the right of every student is a red **Reset** button; the name of the student is the one to reset, and no other student is touched.",
+     "shots": [
+      {
+       "id": "reset-demo-02",
+       "caption": "Inside a group: every student has a red Reset button."
+      }
+     ]
+    },
+    {
+     "text": "Select **Reset** for Anton Bautista. The browser asks to confirm: Reset Anton Bautista's Student-Handoff demo? This clears this workflow's submissions, messages, tasks, and staff actions for the student. Choose OK. A green line at the bottom of the panel reads **Reset Anton Bautista's Student-Handoff demo. All prerequisite stages are complete and the student is ready to begin again.** The page signs in as a demo staff account for a moment to make the reset, then signs out again, so nothing has to be typed.",
+     "shots": [
+      {
+       "id": "reset-demo-03",
+       "caption": "The confirmation line after pressing Reset."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - Reset from the staff case window",
+   "steps": [
+    {
+     "text": "To have something to reset, the student side was used first: Andrea Villanueva signed in, opened **Practicum** and sent her MOA. As Graduate School Staff, open **8 · Practicum**. Her card is now in the **Submitted** column of the board.",
+     "shots": [
+      {
+       "id": "reset-demo-04",
+       "caption": "Practicum board: Andrea's card in the Submitted column."
+      }
+     ]
+    },
+    {
+     "text": "Select **View details** on her card. In the case window the footer holds a red **Reset demo case** button next to **Message / Return** and the forwarding button. It shows only for a student who has a case on that board, and only for staff.",
+     "shots": [
+      {
+       "id": "reset-demo-05",
+       "caption": "The case window with the Reset demo case button."
+      }
+     ]
+    },
+    {
+     "text": "Select **Reset demo case**. The browser asks: Reset the practicum demo case for Andrea Villanueva? This removes only this student's practicum records, uploaded request PDFs, related tasks, and activity entries. Academic and research source data are kept. After OK the board shows **Reset Andrea Villanueva's Practicum demo case. The student can start that workflow again.** and she is back in **Awaiting Submission**.",
+     "shots": [
+      {
+       "id": "reset-demo-06",
+       "caption": "Notice after the reset: Andrea is back in Awaiting Submission."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - When to press it and what it leaves alone",
+   "steps": [
+    "Press it before a run, so the student is at the first step, and after a run when a student's case has been used up (a submitted request, a forwarded MOA, a withdrawn subject). It is quick, so reset first and present second rather than guessing.",
+    "It clears only the chosen student's records for that one workflow (the request or case, uploaded request files, messages, tasks and activity entries for it) and puts that student back at the ready-to-start state. Reset on the sign-in page also makes sure the student's demo login still uses the shared password.",
+    "It does not touch any other student, the official student, enrollment and grade data (these only come from the AIMS import), the course and faculty lists, the policy documents or the accounts of staff, Dean and faculty. Withdrawal and Research have no staff button inside their pages; use the sign-in page for those.",
+    "It exists only in demo mode. With demo mode off the buttons are not shown and the server answers Not found. On a public site the **Demo accounts** panel itself is hidden (DEMO_SHOW_ACCOUNTS is off), so presenters on the public site are given their logins privately; on this computer the panel is shown."
+   ]
+  }
+ ],
+ "notes": [
+  "A reset cannot be undone. Anything the student had sent for that workflow is deleted, so reset only demo students.",
+  "The sign-in page reset needs the demo Graduate School Staff login to still have the shared password; if it was changed, the page says it could not sign in to reset, and the reset must be made from a staff session instead.",
+  "Part B was captured by first submitting a MOA as Andrea so the staff board had a case to reset; the board also lists Paolo Ramirez, the Practicum demo student used in {case:practicum}.",
+  "Related cases: {case:signin} shows the same Demo accounts panel when signing in."
+ ]
+}

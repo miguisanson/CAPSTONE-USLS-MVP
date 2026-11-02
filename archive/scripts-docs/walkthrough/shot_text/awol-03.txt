@@ -1,0 +1,273 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+AWOL & Residency
+Grace Fernandez · Graduate School Staff
+4
+GF
+AWOL & Residency
+
+Automatically flag policy-backed AWOL cases, review structured return declarations, and record valid residency enrollment without subjects.
+
+How this works
+View recent activity
+Rules applied on this screen
+9 rules from the Graduate School policies
+
+Master's: all requirements within 5 academic years
+
+5 years
+
+A master's student completes all requirements within five academic years from the date of admission. Beyond that the student needs the extension below.
+
+Source: Graduate School Handbook 2022-2023, p. 54 (Maximum Residence - Master's Program)
+
+Enforced by the system
+
+Master's: absolute maximum of 7 academic years, including leave of absence
+
+7 years
+
+A master's program must be finished within seven academic years including leave of absence. A student who cannot finish within seven years re-enrolls all courses taken. The residence clock is not paused during a leave.
+
+Source: Graduate School Handbook 2022-2023, p. 55 (Maximum Residence - Master's Program)
+
+Enforced by the system
+
+Doctorate: all requirements within 7 academic years
+
+7 years
+
+A doctorate student completes all requirements, including the dissertation, within seven academic years from the date of admission.
+
+Source: Graduate School Handbook 2022-2023, p. 55 (Maximum Residence - Doctorate Program)
+
+Enforced by the system
+
+Doctorate: absolute maximum of 9 academic years, including leave of absence
+
+9 years
+
+A doctoral program must be finished within nine academic years including leave of absence. A student who cannot finish within nine years re-enrolls all courses taken. The residence clock is not paused during a leave.
+
+Source: Graduate School Handbook 2022-2023, p. 55 (Maximum Residence - Doctorate Program)
+
+Enforced by the system
+
+Extension beyond the normal limit
+
+2 years
+
+A student who cannot comply with the normal maximum residence is allowed a maximum two-year extension.
+
+Source: Graduate School Handbook 2022-2023, pp. 54-55 (Maximum Residence)
+
+Enforced by the system
+
+Graded refresher course during the extension
+
+6 units
+
+During the two-year extension the student enrolls in a graded 6-unit refresher course related to the area of specialization.
+
+Source: Graduate School Handbook 2022-2023, pp. 54-55 (Maximum Residence)
+
+Enforced by the system
+
+Time on leave of absence counts toward maximum residence
+
+Yes
+
+The maximum-residence limits include leave of absence. The residency clock keeps running while a student is on leave; it is never paused.
+
+Source: Graduate School Handbook 2022-2023, p. 55 (Maximum Residence)
+
+Enforced by the system
+
+Master's: candidacy within 3 academic years
+
+3 years
+
+Candidacy to the degree must be attained within three academic years from the date of admission.
+
+Source: Graduate School Handbook 2022-2023, p. 54 (Maximum Residence - Master's Program)
+
+Documented only
+
+Candidacy status is decided by the Graduate School and is not tracked as a date in the system.
+
+Doctorate: candidacy within 5 academic years
+
+5 years
+
+Candidacy to the degree must be attained within five academic years from the date of admission.
+
+Source: Graduate School Handbook 2022-2023, p. 55 (Maximum Residence - Doctorate Program)
+
+Documented only
+
+Candidacy status is decided by the Graduate School and is not tracked as a date in the system.
+
+See every business rule and its history
+
+2 AWOL, 1 Return review, 1 With the Dean, 1 Residency
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Record residency
+Search requests by name, student number or program
+All programs
+MAED
+MAN
+All statuses
+AWOL (flagged by the system)
+Return filed
+With the Dean
+Residency active
+All types
+Return from AWOL
+Residency
+Showing 1 of 5 cases
+Clear 1 filter
+Board
+Table
+
+4 more stages to the right →
+
+AWOL
+1 of 2
+
+Flagged from source records. Waiting for the student's written return.
+
+Maya Torres
+
+GS-2026-AWOL-01 · MAED
+
+Awaiting return intent
+
+No return filed yet · AWOL since 2026-07-05
+
+Next: Student
+
+Demo imported AWOL standing
+View details
+
+Waiting for: Student
+
+Return review
+0 of 1
+
+Staff check the written return against the residence limits, then forward it.
+
+No cases here
+
+With the Dean
+0 of 1
+
+Waiting for the Dean's decision.
+
+No cases here
+
+Re-enrollment
+0
+
+The Dean endorsed a full re-enrollment. Mark it complete when the courses are re-enrolled.
+
+No cases here
+
+Back in the program
+0
+
+The return was approved or the re-enrollment is done. The student is active again.
+
+No cases here
+
+Not approved
+0
+
+The Dean denied the return. The student stays AWOL.
+
+No cases here
+
+Residency
+0 of 1
+
+Active no-subject residency semesters.
+
+No cases here
+
+Residency closed
+0
+
+Residency semesters that were closed.
+
+No cases here
+
+Registrar list
+
+Approved returns and residency semesters go to the Registrar. The portal does not send any email: download the report and email it through the official channel. Enrollment itself stays a separate Academic Coordinator step.
+
+1 report available.
+
+Reports for the Registrar
+STUDENT	TYPE
+	STATUS
+	
+REPORT
+
+
+
+Elena Mendoza
+
+2260011 · MAED
+
+	Residency	Residency active	
+Download report

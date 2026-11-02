@@ -1,0 +1,516 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+AWOL & Residency
+
+MONITORING & SUPPORT
+
+Work Queue
+Policy Assistant
+Business Rules
+
+Academic Coordinator
+
+Figures are computed live from recorded transactions.
+
+Academic Coordinator Portal
+Course Adjustments
+Dr. Ramon Alvarez · Academic Coordinator
+DR
+Course Adjustments
+
+Review subject demand, decide what to offer, then complete the semester schedule and faculty assignments in one workspace.
+
+Demand & adjustments
+Offering setup
+Adding or changing a subject: rules applied
+3 rules from the Graduate School policies
+
+Adding a subject: first week of classes only
+
+7 days
+
+Adding subjects is allowed during the first week of classes (7 calendar days from the start of classes) with the written approval of the Associate Dean. After that, an addition is flagged on the enrollment preview and can only be saved with a documented exception (the Associate Dean's written approval).
+
+Source: Graduate School Handbook 2022-2023, p. 49 (Registration - Adding of Subject/s)
+
+Enforced by the system
+
+Changing one subject for another: first week of classes only
+
+7 days
+
+Changing one subject for another is allowed during the first week of classes (7 calendar days from the start of classes) only if the original subject was dissolved, the student has a schedule conflict, or the student failed the prerequisite subject.
+
+Source: Graduate School Handbook 2022-2023, pp. 48-49 (Registration - Change of Subject)
+
+Enforced by the system
+
+Conditions for a change of subject
+
+Subject dissolved; schedule conflict; failed prerequisite
+
+The reason for a change must be one of: the original subject is dissolved, a conflict in schedules, or failure in the prerequisite subject. Staff confirm the reason; the system records the exception but cannot see the schedule or the grade.
+
+Source: Graduate School Handbook 2022-2023, p. 49 (Registration - Change of Subject)
+
+Documented only
+
+The reason is confirmed by staff and the Associate Dean; schedules and grades are outside the portal.
+
+See every business rule and its history
+
+Adjustments and subject demand
+
+Demand is recalculated automatically from the current student records. The coordinator remains responsible for every offering and faculty decision.
+
+Program
+DBA - Doctor of Business Administration
+DPSY - Doctor of Philosophy in Psychology
+EDD - Doctor of Education
+MAED - Master of Arts in Education
+MAN - Master of Arts in Nursing
+MAPSY - Master of Arts in Psychology
+MASS - Master of Arts in Social Sciences
+MBA - Master of Business Administration
+MIT - Master in Information Technology
+MSCS - Master of Science in Computer Science
+MSGC - Master of Science in Guidance and Counseling
+MSN - Master of Science in Nursing
+Academic year and semester
+AY 2028-2029 2nd Semester (+5)
+AY 2028-2029 1st Semester (+4)
+AY 2027-2028 2nd Semester (+3)
+AY 2027-2028 1st Semester (+2)
+AY 2026-2027 2nd Semester (Next)
+AY 2026-2027 1st Semester (Current)
+AY 2025-2026 2nd Semester (Previous)
+AY 2025-2026 1st Semester (-2)
+AY 2024-2025 2nd Semester (-3)
+AY 2024-2025 1st Semester (-4)
+
+Subject needs are calculated automatically
+
+Counts below update with the selected program and semester. They support the decision; they do not publish an offering or assign a faculty member by themselves.
+
+OFFERING PLAN PROGRESS
+
+1
+Upcoming:
+Draft
+2
+Upcoming:
+Submitted
+3
+Upcoming:
+Approved
+4
+Upcoming:
+Published
+
+Draft saved. Review the demand list and submit when ready.
+
+Demand numbers are guidance. Every curriculum subject remains available for a manual offering decision.
+
+Save draft (7 offered)
+Submit for approval
+Publish
+
+CURRICULUM SUBJECTS
+
+18
+
+AFFECTED STUDENTS
+
+13
+
+DELAYED IF WITHHELD
+
+13
+
+SELECTED TO OFFER
+
+7
+
+Course offering decisions
+
+MAED · Master of Arts in Education · planning for AY 2026-2027 2nd Semester · generated 11/2/2026, 8:57:59 PM
+
+Download CSV
+
+17 students reviewed · 7 subjects needed next term · 27 student seats needed · 18 subjects with a backlog
+
+Needing next term: the subject is in the student's next semester group, or the student must retake it. This is the number to plan an offering from. Not taken yet: everyone who still has to take it at some point; never smaller than the first number. One affected student is enough to offer a subject; open Details on a row to see the students, who would be delayed if it is withheld, and who could teach it.
+
+Dr. Liwayway Bautista is the same suggested faculty member for every subject (from preferences, availability, specialization and teaching load), so it is not repeated on each row. Choose the faculty member for each subject below.
+
+Search subjects or students
+All subjects (18)
+Needed next term (7)
+Later in the curriculum (11)
+Course offering decisions: one row per curriculum subject with students needing it, decision, sections and faculty
+SUBJECT
+	NEEDING NEXT TERM
+	NOT TAKEN YET
+	DECISION	SECTIONS	FACULTY	
+DETAILS
+
+
+
+MAED-MAJ1
+
+Curriculum Development and Evaluation
+
+	
+8
+	8	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-STAT
+
+Statistics in Education
+
+	
+8
+	8	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-MOR
+
+Methods of Educational Research
+
+	
+6
+	6	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG2
+
+Learning Analytics
+
+	
+2
+	11	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG5
+
+School Administration and Supervision
+
+	
+1
+	13	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG6
+
+Educational Policy and Planning
+
+	
+1
+	13	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG1
+
+Teaching Strategies in Higher Education
+
+	
+1
+	10	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG7
+
+Guidance and Student Development
+
+	
+0
+	13	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG8
+
+Instructional Design
+
+	
+0
+	13	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG9
+
+Language and Literacy Education
+
+	
+0
+	13	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG10
+
+Seminar on Contemporary Issues in Education
+
+	
+0
+	12	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG3
+
+Inclusive Education
+
+	
+0
+	12	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG4
+
+Action Research in the Classroom
+
+	
+0
+	12	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-MAJ5
+
+Philosophy of Education
+
+	
+0
+	11	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-MAJ4
+
+Educational Technology and Instruction
+
+	
+0
+	10	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-MAJ2
+
+Educational Leadership and Management
+
+	
+0
+	8	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-MAJ3
+
+Assessment of Learning
+
+	
+0
+	8	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-FED
+
+Foundations of Education
+
+	
+0
+	6	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+Coursework status report to the Dean
+Generate report
+
+Completion issues and missing subjects for the active term, compiled for the Dean's review.
+
+No coursework reports yet
+
+Generate one to send to the Dean.

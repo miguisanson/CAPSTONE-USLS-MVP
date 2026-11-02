@@ -1,0 +1,302 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+AWOL & Residency
+
+MONITORING & SUPPORT
+
+Work Queue
+Policy Assistant
+Business Rules
+
+Academic Coordinator
+
+Figures are computed live from recorded transactions.
+
+Academic Coordinator Portal
+Faculty
+Dr. Ramon Alvarez · Academic Coordinator
+DR
+Faculty
+
+Search the faculty directory, then open a profile to review expertise, login email, panel load, and the availability the faculty member has entered.
+
+Add faculty
+Search faculty
+All departments
+Arts and Sciences
+Business
+Education
+Engineering and Technology
+Nursing
+All availability
+Available
+Unavailable
+Not entered
+Google Calendar connected
+
+Showing 12 of 12 faculty
+
+Select a faculty member to open their profile
+
+Faculty directory
+FACULTY
+	DEPARTMENT / SPECIALIZATION
+	STATUS	AVAILABILITY
+	PANEL LOAD
+	ACTIONS
+
+DA
+Dr. Adriana Santos
+
+Adviser / Panel · adriana.santos@usls.edu.ph
+
+	
+
+Nursing
+
+Health informatics, public health, and medical systems
+
+	
+Active
+Active login
+	
+Available
+	0	
+Edit
+
+DA
+Dr. Angela Cruz
+
+Adviser / Panel · angela.cruz@usls.edu.ph
+
+	
+
+Business
+
+Strategic management, entrepreneurship, organizational innovation, and family business
+
+	
+Active
+Active login
+	
+Available
+	8	
+Edit
+
+DB
+Dr. Benjamin Reyes
+
+Adviser / Panel · benjamin.reyes@usls.edu.ph
+
+	
+
+Business
+
+Finance, business analytics, accounting, and financial technology
+
+	
+Active
+Active login
+	
+Available
+	5	
+Edit
+
+DC
+Dr. Celeste Tan
+
+Adviser / Panel · celeste.tan@usls.edu.ph
+
+	
+
+Arts and Sciences
+
+Psychology, student well-being, and behavioral research
+
+	
+Active
+Active login
+	
+Available
+	3	
+Edit
+
+DD
+Dr. Daniel Uy
+
+Adviser / Panel · daniel.uy@usls.edu.ph
+
+	
+
+Engineering and Technology
+
+Engineering systems, automation, data modeling, and predictive analytics
+
+	
+Active
+Active login
+	
+Available
+	0	
+Edit
+
+DL
+Dr. Liwayway Bautista
+
+Adviser / Panel · liwayway.bautista@usls.edu.ph
+
+	
+
+Education
+
+Learning analytics, online learning, and student engagement in graduate education
+
+	
+Active
+Active login
+	
+Available
+	6	
+Edit
+
+DM
+Dr. Marco Villanueva
+
+Adviser / Panel · marco.villanueva@usls.edu.ph
+
+	
+
+Business
+
+Operations management, supply chain analytics, quality systems, and process improvement
+
+	
+Active
+Active login
+	
+Available
+	8	
+Edit
+
+DM
+Dr. Marlon Geronimo
+
+Adviser / Panel · marlon.geronimo@usls.edu.ph
+
+	
+
+Education
+
+Machine learning, educational data analytics, and predicting student performance
+
+	
+Active
+Active login
+	
+Available
+	9	
+Edit
+
+DP
+Dr. Paolo Navarro
+
+Adviser / Panel · paolo.navarro@usls.edu.ph
+
+	
+
+Business
+
+Human resource management, organizational behavior, leadership, and workplace research
+
+	
+Active
+Active login
+	
+Available
+	3	
+Edit
+
+DP
+Dr. Patricia Salvador
+
+Adviser / Panel · patricia.salvador@usls.edu.ph
+
+	
+
+Education
+
+Online learning, learning management systems, education technology, and curriculum development
+
+	
+Active
+Active login
+	
+Available
+	9	
+Edit
+
+DT
+Dr. Teodoro Ramos
+
+Adviser / Panel · teodoro.ramos@usls.edu.ph
+
+	
+
+Education
+
+Learning analytics, online learning assessment, and educational data science
+
+	
+Active
+Active login
+	
+Available
+	17	
+Edit
+
+DT
+Dr. Teresa Lim
+
+Adviser / Panel · teresa.lim@usls.edu.ph
+
+	
+
+Business
+
+Marketing strategy, consumer behavior, digital commerce, and brand analytics
+
+	
+Active
+Active login
+	
+Available
+	3	
+Edit

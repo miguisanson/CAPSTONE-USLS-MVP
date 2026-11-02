@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 
+from .case_01_signin import harden
 from .helpers_a3 import open_link
 
 KEY = "residency-nicolas"
@@ -10,6 +11,7 @@ NOTE = "Thesis writing continues without subject enrollment; adviser confirmed p
 
 
 def run(rt):
+    harden(rt)
     S = "residency"
     rt.step("reset Nicolas", lambda: rt.reset(KEY))
     staff = rt.new_page("staff@usls.edu.ph")
@@ -21,19 +23,23 @@ def run(rt):
         staff.get_by_role("button", name="Record residency").first.click()
         staff.wait_for_timeout(1000)
         dlg = staff.locator("[role=dialog]").last
-        dlg.get_by_placeholder(re.compile("Search all students")).fill("Valdez")
+        dlg.get_by_label("Search a student").fill("Valdez")
         rt.settle(staff, 1500)
         dlg.get_by_role("button", name=re.compile("Nicolas Valdez")).first.click()
         staff.wait_for_timeout(800)
         dlg.get_by_label(re.compile("Residency purpose", re.I)).select_option(label="Thesis / dissertation work")
         dlg.get_by_label(re.compile(r"^Semester", re.I)).select_option(label="AY 2026-2027 1st Semester")
-        dlg.get_by_label(re.compile("Staff verification notes", re.I)).fill(NOTE)
+        dlg.get_by_label(re.compile("Staff notes", re.I)).fill(NOTE)
         rt.shot(staff, f"{S}-02")
         dlg.get_by_role("button", name="Run residency policy checker").click()
         rt.settle(staff, 1800)
         rt.note("checker: " + " | ".join(dlg.inner_text().split())[-1600:])
-        dlg.get_by_text(re.compile("policy", re.I)).last.scroll_into_view_if_needed()
+        # the dialog scrolls inside a 768 px window: enlarge the window so the whole checker result is on the picture
+        staff.set_viewport_size({"width": 1366, "height": 1150})
+        staff.wait_for_timeout(800)
         rt.shot(staff, f"{S}-03")
+        staff.set_viewport_size({"width": 1366, "height": 768})
+        staff.wait_for_timeout(500)
 
     rt.step("staff selects Nicolas, chooses purpose and semester, runs the checker", pick_and_check)
 
@@ -48,7 +54,7 @@ def run(rt):
 
     def case_board():
         rt.go(staff, "/workflow/awol")
-        staff.get_by_role("textbox", name=re.compile("Search", re.I)).first.fill("Nicolas")
+        staff.get_by_label(re.compile("Search requests")).first.fill("Nicolas")
         rt.settle(staff, 1000)
         staff.get_by_role("heading", name="Residency", exact=True).first.evaluate("el => el.scrollIntoView({block: 'center', inline: 'center'})")
         staff.wait_for_timeout(500)

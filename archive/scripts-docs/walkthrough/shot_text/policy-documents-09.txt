@@ -1,0 +1,156 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Policy Documents
+Grace Fernandez · Graduate School Staff
+1
+GF
+Policy Documents
+
+Manage the approved PDF and Word documents the Policy Assistant searches. Every answer names the document and page or section it came from. Drafts are searched but flagged as pending validation.
+
+Add document
+
+ALL SOURCES
+
+4
+
+STAFF UPLOADS
+
+2
+
+DRAFTS PENDING VALIDATION
+
+1
+
+READY FOR ASSISTANT
+
+4
+
+The file for Walkthrough Memo - Lounge Reservation 20261102-2048 was replaced and re-indexed. The previous version is kept in the version history.
+Test a question
+
+Type a question to see which passages the Policy Assistant would use, and from which document. Use it after an upload to confirm the new policy is found.
+
+Find passages
+What is the maximum residence period for a master's program?
+When may a student withdraw a subject?
+Who nominates the panel for a title defense?
+
+1 passage found by keyword search among 1450 indexed sections.
+
+ANSWER PREVIEW (EXTRACTED FROM THE PASSAGES, NO AI)
+
+Walkthrough Memo - Lounge Reservation 20261102-2048 Graduate School Lounge Reservation Rule (walkthrough memo, made-up for demonstration only). Section 1. A student organisation may reserve the Graduate School lounge at most four (4) times per semes Section 2. A reservation must be filed with the Graduate School office at least three working days ahead.
+Source: Walkthrough Memo - Lounge Reservation 20261102-2048 (p. 1)
+
+1. Walkthrough Memo - Lounge Reservation 20261102-2048
+
+Active
+p. 1
+
+A student organisation may reserve the Graduate School lounge at most four (4) times per semes Section 2.
+
+Documents
+
+Staff uploads can be edited, replaced, or removed. Built-in sources are view-only.
+
+Search documents
+All categories
+Handbook
+Research Protocol
+Operations Manual
+Memo
+Form
+Other
+All statuses
+Active
+Draft
+Archived
+Walkthrough Memo - Lounge Reservation 20261102-2048
+
+Lounge_Reservation_Memo_20261102-2048_v2.pdf
+
+Active
+Memo
+Version 2
+
+Made-up lounge reservation rule, uploaded during the walkthrough to show that a new policy is searchable at once.
+
+PDF
+2 KB
+1 page
+1 searchable section
+
+Grace Fernandez · Nov 2, 2026, 8:48 PM
+
+Version history (2)
+
+Version 2
+Current, searched
+
+Lounge_Reservation_Memo_20261102-2048_v2.pdf · 2 KB
+
+Grace Fernandez · Nov 2, 2026, 8:48 PM
+
+“Raised the limit from four to six reservations”
+
+View
+
+Version 1
+
+Lounge_Reservation_Memo_20261102-2048.pdf · 2 KB
+
+Grace Fernandez · Nov 2, 2026, 8:48 PM
+
+“First upload for the walkthrough”
+
+View

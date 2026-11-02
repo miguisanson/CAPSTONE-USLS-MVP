@@ -361,9 +361,13 @@ def render_blocks(b: Builder, sections: list[dict]) -> None:
 
 
 def render_case(b: Builder, number: int, case: dict) -> None:
-    suffix = "  ·  reference only" if case.get("kind") == "reference" and "reference only" not in case["title"] else ""
-    b.heading(f"Case {number} — {case['title']}{suffix}", 2)
-    bits = [x for x in (f"Time: {case['duration']}" if case.get("duration") else "", case.get("owner", "")) if x]
+    b.heading(f"Case {number} — {case['title']}", 2)
+    bits = [x for x in (
+        f"Demo part {case['part']}" if case.get("part") else "",
+        f"Presenter: {case['presenter']}" if case.get("presenter") else "",
+        f"Time: {case['duration']}" if case.get("duration") else "",
+        f"Signs in as: {case['owner']}" if case.get("owner") else "",
+    ) if x]
     if bits:
         b.para("  ·  ".join(bits), italic=True, size=9.5, color=GREY, after=3)
     b.label("Story")
@@ -426,16 +430,21 @@ def build(toc_pages: dict[str, int] | None, out: Path) -> Builder:
     render_blocks(b, front["before_cases"])
     b.heading("6.  Demonstration Running Order", 1)
     b.para(front["running_order_intro"])
-    rows = []
-    for n, c in enumerate(cases, 1):
-        rows.append([f"Case {n}", c["title"] + ("  ·  reference only" if c.get("kind") == "reference" and "reference only" not in c["title"] else ""), c.get("owner", ""), c.get("duration", "")])
-    b.table(["Case", "What is demonstrated", "Who", "Time"], rows, [0.7, 3.3, 1.8, 0.7], small=True)
+    rows = [[c.get("part", ""), f"Case {n}", c["title"], c.get("presenter", ""), c.get("duration", "")] for n, c in enumerate(cases, 1)]
+    b.table(["Part", "Case", "What is demonstrated", "Who", "Time"], rows, [0.5, 0.65, 3.55, 1.1, 0.7], small=True)
     for text in front.get("running_order_notes", []):
         b.para(text)
+    live = [(n, c) for n, c in enumerate(cases, 1) if c.get("kind", "live") == "live"]
+    ref = [(n, c) for n, c in enumerate(cases, 1) if c.get("kind") == "reference"]
     b.heading("7.  Demonstration Cases", 1)
     b.para(front["cases_intro"])
-    for n, c in enumerate(cases, 1):
+    for n, c in live:
         render_case(b, n, c)
+    if ref:
+        b.heading("8.  Reference Only", 1)
+        b.para(front["reference_intro"])
+        for n, c in ref:
+            render_case(b, n, c)
     render_blocks(b, front["after_cases"])
     b.para("")
     b.para("End of Demonstration Walkthrough", italic=True, color=GREY, align=WD_ALIGN_PARAGRAPH.CENTER)

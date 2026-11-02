@@ -1,0 +1,512 @@
+{
+ "slug": "proposal_final",
+ "title": "Research - Miguel Yu's journey: Title Defense verdict, Proposal Defense, Final Defense and graduation eligibility",
+ "kind": "live",
+ "part": "2i",
+ "presenter": "Nat",
+ "owner": "Student, Faculty adviser, GS Staff, Research Coordinator, Panel Chair",
+ "duration": "25 min",
+ "story": [
+  "Last of the six research cases of one demo slot ({case:research_title}, {case:panel_matching}, {case:defense-scheduling}, {case:calendars}, {case:verdicts}). After Miguel Yu's Title Defense package is endorsed and his panel is chosen, the research lifecycle continues through four stages in the same Research Gate: Title Defense, Proposal Defense, Final Defense and Completion. Each stage unlocks only when the one before it has a passing result recorded by the panel chair. This case follows Miguel through all of them and ends where the Graduation Endorsement page lists him as eligible.",
+  "Scheduling and verdict screens are the subject of {case:defense-scheduling} and {case:verdicts}; here they are used with the minimum of steps to move Miguel forward. The system only accepts a verdict after the defense has started and refuses a slot in the past, so each defense is booked for a short slot that starts about two minutes after the booking, and the panel chair submits the verdict once the start time has passed. The Title Defense needs the staff warning override for the 14-day lead time (with a recorded reason); the proposal and final defenses are counted from the date the panel received the manuscript, so no override is needed there.",
+  "The app also refuses a slot outside the hours a panelist or the adviser entered (this cannot be overridden). The demo faculty work Monday to Friday, 08:00 to 17:00. This run was made on a Monday evening, so before the first booking every person of the defense entered \"available only these hours\" for today in My Availability (Part A, first step). Run during office hours, that step is not needed."
+ ],
+ "accounts": [
+  [
+   "Student",
+   "student@usls.edu.ph",
+   "Miguel Yu: uploads the documents of each stage"
+  ],
+  [
+   "GS Staff",
+   "staff@usls.edu.ph",
+   "Books the defenses, runs Panel Matching, verifies the requirements, opens Graduation Endorsement"
+  ],
+  [
+   "Faculty adviser",
+   "celeste.tan@usls.edu.ph",
+   "Dr. Celeste Tan: signs the uploaded manuscripts and endorsements in the Faculty Portal; also enters today's hours"
+  ],
+  [
+   "Panel chair (all three defenses)",
+   "liwayway.bautista@usls.edu.ph",
+   "Dr. Liwayway Bautista: submits the Title, Proposal and Final Defense verdicts in the Faculty Portal"
+  ],
+  [
+   "Research Coordinator",
+   "research@usls.edu.ph",
+   "Dr. Sofia Mendoza: records the ethics clearance (Form 5.2)"
+  ]
+ ],
+ "data": [
+  [
+   "Student",
+   "Miguel Yu, 2260004, MAED (reset first; the title package, adviser and panel come from the previous cases or are prepared first)"
+  ],
+  [
+   "Title panel",
+   "The panel Panel Matching suggests, kept as it is: Dr. Liwayway Bautista (Panel Chair), Dr. Marlon Geronimo (Content Specialist), Dr. Teodoro Ramos (Method Specialist)"
+  ],
+  [
+   "Proposal and final panel",
+   "The four-member panel Panel Matching suggests for the proposal, kept as it is and carried over to the final defense: Dr. Liwayway Bautista (Panel Chair), Dr. Patricia Salvador (Content Specialist), Dr. Teodoro Ramos (Method Specialist), Dr. Paolo Navarro (External Panel)"
+  ],
+  [
+   "Files uploaded",
+   "Small demonstration PDFs with realistic names, for example Yu_Miguel_Proposal_Manuscript.pdf, Yu_Miguel_Form4_Endorsement_for_Proposal_Defense.pdf, Yu_Miguel_Form5-2_Ethics_Clearance.pdf, Yu_Miguel_Final_Defense_Manuscript.pdf, Yu_Miguel_Turnitin_Certificate_SIR_11.pdf"
+  ],
+  [
+   "Verdicts",
+   "Title Defense: Approved, with the title taken from the three submitted; Proposal Defense: Passed; Final Defense: Passed with evaluation score 92 (Form 7)"
+  ],
+  [
+   "Ethics clearance",
+   "Status Cleared, dated the day of the demonstration"
+  ],
+  [
+   "Availability entered for the demo",
+   "Evening run only: today, 12:00 AM to 11:59 PM, for the adviser and every panelist, through My Availability > Specific dates"
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Title Defense: schedule and verdict",
+   "steps": [
+    {
+     "text": "Evening or weekend run only. The demo faculty have weekly hours of Monday to Friday, 08:00 to 17:00, and the app refuses a slot outside the hours a person entered. So each person of the defense (the adviser Dr. Celeste Tan and the three panelists: Dr. Liwayway Bautista, Dr. Marlon Geronimo, Dr. Teodoro Ramos) signs in, opens **My Availability**, and in **Specific dates** chooses **I am available ONLY these hours**, sets **First date** to today, **From (Philippine time)** 12:00 AM and **To (Philippine time)** 11:59 PM, and clicks **Add date**. The message **Date saved.** appears and the date shows under **Your dates**. Skip this step in office hours.",
+     "shots": [
+      {
+       "id": "proposal_final-01",
+       "caption": "My Availability: the form for today, hours 12:00 AM to 11:59 PM."
+      },
+      {
+       "id": "proposal_final-02",
+       "caption": "Date saved; today appears under Your dates."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as **staff@usls.edu.ph**, open **7 · Defense Scheduling**, search **2260004** and select **Miguel Yu**. Under **Student readiness** confirm that the stage is Title Defense and the requirements are complete (Form 1 application and Concept papers Verified, Academic Coordinator endorsement Endorsed).",
+     "shots": [
+      {
+       "id": "proposal_final-03",
+       "caption": "Defense Scheduling, student readiness for the Title Defense."
+      }
+     ]
+    },
+    {
+     "text": "Scroll to **Panel members**: the three panelists each show **Entered** (availability) and **Accepted** (invitation). Further down, **Availability of the panel** lists the adviser Dr. Celeste Tan too, because the adviser sits in the defense.",
+     "shots": [
+      {
+       "id": "proposal_final-04",
+       "caption": "The three panel members: availability entered, invitation accepted."
+      }
+     ]
+    },
+    {
+     "text": "In **Final schedule** enter today's date, a start time about two minutes from now and an end time five minutes later (short on purpose, so that the next defenses can follow), mode **On-site**, venue GS Conference Room. A yellow box **Needs a reason** says that a Title Defense needs at least 14 days after the Academic Coordinator endorsed Form 1. Tick **Warning override** and write the reason (\"Demonstration run: booked the same day so that the verdict can follow\").",
+     "shots": [
+      {
+       "id": "proposal_final-05",
+       "caption": "Final schedule filled in; the warning box and the override with its reason."
+      }
+     ]
+    },
+    {
+     "text": "Click **Set defense schedule**. Confirm the message \"Saved. The student record, queue, and monitoring indicators were updated.\" The form now says that the stage is already booked, and **View schedule history** shows the booking.",
+     "shots": [
+      {
+       "id": "proposal_final-06",
+       "caption": "The Title Defense is booked."
+      }
+     ]
+    },
+    {
+     "text": "When the start time has passed, sign in as the panel chair **Dr. Liwayway Bautista** (**liwayway.bautista@usls.edu.ph**) and open **Verdicts**. In **Needs your verdict** the card of Miguel Yu lists the Form 1 and the three concept papers under **Current-stage papers**, and the block **Submit panel chair verdict** is open (before the start time the card waits under Waiting on others).",
+     "shots": [
+      {
+       "id": "proposal_final-07",
+       "caption": "The Title Defense card with the papers and the verdict form."
+      }
+     ]
+    },
+    {
+     "text": "Keep the verdict result **Approved** (the first option for a title defense), write the remark \"Title approved as submitted.\" and type the title chosen by the panel from the three submitted into **Title selected by the panel (from the three submitted)**. Click **Submit final verdict**.",
+     "shots": [
+      {
+       "id": "proposal_final-08",
+       "caption": "Verdict form filled in."
+      }
+     ]
+    },
+    {
+     "text": "The card moves to **Verdict history** and reads \"Verdict: Approved\" with the title, the chair and the time. Under it, **Entered the wrong verdict?** lets the chair correct the verdict with a reason until staff or the student act on it.",
+     "shots": [
+      {
+       "id": "proposal_final-09",
+       "caption": "The verdict recorded; the correction box under it."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as the student and open **Research Progress**. The box **Automatically detected stage** now says **Proposal Defense**: the Title Defense box is complete.",
+     "shots": [
+      {
+       "id": "proposal_final-10",
+       "caption": "The student's stage moved to Proposal Defense."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - Proposal Defense requirements, panel, schedule and verdict",
+   "steps": [
+    {
+     "text": "On the student's Research Progress page read the cards under **Files you upload** for the Proposal Defense: **Proposal manuscript**, **Proposal defense endorsement**, **Statistical consultation form or qualitative exemption** and **Proposal manuscript endorsement**. Two more cards, **Form 5.1 Technical Review Certificate** and **Research Protocol Form 5.2 ethics clearance**, say \"Opens after the proposal defense is passed\". The block **Completed by staff or the system** lists the panel assignment, the confirmed schedule, the defense result and the ethics clearance record.",
+     "shots": [
+      {
+       "id": "proposal_final-11",
+       "caption": "The Proposal Defense cards, all waiting for an upload."
+      }
+     ]
+    },
+    {
+     "text": "Click **Upload PDF** in each of the four cards and choose a PDF. Each card then reads 1 of 1 file uploaded; the manuscript and endorsements show that the assigned adviser must sign the exact uploaded file.",
+     "shots": [
+      {
+       "id": "proposal_final-12",
+       "caption": "Four proposal documents uploaded."
+      }
+     ]
+    },
+    {
+     "text": "Click **Submit Proposal Defense for review**. The window **Send this request?** says \"Proposal Defense Readiness for review\"; click **Send request**. Confirm the notice **Request sent** at the top of the page (\"Submitted. Research staff will review your application.\") and the page status **Awaiting Review**.",
+     "shots": [
+      {
+       "id": "proposal_final-13",
+       "caption": "The Send this request window."
+      },
+      {
+       "id": "proposal_final-14",
+       "caption": "Proposal Defense package submitted."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as the adviser (**celeste.tan@usls.edu.ph**) and open **Signatures & Endorsements**. The list shows the documents of all her advisees; Miguel's three unsigned documents (proposal manuscript, Form 4 endorsement, proposal manuscript endorsement) carry the badge **Needs signature**. (The statistical form is not signed by the adviser.)",
+     "shots": [
+      {
+       "id": "proposal_final-15",
+       "caption": "Miguel's three documents waiting for the adviser's signature."
+      }
+     ]
+    },
+    {
+     "text": "Select one document: the panel on the right asks you to review the exact file and sign it. Draw a signature on the pad, click **Finalize signature**, then **Sign this document**. Repeat for the other two documents. After each one the message \"Document signed successfully.\" appears and the badge becomes **Signed**.",
+     "shots": [
+      {
+       "id": "proposal_final-16",
+       "caption": "A signature drawn and finalized on the selected document."
+      },
+      {
+       "id": "proposal_final-17",
+       "caption": "All three documents signed by Dr. Celeste Tan."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff open **5 · Research Gate**, select Miguel Yu and read **Proposal Defense requirements** (stage Proposal Defense, awaiting review).",
+     "shots": [
+      {
+       "id": "proposal_final-18",
+       "caption": "Research Gate record for the proposal stage before verification."
+      }
+     ]
+    },
+    {
+     "text": "Click **Verify submitted requirements**. The four uploaded documents show **Verified**; the panel assignment is still pending panel matching and the schedule and result are pending.",
+     "shots": [
+      {
+       "id": "proposal_final-19",
+       "caption": "The proposal documents verified."
+      }
+     ]
+    },
+    {
+     "text": "Open **6 · Panel Matching** for Miguel Yu. The source is now the proposal manuscript with the same similarity method, and the panel needs **4 members**: Panel Chair, Content Specialist, Method Specialist and External Panel (the external member joins from the proposal stage). Dr. Celeste Tan is again excluded as adviser.",
+     "shots": [
+      {
+       "id": "proposal_final-20",
+       "caption": "Panel Matching for the proposal: source and method."
+      }
+     ]
+    },
+    {
+     "text": "Read the ranking: the suggested panel is Dr. Liwayway Bautista (Panel Chair), Dr. Patricia Salvador (Content Specialist), Dr. Teodoro Ramos (Method Specialist), Dr. Paolo Navarro (External Panel). The ranking differs from the one for the concept papers because the text read is different. Keep the suggested panel (staff may change any seat) and click **Finalize selected panel**.",
+     "shots": [
+      {
+       "id": "proposal_final-21",
+       "caption": "Ranked candidates for the proposal manuscript."
+      },
+      {
+       "id": "proposal_final-22",
+       "caption": "Review and adjust the panel set: the four suggested seats."
+      }
+     ]
+    },
+    {
+     "text": "Open **5 · Research Gate** for Miguel Yu and scroll to the card **Panel Matching**: it shows **Final panel selected** and the four names. The four panelists then accept their invitations in the Faculty Portal under **Panel Invitations** (click **Accept**).",
+     "shots": [
+      {
+       "id": "proposal_final-23",
+       "caption": "Research Gate: the final proposal panel."
+      }
+     ]
+    },
+    {
+     "text": "Open **7 · Defense Scheduling** and select Miguel Yu. Confirm the readiness block (Proposal Defense; manuscript, endorsements and panel assignment complete; Form 5.1 and ethics clearance \"Opens after the proposal defense is passed\") and the four **Panel members** (**Entered** and **Accepted**). Each new panelist first entered today's hours the same way as in Part A.",
+     "shots": [
+      {
+       "id": "proposal_final-24",
+       "caption": "Readiness for the Proposal Defense."
+      },
+      {
+       "id": "proposal_final-25",
+       "caption": "The four proposal panel members."
+      }
+     ]
+    },
+    {
+     "text": "In **Final schedule** enter the same kind of short same-day slot, fill **Date the panel received the manuscript** (a date 20 days back) and read the green line **No conflicts found (5 of 5 checked)**, which counts the adviser. Because the lead time is counted from the manuscript date, no warning appears and no override is needed (override was not needed in this run). Click **Set defense schedule**.",
+     "shots": [
+      {
+       "id": "proposal_final-26",
+       "caption": "Final schedule for the Proposal Defense; no conflicts."
+      },
+      {
+       "id": "proposal_final-27",
+       "caption": "The Proposal Defense is booked."
+      }
+     ]
+    },
+    {
+     "text": "As the panel chair **Dr. Liwayway Bautista** open **Verdicts**. The Proposal Defense card lists the four proposal documents. Keep **Passed**, add the remark \"Proposal approved.\" and click **Submit final verdict**. The card moves to **Verdict history** and reads \"Verdict: Passed\".",
+     "shots": [
+      {
+       "id": "proposal_final-28",
+       "caption": "The Proposal Defense card with the four documents."
+      },
+      {
+       "id": "proposal_final-29",
+       "caption": "Verdict form filled in."
+      },
+      {
+       "id": "proposal_final-30",
+       "caption": "Verdict: Passed."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - Form 5.1, ethics clearance (Form 5.2) and the end of the Proposal stage",
+   "steps": [
+    {
+     "text": "As the student open **Research Progress**. The cards **Form 5.1 Technical Review Certificate** and **Research Protocol Form 5.2 ethics clearance** are now open for upload and the page status is Missing Requirements. Upload Yu_Miguel_Form5-1_Technical_Review_Certificate.pdf and Yu_Miguel_Form5-2_Ethics_Clearance.pdf. Both show Submitted for review; **Ethics clearance status and date** waits for the Research Coordinator.",
+     "shots": [
+      {
+       "id": "proposal_final-31",
+       "caption": "Form 5.1 and Form 5.2 now open for upload."
+      },
+      {
+       "id": "proposal_final-32",
+       "caption": "Both uploaded."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as the Research Coordinator (**research@usls.edu.ph**), open **5 · Research Gate** for Miguel Yu and scroll to the ethics card. Choose **Clearance status** = Cleared, set **Clearance date** and click **Record ethics clearance**. The card shows \"Cleared on\" with the date, and the record **Ethics clearance status and date** is complete.",
+     "shots": [
+      {
+       "id": "proposal_final-33",
+       "caption": "The ethics card with the clearance status and date."
+      },
+      {
+       "id": "proposal_final-34",
+       "caption": "Ethics clearance recorded."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff click **Verify submitted requirements** again. The progress steps show **Title Defense** and **Proposal Defense** Complete and **Final Defense** as the current stage with 0 of 4 requirements complete.",
+     "shots": [
+      {
+       "id": "proposal_final-35",
+       "caption": "Proposal stage complete; Final Defense is next."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part D - Final Defense",
+   "steps": [
+    {
+     "text": "As the student open **Research Progress**. The stage is **Final Defense**: the proposal panel carries over to the final defense. Upload **Final defense manuscript** and **Final defense endorsement** and click **Submit Final Defense for review**; confirm in the window **Send this request?** with **Send request**. The manuscript card shows the badge Pending adviser signature.",
+     "shots": [
+      {
+       "id": "proposal_final-36",
+       "caption": "Final Defense cards."
+      },
+      {
+       "id": "proposal_final-37",
+       "caption": "Both documents uploaded."
+      },
+      {
+       "id": "proposal_final-38",
+       "caption": "The Send this request window."
+      },
+      {
+       "id": "proposal_final-39",
+       "caption": "Final Defense package submitted."
+      }
+     ]
+    },
+    {
+     "text": "As the adviser open **Signatures & Endorsements**, select each of Miguel's two final documents, draw a signature, finalize it and click **Sign this document**.",
+     "shots": [
+      {
+       "id": "proposal_final-40",
+       "caption": "Miguel's final documents waiting for signature."
+      },
+      {
+       "id": "proposal_final-41",
+       "caption": "A signature on the selected document."
+      },
+      {
+       "id": "proposal_final-42",
+       "caption": "Both final documents signed."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff open **5 · Research Gate**, select Miguel Yu (current stage Final Defense, awaiting review) and click **Verify submitted requirements**. The two documents show Verified; the confirmed final defense schedule and the final defense result stay pending.",
+     "shots": [
+      {
+       "id": "proposal_final-43",
+       "caption": "Research Gate for the final stage before verification."
+      },
+      {
+       "id": "proposal_final-44",
+       "caption": "Final documents verified."
+      }
+     ]
+    },
+    {
+     "text": "Open **7 · Defense Scheduling** and book the Final Defense as before (same-day short slot, manuscript receipt date). The panel is the one carried over, with **No conflicts found (5 of 5 checked)** counting the adviser. No override is needed.",
+     "shots": [
+      {
+       "id": "proposal_final-45",
+       "caption": "Readiness for the Final Defense."
+      },
+      {
+       "id": "proposal_final-46",
+       "caption": "The carried-over panel members."
+      },
+      {
+       "id": "proposal_final-47",
+       "caption": "Final schedule for the Final Defense."
+      },
+      {
+       "id": "proposal_final-48",
+       "caption": "The Final Defense is booked."
+      }
+     ]
+    },
+    {
+     "text": "As the panel chair **Dr. Liwayway Bautista** open **Verdicts**. For a final defense the form has an extra field **Evaluation score (Form 7, optional)** with the hint \"Below 85 thesis / 90 dissertation cannot be a pass\". Keep **Passed**, write \"Final defense passed.\", enter **92** and click **Submit final verdict**.",
+     "shots": [
+      {
+       "id": "proposal_final-49",
+       "caption": "The Final Defense card."
+      },
+      {
+       "id": "proposal_final-50",
+       "caption": "Verdict form with the evaluation score."
+      },
+      {
+       "id": "proposal_final-51",
+       "caption": "Verdict: Passed."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part E - Completion evidence and graduation eligibility",
+   "steps": [
+    {
+     "text": "As the student open **Research Progress**. The stage is now **Completion** (Missing Requirements). Upload the five completion documents: **Final manuscript for archiving**, **Panel approval confirmations**, **Turnitin certificate (SIR 15% or below)**, **Form 9 editor certification** and **Form 10 approval sheet**, then click **Submit Completion for review** and **Send request**. The Turnitin percentage is not read from the file; staff check the certificate.",
+     "shots": [
+      {
+       "id": "proposal_final-52",
+       "caption": "Completion cards."
+      },
+      {
+       "id": "proposal_final-53",
+       "caption": "Five documents uploaded."
+      },
+      {
+       "id": "proposal_final-54",
+       "caption": "The Send this request window."
+      },
+      {
+       "id": "proposal_final-55",
+       "caption": "Completion package submitted."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff open **5 · Research Gate**, select Miguel Yu and click **Verify submitted requirements**. All four progress steps (Title Defense, Proposal Defense, Final Defense, Completion) read Complete, with 5 completed and 0 pending requirements.",
+     "shots": [
+      {
+       "id": "proposal_final-56",
+       "caption": "All four stages complete."
+      }
+     ]
+    },
+    {
+     "text": "Open **9 · Graduation Endorsement**. The page is a board (with the **Board** and **Table** buttons). Type Miguel in **Search list**: he is the one card in the column **Academically eligible** (\"Requirements met. Signed application not in yet.\", status **Awaiting Student Application**). He cannot be put in a graduation batch until he submits the signed application in the student portal. Click **View details**: the window shows Coursework completed, Thesis / research completed, Practicum not required and **Eligible for graduation**. Click **Close details**.",
+     "shots": [
+      {
+       "id": "proposal_final-57",
+       "caption": "Graduation Endorsement board: Miguel Yu in Academically eligible."
+      },
+      {
+       "id": "proposal_final-58",
+       "caption": "His details window: every requirement met."
+      }
+     ]
+    },
+    {
+     "text": "As the student open **Graduation Endorsement**. The step **Requirements Validation** shows **Monitoring eligibility recommendation** with the badge **Eligible** (\"No missing requirements are currently flagged by the monitoring layer\"), and the first step still asks the student to **Submit graduation application** with the signed PDF. The batch, Dean endorsement and export steps are covered in {case:graduation}.",
+     "shots": [
+      {
+       "id": "proposal_final-59",
+       "caption": "The student's Graduation Endorsement page: eligible."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "Each stage unlocks only after the previous stage has a passing result from the panel chair. A failed or deferred verdict keeps the student at the same stage and asks for resubmission or a re-defense.",
+  "The advisers sign the exact uploaded file in the system; replacing a manuscript sends the new file back to the adviser. The statistical consultation form is not an adviser signature item.",
+  "To reach these screens in one sitting the three defenses were booked for short slots about two minutes ahead. Past slots, double-booked panelists and people outside their entered hours cannot be overridden. The Title Defense lead time (14 days after the Form 1 endorsement) needed the warning override with a recorded reason; the later defenses did not.",
+  "Verdict words differ by stage: the Title Defense options start with Approved; proposal and final start with Passed. The evaluation score on the Final Defense verdict is optional and a score below the thesis or dissertation minimum cannot be a pass.",
+  "The files uploaded here are small demonstration PDFs; no document content is graded. Graduation batch creation, Dean endorsement and export are not part of this case ({case:graduation}).",
+  "The demo needs a fresh database or a reset of Miguel Yu from the sign-in page: the research cases consume him. No e-mail is sent by these steps."
+ ]
+}

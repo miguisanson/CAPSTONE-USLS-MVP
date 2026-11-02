@@ -1,0 +1,478 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Panel Matching
+Grace Fernandez · Graduate School Staff
+2
+GF
+Panel Matching
+
+Nominate panel members (after the Academic Coordinator's endorsement of Form 1) using specialization, availability, workload, and eligibility notes.
+
+How this works
+View recent activity
+Rules applied on this screen
+11 rules from the Graduate School policies · 2 need review
+Choose a student
+
+Pick the record this action applies to
+
+FB
+
+Selected student
+
+GS-2026-PM-04 - Fontanilla, Bea - MBA
+
+Panel recommendation workspace
+
+Review why each faculty member ranks where they do, adjust the suggested panel, then finalize it
+
+Faculty profiles
+
+Three concept papers content ready
+
+3 of 3 PDFs uploaded. 3 of 3 successfully read. Source: Three concept papers body text only; research titles and filenames excluded.
+
+Similarity match (keyword TF-IDF)
+Ready
+
+Paper analysis: Keyword analysis (local, no AI service)
+
+Keyword TF-IDF similarity between the paper and each faculty member's expertise records.
+
+Research title (display only; excluded from matching): Trust, Perceived Risk, and E-Wallet Adoption among Young Working Adults
+
+e-wallet
+savings behavior
+information systems
+financial
+digital
+accounting
+information
+systems
+reporting
+quality
+small
+enterprises
+adoption
+payment
+savings
+behavior
+micro-entrepreneurs
+investigates
+Accounting Information Systems and Financial Reporting Quality in Small Enterprises.pdf
+Text extracted
+
+Analyzed keywords: information systems, accounting, information, systems, financial
+
+Accounting Information Systems and Financial Reporting Quality in Small Enterprises This concept paper investigates how the adoption of cloud accounting information systems affects the quality of financial reporting and...
+
+Digital Payment Usage and Savings Behavior of Micro-entrepreneurs.pdf
+Text extracted
+
+Analyzed keywords: savings behavior, digital, savings, behavior, micro-entrepreneurs
+
+Digital Payment Usage and Savings Behavior of Micro-entrepreneurs This concept paper examines whether the use of digital payments and mobile banking changes the savings behavior and financial record keeping of...
+
+Trust, Perceived Risk, and E-Wallet Adoption among Young Working Adults.pdf
+Text extracted
+
+Analyzed keywords: e-wallet, studies, trust, perceived, risk
+
+This concept paper studies how trust and perceived risk influence the adoption of e-wallets and digital payment apps among young working adults, using a technology acceptance model and a survey of app users.
+
+EXPERTISE MATCH
+
+60 pts
+
+paper vs. faculty records
+
+AVAILABILITY
+
+25 pts
+
+conflict-free windows
+
+WORKLOAD
+
+15 pts
+
+other student panels
+
+Thesis panel needs 3 members: Panel Chair, Content Specialist, Method Specialist. Expertise counts most; candidates who share no topic with the paper are listed after those who do.
+
+Not eligible for this student's panel
+
+Dr. Angela Cruz: Adviser of this student; an adviser cannot sit on the student's panel.
+Search faculty
+Specialization
+Department / program
+Availability
+All availability
+Available
+Limited availability
+No availability recorded
+Showing the top 11 ranked candidates. The suggested panel is highlighted and preselected; open "Why" on any row to see the evidence.
+RANK / FACULTY
+EXPERTISE MATCH
+AVAILABILITY & WORKLOAD
+SCORE BREAKDOWN
+1
+Dr. Benjamin Reyes
+Suggested: Panel Chair
+
+Business
+
+financial
+savings behavior
+digital payment
+accounting information
+business analytics
+
+Finance, business analytics, accounting, and financial technology
+
+Why this score
+
+Available
+
+3 conflict-free windows
+
+3 other student panels
+
+84.7/100
+
+60/60 · 17.2/25 · 7.5/15
+
+2
+Dr. Adriana Santos
+Suggested: Content Specialist
+
+Nursing
+
+quality
+information systems
+
+Health informatics, public health, and medical systems
+
+Why this score
+
+Available
+
+4 conflict-free windows
+
+0 other student panels
+
+39.9/100
+
+4.6/60 · 20.3/25 · 15/15
+
+3
+Dr. Teresa Lim
+
+Business
+
+digital
+marketing
+behavior
+perceived risk
+trust
+
+Marketing strategy, consumer behavior, digital commerce, and brand analytics
+
+Why this score
+
+Limited availability
+
+2 conflict-free windows
+
+2 other student panels
+
+35.6/100
+
+11.5/60 · 14.1/25 · 10/15
+
+4
+Dr. Liwayway Bautista
+Suggested: Method Specialist
+
+Education
+
+technology
+
+Learning analytics, online learning, and student engagement in graduate education
+
+Why this score
+
+Available
+
+5 conflict-free windows
+
+2 other student panels
+
+35.1/100
+
+1.7/60 · 23.4/25 · 10/15
+
+5
+Dr. Paolo Navarro
+
+Business
+
+behavior
+
+Human resource management, organizational behavior, leadership, and workplace research
+
+Why this score
+
+Available
+
+5 conflict-free windows
+
+2 other student panels
+
+34.8/100
+
+1.4/60 · 23.4/25 · 10/15
+
+6
+Dr. Marlon Geronimo
+
+Education
+
+business
+risk
+
+Machine learning, educational data analytics, and predicting student performance
+
+Why this score
+
+Available
+
+4 conflict-free windows
+
+2 other student panels
+
+32.5/100
+
+2.2/60 · 20.3/25 · 10/15
+
+7
+Dr. Celeste Tan
+
+Arts and Sciences
+
+behavior
+
+Psychology, student well-being, and behavioral research
+
+Why this score
+
+Limited availability
+
+2 conflict-free windows
+
+1 other student panel
+
+28.1/100
+
+1.5/60 · 14.1/25 · 12.5/15
+
+8
+Dr. Patricia Salvador
+
+Education
+
+technology
+
+Online learning, learning management systems, education technology, and curriculum development
+
+Why this score
+
+Available
+
+3 conflict-free windows
+
+3 other student panels
+
+26.1/100
+
+1.4/60 · 17.2/25 · 7.5/15
+
+9
+Dr. Marco Villanueva
+
+Business
+
+Overloaded
+quality
+
+Operations management, supply chain analytics, quality systems, and process improvement
+
+Why this score
+
+Available
+
+3 conflict-free windows
+
+5 other student panels
+
+21.9/100
+
+2.2/60 · 17.2/25 · 2.5/15
+
+10
+Dr. Teodoro Ramos
+
+Education
+
+Overloaded
+survey
+
+Learning analytics, online learning assessment, and educational data science
+
+Why this score
+
+Limited availability
+
+2 conflict-free windows
+
+8 other student panels
+
+15.7/100
+
+1.6/60 · 14.1/25 · 0/15
+
+11
+Dr. Daniel Uy
+
+Engineering and Technology
+
+No topic match
+
+No distinctive topic in common with the paper
+
+Engineering systems, automation, data modeling, and predictive analytics
+
+Why this score
+
+Available
+
+5 conflict-free windows
+
+0 other student panels
+
+39.4/100
+
+1/60 · 23.4/25 · 15/15
+
+Expertise match
+Availability
+Workload
+
+Review and adjust the panel set
+
+The suggested panel is preselected: the strongest methods profile takes the Method seat and the rest follow by score. Staff may change any role before finalizing.
+
+Staff review
+Panel Chair
+Select faculty
+#1 Dr. Benjamin Reyes - 84.7/100
+#2 Dr. Adriana Santos - 39.9/100
+#3 Dr. Teresa Lim - 35.6/100
+#4 Dr. Liwayway Bautista - 35.1/100
+#5 Dr. Paolo Navarro - 34.8/100
+#6 Dr. Marlon Geronimo - 32.5/100
+#7 Dr. Celeste Tan - 28.1/100
+#8 Dr. Patricia Salvador - 26.1/100
+#9 Dr. Marco Villanueva - 21.9/100
+#10 Dr. Teodoro Ramos - 15.7/100
+#11 Dr. Daniel Uy - 39.4/100
+Content Specialist
+Select faculty
+#1 Dr. Benjamin Reyes - 84.7/100
+#2 Dr. Adriana Santos - 39.9/100
+#3 Dr. Teresa Lim - 35.6/100
+#4 Dr. Liwayway Bautista - 35.1/100
+#5 Dr. Paolo Navarro - 34.8/100
+#6 Dr. Marlon Geronimo - 32.5/100
+#7 Dr. Celeste Tan - 28.1/100
+#8 Dr. Patricia Salvador - 26.1/100
+#9 Dr. Marco Villanueva - 21.9/100
+#10 Dr. Teodoro Ramos - 15.7/100
+#11 Dr. Daniel Uy - 39.4/100
+Method Specialist
+Select faculty
+#1 Dr. Benjamin Reyes - 84.7/100
+#2 Dr. Adriana Santos - 39.9/100
+#3 Dr. Teresa Lim - 35.6/100
+#4 Dr. Liwayway Bautista - 35.1/100
+#5 Dr. Paolo Navarro - 34.8/100
+#6 Dr. Marlon Geronimo - 32.5/100
+#7 Dr. Celeste Tan - 28.1/100
+#8 Dr. Patricia Salvador - 26.1/100
+#9 Dr. Marco Villanueva - 21.9/100
+#10 Dr. Teodoro Ramos - 15.7/100
+#11 Dr. Daniel Uy - 39.4/100
+
+Panel composition rules
+
+Suggested panel satisfies the protocol
+All 3 panel seats required for a Thesis are filled.
+Every required role is seated exactly once.
+Every seat has a different faculty member.
+The student's adviser and co-adviser are not on the panel.
+Dr. Benjamin Reyes chairs the panel (University-affiliated faculty).
+A Thesis panel has no External Panel seat.
+Dr. Liwayway Bautista has recorded research-methods expertise.
+
+Source: Graduate School Research Protocol (AY 2024-2025), Title Defense - panel composition. Checked again on the server when the panel is finalized.
+
+Finalize selected panel

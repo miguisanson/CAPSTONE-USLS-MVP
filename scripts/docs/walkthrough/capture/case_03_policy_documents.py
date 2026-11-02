@@ -6,6 +6,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from .case_01_signin import harden
 from .common import Runtime
 from .helpers_a1 import goto_nav, scroll_to, scroll_top, wait_loaded, safe_notes
 
@@ -39,6 +40,7 @@ def make_pdf(path: Path, title: str, limit: str) -> None:
 
 
 def run(rt: Runtime) -> None:
+    harden(rt)
     safe_notes(rt)
     stamp = time.strftime("%Y%m%d-%H%M")
     title = f"Walkthrough Memo - Lounge Reservation {stamp}"
@@ -56,7 +58,7 @@ def run(rt: Runtime) -> None:
 
     def library():
         goto_nav(rt, page, "Policy Documents", "/policy-documents")
-        page.get_by_role("heading", name=re.compile("Policy document library", re.I)).first.wait_for()
+        page.get_by_role("heading", name="Policy Documents", exact=True).first.wait_for()
         page.wait_for_timeout(800)
         rt.shot(page, s(1), full=True)
     rt.step("open Policy Documents", library)
@@ -71,7 +73,7 @@ def run(rt: Runtime) -> None:
     rt.step("Operations Manual is a Draft pending validation", draft_manual)
 
     def day_one_test():
-        page.get_by_placeholder(re.compile("library tablets")).fill("Can a student withdraw a subject on Day 1?")
+        page.get_by_label("Question to test").fill("Can a student withdraw a subject on Day 1?")
         page.get_by_role("button", name=re.compile("Find passages", re.I)).click()
         page.get_by_text(re.compile(r"passages? found by")).first.wait_for(timeout=60000)
         page.wait_for_timeout(600)
@@ -114,7 +116,7 @@ def run(rt: Runtime) -> None:
 
     def test_v1():
         page.get_by_placeholder("Search documents").fill("")
-        page.get_by_placeholder(re.compile("library tablets")).fill(question)
+        page.get_by_label("Question to test").fill(question)
         page.get_by_role("button", name=re.compile("Find passages", re.I)).click()
         page.get_by_text(re.compile(r"passages? found by")).first.wait_for(timeout=60000)
         page.wait_for_timeout(600)
@@ -148,7 +150,7 @@ def run(rt: Runtime) -> None:
 
     def test_v2():
         page.get_by_placeholder("Search documents").fill("")
-        page.get_by_placeholder(re.compile("library tablets")).fill(question)
+        page.get_by_label("Question to test").fill(question)
         page.get_by_role("button", name=re.compile("Find passages", re.I)).click()
         page.get_by_text(re.compile(r"passages? found by")).first.wait_for(timeout=60000)
         page.wait_for_timeout(600)

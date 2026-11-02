@@ -1,0 +1,314 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Practicum
+Grace Fernandez · Graduate School Staff
+3
+GF
+Practicum
+
+Track practicum MOA receipt, hours, certificates, completion report, and Dean review for Psychology and MSGC students only. Practicum applies to Psychology and MSGC students only; other programs are not listed.
+
+How this works
+View recent activity
+Rules applied on this screen
+5 rules from the Graduate School policies · 5 need review
+
+1 Awaiting Submission, 1 Submitted
+
+Dragging a card to another column does the same as the buttons in its case window. On a keyboard or phone, use "Move to…" on the card.
+
+Search requests by name, student number or program
+All programs
+MAPSY
+MSGC
+All statuses
+MOA Submitted
+Not Submitted
+Showing 2 of 2 students
+Board
+Table
+
+3 more stages to the right → · 1 to the left
+
+Awaiting Submission
+1
+
+Waiting for the student's MOA.
+
+Andrea Villanueva
+
+GS-2026-PRAC-01 · MAPSY
+
+Waiting for documents
+
+Site pending
+
+No hours yet · Eligible
+
+No practicum documents submitted
+
+Next: Student
+
+View details
+
+Waiting for: Student
+
+Submitted
+1
+
+Staff receive the MOA and forward it.
+
+Paolo Ramirez
+
+GS-2026-PRAC-02 · MSGC
+
+Guidance and Counseling Partner Center
+
+0/200 hrs · Eligible
+
+Submitted Nov 2, 2026
+
+Updated Nov 2, 2026
+
+1 VISIBLE MESSAGE
+
+Signed MOA with the partner center.
+
+Next: Graduate School Staff
+
+View details
+Move to…
+Eligibility Review
+0
+
+The Academic Coordinator checks the MOA.
+
+No practicum students here
+
+Documents Review
+0
+
+Certificates and hours are being checked.
+
+No practicum students here
+
+In Progress
+0
+
+The student is completing the hours.
+
+No practicum students here
+
+Completion Review
+0
+
+Hours verified. The report goes to the Dean.
+
+No practicum students here
+
+Completed
+0
+
+The Dean has the report or has reviewed it.
+
+No practicum students here
+
+Returned
+0
+
+Sent back to the student to correct.
+
+No practicum students here
+
+Paolo Ramirez
+MOA Submitted
+
+GS-2026-PRAC-02 · MSGC · Practicum case
+
+ELIGIBILITY
+
+Eligible
+
+MOA
+
+Uploaded
+
+DOCUMENTS
+
+Missing
+
+HOURS
+
+0/200
+
+SUPERVISOR
+
+Ms. Angela Cruz
+
+COMPLETION
+
+Pending
+
+AUTOMATIC ELIGIBILITY
+
+Practicum program scope
+
+MSGC - Master of Science in Guidance and Counseling / Psychology program or MSGC
+
+Passed
+
+Basic units completed
+
+9 / 6
+
+Passed
+
+Major units completed
+
+15 / 9
+
+Passed
+
+Cognate units completed
+
+30 / 6
+
+Passed
+
+Total units completed
+
+54 / 21
+
+Passed
+
+Title stage
+
+Final Defense / Completed
+
+Passed
+
+Proposal stage
+
+Final Defense / Completed
+
+Passed
+
+Ethics clearance
+
+Final Defense / Completed
+
+Passed
+
+Final stage
+
+Final Defense / Completed
+
+Passed
+
+STUDENT SUBMISSION
+
+Guidance and Counseling Partner Center
+
+Supervisor: Ms. Angela Cruz
+
+System-detected certificate submissions: 0
+
+LATEST STUDENT SUBMISSION REMARK
+
+Signed MOA with the partner center.
+
+MOA
+View stage history
+11
+
+SUBMITTED FILE HISTORY
+
+Paolo_Ramirez_Signed_MOA.pdf
+
+Uploaded by Paolo Ramirez (Student) (Student) · Nov 2, 2026, 8:25 PM · MOA Submission
+
+View file
+
+CASE DISCUSSION / REVIEWER REMARKS
+
+1 message
+P
+
+Paolo Ramirez (Student) (Student) → Graduate School Staff
+
+Latest
+Student visible
+Sent
+
+Signed MOA with the partner center.
+
+Nov 2, 2026, 8:25 PM
+Reply
+View logs
+1
+Close details
+Reset demo case
+Message / Return
+Forward to Academic Coordinator
+Confirm: Forward to Academic Coordinator
+
+Paolo Ramirez · GS-2026-PRAC-02 · practicum
+
+MOA Submitted
+MOA Under Review
+
+This action is recorded against your signed-in account and preserves the submitted fields and files.
+
+Comment sent with this action
+Optional. Leave blank if there is nothing to add.
+Forward to Academic Coordinator
+Cancel

@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 import time
 
-from .common import Runtime
+from .common import SHOTS, TEXTS, Runtime
 from .helpers_a2 import pick, scroll_to, top, visible_text
 
 SLUG = "dropping"
@@ -56,8 +56,14 @@ def run(rt: Runtime) -> None:
 
     def dialog():
         _open_dialog(coord)
-        pass
-        rt.shot(coord, f"{SLUG}-02")
+        dlg = coord.get_by_role("dialog")
+        box = dlg.bounding_box()
+        # the dialog with its open rules panel is taller than any screen: save its top part (status, date, first rules) as the picture
+        coord.screenshot(path=str(SHOTS / f"{SLUG}-02.png"), clip={
+            "x": box["x"] - 10, "y": box["y"] - 10, "width": box["width"] + 20, "height": min(box["height"] + 20, 860)})
+        (TEXTS / f"{SLUG}-02.txt").write_text(dlg.inner_text(), encoding="utf-8")
+        rt.note("shot dropping-02 (dialog clip)")
+        rt.note("DIALOG: " + dlg.inner_text().replace(chr(10), " | ")[:700])
 
     rt.step("Open the status dialog from the Enrolled badge", dialog)
 

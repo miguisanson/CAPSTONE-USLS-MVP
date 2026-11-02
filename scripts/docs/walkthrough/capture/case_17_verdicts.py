@@ -12,7 +12,10 @@ has passed.
     Gab Tolentino   (GS-2026-UD-03)  chair Dr. Marco Villanueva     -> Failed
 
 The three students are not resettable, so this module works on the state it finds: a student who already
-has the verdict is skipped. Needs a weekday between 08:00 and about 16:00 (panel hours are 08:00-17:00).
+has the verdict is skipped. Panelists' entered hours are 08:00-17:00, and the booking form refuses a slot
+outside the entered hours (no override). So when the walkthrough is run outside office hours, the six
+panelists first add a specific date for today through My Availability ("available ONLY these hours"),
+exactly what a real panelist would do; inside office hours that prelude is skipped.
 """
 from __future__ import annotations
 
@@ -36,20 +39,38 @@ def hm(dt: datetime) -> str:
     return dt.strftime("%H:%M")
 
 
+def snap(rt: Runtime, page, shot_id: str, **kw) -> None:
+    """rt.shot with a retry: Windows now and then refuses to write a PNG that a scanner has just opened."""
+    for _ in range(4):
+        try:
+            rt.shot(page, shot_id, **kw)
+            return
+        except OSError:
+            page.wait_for_timeout(1500)
+    rt.shot(page, shot_id, **kw)
+
+
+def centre(page, locator) -> None:
+    """Scroll so the element sits in the middle of the screen."""
+    locator.first.evaluate("e => e.scrollIntoView({block: 'center'})")
+    page.wait_for_timeout(500)
+
+
+def top_of(page, locator, gap: int = 90) -> None:
+    """Scroll so the element sits just under the header (works whichever box scrolls)."""
+    locator.first.evaluate("""(e, gap) => { e.scrollIntoView({block: 'start'}); let p = e.parentElement;
+        while (p) { if (p.scrollHeight > p.clientHeight + 5 && /auto|scroll/.test(getComputedStyle(p).overflowY)) { p.scrollTop -= gap; return; } p = p.parentElement; }
+        window.scrollBy(0, -gap); }""", gap)
+    page.wait_for_timeout(500)
+
+
 def run(rt: Runtime) -> None:
     api = h.Api(h.STAFF)
     ids = h.student_ids(api)
     facts: dict = {}
     today = h.now_manila().date()
     now = h.now_manila()
-    base = (now + timedelta(minutes=9)).replace(second=0, microsecond=0)
-    slots = {
-        "nico": (base, base + timedelta(minutes=4)),
-        "bea": (base + timedelta(minutes=6), base + timedelta(minutes=10)),
-        "gab": (base + timedelta(minutes=12), base + timedelta(minutes=16)),
-        "bea2": (base + timedelta(minutes=18), base + timedelta(minutes=22)),
-    }
-    rt.note("slots: " + ", ".join(f"{k} {hm(a)}-{hm(b)}" for k, (a, b) in slots.items()))
+    slots: dict = {}
 
     def _verdict_count() -> int:
         n = 0
@@ -69,11 +90,42 @@ def run(rt: Runtime) -> None:
             RuntimeError("NEEDS A FRESH DATABASE: Nico, Bea and Gab (GS-2026-UD-01..03) already hold their verdicts, so case 17 "
                          "cannot be repeated. Restart the demo on a new SQLite file; the existing verdicts-*.png are kept.")))
         return
-    if now.weekday() >= 5 or now.hour < 8 or now.hour >= 16:
-        rt.step("precondition: weekday 08:00-16:00", lambda: (_ for _ in ()).throw(
-            RuntimeError("Run case 17 on a weekday between 08:00 and 16:00 Manila time: the verdict form opens only after the defense "
-                         "start time and panel availability is entered for 08:00-17:00.")))
-        return
+    outside_hours = now.hour < 8 or (now + timedelta(minutes=70)).time() > datetime.strptime("17:00", "%H:%M").time()
+
+    # ---- Part 0: outside 08:00-17:00 the panelists add today's hours first (My Availability) -------------
+    def add_hours(email: str, shot_ids: tuple[int, int] | None) -> None:
+        page = rt.new_page(email)
+        rt.go(page, "/faculty-portal/availability")
+        page.get_by_text("I am available ONLY these hours").first.click()
+        form = page.locator("form[aria-label='Add a specific date']")
+        form.get_by_label("First date").fill(str(today))
+        form.get_by_label(re.compile("^From")).fill("08:00")
+        form.get_by_label(re.compile("^To")).fill("23:59")
+        form.get_by_label("Note").fill("Extra hours for the demonstration defenses")
+        if shot_ids:
+            top_of(page, page.get_by_text("Specific dates", exact=True), 90)
+            snap(rt, page, sid(shot_ids[0]))
+        page.get_by_role("button", name=re.compile("Add date", re.I)).click()
+        page.wait_for_timeout(2000)
+        if shot_ids:
+            top_of(page, page.get_by_text("Your dates", exact=True), 0)
+            snap(rt, page, sid(shot_ids[1]))
+        page.context.close()
+
+    if outside_hours:
+        for n, key in enumerate(("villanueva", "cruz", "reyes", "ramos", "navarro", "lim")):
+            rt.step(f"0{n} {key} adds today's hours", lambda k=key, n=n: add_hours(h.FAC[k], (28, 29) if n == 0 else None))
+    else:
+        rt.note("inside office hours: panelists' weekly hours already cover today; no extra hours needed")
+    now = h.now_manila()
+    base = (now + timedelta(minutes=8)).replace(second=0, microsecond=0)
+    slots.update({
+        "nico": (base, base + timedelta(minutes=4)),
+        "bea": (base + timedelta(minutes=6), base + timedelta(minutes=10)),
+        "gab": (base + timedelta(minutes=12), base + timedelta(minutes=16)),
+        "bea2": (base + timedelta(minutes=18), base + timedelta(minutes=22)),
+    })
+    rt.note("slots: " + ", ".join(f"{k} {hm(a)}-{hm(b)}" for k, (a, b) in slots.items()))
 
     def has_verdict(key: str) -> bool:
         st = h.sched_state(api, ids[key])
@@ -104,7 +156,7 @@ def run(rt: Runtime) -> None:
         staff.wait_for_timeout(1200)
         facts[f"{key}_slot_check"] = h.slot_check_text(staff)
         if shot_ids:
-            rt.shot(staff, sid(shot_ids[0]))
+            snap(rt, staff, sid(shot_ids[0]))
         label = "Reschedule defense" if resched else re.compile("Set defense schedule|Book the re-defense")
         staff.get_by_role("button", name=label).click()
         staff.wait_for_timeout(3500)
@@ -115,7 +167,7 @@ def run(rt: Runtime) -> None:
             raise RuntimeError(f"booking for {key} not saved: {facts[f'{key}_booked']} | {h.page_text(staff, 12000)[-900:]}")
         if shot_ids:
             h.scroll_to_text(staff, "This stage is already booked", offset=60)
-            rt.shot(staff, sid(shot_ids[1]))
+            snap(rt, staff, sid(shot_ids[1]))
 
     # ---- Part A: staff reschedule Nico, Bea and Gab to short slots today ---------------------------
     for key, surname, shots_, who, n in (
@@ -146,9 +198,10 @@ def run(rt: Runtime) -> None:
     def early_look():
         rt.go(villanueva, "/faculty-portal/verdicts")
         art = article(villanueva, "Nico Barrientos")
-        art.scroll_into_view_if_needed()
         facts["early_nico"] = art.inner_text()[-900:]
-        rt.shot(villanueva, sid(7))
+        facts["early_page"] = h.page_text(villanueva, 4000)
+        top_of(villanueva, villanueva.get_by_text("Waiting on others", exact=True))
+        snap(rt, villanueva, sid(7))
     if not has_verdict("nico"):
         rt.step("B1 chair opens the verdict page before the defense starts", early_look)
 
@@ -166,14 +219,14 @@ def run(rt: Runtime) -> None:
         art.get_by_label("Remarks or conditions").fill(remarks)
         facts[f"{key}_form"] = art.inner_text()[-1200:]
         art.scroll_into_view_if_needed()
-        rt.shot(page, sid(shot_form))
+        snap(rt, page, sid(shot_form))
         art.get_by_role("button", name="Submit final verdict").click()
         page.wait_for_timeout(3000)
         art = article(page, name)
         facts[f"{key}_done"] = art.inner_text()[-1500:]
         facts[f"{key}_notice"] = h.page_text(page, 400)
         art.scroll_into_view_if_needed()
-        rt.shot(page, sid(shot_done))
+        snap(rt, page, sid(shot_done))
 
     if not has_verdict("nico"):
         rt.step("C1 Dr. Villanueva records 'Passed with minor revisions' for Nico", lambda: verdict(
@@ -184,13 +237,10 @@ def run(rt: Runtime) -> None:
         navarro = rt.new_page(h.FAC["navarro"])
         rt.go(navarro, "/faculty-portal/signatures")
         facts["navarro_signatures"] = h.page_text(navarro, 3000)
-        try:
-            h.scroll_to_text(navarro, "Revisions to confirm")
-        except Exception:  # noqa: BLE001
-            pass
-        rt.shot(navarro, sid(10))
+        top_of(navarro, navarro.get_by_text("Revisions to confirm", exact=True), 90)
+        snap(rt, navarro, sid(10))
         facts["navarro_bell"] = h.bell_text(navarro)
-        rt.shot(navarro, sid(11))
+        snap(rt, navarro, sid(11))
     rt.step("C2 adviser Dr. Navarro sees the revisions waiting for the student", adviser_view)
 
     def staff_after_nico():
@@ -198,7 +248,7 @@ def run(rt: Runtime) -> None:
         h.pick_student(rt, staff, "Barrientos")
         facts["nico_staff"] = h.page_text(staff, 3500)
         h.scroll_to_text(staff, "Last verdict")
-        rt.shot(staff, sid(12))
+        snap(rt, staff, sid(12))
     rt.step("C3 staff sees the last verdict on the scheduling screen", staff_after_nico)
 
     # ---- Part D: Bea - Deferred, rebook, re-defense verdict, re-defense booked then cancelled --------
@@ -211,7 +261,7 @@ def run(rt: Runtime) -> None:
         h.pick_student(rt, staff, "Salonga")
         facts["bea_deferred_staff"] = h.page_text(staff, 3500)
         h.scroll_to_text(staff, "Last verdict")
-        rt.shot(staff, sid(15))
+        snap(rt, staff, sid(15))
     rt.step("D2 staff sees Deferred and the schedule status", staff_after_deferred)
 
     def rebook_bea():
@@ -226,7 +276,7 @@ def run(rt: Runtime) -> None:
         reschedule_soon("bea2", "Salonga", None, "", "", fresh=True)
     bea_state = h.sched_state(api, ids["bea"])
     if not bea_state["active"] and (bea_state["outcome"] or {}).get("effect") == "reschedule":
-        rt.step("D3 staff books Bea's deferred defense again (a few minutes ahead)", lambda: [rebook_bea(), h.scroll_to_text(staff, "This stage is already booked", offset=60), rt.shot(staff, sid(16))])
+        rt.step("D3 staff books Bea's deferred defense again (a few minutes ahead)", lambda: [rebook_bea(), h.scroll_to_text(staff, "This stage is already booked", offset=60), snap(rt, staff, sid(16))])
 
     def redefense_verdict():
         start = slots["bea2"][0]
@@ -241,7 +291,7 @@ def run(rt: Runtime) -> None:
         h.pick_student(rt, staff, "Salonga")
         facts["bea_redefense_staff"] = h.page_text(staff, 4000)
         h.scroll_to_text(staff, "Last verdict")
-        rt.shot(staff, sid(19))
+        snap(rt, staff, sid(19))
         # book the re-defense for a normal future date from the Best Shared Options
         h.scroll_to_text(staff, "Best shared options")
         staff.get_by_text(re.compile("Earliest option")).first.click()
@@ -254,12 +304,12 @@ def run(rt: Runtime) -> None:
         staff.wait_for_timeout(1500)
         facts["bea_redefense_check"] = h.slot_check_text(staff)
         h.scroll_to_text(staff, "Final schedule")
-        rt.shot(staff, sid(20))
+        snap(rt, staff, sid(20))
         staff.get_by_role("button", name=re.compile("Book the re-defense|Set defense schedule")).click()
         staff.wait_for_timeout(3500)
         facts["bea_redefense_booked"] = h.sched_state(api, ids["bea"])["active"] and h.sched_state(api, ids["bea"])["active"]["preferred_date"]
         h.scroll_to_text(staff, "This stage is already booked", offset=60)
-        rt.shot(staff, sid(21))
+        snap(rt, staff, sid(21))
     if not h.sched_state(api, ids["bea"])["active"]:
         rt.step("D5 staff books the re-defense", staff_redefense)
 
@@ -268,16 +318,13 @@ def run(rt: Runtime) -> None:
         staff.get_by_role("button", name=re.compile("Cancel this booking instead", re.I)).click()
         staff.wait_for_timeout(3500)
         facts["bea_cancel_page"] = h.page_text(staff, 14000)[-1500:]
-        try:
-            h.scroll_to_text(staff, "Defense cancelled", offset=450)
-        except Exception:  # noqa: BLE001
-            h.scroll_to_text(staff, "Final schedule")
-        rt.shot(staff, sid(22))
-        h.scroll_to_text(staff, "View schedule history")
+        centre(staff, staff.get_by_text("Defense cancelled. Book a new schedule"))
+        snap(rt, staff, sid(22))
         staff.get_by_text("View schedule history").first.click()
         staff.wait_for_timeout(800)
         facts["bea_history"] = h.page_text(staff, 20000)
-        rt.shot(staff, sid(23))
+        top_of(staff, staff.get_by_text("Hide schedule history"), 90)
+        snap(rt, staff, sid(23))
     if h.sched_state(api, ids["bea"])["active"]:
         rt.step("D6 staff cancels the re-defense with a reason", cancel_redefense)
 
@@ -292,14 +339,24 @@ def run(rt: Runtime) -> None:
         h.pick_student(rt, staff, "Tolentino")
         facts["gab_staff"] = h.page_text(staff, 4000)
         h.scroll_to_text(staff, "Last verdict")
-        rt.shot(staff, sid(26))
+        snap(rt, staff, sid(26))
     rt.step("E2 staff sees Failed and the re-defense rule", staff_after_failed)
 
     # ---- Part F: the calendar afterwards ------------------------------------------------------------
     def calendar_after():
-        rt.go(staff, "/calendar")
-        facts["calendar_text"] = h.page_text(staff, 4000)
-        rt.shot(staff, sid(27))
+        h.open_defense_scheduling(rt, staff)
+        staff.get_by_role("tab", name=re.compile("Calendar")).first.click(timeout=8000)
+        rt.settle(staff)
+        staff.get_by_label("Status").select_option(label="Everything")
+        staff.wait_for_timeout(1200)
+        staff.get_by_role("button", name="Agenda").click()
+        staff.wait_for_timeout(1500)
+        staff.get_by_label("Student", exact=True).fill("Tolentino")
+        staff.wait_for_timeout(1800)
+        staff.get_by_role("button", name=re.compile("Tolentino")).first.click()
+        staff.wait_for_timeout(900)
+        facts["calendar_text"] = h.page_text(staff, 8000)
+        snap(rt, staff, sid(27), full=True)
     rt.step("F1 staff calendar after the verdicts", calendar_after)
 
     (SHOTS / "_facts_17.json").write_text(json.dumps(facts, indent=1, default=str), encoding="utf-8")

@@ -1,0 +1,160 @@
+{
+ "slug": "reports",
+ "title": "Reports and Analytics - what the Graduate School knows about all students at once",
+ "kind": "live",
+ "part": "2l",
+ "presenter": "Migui",
+ "owner": "GS Staff",
+ "duration": "6 min",
+ "story": [
+  "The lifecycle cases follow one student at a time. This case answers the other question: what does the Graduate School know about all of its students at once. Every figure on these screens is computed from the records and recorded events rather than typed in, so the numbers move as the other cases are run. The case reads them off the screen instead of promising fixed values.",
+  "**Reports & Analytics** has one tab per report: Students at risk, Cohorts by stage, Overdue and pending, Defenses and Graduation candidates, then Registrar changes (the daily list for the Registrar) and Analytics (four charts). Every report can be filtered, sorted and downloaded as Excel or PDF."
+ ],
+ "accounts": [
+  [
+   "Graduate School Staff",
+   "staff@usls.edu.ph",
+   "Reports & Analytics, including the Analytics tab"
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   "same for every demo account"
+  ]
+ ],
+ "data": [
+  [
+   "Screen",
+   "Reports & Analytics, under Overview in the staff sidebar"
+  ],
+  [
+   "Tabs",
+   "Students at risk, Cohorts by stage, Overdue and pending, Defenses, Graduation candidates, Registrar changes, Analytics"
+  ],
+  [
+   "Downloads",
+   "Download Excel and Download PDF on every report; CSV and Print on Registrar changes"
+  ],
+  [
+   "Analytics tab",
+   "Shown to Graduate School staff and administrators only"
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Open the first report",
+   "steps": [
+    {
+     "text": "Sign in as **staff@usls.edu.ph** and open **Reports & Analytics** under Overview. The page says it shows who is late, where each cohort stands, what is waiting, defenses and graduation, and that the lists can be filtered, sorted and downloaded. Across the top are the seven tabs. The first one, **Students at risk**, opens with three filters (**Program**, **Stage**, **Risk**) and a card called **Students at risk or delayed** with the two buttons **Download Excel** and **Download PDF**. Under the card title is the row count (18 rows in this run) and the table: STUDENT, PROGRAM, STAGE, RISK, WHAT IS LATE, SINCE, DAYS LATE and NEXT OWNER. Each student name is a link to the student record.",
+     "shots": [
+      {
+       "id": "reports-01",
+       "caption": "Reports & Analytics, first tab: Students at risk."
+      }
+     ]
+    },
+    {
+     "text": "Set **Risk** to Delayed. The table narrows (13 rows match the filters in this run) and a **Clear filters** link appears under the filters. The two download buttons use the same filters, so the file holds the rows on the screen. In this run both download links answered correctly (an Excel workbook and a PDF); the downloaded files were not opened.",
+     "shots": [
+      {
+       "id": "reports-02",
+       "caption": "Risk filtered to Delayed: the row count and the Clear filters link."
+      }
+     ]
+    },
+    {
+     "text": "Select **Clear filters** and use **Next** under the table. The table shows ten rows a page with Showing 11-18 of 18 and Page 2 of 2. The column headings are buttons: selecting one sorts the table by it.",
+     "shots": [
+      {
+       "id": "reports-03",
+       "caption": "Second page of the table, with the paging controls."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - The other four reports",
+   "steps": [
+    {
+     "text": "Select the **Cohorts by stage** tab. The filters are Program, Stage and **AY entry**. The card **Cohorts by lifecycle stage** has one row per program and entry year (for example DBA 24-25), with the number of STUDENTS and one column for every lifecycle stage from ADMISSION to COMPLETED, so it reads as how many students of each program and entry year are at each stage.",
+     "shots": [
+      {
+       "id": "reports-04",
+       "caption": "Cohorts by lifecycle stage."
+      }
+     ]
+    },
+    {
+     "text": "Select **Overdue and pending**. The filters add **Term**, **Office** and **Type**. The card **Overdue milestones and pending requests by office** lists overdue tasks and requests still waiting for an answer, longest wait first: STUDENT, PROGRAM, TYPE (for example Pending request), WHAT IS WAITING, OFFICE, SINCE and DAYS WAITING. The Office column shows who must act (Graduate School Staff, Dean, Student and so on).",
+     "shots": [
+      {
+       "id": "reports-05",
+       "caption": "Overdue milestones and pending requests by office."
+      }
+     ]
+    },
+    {
+     "text": "Select **Defenses**. The filters are Program, Term, **Status** and **Defense**. The card **Defenses held and upcoming** lists each defense with the DEFENSE type (Title, Proposal or Final), DATE, STATUS (Upcoming or Held), the PANEL with each member's role, and the VERDICT, which reads Not yet recorded until a verdict is entered. This comes from the scheduling and verdict cases ({case:defense-scheduling}, {case:verdicts}).",
+     "shots": [
+      {
+       "id": "reports-06",
+       "caption": "Defenses held and upcoming, with the panel and the verdict."
+      }
+     ]
+    },
+    {
+     "text": "Select **Graduation candidates**. The filters are Program, Stage, **Eligibility** and **Batch status**. The card **Graduation candidates** shows for each student the ELIGIBILITY (Eligible or Needs verification), WHAT IS MISSING, the REVIEW WINDOW, the BATCH STATUS (for example Ready for Dean Review, For Review or Not in a batch) and the NEXT OWNER. The batches themselves are handled in {case:graduation}.",
+     "shots": [
+      {
+       "id": "reports-07",
+       "caption": "Graduation candidates: eligibility, what is missing and the batch status."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - Registrar changes and Analytics",
+   "steps": [
+    {
+     "text": "Select **Registrar changes**. The card **Daily changes** lists every change made in this system on the chosen date that the Registrar must apply in AIMS. It has a date box, **CSV** and **Print** buttons, three counters (CHANGES TODAY, SENT TO REGISTRAR, NOT YET SENT) and a table where each change has a Mark as sent button that turns to Sent. In this run nothing had been changed yet that day, so the screen reads **No changes on this date** and CSV and Print are greyed out; after the enrollment and withdrawal cases have been run the list fills. Marking a change as sent was not pressed in this walkthrough.",
+     "shots": [
+      {
+       "id": "reports-08",
+       "caption": "Registrar changes: the daily list, empty in this run."
+      }
+     ]
+    },
+    {
+     "text": "Select **Analytics**. It has the filters Program, Stage and Risk and a card **Analytics** that says the figures are computed live from recorded transactions for the students the filters select. Four charts follow: **Lifecycle stage distribution**, **Risk level**, **Students by college** and **Research gate position**. Every bar carries its figure, and a chip under each chart gives the same figure in words.",
+     "shots": [
+      {
+       "id": "reports-09",
+       "caption": "Analytics: lifecycle stage distribution and risk level."
+      },
+      {
+       "id": "reports-10",
+       "caption": "Students by college and research gate position."
+      }
+     ]
+    },
+    {
+     "text": "Select a chip, for example **Coursework**. A window titled **Coursework students** lists the students behind the figure: STUDENT, PROGRAM, STAGE / STATUS, RISK and RELEVANT DATE, with each name linked to the student record. This is how a number on the chart is checked against real records.",
+     "shots": [
+      {
+       "id": "reports-11",
+       "caption": "The students behind a chart figure."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "The screens are measurements of the current records, not constants. Read the figures off the screen; the numbers in this text come from the capture run and will differ after other cases are run.",
+  "Risk is shown from monitoring signals; where the official risk rules are not confirmed it reads Not Yet Assessed rather than an invented High, Medium or Low.",
+  "The Analytics tab is shown to Graduate School staff and administrators; the other tabs follow the same filter and download pattern.",
+  "Captured 2026-11-02; this screen is being redesigned"
+ ]
+}

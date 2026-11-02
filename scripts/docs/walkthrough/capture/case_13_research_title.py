@@ -13,6 +13,16 @@ from .common import click_text, main_text
 SLUG = "research_title"
 
 
+def shot(rt, page, shot_id: str, **kw):
+    """rt.shot with a retry: Windows now and then refuses a write to a png ([Errno 22]); a second try works."""
+    for attempt in range(4):
+        try:
+            return rt.shot(page, shot_id, **kw)
+        except OSError:
+            page.wait_for_timeout(1500)
+    return rt.shot(page, shot_id, **kw)
+
+
 def sid(n: int) -> str:
     return f"{SLUG}-{n:02d}"
 
@@ -23,15 +33,15 @@ def run(rt):
 
     # ---------------- Part A: the student submits the title package ----------------
     stu = rt.new_page("student@usls.edu.ph")
-    rt.step("student: open Research", lambda: (rt.go(stu, "/student/research"), rt.shot(stu, sid(1))))
+    rt.step("student: open Research", lambda: (rt.go(stu, "/student/research"), shot(rt, stu, sid(1))))
 
     def show_rules():
         stu.get_by_text("Rules applied on this screen").first.click()
         stu.wait_for_timeout(600)
         h.scroll_to(stu, stu.get_by_text("Rules applied on this screen"), 70)
-        rt.shot(stu, sid(2))
+        shot(rt, stu, sid(2))
         h.scroll_to(stu, stu.get_by_text("Similarity index of at most 15%"), 120)
-        rt.shot(stu, sid(3))
+        shot(rt, stu, sid(3))
         stu.get_by_text("Rules applied on this screen").first.click()  # collapse again
         stu.wait_for_timeout(400)
 
@@ -43,7 +53,7 @@ def run(rt):
         stu.locator("input[type=file]").nth(0).set_input_files(str(form1))
         rt.settle(stu)
         h.scroll_to(stu, stu.get_by_text("Research title from uploaded Form 1"), 100)
-        rt.shot(stu, sid(4))
+        shot(rt, stu, sid(4))
 
     rt.step("student: upload Form 1", upload_form1)
 
@@ -52,25 +62,28 @@ def run(rt):
             stu.locator("input[type=file]").nth(1).set_input_files(str(paper))
             rt.settle(stu)
         h.scroll_to(stu, stu.get_by_text("Upload each of the three concept papers"), 110)
-        rt.shot(stu, sid(5))
+        shot(rt, stu, sid(5))
         # open the first compliance summary to show the checks
         stu.locator("details summary").first.click()
         stu.wait_for_timeout(500)
         h.scroll_to(stu, stu.locator("details").first, 140)
-        rt.shot(stu, sid(6))
+        shot(rt, stu, sid(6))
 
     rt.step("student: upload three concept papers and read compliance check", upload_papers)
 
     def submit():
         stu.get_by_role("button", name=re.compile("Submit Title Defense")).click()
+        stu.get_by_role("button", name="Send request").wait_for()
+        shot(rt, stu, sid(7))  # the "Send this request?" dialog
+        stu.get_by_role("button", name="Send request").click()
         rt.settle(stu)
-        stu.get_by_role("button", name=re.compile("Submit Title Defense")).scroll_into_view_if_needed()
-        rt.shot(stu, sid(7))
+        h.scroll_to(stu, stu.get_by_text("Request sent", exact=True), 140)  # the notice sits at the top of the page
+        shot(rt, stu, sid(24))
 
     rt.step("student: submit Title Defense for review", submit)
 
     # ---------------- Part B: adviser (recorded and accepted) ----------------
-    rt.step("student: Research Adviser page", lambda: (rt.go(stu, "/student/adviser"), rt.shot(stu, sid(8))))
+    rt.step("student: Research Adviser page", lambda: (rt.go(stu, "/student/adviser"), shot(rt, stu, sid(8))))
 
     def staff_adviser_view():
         rc = rt.new_page("research@usls.edu.ph")
@@ -84,19 +97,20 @@ def run(rt):
         rc.get_by_role("tab", name=re.compile("^All")).click()
         rt.settle(rc)
         h.scroll_to(rc, rc.get_by_text("Miguel Yu", exact=True).first, 160)
-        rt.shot(rc, sid(9))
+        shot(rt, rc, sid(9))
         rc.context.close()
 
     rt.step("research coordinator: adviser appointment record", staff_adviser_view)
 
     def faculty_view():
-        fac = rt.new_page("liwayway.bautista@usls.edu.ph")
+        fac = rt.new_page("celeste.tan@usls.edu.ph")
         fac.get_by_role("link", name="My Advisees").click()
         rt.settle(fac)
-        rt.shot(fac, sid(10))
+        h.scroll_to(fac, fac.get_by_text("Miguel Yu", exact=True), 330)
+        shot(rt, fac, sid(10))
         fac.context.close()
 
-    rt.step("faculty (adviser): My Advisees lists Miguel", faculty_view)
+    rt.step("faculty (adviser Dr. Celeste Tan): My Advisees lists Miguel", faculty_view)
 
     # ---------------- Part C: GS staff verifies in Research Gate ----------------
     staff = rt.new_page("staff@usls.edu.ph")
@@ -105,13 +119,13 @@ def run(rt):
         rt.go(staff, "/workflow/research-gate")
         h.pick_student(staff, "2260004", "Miguel Yu")
         h.scroll_to(staff, staff.get_by_text("Research Gate record"), 80)
-        rt.shot(staff, sid(11))
+        shot(rt, staff, sid(11))
 
     rt.step("staff: open Research Gate and pick Miguel", open_gate)
 
     def see_files():
         h.scroll_to(staff, staff.get_by_text("Title Defense requirements"), 90)
-        rt.shot(staff, sid(12))
+        shot(rt, staff, sid(12))
 
     rt.step("staff: submitted files visible", see_files)
 
@@ -119,9 +133,9 @@ def run(rt):
         staff.get_by_role("button", name="Verify submitted requirements").click()
         rt.settle(staff)
         h.scroll_to(staff, staff.get_by_text("Title Defense requirements"), 90)
-        rt.shot(staff, sid(13))
+        shot(rt, staff, sid(13))
         staff.get_by_role("button", name="Verify submitted requirements").scroll_into_view_if_needed()
-        rt.shot(staff, sid(14))
+        shot(rt, staff, sid(14))
 
     rt.step("staff: Verify submitted requirements", verify)
 
@@ -133,18 +147,18 @@ def run(rt):
         h.pick_student(ac, "2260004", "Miguel Yu")
         ac.get_by_role("button", name=re.compile("Miguel Yu.*Waiting", re.S)).first.click()
         ac.wait_for_timeout(500)
-        h.scroll_to(ac, ac.get_by_text("Form 1 Endorsements").first, 80)
-        rt.shot(ac, sid(15))
+        h.scroll_to(ac, ac.get_by_role("heading", name="Form 1 Endorsements"), 80)
+        shot(rt, ac, sid(15))
 
     rt.step("academic coordinator: open Form 1 endorsements and select Miguel", open_ac)
 
     def sign():
         h.draw_signature(ac)
         h.scroll_to(ac, ac.get_by_text("Draw signature"), 90)
-        rt.shot(ac, sid(16))
+        shot(rt, ac, sid(16))
         ac.get_by_role("button", name=re.compile("Finalize signature")).click()
         ac.wait_for_timeout(400)
-        rt.shot(ac, sid(17))
+        shot(rt, ac, sid(17))
 
     rt.step("academic coordinator: draw and finalize signature", sign)
 
@@ -155,15 +169,17 @@ def run(rt):
             rt.note("after endorse, on screen: " + " / ".join(ac.get_by_text(re.compile("endorsed successfully|Cannot read", re.I)).all_inner_texts())[:200])
         except Exception:  # noqa: BLE001
             pass
-        # The queue does not refresh by itself after endorsing (see report: red banner, stale list); reload to see the result.
-        rt.go(ac, "/workflow/research-gate")
-        h.pick_student(ac, "2260004", "Miguel Yu")
-        ac.get_by_role("button", name=re.compile("Miguel Yu.*Endorsed", re.S)).first.click()
-        ac.wait_for_timeout(500)
-        h.scroll_to(ac, ac.get_by_text("Form 1 Endorsements").first, 80)
-        rt.shot(ac, sid(18))
+        banner = ac.get_by_text(re.compile("Cannot read", re.I)).count()
+        rt.note(f"red error line after endorse: {banner}")
+        if not ac.get_by_text("Endorsed by").count():  # the queue did not refresh by itself: reload to see the result
+            rt.go(ac, "/workflow/research-gate")
+            h.pick_student(ac, "2260004", "Miguel Yu")
+            ac.get_by_role("button", name=re.compile("Miguel Yu.*Endorsed", re.S)).first.click()
+            ac.wait_for_timeout(500)
+        h.scroll_to(ac, ac.get_by_role("heading", name="Form 1 Endorsements"), 80)
+        shot(rt, ac, sid(18))
         h.scroll_to(ac, ac.get_by_text("Endorsed by").first, 160)
-        rt.shot(ac, sid(19))
+        shot(rt, ac, sid(19))
 
     rt.step("academic coordinator: Endorse and sign Form 1", endorse)
 
@@ -171,9 +187,9 @@ def run(rt):
         rt.go(staff, "/workflow/research-gate")
         h.pick_student(staff, "2260004", "Miguel Yu")
         h.scroll_to(staff, staff.get_by_text("Title Defense requirements"), 90)
-        rt.shot(staff, sid(20))
-        staff.get_by_text("Panel Matching", exact=True).last.scroll_into_view_if_needed()
-        rt.shot(staff, sid(21))
+        shot(rt, staff, sid(20))
+        h.scroll_to(staff, staff.get_by_text("System-generated from the active paper body"), 300)
+        shot(rt, staff, sid(21))
 
     rt.step("staff: Research Gate after endorsement; panel matching is next", gate_after)
 
@@ -182,9 +198,9 @@ def run(rt):
         rt.go(staff, "/faculty")
         staff.get_by_text("Dr. Liwayway Bautista").first.click()
         rt.settle(staff)
-        rt.shot(staff, sid(22))
+        shot(rt, staff, sid(22))
         h.scroll_to(staff, staff.get_by_role("heading", name=re.compile("^Expertise records")), 185)
-        rt.shot(staff, sid(23))
+        shot(rt, staff, sid(23))
 
     rt.step("staff: faculty profile and expertise records", expertise)
 

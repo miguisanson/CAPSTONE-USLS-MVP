@@ -1,0 +1,215 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Leave of Absence
+Grace Fernandez · Graduate School Staff
+4
+GF
+Leave of Absence
+
+Record an LOA application and route the Dean decision. Time on leave still counts toward the maximum residence.
+
+How this works
+View recent activity
+Rules applied on this screen
+9 rules from the Graduate School policies · 3 need review
+
+2 With the Dean, 1 Leave scheduled, 3 On leave, 1 Ended
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Refresh leave dates
+Search requests by name, student number or program
+All programs
+MAED
+MIT
+MSCS
+MSN
+All statuses
+On leave
+Closed
+Leave scheduled
+With the Dean
+All reasons
+Employment / professional obligation
+Family emergency
+Medical / health
+Showing 1 of 7 requests
+Clear 1 filter
+Board
+Table
+Daniel Fernandez: The leave has started.
+
+2 more stages to the right → · 3 to the left
+
+Submitted
+0
+
+Waiting for Graduate School staff to start.
+
+No requests here
+
+In staff review
+0
+
+Staff are checking the request against the handbook rules.
+
+No requests here
+
+Returned to student
+0
+
+Waiting for the student to correct and resend.
+
+No requests here
+
+With the Dean
+0 of 2
+
+Waiting for the Dean's decision.
+
+No requests here
+
+Leave scheduled
+0 of 1
+
+Approved; the leave has not started yet.
+
+No requests here
+
+On leave
+1 of 3
+
+The student is away. Enrollment is closed.
+
+Daniel Fernandez
+
+GS-2026-LOA-02 · MAED
+
+AY 2026-2027 2nd Semester to AY 2027-2028 1st Semester (2 semesters)
+
+Reason: Employment / professional obligation
+
+Next: Student
+
+Registrar: Pending Handoff
+View details
+Move to…
+Return due
+0
+
+The leave is ending or has ended. Follow up with the student.
+
+No requests here
+
+Ended
+0 of 1
+
+Finished leaves, approved extensions and leaves that ended with no return.
+
+No requests here
+
+Not approved
+0
+
+Denied, taken back by the student, or cancelled.
+
+No requests here
+
+Registrar list
+
+Dean-approved requests that go to the Registrar. The portal does not send any email: download the list, email it yourself, then mark it as sent. Mark it as acknowledged when the Registrar confirms.
+
+Download list (Excel)
+Download list (CSV)
+Mark as sent
+Mark as acknowledged
+
+Nothing ticked: a download includes every request still waiting to go out.
+
+Dean-approved requests for the Registrar
+	STUDENT	LEAVE PERIOD	DEAN DECISION	HANDOFF
+	
+
+Daniel Fernandez
+
+GS-2026-LOA-02 · MAED
+
+	AY 2026-2027 2nd Semester to AY 2027-2028 1st Semester (2 semesters)	Nov 2, 2026	Pending Handoff
+	
+
+Therese Lacson
+
+GS-2026-READ-01 · MAED
+
+	AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester (2 semesters)	Sep 8, 2026	Acknowledged
+	
+
+Olivia Cabrera
+
+2460017 · MSCS
+
+	AY 2026-2027 2nd Semester (1 semester)	Oct 13, 2026	Exported - Ready to Send
+	
+
+Hazel Castillo
+
+2360031 · MIT
+
+	AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester (2 semesters)	Sep 8, 2026	Acknowledged
+	
+
+Gabriel Domingo
+
+GS-2026-READ-02 · MAED
+
+	AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester (2 semesters)	Sep 8, 2026	Acknowledged
+Export history

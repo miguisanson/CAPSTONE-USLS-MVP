@@ -23,6 +23,7 @@ HERE = Path(__file__).resolve().parent.parent
 SHOTS = HERE.parent.parent.parent / "archive" / "scripts-docs" / "walkthrough" / "shots"
 BASE = os.environ.get("WT_BASE", "http://127.0.0.1:5074").rstrip("/")
 PASSWORD = "DemoPass123!"
+TEXTS = SHOTS.parent / "shot_text"
 VIEWPORT = {"width": 1366, "height": 768}
 
 
@@ -33,6 +34,7 @@ class Runtime:
         self.log: list[dict] = []
         self.case = "?"
         SHOTS.mkdir(parents=True, exist_ok=True)
+        TEXTS.mkdir(parents=True, exist_ok=True)
 
     # -- browser sessions ---------------------------------------------------
     def new_page(self, email: str | None = None, *, accept_dialogs: bool = True) -> Page:
@@ -107,6 +109,10 @@ class Runtime:
             page.set_viewport_size(VIEWPORT)
         else:
             page.screenshot(path=str(path))
+        try:  # visible text next to the picture, so check_labels.py can compare the case text with the screen
+            (TEXTS / f"{shot_id}.txt").write_text(page.inner_text("body"), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
         self.note(f"shot {shot_id}")
         return shot_id
 

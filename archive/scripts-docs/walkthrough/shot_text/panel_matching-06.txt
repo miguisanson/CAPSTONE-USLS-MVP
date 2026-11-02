@@ -1,0 +1,544 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Panel Matching
+Grace Fernandez · Graduate School Staff
+2
+GF
+Panel Matching
+
+Nominate panel members (after the Academic Coordinator's endorsement of Form 1) using specialization, availability, workload, and eligibility notes.
+
+How this works
+View recent activity
+Rules applied on this screen
+11 rules from the Graduate School policies · 2 need review
+Choose a student
+
+Pick the record this action applies to
+
+YM
+
+Selected student
+
+2260004 - Yu, Miguel - MAED
+
+Panel recommendation workspace
+
+Review why each faculty member ranks where they do, adjust the suggested panel, then finalize it
+
+Faculty profiles
+
+Three concept papers content ready
+
+3 of 3 PDFs uploaded. 3 of 3 successfully read. Source: Three concept papers body text only; research titles and filenames excluded.
+
+Similarity match (keyword TF-IDF)
+Ready
+
+Paper analysis: Keyword analysis (local, no AI service)
+
+Keyword TF-IDF similarity between the paper and each faculty member's expertise records.
+
+Research title (display only; excluded from matching): Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses
+
+machine learning
+learning analytics
+student engagement
+learning management system
+case study
+students
+learning
+courses
+data
+working
+activity
+will
+management
+system
+blended
+course
+scope
+analytics
+Yu_Miguel_ConceptPaper3_Student_Perceptions_Online_Courses.pdf
+Text extracted
+
+Analyzed keywords: case study, students, courses, working, burnout
+
+Graduate Courses: An Interview Study Student: Miguel Yu, Master of Arts in Education Background and Rationale Working adults who enroll in graduate programs balance coursework with jobs and family duties. Academic...
+
+Yu_Miguel_ConceptPaper2_Predicting_Course_Persistence.pdf
+Text extracted
+
+Analyzed keywords: machine learning, learning analytics, learning management system, data, activity
+
+Management System Activity Using Machine Learning Student: Miguel Yu, Master of Arts in Education Background and Rationale Some graduate students stop attending an online or blended course before the term ends, and the...
+
+Yu_Miguel_ConceptPaper1_Dashboard_Feedback_Engagement.pdf
+Text extracted
+
+Analyzed keywords: learning analytics, student engagement, learning management system, students, learning
+
+Working Graduate Students in Blended Courses Student: Miguel Yu, Master of Arts in Education Background and Rationale Working graduate students in blended courses leave traces in the learning management system every...
+
+EXPERTISE MATCH
+
+60 pts
+
+paper vs. faculty records
+
+AVAILABILITY
+
+25 pts
+
+conflict-free windows
+
+WORKLOAD
+
+15 pts
+
+other student panels
+
+Thesis panel needs 3 members: Panel Chair, Content Specialist, Method Specialist. Expertise counts most; candidates who share no topic with the paper are listed after those who do.
+
+Not eligible for this student's panel
+
+Dr. Celeste Tan: Adviser of this student; an adviser cannot sit on the student's panel.
+Search faculty
+Specialization
+Department / program
+Availability
+All availability
+Available
+Limited availability
+No availability recorded
+Showing the top 11 ranked candidates. The suggested panel is highlighted and preselected; open "Why" on any row to see the evidence.
+RANK / FACULTY
+EXPERTISE MATCH
+AVAILABILITY & WORKLOAD
+SCORE BREAKDOWN
+1
+Dr. Liwayway Bautista
+Suggested: Panel Chair
+
+Education
+
+feedback
+blended
+learning analytics
+online courses
+management system
+
+Learning analytics, online learning, and student engagement in graduate education
+
+Hide why
+
+Available
+
+5 conflict-free windows
+
+1 other student panel
+
+95.9/100
+
+60/60 · 23.4/25 · 12.5/15
+
+HOW THE SCORE WAS BUILT
+
+Expertise match
+60 / 60
+Availability
+23.4 / 25
+Workload
+12.5 / 15
+Total
+95.9 / 100
+
+Expertise is scaled across the candidate pool, so the closest match gets full marks and others are proportional. 5 conflict-free defense windows; 1 other student panel.
+
+Method: Similarity match (keyword TF-IDF) (similarity 0.4869).
+
+WHY THIS FACULTY MATCHES
+
+Dr. Liwayway Bautista: expertise records (publication, research interest) strongly match the paper on 'feedback', 'blended', 'learning analytics'; 5 conflict-free defense windows; 1 other student panel.
+
+PASSAGE OF THE PAPER THAT MATCHED
+The study asks how a learning analytics feedback dashboard relates to the engagement and persistence of
+
+EXPERTISE RECORDS USED
+
+Research interest
+Demo data
+
+Learning analytics dashboards that give graduate students feedback on their participation in online courses
+
+Matched: feedback, learning analytics, online courses
+
+Publication
+2022
+Demo data
+
+Dashboard feedback, self-regulated learning, and engagement in online graduate courses: a mixed-method study
+
+Matched: dashboards, feedback, engagement
+
+Research interest
+Demo data
+
+Student engagement, motivation, and persistence in online and blended graduate programs
+
+Matched: persistence, student engagement, motivation
+
+2
+Dr. Marlon Geronimo
+Suggested: Content Specialist
+
+Education
+
+educational data
+machine learning
+data mining
+logs
+random forest
+
+Machine learning, educational data analytics, and predicting student performance
+
+Why this score
+
+Available
+
+4 conflict-free windows
+
+2 other student panels
+
+67.9/100
+
+37.6/60 · 20.3/25 · 10/15
+
+3
+Dr. Patricia Salvador
+
+Education
+
+management system
+learning management
+online courses
+training
+arts education
+
+Online learning, learning management systems, education technology, and curriculum development
+
+Why this score
+
+Available
+
+3 conflict-free windows
+
+2 other student panels
+
+52.1/100
+
+24.9/60 · 17.2/25 · 10/15
+
+4
+Dr. Daniel Uy
+
+Engineering and Technology
+
+signal
+predictive
+machine learning
+prediction
+
+Engineering systems, automation, data modeling, and predictive analytics
+
+Why this score
+
+Available
+
+5 conflict-free windows
+
+0 other student panels
+
+46.6/100
+
+8.2/60 · 23.4/25 · 15/15
+
+5
+Dr. Paolo Navarro
+
+Business
+
+burnout
+human
+engagement
+balance
+school
+
+Human resource management, organizational behavior, leadership, and workplace research
+
+Why this score
+
+Available
+
+5 conflict-free windows
+
+2 other student panels
+
+40.8/100
+
+7.4/60 · 23.4/25 · 10/15
+
+6
+Dr. Teodoro Ramos
+Suggested: Method Specialist
+
+Education
+
+Overloaded
+learning analytics
+testing
+validation
+educational data
+case
+
+Learning analytics, online learning assessment, and educational data science
+
+Why this score
+
+Limited availability
+
+2 conflict-free windows
+
+7 other student panels
+
+37.2/100
+
+23.1/60 · 14.1/25 · 0/15
+
+7
+Dr. Adriana Santos
+
+Nursing
+
+follow
+
+Health informatics, public health, and medical systems
+
+Why this score
+
+Available
+
+4 conflict-free windows
+
+0 other student panels
+
+36.1/100
+
+0.8/60 · 20.3/25 · 15/15
+
+8
+Dr. Benjamin Reyes
+
+Business
+
+risk
+working adults
+family
+
+Finance, business analytics, accounting, and financial technology
+
+Why this score
+
+Available
+
+3 conflict-free windows
+
+3 other student panels
+
+28.9/100
+
+4.2/60 · 17.2/25 · 7.5/15
+
+9
+Dr. Teresa Lim
+
+Business
+
+engagement
+experience
+family
+
+Marketing strategy, consumer behavior, digital commerce, and brand analytics
+
+Why this score
+
+Limited availability
+
+2 conflict-free windows
+
+2 other student panels
+
+28.2/100
+
+4.1/60 · 14.1/25 · 10/15
+
+10
+Dr. Angela Cruz
+
+Business
+
+Overloaded
+family
+case
+
+Strategic management, entrepreneurship, organizational innovation, and family business
+
+Why this score
+
+Available
+
+4 conflict-free windows
+
+5 other student panels
+
+26.5/100
+
+3.7/60 · 20.3/25 · 2.5/15
+
+11
+Dr. Marco Villanueva
+
+Business
+
+Overloaded
+time
+logistic
+policy
+family
+
+Operations management, supply chain analytics, quality systems, and process improvement
+
+Why this score
+
+Available
+
+3 conflict-free windows
+
+5 other student panels
+
+24.6/100
+
+4.9/60 · 17.2/25 · 2.5/15
+
+Expertise match
+Availability
+Workload
+
+Review and adjust the panel set
+
+The suggested panel is preselected: the strongest methods profile takes the Method seat and the rest follow by score. Staff may change any role before finalizing.
+
+Staff review
+Panel Chair
+Select faculty
+#1 Dr. Liwayway Bautista - 95.9/100
+#2 Dr. Marlon Geronimo - 67.9/100
+#3 Dr. Patricia Salvador - 52.1/100
+#4 Dr. Daniel Uy - 46.6/100
+#5 Dr. Paolo Navarro - 40.8/100
+#6 Dr. Teodoro Ramos - 37.2/100
+#7 Dr. Adriana Santos - 36.1/100
+#8 Dr. Benjamin Reyes - 28.9/100
+#9 Dr. Teresa Lim - 28.2/100
+#10 Dr. Angela Cruz - 26.5/100
+#11 Dr. Marco Villanueva - 24.6/100
+Content Specialist
+Select faculty
+#1 Dr. Liwayway Bautista - 95.9/100
+#2 Dr. Marlon Geronimo - 67.9/100
+#3 Dr. Patricia Salvador - 52.1/100
+#4 Dr. Daniel Uy - 46.6/100
+#5 Dr. Paolo Navarro - 40.8/100
+#6 Dr. Teodoro Ramos - 37.2/100
+#7 Dr. Adriana Santos - 36.1/100
+#8 Dr. Benjamin Reyes - 28.9/100
+#9 Dr. Teresa Lim - 28.2/100
+#10 Dr. Angela Cruz - 26.5/100
+#11 Dr. Marco Villanueva - 24.6/100
+Method Specialist
+Select faculty
+#1 Dr. Liwayway Bautista - 95.9/100
+#2 Dr. Marlon Geronimo - 67.9/100
+#3 Dr. Patricia Salvador - 52.1/100
+#4 Dr. Daniel Uy - 46.6/100
+#5 Dr. Paolo Navarro - 40.8/100
+#6 Dr. Teodoro Ramos - 37.2/100
+#7 Dr. Adriana Santos - 36.1/100
+#8 Dr. Benjamin Reyes - 28.9/100
+#9 Dr. Teresa Lim - 28.2/100
+#10 Dr. Angela Cruz - 26.5/100
+#11 Dr. Marco Villanueva - 24.6/100
+
+Panel composition rules
+
+Suggested panel satisfies the protocol
+All 3 panel seats required for a Thesis are filled.
+Every required role is seated exactly once.
+Every seat has a different faculty member.
+The student's adviser and co-adviser are not on the panel.
+Dr. Liwayway Bautista chairs the panel (University-affiliated faculty).
+A Thesis panel has no External Panel seat.
+Dr. Teodoro Ramos has recorded research-methods expertise.
+
+Source: Graduate School Research Protocol (AY 2024-2025), Title Defense - panel composition. Checked again on the server when the panel is finalized.
+
+Finalize selected panel

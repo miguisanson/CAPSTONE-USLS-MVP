@@ -1,0 +1,146 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+
+APPROVALS
+
+Approvals Queue
+10
+Course Adjustments
+1
+Leave of Absence
+2
+Readmission
+2
+AWOL & Residency
+2
+Subject Withdrawal
+1
+Practicum Reports
+1
+Graduation Endorsement
+1
+Admission & Coursework Reports
+
+MONITORING & SUPPORT
+
+Reports & Analytics
+Activity Log
+Policy Assistant
+Business Rules
+
+Dean
+
+Every decision is recorded against your account with the date and time.
+
+Dean Portal
+AWOL & Residency
+Dr. Manuel Villaruz · Dean
+9+
+DM
+AWOL & Residency
+2 waiting
+
+AWOL return declarations that Graduate School staff forwarded for your decision, and the residency records on file.
+
+How this works
+View recent activity
+Rules applied on this screen
+9 rules from the Graduate School policies
+
+1 AWOL, 1 Return review, 2 With the Dean, 1 Residency
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Search requests by name, student number or program
+All programs
+MAED
+MAN
+All statuses
+With the Dean
+Return filed
+AWOL (flagged by the system)
+Residency active
+All types
+Return from AWOL
+Residency
+Showing 1 of 5 cases
+Clear 1 filter
+Board
+Table
+
+3 more stages to the right → · 1 to the left
+
+AWOL
+0 of 1
+
+Flagged from source records. Waiting for the student's written return.
+
+No cases here
+
+Return review
+0 of 1
+
+Staff check the written return against the residence limits, then forward it.
+
+No cases here
+
+With the Dean
+1 of 2
+
+Waiting for the Dean's decision.
+
+Maya Torres
+
+GS-2026-AWOL-01 · MAED
+
+Within Maximum Residence
+
+Returning: AY 2026-2027 2nd Semester · AWOL since 2026-07-05
+
+Next: Dean
+
+Demo imported AWOL standing
+View details
+Move to…
+Select all in this column
+Re-enrollment
+0
+
+The Dean endorsed a full re-enrollment. Mark it complete when the courses are re-enrolled.
+
+No cases here
+
+Back in the program
+0
+
+The return was approved or the re-enrollment is done. The student is active again.
+
+No cases here
+
+Not approved
+0
+
+The Dean denied the return. The student stays AWOL.
+
+No cases here
+
+Residency
+0 of 1
+
+Active no-subject residency semesters.
+
+No cases here
+
+Residency closed
+0
+
+Residency semesters that were closed.
+
+No cases here

@@ -1,0 +1,133 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+
+APPROVALS
+
+Approvals Queue
+7
+Course Adjustments
+1
+Leave of Absence
+1
+Readmission
+1
+AWOL & Residency
+1
+Subject Withdrawal
+1
+Practicum Reports
+1
+Graduation Endorsement
+1
+Admission & Coursework Reports
+
+MONITORING & SUPPORT
+
+Reports & Analytics
+Activity Log
+Policy Assistant
+Business Rules
+
+Dean
+
+Every decision is recorded against your account with the date and time.
+
+Dean Portal
+Reports & Analytics
+Dr. Manuel Villaruz · Dean
+3
+DM
+Reports & Analytics
+
+Where Dean decisions stand across every process. Figures are computed live from the approvals records.
+
+WAITING NOW
+
+7
+
+across all processes
+
+DECIDED THIS WEEK
+
+0
+
+See Decision History
+
+APPROVAL SHARE
+
+80%
+
+of recent workflow decisions
+
+COURSE PLANS WAITING
+
+1
+
+Decisions by process
+
+Current pending load and recent outcomes
+
+Dean decisions by process: waiting now and recent outcomes
+PROCESS
+	WAITING
+	APPROVED / COMPLETED
+	RETURNED
+	DENIED
+	AVERAGE WAIT
+
+Leave of Absence	
+
+1
+
+	4	0	0	56 days
+Readmission	
+
+1
+
+	0	0	0	11 days
+AWOL & Residency	
+
+1
+
+	0	0	0	43 days
+Subject Withdrawal	
+
+1
+
+	0	0	1	55 days
+Practicum Reports	
+
+1
+
+	0	0	0	13 days
+Graduation Endorsement	
+
+1
+
+	0	0	0	25 days
+Course Adjustments	
+
+1
+
+	0	1	-	-
+Pending load by program
+
+Where the waiting requests come from
+
+MAN
+2
+MIT
+2
+MSN
+1
+MAED
+1
+MAPSY
+1

@@ -10,6 +10,7 @@ import os
 import re
 from pathlib import Path
 
+from .case_01_signin import harden
 from .common import Runtime, main_text
 
 DUMP = os.environ.get("WT_DUMP")  # optional path: write the visible text of each page for authoring
@@ -43,6 +44,7 @@ def tour(rt: Runtime, page, prefix: str, pages: list[tuple[str, str]]) -> None:
 
 
 def run(rt: Runtime) -> None:
+    harden(rt)
     rt.reset("student-handoff-sofia")
 
     # Dean
@@ -52,9 +54,10 @@ def run(rt: Runtime) -> None:
     rt.shot(page, "portals-dean-01")
     tour(rt, page, "Dean", [
         ("Approvals Queue", "portals-dean-02"),
-        ("Decision History", "portals-dean-03"),
+        ("Activity Log", "portals-dean-03"),
         ("Reports & Analytics", "portals-dean-04"),
         ("Business Rules", "portals-dean-05"),
+        ("Leave of Absence", "portals-dean-06"),
     ])
     page.context.close()
 
@@ -68,6 +71,7 @@ def run(rt: Runtime) -> None:
         ("Panel Invitations", "portals-faculty-03"),
         ("My Availability", "portals-faculty-04"),
         ("My Calendar", "portals-faculty-05"),
+        ("Defense Schedule", "portals-faculty-06"),
     ])
     page.context.close()
 
@@ -81,5 +85,6 @@ def run(rt: Runtime) -> None:
         ("Enrollment", "portals-student-03"),
         ("Request Center", "portals-student-04"),
         ("Messages", "portals-student-05"),
+        ("Leave of Absence", "portals-student-06"),
     ])
     page.context.close()

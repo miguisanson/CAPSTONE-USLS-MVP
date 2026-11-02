@@ -1,0 +1,193 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Research Gate
+Grace Fernandez · Graduate School Staff
+1
+GF
+Research Gate
+
+Check Form 1, Form 4, or completion evidence and set readiness or revision state. The Academic Coordinator endorses Form 1; the panel chair records each defense verdict.
+
+How this works
+View recent activity
+Rules applied on this screen
+8 rules from the Graduate School policies · 1 needs review
+
+Comprehensive exam must be passed before the title defense
+
+Yes
+
+A student who passes the comprehensive examination confers with the Dean for an adviser and is advanced to candidacy. Research stages (Form 1 title defense onward) stay locked until the comprehensive exam is marked Passed.
+
+Source: Graduate School Handbook 2022-2023, p. 57 (Comprehensive Examinations - Advancement to Candidacy)
+
+Enforced by the system
+
+Thesis / project paper writing period
+
+2 years
+
+Thesis or project paper writing must be finished within two years from the title defense (or proposal defense). The proposal must be submitted and defended within one year of the title defense.
+
+Source: Graduate School Handbook 2022-2023, p. 58 (Project Paper, Thesis & Dissertation - Standards)
+
+Documented only
+
+The deadline is tracked by staff; the system shows time in stage but does not block on it.
+
+Dissertation writing period
+
+3 years
+
+Dissertation writing must be finished within three years from the title defense. The proposal must be submitted and defended within one year of the title defense.
+
+Source: Graduate School Handbook 2022-2023, p. 58 (Project Paper, Thesis & Dissertation - Standards)
+
+Documented only
+
+The deadline is tracked by staff; the system shows time in stage but does not block on it.
+
+Similarity index of at most 15%
+
+15 percent
+
+The final draft undergoes Turnitin scanning and a similarity index rating of not more than 15% is required before the paper goes to the editor.
+
+Source: Graduate School Research Protocol AY 2024-2025 (Closed-door Final Defense - After the defense (Turnitin scanning))
+
+Documented only
+
+Staff check the uploaded Turnitin certificate; the percentage is not read from the file automatically.
+
+One change of title only
+
+1 requests
+
+A student may request only one change of the title of the study, before applying for the proposal defense.
+
+Source: Graduate School Research Protocol AY 2024-2025 (Change of Title of the Study)
+
+Documented only
+
+Not tracked by the system yet; the panel and the Research Coordinator enforce it.
+
+One change of research adviser only
+
+1 requests
+
+A student may request only one change of research adviser, before the proposal defense.
+
+Source: Graduate School Research Protocol AY 2024-2025 (Request for Change of Research Adviser)
+
+Enforced by the system
+
+Advising contract forms within 5 days of Form 3.1
+
+5 days
+
+Once the research adviser is appointed, the student emails Form 3.2 (Research Timetable) and Form 3.3 (Thesis/Dissertation Advising Contract) to the GS Research Coordinator within 5 days of receiving Form 3.1. The adviser tracker shows the due date and flags it when it is overdue.
+
+Source: Graduate School Research Protocol AY 2024-2025 (Designation of the Research Adviser - II. Advising Contract)
+
+Enforced by the system
+
+Adviser signature waiting: remind after 3 days
+
+3 days
+
+An adviser is reminded when an advisee's manuscript or endorsement has waited for their signature this many days.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+See every business rule and its history
+
+Research Gate
+Adviser designation
+Choose a student
+
+Pick the record this action applies to
+
+Filter
+All programs
+DPSY — Doctor of Philosophy in Psychology
+MAPSY — Master of Arts in Psychology
+MASS — Master of Arts in Social Sciences
+DBA — Doctor of Business Administration
+MBA — Master of Business Administration
+EDD — Doctor of Education
+MAED — Master of Arts in Education
+MSGC — Master of Science in Guidance and Counseling
+MIT — Master in Information Technology
+MSCS — Master of Science in Computer Science
+MAN — Master of Arts in Nursing
+MSN — Master of Science in Nursing
+All stages
+Admission
+Coursework
+Comprehensive Exam
+Proposal Development
+Proposal Defense
+Data Collection
+Writing
+Final Defense
+LOA
+AWOL
+Withdrawal In Progress
+Withdrawn
+Completed
+
+Select a student to begin
+
+Search above to load this student's current monitoring data.

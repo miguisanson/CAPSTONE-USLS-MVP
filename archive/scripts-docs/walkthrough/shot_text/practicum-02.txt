@@ -1,0 +1,184 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+My Progress
+
+ACADEMICS
+
+Enrollment
+Practicum
+Graduation Endorsement
+
+RESEARCH
+
+Research Progress
+Research Adviser
+Defense Schedule
+Research Calendar
+
+REQUESTS
+
+Request Center
+Leave of Absence
+Readmission
+Return from AWOL
+Subject Withdrawal
+
+SUPPORT
+
+Messages
+Documents
+Activity Log
+Policy Assistant
+My Profile
+
+Student
+
+Your record updates as staff act on your requests. Nothing here changes official grades or enrollment.
+
+Student Portal
+Practicum
+Paolo Ramirez · MSGC
+2
+PR
+Practicum
+Not submitted
+
+Submit your MOA and completion evidence for the practicum requirement (Psychology and MSGC programs).
+
+All requests
+Rules applied on this screen
+5 rules from the Graduate School policies · 5 need review
+
+Psychology and MSGC students only
+
+Practicum is restricted to students enrolled in a Psychology program or the Master of Science in Guidance and Counseling (MSGC). Your program, MSGC — Master of Science in Guidance and Counseling, is within this scope.
+
+Current practicum stage
+
+Only the requirements due now can be edited. Completed submissions stay available below.
+
+Not submitted
+1
+Eligibility Check / Pre-Practicum Requirements
+
+Automatically checked from your monitoring sheet and research milestones.
+
+Completed
+
+Eligibility recommendation
+
+Based on the encoded course audit and research milestone records.
+
+Verified
+
+Practicum program scope
+
+Source: student.program
+
+MSGC - Master of Science in Guidance and Counseling / Psychology program or MSGC
+
+Verified
+
+Basic units completed
+
+Source: course_audit.by_category.Basic
+
+9 / 6
+
+Verified
+
+Major units completed
+
+Source: course_audit.by_category.Major
+
+15 / 9
+
+Verified
+
+Cognate units completed
+
+Source: course_audit.by_category.Cognate
+
+30 / 6
+
+Verified
+
+Total units completed
+
+Source: course_audit.completed_units
+
+54 / 21
+
+Verified
+
+Title stage
+
+Source: student.current_stage / research_case.current_gate
+
+Completed / Completed
+
+Verified
+
+Proposal stage
+
+Source: student.current_stage / research_case.current_gate
+
+Completed / Completed
+
+Verified
+
+Ethics clearance
+
+Source: student.current_stage / research_case.current_gate
+
+Completed / Completed
+
+Verified
+
+Final stage
+
+Source: student.current_stage / research_case.current_gate
+
+Completed / Completed
+
+Verified
+2
+MOA Submission
+
+What you need to submit now: practicum site details and the signed MOA PDF.
+
+Current stage
+Practicum site / company *
+Supervisor name
+Practicum MOA PDF
+Paolo_Ramirez_Signed_MOA.pdf
+Browse
+View uploaded application
+PDF only, up to 25 MB. The file is stored with your request.
+Remarks for the reviewer
+Submit MOA stage
+3
+Practicum Document Submission
+
+Available after the MOA is approved and the practicum is marked in progress.
+
+Locked
+4
+Review / Approval
+
+Available after Step 3 is submitted.
+
+Locked
+5
+Completion / Final Verification
+
+Available after the completion review is approved.
+
+Locked

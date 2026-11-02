@@ -4,17 +4,33 @@
   "title": "Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses",
   "roles": "panel needs 3 members: Panel Chair, Content Specialist, Method Specialist.",
   "excluded": [
-   "Dr. Liwayway Bautista: Adviser of this student; an adviser cannot sit on the student's panel."
+   "Dr. Celeste Tan: Adviser of this student; an adviser cannot sit on the student's panel."
   ],
   "rows": [
    {
     "rank": 1,
-    "name": "Dr. Marlon Geronimo",
-    "score": 90.3,
+    "name": "Dr. Liwayway Bautista",
+    "score": 95.9,
     "expertise": 60.0,
+    "availability": 23.4,
+    "workload": 12.5,
+    "suggested": "",
+    "windows": "5",
+    "other_panels": "1",
+    "topics": [
+     "feedback",
+     "learning analytics",
+     "management system"
+    ]
+   },
+   {
+    "rank": 2,
+    "name": "Dr. Marlon Geronimo",
+    "score": 67.9,
+    "expertise": 37.6,
     "availability": 20.3,
     "workload": 10.0,
-    "suggested": "PANEL CHAIR",
+    "suggested": "",
     "windows": "4",
     "other_panels": "2",
     "topics": [
@@ -24,26 +40,10 @@
     ]
    },
    {
-    "rank": 2,
-    "name": "Dr. Celeste Tan",
-    "score": 70.4,
-    "expertise": 41.3,
-    "availability": 14.1,
-    "workload": 15.0,
-    "suggested": "CONTENT SPECIALIST",
-    "windows": "2",
-    "other_panels": "0",
-    "topics": [
-     "academic",
-     "persistence",
-     "structured interviews"
-    ]
-   },
-   {
     "rank": 3,
     "name": "Dr. Patricia Salvador",
-    "score": 66.9,
-    "expertise": 39.7,
+    "score": 52.1,
+    "expertise": 24.9,
     "availability": 17.2,
     "workload": 10.0,
     "suggested": "",
@@ -58,8 +58,8 @@
    {
     "rank": 4,
     "name": "Dr. Daniel Uy",
-    "score": 51.5,
-    "expertise": 13.1,
+    "score": 46.6,
+    "expertise": 8.2,
     "availability": 23.4,
     "workload": 15.0,
     "suggested": "",
@@ -72,25 +72,9 @@
    },
    {
     "rank": 5,
-    "name": "Dr. Teodoro Ramos",
-    "score": 51.0,
-    "expertise": 36.9,
-    "availability": 14.1,
-    "workload": 0.0,
-    "suggested": "METHOD SPECIALIST",
-    "windows": "2",
-    "other_panels": "7",
-    "topics": [
-     "learning analytics",
-     "validation",
-     "case"
-    ]
-   },
-   {
-    "rank": 6,
     "name": "Dr. Paolo Navarro",
-    "score": 45.2,
-    "expertise": 11.8,
+    "score": 40.8,
+    "expertise": 7.4,
     "availability": 23.4,
     "workload": 10.0,
     "suggested": "",
@@ -101,20 +85,36 @@
      "engagement",
      "school"
     ]
+   },
+   {
+    "rank": 6,
+    "name": "Dr. Teodoro Ramos",
+    "score": 37.2,
+    "expertise": 23.1,
+    "availability": 14.1,
+    "workload": 0.0,
+    "suggested": "",
+    "windows": "2",
+    "other_panels": "7",
+    "topics": [
+     "learning analytics",
+     "validation",
+     "case"
+    ]
    }
   ]
  },
- "miguel_why": "1\nDr. Marlon Geronimo\nSUGGESTED: PANEL CHAIR\n\nEducation\n\neducational data\nmachine learning\ndata mining\nlogs\nrandom forest\n\nMachine learning, educational data analytics, and predicting student performance\n\nHide why\n\nAvailable\n\n4 conflict-free windows\n\n2 other student panels\n\n90.3/100\n\n60/60 \u00b7 20.3/25 \u00b7 10/15\n\nHOW THE SCORE WAS BUILT\n\nExpertise match\n60 / 60\nAvailability\n20.3 / 25\nWorkload\n10 / 15\nTotal\n90.3 / 100\n\nExpertise is scaled across the candidate pool, so the closest match gets full marks and others are proportional. 4 conflict-free defense windows; 2 other student panels.\n\nMethod: Similarity match (keyword TF-IDF) (similarity 0.3049).\n\nWHY THIS FACULTY MATCHES\n\nDr. Marlon Geronimo: expertise records (publication, research interest, specialization) strongly match the paper on 'educational data', 'machine learning', 'data mining'; 4 conflict-free defense windows; 2 other student panels.\n\nPASSAGE OF THE PAPER THAT MATCHED\nThe study asks how accurately logistic regression and random forest models can predict course\n\nEXPERTISE RECORDS USED\n\nPublication\n2023\nDemo data\n\nRandom forest and logistic regression models for predicting course failure in online programs\n\nMatched: random forest, logistic regression, models predicting\n\nSpecialization\nfaculty profile\n\nMachine learning, educational data analytics, and predicting student performance\n\nMatched: predicting, educational data, machine learning\n\nResearch interest\nDemo data\n\nEducational data mining and predictive modeling of student performance and attrition\n\nMatched: educational data, data mining, predictive",
+ "miguel_why": "1\nDr. Liwayway Bautista\nSuggested: Panel Chair\n\nEducation\n\nfeedback\nblended\nlearning analytics\nonline courses\nmanagement system\n\nLearning analytics, online learning, and student engagement in graduate education\n\nHide why\n\nAvailable\n\n5 conflict-free windows\n\n1 other student panel\n\n95.9/100\n\n60/60 \u00b7 23.4/25 \u00b7 12.5/15\n\nHOW THE SCORE WAS BUILT\n\nExpertise match\n60 / 60\nAvailability\n23.4 / 25\nWorkload\n12.5 / 15\nTotal\n95.9 / 100\n\nExpertise is scaled across the candidate pool, so the closest match gets full marks and others are proportional. 5 conflict-free defense windows; 1 other student panel.\n\nMethod: Similarity match (keyword TF-IDF) (similarity 0.4869).\n\nWHY THIS FACULTY MATCHES\n\nDr. Liwayway Bautista: expertise records (publication, research interest) strongly match the paper on 'feedback', 'blended', 'learning analytics'; 5 conflict-free defense windows; 1 other student panel.\n\nPASSAGE OF THE PAPER THAT MATCHED\nThe study asks how a learning analytics feedback dashboard relates to the engagement and persistence of\n\nEXPERTISE RECORDS USED\n\nResearch interest\nDemo data\n\nLearning analytics dashboards that give graduate students feedback on their participation in online courses\n\nMatched: feedback, learning analytics, online courses\n\nPublication\n2022\nDemo data\n\nDashboard feedback, self-regulated learning, and engagement in online graduate courses: a mixed-method study\n\nMatched: dashboards, feedback, engagement\n\nResearch interest\nDemo data\n\nStudent engagement, motivation, and persistence in online and blended graduate programs\n\nMatched: persistence, student engagement, motivation",
  "miguel_seats": {
-  "Panel Chair": "#1 Dr. Marlon Geronimo - 90.3/100",
-  "Content Specialist": "#3 Dr. Patricia Salvador - 66.9/100",
-  "Method Specialist": "#5 Dr. Teodoro Ramos - 51/100"
+  "Panel Chair": "#1 Dr. Liwayway Bautista - 95.9/100",
+  "Content Specialist": "#3 Dr. Patricia Salvador - 52.1/100",
+  "Method Specialist": "#6 Dr. Teodoro Ramos - 37.2/100"
  },
  "miguel_rules": "Panel composition rules\n\nSuggested panel satisfies the protocol",
  "invitation_text": {
-  "marlon.geronimo@usls.edu.ph": "Panel invitations\n\nResearch defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense.\n\nAccepted (1)\n\nMiguel Yu\n\nMAED \u00b7 2260004\n\nTitle Defense\nAccepted\n\nYour role on the panel: Panel Chair\n\nOTHER PANEL MEMBERS\n\nDr. Patricia Salvador \u00b7 Content Specialist\nDr. Teodoro Ramos \u00b7 Method Specialist\n\nNo date has been booked yet.\n\nAnswered Oct 1, 2026, 10:32 AM\n\nDecline",
-  "patricia.salvador@usls.edu.ph": "Panel invitations\n\nResearch defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense.\n\nAccepted (1)\n\nMiguel Yu\n\nMAED \u00b7 2260004\n\nTitle Defense\nAccepted\n\nYour role on the panel: Content Specialist\n\nOTHER PANEL MEMBERS\n\nDr. Marlon Geronimo \u00b7 Panel Chair\nDr. Teodoro Ramos \u00b7 Method Specialist\n\nNo date has been booked yet.\n\nAnswered Oct 1, 2026, 10:32 AM\n\nDecline",
-  "teodoro.ramos@usls.edu.ph": "Panel invitations\n\nResearch defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense.\n\n1 invitation is waiting for your answer.\nWaiting for your answer (1)\n\nMiguel Yu\n\nMAED \u00b7 2260004\n\nTitle Defense\nInvited\n\nYour role on the panel: Method Specialist\n\nOTHER PANEL MEMBERS\n\nDr. Marlon Geronimo \u00b7 Panel Chair\nDr. Patricia Salvador \u00b7 Content Specialist\n\nNo date has been booked yet.\n\nAccept\nDecline\nAccepted (3)\n\nGab Tolentino\n\nMBA \u00b7 GS-2026-UD-03\n\nProposal Defense\nAccepted\n\nYour role on the panel: Method Specialist\n\nOTHER P"
+  "liwayway.bautista@usls.edu.ph": "Panel Invitations\n\nResearch defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense.\n\nAccepted (1)\n\nMiguel Yu\n\nMAED \u00b7 2260004\n\nTitle Defense\nAccepted\n\nYour role on the panel: Panel Chair\n\nOTHER PANEL MEMBERS\n\nDr. Patricia Salvador \u00b7 Content Specialist\nDr. Teodoro Ramos \u00b7 Method Specialist\n\nNo date has been booked yet.\n\nAnswered Nov 2, 2026, 8:43 PM\n\nDecline",
+  "patricia.salvador@usls.edu.ph": "Panel Invitations\n\nResearch defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense.\n\nAccepted (1)\n\nMiguel Yu\n\nMAED \u00b7 2260004\n\nTitle Defense\nAccepted\n\nYour role on the panel: Content Specialist\n\nOTHER PANEL MEMBERS\n\nDr. Liwayway Bautista \u00b7 Panel Chair\nDr. Teodoro Ramos \u00b7 Method Specialist\n\nNo date has been booked yet.\n\nAnswered Nov 2, 2026, 8:44 PM\n\nDecline",
+  "teodoro.ramos@usls.edu.ph": "Panel Invitations\n\nResearch defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense.\n\nAccepted (4)\n\nMiguel Yu\n\nMAED \u00b7 2260004\n\nTitle Defense\nAccepted\n\nYour role on the panel: Method Specialist\n\nOTHER PANEL MEMBERS\n\nDr. Liwayway Bautista \u00b7 Panel Chair\nDr. Patricia Salvador \u00b7 Content Specialist\n\nNo date has been booked yet.\n\nAnswered Nov 2, 2026, 8:44 PM\n\nDecline\n\nGab Tolentino\n\nMBA \u00b7 GS-2026-UD-03\n\nProposal Defense\nAccepted\n\nYour role on the panel: Method Specialist\n\nOTHER PANEL MEMBERS\n\nDr. Marco Villanueva \u00b7 Panel"
  },
  "GS-2026-PM-01": {
   "method": "Similarity match (keyword TF-IDF)",
@@ -131,7 +131,7 @@
     "expertise": 60.0,
     "availability": 20.3,
     "workload": 15.0,
-    "suggested": "PANEL CHAIR",
+    "suggested": "",
     "windows": "4",
     "other_panels": "0",
     "topics": [
@@ -142,22 +142,6 @@
    },
    {
     "rank": 2,
-    "name": "Dr. Celeste Tan",
-    "score": 40.7,
-    "expertise": 11.6,
-    "availability": 14.1,
-    "workload": 15.0,
-    "suggested": "CONTENT SPECIALIST",
-    "windows": "2",
-    "other_panels": "0",
-    "topics": [
-     "patient",
-     "nursing",
-     "health"
-    ]
-   },
-   {
-    "rank": 3,
     "name": "Dr. Paolo Navarro",
     "score": 38.8,
     "expertise": 5.4,
@@ -172,15 +156,31 @@
     ]
    },
    {
+    "rank": 3,
+    "name": "Dr. Celeste Tan",
+    "score": 38.2,
+    "expertise": 11.6,
+    "availability": 14.1,
+    "workload": 12.5,
+    "suggested": "",
+    "windows": "2",
+    "other_panels": "1",
+    "topics": [
+     "patient",
+     "nursing",
+     "health"
+    ]
+   },
+   {
     "rank": 4,
     "name": "Dr. Marlon Geronimo",
-    "score": 32.1,
+    "score": 34.6,
     "expertise": 4.3,
     "availability": 20.3,
-    "workload": 7.5,
-    "suggested": "METHOD SPECIALIST",
+    "workload": 10.0,
+    "suggested": "",
     "windows": "4",
-    "other_panels": "3",
+    "other_panels": "2",
     "topics": [
      "health"
     ]
@@ -227,13 +227,13 @@
    {
     "rank": 1,
     "name": "Dr. Celeste Tan",
-    "score": 89.1,
+    "score": 86.6,
     "expertise": 60.0,
     "availability": 14.1,
-    "workload": 15.0,
-    "suggested": "PANEL CHAIR",
+    "workload": 12.5,
+    "suggested": "",
     "windows": "2",
-    "other_panels": "0",
+    "other_panels": "1",
     "topics": [
      "psychological",
      "adult learners",
@@ -247,7 +247,7 @@
     "expertise": 4.0,
     "availability": 23.4,
     "workload": 10.0,
-    "suggested": "CONTENT SPECIALIST",
+    "suggested": "",
     "windows": "5",
     "other_panels": "2",
     "topics": [
@@ -303,7 +303,7 @@
     "expertise": 9.1,
     "availability": 14.1,
     "workload": 0.0,
-    "suggested": "METHOD SPECIALIST",
+    "suggested": "",
     "windows": "2",
     "other_panels": "8",
     "topics": [
@@ -329,7 +329,7 @@
     "expertise": 60.0,
     "availability": 23.4,
     "workload": 15.0,
-    "suggested": "PANEL CHAIR",
+    "suggested": "",
     "windows": "5",
     "other_panels": "0",
     "topics": [
@@ -345,7 +345,7 @@
     "expertise": 1.2,
     "availability": 23.4,
     "workload": 10.0,
-    "suggested": "CONTENT SPECIALIST",
+    "suggested": "",
     "windows": "5",
     "other_panels": "2",
     "topics": [
@@ -401,7 +401,7 @@
     "expertise": 0.0,
     "availability": 23.4,
     "workload": 10.0,
-    "suggested": "METHOD SPECIALIST",
+    "suggested": "",
     "windows": "5",
     "other_panels": "2",
     "topics": []
@@ -423,7 +423,7 @@
     "expertise": 60.0,
     "availability": 17.2,
     "workload": 7.5,
-    "suggested": "PANEL CHAIR",
+    "suggested": "",
     "windows": "3",
     "other_panels": "3",
     "topics": [
@@ -439,7 +439,7 @@
     "expertise": 4.7,
     "availability": 20.3,
     "workload": 15.0,
-    "suggested": "CONTENT SPECIALIST",
+    "suggested": "",
     "windows": "4",
     "other_panels": "0",
     "topics": [
@@ -454,7 +454,7 @@
     "expertise": 1.8,
     "availability": 23.4,
     "workload": 10.0,
-    "suggested": "METHOD SPECIALIST",
+    "suggested": "",
     "windows": "5",
     "other_panels": "2",
     "topics": [
@@ -477,30 +477,31 @@
    },
    {
     "rank": 5,
-    "name": "Dr. Celeste Tan",
-    "score": 30.6,
-    "expertise": 1.5,
-    "availability": 14.1,
-    "workload": 15.0,
+    "name": "Dr. Marlon Geronimo",
+    "score": 32.6,
+    "expertise": 2.3,
+    "availability": 20.3,
+    "workload": 10.0,
     "suggested": "",
-    "windows": "2",
-    "other_panels": "0",
+    "windows": "4",
+    "other_panels": "2",
     "topics": [
-     "behavior"
+     "risk"
     ]
    },
    {
     "rank": 6,
-    "name": "Dr. Marlon Geronimo",
-    "score": 30.1,
-    "expertise": 2.3,
-    "availability": 20.3,
-    "workload": 7.5,
+    "name": "Dr. Teresa Lim",
+    "score": 30.0,
+    "expertise": 5.9,
+    "availability": 14.1,
+    "workload": 10.0,
     "suggested": "",
-    "windows": "4",
-    "other_panels": "3",
+    "windows": "2",
+    "other_panels": "2",
     "topics": [
-     "risk"
+     "digital",
+     "behavior"
     ]
    }
   ]
@@ -520,7 +521,7 @@
     "expertise": 60.0,
     "availability": 17.2,
     "workload": 5.0,
-    "suggested": "METHOD SPECIALIST",
+    "suggested": "",
     "windows": "3",
     "other_panels": "4",
     "topics": [
@@ -536,7 +537,7 @@
     "expertise": 1.1,
     "availability": 23.4,
     "workload": 15.0,
-    "suggested": "PANEL CHAIR",
+    "suggested": "",
     "windows": "5",
     "other_panels": "0",
     "topics": [
@@ -550,7 +551,7 @@
     "expertise": 1.3,
     "availability": 20.3,
     "workload": 15.0,
-    "suggested": "CONTENT SPECIALIST",
+    "suggested": "",
     "windows": "4",
     "other_panels": "0",
     "topics": [
@@ -560,13 +561,13 @@
    {
     "rank": 4,
     "name": "Dr. Marlon Geronimo",
-    "score": 30.0,
+    "score": 32.5,
     "expertise": 2.2,
     "availability": 20.3,
-    "workload": 7.5,
-    "suggested": "EXTERNAL PANEL",
+    "workload": 10.0,
+    "suggested": "",
     "windows": "4",
-    "other_panels": "3",
+    "other_panels": "2",
     "topics": [
      "forecasting"
     ]
@@ -616,7 +617,7 @@
     "expertise": 60.0,
     "availability": 20.3,
     "workload": 5.0,
-    "suggested": "PANEL CHAIR",
+    "suggested": "",
     "windows": "4",
     "other_panels": "4",
     "topics": [
@@ -632,7 +633,7 @@
     "expertise": 6.3,
     "availability": 23.4,
     "workload": 12.5,
-    "suggested": "CONTENT SPECIALIST",
+    "suggested": "",
     "windows": "5",
     "other_panels": "1",
     "topics": [
@@ -642,16 +643,16 @@
    },
    {
     "rank": 3,
-    "name": "Dr. Celeste Tan",
-    "score": 31.8,
-    "expertise": 2.7,
-    "availability": 14.1,
-    "workload": 15.0,
-    "suggested": "CONTENT SPECIALIST",
-    "windows": "2",
-    "other_panels": "0",
+    "name": "Dr. Marlon Geronimo",
+    "score": 31.7,
+    "expertise": 1.4,
+    "availability": 20.3,
+    "workload": 10.0,
+    "suggested": "",
+    "windows": "4",
+    "other_panels": "2",
     "topics": [
-     "interview"
+     "board"
     ]
    },
    {
@@ -661,7 +662,7 @@
     "expertise": 3.0,
     "availability": 14.1,
     "workload": 12.5,
-    "suggested": "EXTERNAL PANEL",
+    "suggested": "",
     "windows": "2",
     "other_panels": "1",
     "topics": [
@@ -670,16 +671,16 @@
    },
    {
     "rank": 5,
-    "name": "Dr. Marlon Geronimo",
-    "score": 29.2,
-    "expertise": 1.4,
-    "availability": 20.3,
-    "workload": 7.5,
+    "name": "Dr. Celeste Tan",
+    "score": 29.3,
+    "expertise": 2.7,
+    "availability": 14.1,
+    "workload": 12.5,
     "suggested": "",
-    "windows": "4",
-    "other_panels": "3",
+    "windows": "2",
+    "other_panels": "1",
     "topics": [
-     "board"
+     "interview"
     ]
    },
    {
@@ -713,7 +714,7 @@
     "expertise": 60.0,
     "availability": 14.1,
     "workload": 10.0,
-    "suggested": "PANEL CHAIR",
+    "suggested": "",
     "windows": "2",
     "other_panels": "2",
     "topics": [
@@ -729,7 +730,7 @@
     "expertise": 3.7,
     "availability": 23.4,
     "workload": 10.0,
-    "suggested": "METHOD SPECIALIST",
+    "suggested": "",
     "windows": "5",
     "other_panels": "2",
     "topics": [
@@ -743,7 +744,7 @@
     "expertise": 1.1,
     "availability": 20.3,
     "workload": 15.0,
-    "suggested": "CONTENT SPECIALIST",
+    "suggested": "",
     "windows": "4",
     "other_panels": "0",
     "topics": [
@@ -767,30 +768,30 @@
    },
    {
     "rank": 5,
-    "name": "Dr. Celeste Tan",
-    "score": 29.9,
-    "expertise": 0.8,
-    "availability": 14.1,
-    "workload": 15.0,
+    "name": "Dr. Marlon Geronimo",
+    "score": 32.0,
+    "expertise": 1.7,
+    "availability": 20.3,
+    "workload": 10.0,
     "suggested": "",
-    "windows": "2",
-    "other_panels": "0",
+    "windows": "4",
+    "other_panels": "2",
     "topics": [
-     "behavior"
+     "regression"
     ]
    },
    {
     "rank": 6,
-    "name": "Dr. Marlon Geronimo",
-    "score": 29.5,
-    "expertise": 1.7,
-    "availability": 20.3,
-    "workload": 7.5,
+    "name": "Dr. Celeste Tan",
+    "score": 27.4,
+    "expertise": 0.8,
+    "availability": 14.1,
+    "workload": 12.5,
     "suggested": "",
-    "windows": "4",
-    "other_panels": "3",
+    "windows": "2",
+    "other_panels": "1",
     "topics": [
-     "regression"
+     "behavior"
     ]
    }
   ]
@@ -803,7 +804,7 @@
    "expertise": 60.0,
    "availability": 17.2,
    "workload": 7.5,
-   "suggested": "PANEL CHAIR",
+   "suggested": "",
    "windows": "3",
    "other_panels": "3",
    "topics": [
@@ -819,7 +820,7 @@
    "expertise": 4.7,
    "availability": 20.3,
    "workload": 15.0,
-   "suggested": "CONTENT SPECIALIST",
+   "suggested": "",
    "windows": "4",
    "other_panels": "0",
    "topics": [
@@ -834,7 +835,7 @@
    "expertise": 1.8,
    "availability": 23.4,
    "workload": 10.0,
-   "suggested": "METHOD SPECIALIST",
+   "suggested": "",
    "windows": "5",
    "other_panels": "2",
    "topics": [
@@ -857,35 +858,36 @@
   },
   {
    "rank": 5,
-   "name": "Dr. Celeste Tan",
-   "score": 30.6,
-   "expertise": 1.5,
-   "availability": 14.1,
-   "workload": 15.0,
+   "name": "Dr. Marlon Geronimo",
+   "score": 32.6,
+   "expertise": 2.3,
+   "availability": 20.3,
+   "workload": 10.0,
    "suggested": "",
-   "windows": "2",
-   "other_panels": "0",
+   "windows": "4",
+   "other_panels": "2",
    "topics": [
-    "behavior"
+    "risk"
    ]
   },
   {
    "rank": 6,
-   "name": "Dr. Marlon Geronimo",
-   "score": 30.1,
-   "expertise": 2.3,
-   "availability": 20.3,
-   "workload": 7.5,
+   "name": "Dr. Teresa Lim",
+   "score": 30.0,
+   "expertise": 5.9,
+   "availability": 14.1,
+   "workload": 10.0,
    "suggested": "",
-   "windows": "4",
-   "other_panels": "3",
+   "windows": "2",
+   "other_panels": "2",
    "topics": [
-    "risk"
+    "digital",
+    "behavior"
    ]
   }
  ],
  "pm04_target_before": {
-  "rank": "7",
+  "rank": "6",
   "score": "30",
   "expertise": "5.9"
  },
@@ -897,7 +899,7 @@
    "expertise": 60.0,
    "availability": 17.2,
    "workload": 7.5,
-   "suggested": "PANEL CHAIR",
+   "suggested": "",
    "windows": "3",
    "other_panels": "3",
    "topics": [
@@ -913,7 +915,7 @@
    "expertise": 4.6,
    "availability": 20.3,
    "workload": 15.0,
-   "suggested": "CONTENT SPECIALIST",
+   "suggested": "",
    "windows": "4",
    "other_panels": "0",
    "topics": [
@@ -943,7 +945,7 @@
    "expertise": 1.7,
    "availability": 23.4,
    "workload": 10.0,
-   "suggested": "METHOD SPECIALIST",
+   "suggested": "",
    "windows": "5",
    "other_panels": "2",
    "topics": [
@@ -966,16 +968,16 @@
   },
   {
    "rank": 6,
-   "name": "Dr. Celeste Tan",
-   "score": 30.6,
-   "expertise": 1.5,
-   "availability": 14.1,
-   "workload": 15.0,
+   "name": "Dr. Marlon Geronimo",
+   "score": 32.5,
+   "expertise": 2.2,
+   "availability": 20.3,
+   "workload": 10.0,
    "suggested": "",
-   "windows": "2",
-   "other_panels": "0",
+   "windows": "4",
+   "other_panels": "2",
    "topics": [
-    "behavior"
+    "business"
    ]
   }
  ],

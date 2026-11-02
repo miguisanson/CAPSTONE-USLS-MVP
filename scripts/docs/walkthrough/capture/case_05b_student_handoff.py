@@ -6,6 +6,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from .case_01_signin import harden
 from .common import Runtime
 from .helpers_a1 import asc, goto_nav, scroll_to, scroll_top, wait_loaded, safe_notes
 
@@ -17,23 +18,33 @@ def s(n: int) -> str:
     return f"{SLUG}-{n:02d}"
 
 
-def build_workbook(root: Path, stamp: str, base_id: int) -> Path:
-    """Copy the MSN sample sheet but keep only two NEW students (time-suffixed names, new IDNOs)."""
-    import openpyxl
+_BUILD = """
+import sys, openpyxl
+src, out, stamp, base_id = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
+wb = openpyxl.load_workbook(src)
+ws = wb.active
+ws.delete_rows(7, ws.max_row)
+for row, (given, offset) in zip((5, 6), (("ALMA", 0), ("BEN", 1))):
+    ws.cell(row, 3).value = "WALKTHRU" + stamp
+    ws.cell(row, 4).value = given
+    ws.cell(row, 5).value = base_id + offset
+wb.save(out)
+"""
 
-    wb = openpyxl.load_workbook(root / SAMPLE)
-    ws = wb.active
-    ws.delete_rows(7, ws.max_row)
-    for row, (given, offset) in zip((5, 6), (("ALMA", 0), ("BEN", 1))):
-        ws.cell(row, 3).value = f"WALKTHRU{stamp}"
-        ws.cell(row, 4).value = given
-        ws.cell(row, 5).value = base_id + offset
+
+def build_workbook(root: Path, stamp: str, base_id: int) -> Path:
+    """Copy the MSN sample sheet but keep only two NEW students (time-suffixed names, new IDNOs).
+    openpyxl is not in the capture venv, so the copy is made with the app's own Python."""
+    import subprocess
+
     out = Path(tempfile.gettempdir()) / f"MSN_Monitoring_Sheet_walkthrough_{stamp}.xlsx"
-    wb.save(out)
+    app_python = root / ".venv" / "Scripts" / "python.exe"
+    subprocess.run([str(app_python), "-c", _BUILD, str(root / SAMPLE), str(out), stamp, str(base_id)], check=True)
     return out
 
 
 def run(rt: Runtime) -> None:
+    harden(rt)
     safe_notes(rt)
     root = Path(__file__).resolve().parents[4]
     stamp = time.strftime("%H%M%S")
@@ -73,6 +84,10 @@ def run(rt: Runtime) -> None:
     rt.step("open Upload history", history)
 
     def onboarding():
+        # BUG (reported): the panel is not reloaded by the import, it keeps saying "No import batches yet" until Refresh
+        rt.note("onboarding panel before Refresh: " + asc(page.locator("main").inner_text().split("Onboarding report")[1][:300].replace(chr(10), " | ")))
+        page.get_by_role("button", name="Refresh", exact=True).last.click()
+        page.wait_for_timeout(1500)
         scroll_to(page.get_by_text(re.compile("Onboarding report & Dean approval")).first, 90)
         rt.note("onboarding: " + asc(page.locator("main").inner_text().split("Onboarding report")[1][:900].replace("\n", " | ")))
         rt.shot(page, s(5))

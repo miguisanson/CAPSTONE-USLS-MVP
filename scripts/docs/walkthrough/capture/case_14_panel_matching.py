@@ -11,10 +11,22 @@ import re
 import time
 
 from . import helpers_a4 as h
-from .common import SHOTS, main_text
+from .common import SHOTS, TEXTS, main_text
 
 SLUG = "panel_matching"
-WIDE = {"width": 2000, "height": 960}
+
+
+def shot(rt, page, shot_id: str, **kw):
+    """rt.shot with a retry: Windows now and then refuses a write to a png ([Errno 22]); a second try works."""
+    for attempt in range(4):
+        try:
+            return rt.shot(page, shot_id, **kw)
+        except OSError:
+            page.wait_for_timeout(1500)
+    return rt.shot(page, shot_id, **kw)
+
+
+WIDE = {"width": 1700, "height": 960}
 PM_STUDENTS = [f"GS-2026-PM-0{n}" for n in range(1, 8)]
 
 
@@ -23,28 +35,24 @@ def sid(n: int) -> str:
 
 
 def snap(rt, page, shot_id: str) -> None:
-    """Viewport shot of the main column only (sidebar cropped out).
+    """Viewport shot of everything right of the sidebar (the window is 1700 px wide so the 4-column table fits).
 
-    The ranked table is 980 px wide and normally scrolls sideways inside its card; before the shot the
-    scroll container is set to overflow:visible so all four columns (rank, expertise, availability, score) show at once.
+    The ranked table is wide and normally scrolls sideways inside its card; before the shot the scroll container is set
+    to overflow:visible so all four columns show at once. The visible text is saved next to the picture for check_labels.py.
     """
     page.evaluate("() => { const t = document.querySelector('[role=table]'); if (t && t.parentElement) { t.parentElement.style.overflow = 'visible'; } }")
     page.wait_for_timeout(400)
-    form = page.locator("form").filter(has_text="Panel recommendation workspace")
-    right = 1500
-    left = 288
-    if form.count():
-        box = form.first.bounding_box()
-        right = box["x"] + box["width"] + 24
-        left = max(0, box["x"] - 30)
-    table = page.get_by_role("table", name="Ranked panel candidates")
-    if table.count():
-        tb = table.first.bounding_box()
-        if tb:
-            right = max(right, tb["x"] + tb["width"] + 24)
-    vw = page.viewport_size["width"]
-    clip = {"x": left, "y": 0, "width": min(vw - left, max(right - left, 1230)), "height": page.viewport_size["height"]}
-    page.screenshot(path=str(SHOTS / f"{shot_id}.png"), clip=clip)
+    vw, vh = page.viewport_size["width"], page.viewport_size["height"]
+    for attempt in range(4):
+        try:
+            page.screenshot(path=str(SHOTS / f"{shot_id}.png"), clip={"x": 288, "y": 0, "width": vw - 288, "height": vh})
+            break
+        except OSError:
+            page.wait_for_timeout(1500)
+    try:
+        (TEXTS / f"{shot_id}.txt").write_text(page.inner_text("body"), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
     rt.note(f"shot {shot_id}")
 
 
@@ -117,7 +125,7 @@ def run(rt):
     def paper_analysis():
         h.scroll_to(staff, staff.get_by_text("content ready").first, 80)
         snap(rt, staff, nxt())
-        h.scroll_to(staff, staff.get_by_text("Expertise match (paper vs. faculty records)"), 80)
+        h.scroll_to(staff, staff.get_by_text("paper vs. faculty records"), 80)
         snap(rt, staff, nxt())
 
     rt.step("staff: paper analysis, method label, weights and adviser exclusion", paper_analysis)
@@ -168,7 +176,7 @@ def run(rt):
         rt.go(staff2, "/workflow/research-gate")
         h.pick_student(staff2, "2260004", "Miguel Yu")
         h.scroll_to(staff2, staff2.get_by_text("Panel Matching", exact=True).last, 150)
-        rt.shot(staff2, nxt())
+        shot(rt, staff2, nxt())
 
     rt.step("staff: Research Gate shows the final panel", record_after)
 
@@ -196,9 +204,9 @@ def run(rt):
         finally:
             fac.context.close()
 
-    rt.step("faculty: panel chair accepts the invitation", lambda: accept_invitation("marlon.geronimo@usls.edu.ph"))
-    rt.step("faculty: content specialist accepts", lambda: accept_invitation("patricia.salvador@usls.edu.ph", False))
-    rt.step("faculty: method specialist accepts", lambda: accept_invitation("teodoro.ramos@usls.edu.ph", False))
+    seat_names = [re.search(r"(Dr\. [A-Za-z. ]+?) - ", text).group(1) for text in facts.get("miguel_seats", {}).values()]
+    for name in seat_names:
+        rt.step(f"faculty: {name} accepts the invitation", lambda name=name: accept_invitation(h.faculty_email(name)))
 
     # ---------------- Part B: seven demo papers ----------------
     rt.go(staff, "/workflow/panel-matching")
@@ -235,7 +243,7 @@ def run(rt):
         staff2.get_by_text(target).first.click()
         rt.settle(staff2)
         h.scroll_to(staff2, staff2.get_by_role("heading", name=re.compile("^Expertise records")), 185)
-        rt.shot(staff2, nxt())
+        shot(rt, staff2, nxt())
 
     rt.step("staff: Faculty page, open profile, read expertise records", faculty_page)
 
@@ -243,11 +251,11 @@ def run(rt):
         staff2.get_by_label("Kind of new record").select_option(label="Research interest")
         staff2.get_by_label("Text of new record").fill(record_text)
         h.scroll_to(staff2, staff2.get_by_label("Text of new record"), 520)
-        rt.shot(staff2, nxt())
+        shot(rt, staff2, nxt())
         staff2.get_by_role("button", name=re.compile("Add record")).click()
         rt.settle(staff2)
         h.scroll_to(staff2, staff2.get_by_text("Expertise record added").first, 520)
-        rt.shot(staff2, nxt())
+        shot(rt, staff2, nxt())
 
     rt.step("staff: add a research-interest record", add_record)
 
@@ -272,7 +280,7 @@ def run(rt):
         staff2.get_by_role("button", name="Remove record", exact=True).click()
         rt.settle(staff2)
         h.scroll_to(staff2, staff2.get_by_text("Expertise record removed").first, 520)
-        rt.shot(staff2, nxt())
+        shot(rt, staff2, nxt())
 
     rt.step("staff: remove the added record again", cleanup)
 

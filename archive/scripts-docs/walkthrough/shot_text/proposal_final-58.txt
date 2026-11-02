@@ -1,0 +1,213 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Graduation Endorsement
+Grace Fernandez · Graduate School Staff
+2
+GF
+Graduation Endorsement
+
+Review candidate eligibility across coursework, research, practicum, Dean endorsement, and CSV export for manual Registrar email. The Academic Coordinator checks coursework, the Research Coordinator validates research evidence, Graduate School staff prepare the list, and the Dean owns the endorsement and export.
+
+How this works
+View recent activity
+Rules applied on this screen
+2 rules from the Graduate School policies
+
+3 Academically eligible, 1 Batch created, 1 Dean review
+
+Dragging a card to another column does the same as the buttons in its details window. On a keyboard or phone, use "Move to…" on the card.
+
+Search list
+All programs
+MAED
+All stages / statuses
+For Review
+Not Prepared
+Ready for Dean Review
+All completed courses
+MAED-COG1 — Teaching Strategies in Higher Education
+MAED-COG10 — Seminar on Contemporary Issues in Education
+MAED-COG2 — Learning Analytics
+MAED-COG3 — Inclusive Education
+MAED-COG4 — Action Research in the Classroom
+MAED-COG5 — School Administration and Supervision
+MAED-COG6 — Educational Policy and Planning
+MAED-COG7 — Guidance and Student Development
+MAED-COG8 — Instructional Design
+MAED-COG9 — Language and Literacy Education
+MAED-FED — Foundations of Education
+MAED-MAJ1 — Curriculum Development and Evaluation
+MAED-MAJ2 — Educational Leadership and Management
+MAED-MAJ3 — Assessment of Learning
+MAED-MAJ4 — Educational Technology and Instruction
+MAED-MAJ5 — Philosophy of Education
+MAED-MOR — Methods of Educational Research
+MAED-STAT — Statistics in Education
+Showing 1 of 5 records
+Clear 1 filter
+Board
+Table
+
+5 more stages to the right →
+
+Academically eligible
+1
+
+Waiting for the student's signed application.
+
+Miguel Yu
+
+2260004 · MAED
+
+Requirements met. Signed application not in yet.
+
+Next: Student
+
+Awaiting Student Application
+View details
+
+Waiting for: Student (signed application)
+
+Application submitted
+0
+
+Staff can now create a graduation batch.
+
+No candidates here
+
+Batch created
+0
+
+Staff forward it for coursework review.
+
+No candidates here
+
+Coursework review
+0
+
+The Academic Coordinator checks coursework.
+
+No candidates here
+
+Research and practicum check
+0
+
+The Research Coordinator checks the evidence.
+
+No candidates here
+
+Endorsement prep or revision
+0
+
+Staff prepare the list or revise it.
+
+No candidates here
+
+Dean review
+0
+
+The Dean approves or returns the list.
+
+No candidates here
+
+Approved, ready to export
+0
+
+The Dean exports the approved list.
+
+No candidates here
+
+Exceptions
+0
+
+Missing requirements to correct.
+
+No candidates here
+
+Miguel Yu
+Eligible
+
+2260004 · MAED · Graduation endorsement
+
+PROGRAM
+
+Master of Arts in Education
+
+BATCH
+
+No batch assigned
+
+Coursework completed
+
+Thesis / research completed
+
+Practicum not required
+
+Eligible for graduation
+
+View stage history
+9
+
+CASE DISCUSSION / REVIEWER REMARKS
+
+0 messages
+
+No submission remarks or reviewer comments yet.
+
+No activity yet
+
+New submissions, messages, and decisions will appear here.
+
+No uploaded files for this request
+
+Close details
+No Graduate School Staff action is currently due.

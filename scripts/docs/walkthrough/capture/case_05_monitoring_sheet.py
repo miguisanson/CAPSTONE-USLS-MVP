@@ -133,7 +133,7 @@ def run(rt: Runtime) -> None:
     def back_to_grid():
         page.get_by_role("button", name="Close record panel").click()
         page.wait_for_timeout(800)
-        page.get_by_role("button", name=re.compile(f"monitoring record of {last}")).first.scroll_into_view_if_needed()
+        page.get_by_role("button", name=re.compile(f"monitoring record of {last}")).first.evaluate("e => e.scrollIntoView({block: 'center'})")
         page.wait_for_timeout(500)
         rt.shot(page, s(12))
     rt.step("new student appears in the grid, marked Manual", back_to_grid)

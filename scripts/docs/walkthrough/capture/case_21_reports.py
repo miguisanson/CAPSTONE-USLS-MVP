@@ -1,86 +1,113 @@
-"""Case 21 - Reports & Analytics (staff): operational reports, analytics, KPI measurements, dashboard overview."""
+"""Case 21 - Reports & Analytics (staff), as rebuilt in v5.2 (IM20): five reports, the Registrar list and the Analytics tab.
+
+The Reports page is being redesigned again, so this module captures it as it is on 2026-11-02 and keeps the steps close to what
+is on screen: one tab per report, the Program / Stage / Risk style filters, Download Excel / Download PDF, the Registrar changes
+list and the Analytics charts with their drill-down window.
+"""
 from __future__ import annotations
 
 import re
 
 from .common import Runtime
-from .helpers_a2 import scroll_to, top, visible_text
+from .helpers_a1 import scroll_to, scroll_top
 
 SLUG = "reports"
 
 
-def _chip(page, name: str) -> None:
-    page.get_by_role("button", name=name).first.click()
-    page.wait_for_timeout(900)
-    Runtime.settle(page, 500)
+def s(n: int) -> str:
+    return f"{SLUG}-{n:02d}"
+
+
+def _tab(page, name: str) -> None:
+    page.get_by_role("tab", name=name).click()
+    Runtime.settle(page, 900)
+
+
+def _frame(page, offset: int = 78) -> None:
+    """Bring the tab strip to the top of the scrolling area, so the filters and the start of the table show."""
+    scroll_to(page.get_by_role("tablist", name="Reports"), offset)
 
 
 def run(rt: Runtime) -> None:
     staff = rt.new_page("staff@usls.edu.ph")
 
-    def dashboard():
+    def home():
         rt.go(staff, "/")
-        staff.get_by_text("Graduate School Overview").first.wait_for()
-        rt.note("DASHBOARD: " + visible_text(staff, "main", 5000).split("Lifecycle stage distribution")[0][-260:].replace(chr(10), " | "))
-        rt.shot(staff, f"{SLUG}-01")
-        scroll_to(staff, "Lifecycle stage distribution", offset=90, exact=True)
-        rt.shot(staff, f"{SLUG}-02")
+        staff.get_by_role("link", name=re.compile("Reports & Analytics")).first.click()
+        staff.get_by_role("tab", name="Students at risk").wait_for()
+        staff.get_by_text(re.compile(r"\d+ rows?")).first.wait_for()
+        rt.note("REPORTS PAGE: " + staff.locator("main").inner_text()[:700].replace(chr(10), " | "))
+        scroll_top(staff)
+        rt.shot(staff, s(1))
+    rt.step("open Reports & Analytics from the sidebar", home)
 
-    rt.step("Dashboard overview", dashboard)
+    def risk_filter():
+        _frame(staff)
+        staff.locator("main select").nth(2).select_option(label="Delayed")
+        Runtime.settle(staff, 1200)
+        rt.note("AT-RISK DELAYED: " + staff.locator("main").inner_text()[:500].replace(chr(10), " | "))
+        _frame(staff)
+        rt.shot(staff, s(2))
+    rt.step("Students at risk: filter Risk = Delayed", risk_filter)
 
-    def reports_home():
-        rt.go(staff, "/reports")
-        staff.get_by_text("Students monitored").first.wait_for()
-        t = visible_text(staff, "main", 4000)
-        rt.note("REPORTS CHIPS: " + " | ".join(re.findall(r"[A-Za-z/& \-]+ · \d+", t)))
-        rt.note("REPORTS SUMMARY: " + t.split("Dashboard summary")[-1][:400].replace(chr(10), " | "))
-        rt.shot(staff, f"{SLUG}-03")
-        staff.evaluate("window.scrollBy(0, 330)")
-        staff.wait_for_timeout(300)
-        rt.shot(staff, f"{SLUG}-04")
+    def downloads():
+        # The two download buttons are plain links to the same address plus the format: check they answer, without saving a file.
+        out = []
+        for label in ("Download Excel", "Download PDF"):
+            href = staff.get_by_role("link", name=label).get_attribute("href")
+            status = staff.evaluate("async (u) => { const r = await fetch(u); return r.status + ' ' + r.headers.get('content-type'); }", href)
+            out.append(f"{label}: {status}")
+        rt.note("DOWNLOADS: " + " | ".join(out))
+    rt.step("check the Excel and PDF download links answer", downloads)
 
-    rt.step("Reports: operational report set and summary", reports_home)
+    def next_page():
+        staff.locator("main select").nth(2).select_option(index=0)
+        Runtime.settle(staff, 900)
+        staff.get_by_role("button", name="Next", exact=True).scroll_into_view_if_needed()
+        staff.get_by_role("button", name="Next", exact=True).click()
+        staff.wait_for_timeout(600)
+        rt.note("PAGER: " + staff.get_by_text(re.compile(r"Showing \d+")).first.inner_text() + " | " + staff.get_by_text(re.compile(r"Page \d+ of \d+")).first.inner_text())
+        staff.get_by_text(re.compile(r"Showing \d+")).first.scroll_into_view_if_needed()
+        rt.shot(staff, s(3))
+    rt.step("clear the filter, go to the next page of the table", next_page)
 
-    for idx, (chip, shot) in enumerate([("Missing requirements", "05"), ("At-risk", "06"), ("LOA/readmission", "07"), ("Open/overdue tasks", "08")]):
-        def op(chip=chip, shot=shot):
-            _chip(staff, chip)
-            t = visible_text(staff, "main", 9000)
-            i = t.find("Research completion")
-            rt.note(f"REPORT {chip}: " + t[i + 20:i + 700].replace(chr(10), " | "))
-            staff.evaluate("window.scrollBy(0, 330)")
-            staff.wait_for_timeout(300)
-            rt.shot(staff, f"{SLUG}-{shot}")
+    for chip, shot in [("Cohorts by stage", 4), ("Overdue and pending", 5), ("Defenses", 6), ("Graduation candidates", 7)]:
+        def tab(chip=chip, shot=shot):
+            _tab(staff, chip)
+            _frame(staff)
+            rt.note(f"{chip.upper()}: " + staff.locator("main").inner_text()[:900].replace(chr(10), " | "))
+            rt.shot(staff, s(shot))
+        rt.step(f"report tab: {chip}", tab)
 
-        rt.step(f"Operational report: {chip}", op)
+    def registrar():
+        _tab(staff, "Registrar changes")
+        staff.get_by_text("Daily changes", exact=True).first.wait_for()
+        Runtime.settle(staff, 1200)
+        _frame(staff)
+        rt.note("REGISTRAR: " + staff.locator("main").inner_text()[:900].replace(chr(10), " | "))
+        rt.shot(staff, s(8))
+    rt.step("report tab: Registrar changes", registrar)
 
-    def bottlenecks():
-        _chip(staff, "Stage bottlenecks")
-        scroll_to(staff, "Module KPI measurements", offset=90, exact=True)
-        rt.shot(staff, f"{SLUG}-09")
-        scroll_to(staff, re.compile(r"^Computed from recorded event history"), offset=160)
-        rt.shot(staff, f"{SLUG}-10")
+    def analytics():
+        _tab(staff, "Analytics")
+        staff.get_by_text("Lifecycle stage distribution").first.wait_for()
+        staff.wait_for_timeout(800)
+        _frame(staff)
+        rt.note("ANALYTICS: " + staff.locator("main").inner_text()[:1500].replace(chr(10), " | "))
+        rt.shot(staff, s(9))
+        scroll_to(staff.get_by_text("Students by college", exact=True).first, 90)
+        staff.mouse.move(1000, 20)
+        staff.wait_for_timeout(500)
+        rt.shot(staff, s(10))
+    rt.step("report tab: Analytics, the four charts", analytics)
 
-    rt.step("Stage bottlenecks and the KPI measurements", bottlenecks)
-
-    def kpis():
-        t = visible_text(staff, "main", 14000)
-        i = t.find("Module KPI measurements")
-        rt.note("KPI BLOCK: " + t[i:i + 2600].replace(chr(10), " | "))
-        scroll_to(staff, "Module KPI measurements", offset=90, exact=True)
-        staff.evaluate("window.scrollBy(0, 320)")
-        staff.wait_for_timeout(300)
-        rt.shot(staff, f"{SLUG}-11")
-
-    rt.step("Read the KPI basis lines", kpis)
-
-    for chip, shot in [("Queue aging & backlog", "12"), ("Residency watchlist", "13"), ("Workload & turnaround", "14"), ("Completion & attrition", "15"),
-                       ("Scheduling cycle time", "16"), ("Follow-up closure", "17")]:
-        def an(chip=chip, shot=shot):
-            _chip(staff, chip)
-            t = visible_text(staff, "main", 14000)
-            i = t.find("Computed from recorded event history")
-            rt.note(f"ANALYTICS {chip}: " + t[i - 60:i + 900].replace(chr(10), " | "))
-            scroll_to(staff, re.compile(r"^Computed from recorded event history"), offset=160)
-            rt.shot(staff, f"{SLUG}-{shot}")
-
-        rt.step(f"Analytics report: {chip}", an)
+    def drill():
+        scroll_to(staff.get_by_text("Lifecycle stage distribution", exact=True).first, 90)
+        chip = staff.get_by_role("button", name=re.compile(r"^Show Coursework: \d+ records"))
+        chip.first.click()
+        staff.get_by_role("dialog").first.wait_for()
+        Runtime.settle(staff, 1200)
+        rt.note("DRILL: " + staff.get_by_role("dialog").first.inner_text()[:600].replace(chr(10), " | "))
+        rt.shot(staff, s(11))
+    rt.step("Analytics: open the students behind a stage", drill)
+    staff.context.close()

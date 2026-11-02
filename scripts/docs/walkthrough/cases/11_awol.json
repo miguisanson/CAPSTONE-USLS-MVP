@@ -1,0 +1,262 @@
+{
+ "slug": "awol",
+ "title": "LOA and AWOL, 3 of 3 - AWOL and Return from AWOL",
+ "kind": "live",
+ "part": "2h",
+ "presenter": "Migui",
+ "owner": "Student, GS Staff, Dean",
+ "duration": "6 min",
+ "story": [
+  "Last case of the 'LOA and AWOL' slot. {case:leave-of-absence} and {case:readmission} were the proper way to leave and come back. This case is the improper way: a student who stopped enrolling without an approved leave. Nobody types 'AWOL' by hand. The platform flags the student from the official records (an imported standing, or a full-semester withdrawal without an approved leave). Maya Torres, a Master of Arts in Education student, is already flagged (AWOL since Jul 5, 2026).",
+  "Staff only watch the flag. The student moves the case by filing a written Return from AWOL declaration in the Student Portal. Then it follows the same board steps as before: staff check the residence limits and forward it, the Dean decides, and the approved return appears on the Registrar list as a report. Enrollment after the return is a separate step by the Academic Coordinator."
+ ],
+ "accounts": [
+  [
+   "Student demo",
+   "awol.maya@usls.edu.ph",
+   "Maya Torres, flagged AWOL, files the return declaration"
+  ],
+  [
+   "Graduate School Staff",
+   "staff@usls.edu.ph",
+   "AWOL & Residency board, forwards the return to the Dean, Registrar list"
+  ],
+  [
+   "Dean",
+   "dean@usls.edu.ph",
+   "AWOL & Residency board, approves the return"
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   "same for every demo account"
+  ]
+ ],
+ "data": [
+  [
+   "Intended return semester",
+   "AY 2026-2027 2nd Semester (the running semester is not accepted as a return semester)"
+  ],
+  [
+   "Last enrolled semester",
+   "AY 2025-2026 2nd Semester"
+  ],
+  [
+   "Written intention",
+   "I intend to resume my enrollment and complete my thesis."
+  ],
+  [
+   "Reason for returning",
+   "I have resolved the family matter that kept me away and I am ready to continue."
+  ],
+  [
+   "Staff note to the Dean",
+   "Within the normal residence period for a master's student. Forwarded for the Dean's decision."
+  ],
+  [
+   "Dean note",
+   "Approved. Return in the stated semester; the Academic Coordinator will plan the enrollment."
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - The system has flagged Maya",
+   "intro": "Before the demo, press the demo student reset for Maya on the sign-in page.",
+   "steps": [
+    {
+     "text": "Sign in as GS Staff and open **AWOL & Residency** under Standalone Processes. The page flags cases from source records. The line above the board counts the cases by column (for example AWOL, Return review, With the Dean, Residency). The button **Record residency** is for a different feature (a valid semester with no subjects); this case does not use it.",
+     "shots": [
+      {
+       "id": "awol-01",
+       "caption": "AWOL & Residency page, staff view."
+      }
+     ]
+    },
+    {
+     "text": "Type Maya in the search box. Her card sits in the first column **AWOL** ('Flagged from source records. Waiting for the student's written return.') with 'Awaiting return intent', 'AWOL since 2026-07-05', **Next: Student**, and the lock line **Waiting for: Student**. Staff cannot drag it: only the student can start the return.",
+     "shots": [
+      {
+       "id": "awol-02",
+       "caption": "Maya's card in the AWOL column, locked: waiting for the student."
+      }
+     ]
+    },
+    {
+     "text": "Open **Rules applied on this screen** (9 rules from the Graduate School policies): the maximum residence limits (master's 5 years normal and 7 years absolute, doctorate 7 and 9), the two-year extension with a 6-unit refresher, and the rule that time on leave counts toward residence. Each shows its handbook page and whether the system enforces it or it is documented only.",
+     "shots": [
+      {
+       "id": "awol-03",
+       "caption": "Rules panel: the residence limits that the return check uses."
+      }
+     ]
+    },
+    {
+     "text": "Click **View details** on Maya's card. The tracker is on step 1 **AWOL flagged**. The window shows the AWOL effective date, the detection source ('Demo imported AWOL standing') and the last enrolled semester, and the bottom says 'Waiting for the student.' There is no step button for staff yet.",
+     "shots": [
+      {
+       "id": "awol-04",
+       "caption": "Request window before the student has filed anything."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - The student files the return",
+   "steps": [
+    {
+     "text": "Sign in as Maya Torres and open **Return from AWOL** in the sidebar under Requests. The badge is **AWOL Declared**. The page shows her flagged case and a red note: the record was flagged AWOL automatically and registration stays restricted until the return request is reviewed. Further down is the form **Tell us you are coming back**.",
+     "shots": [
+      {
+       "id": "awol-05",
+       "caption": "Student portal, Return from AWOL."
+      }
+     ]
+    },
+    {
+     "text": "Choose **Intended return semester** (AY 2026-2027 2nd Semester) and **Last enrolled semester** (AY 2025-2026 2nd Semester). Type the **Written intention to resume enrollment** and the **Reason for returning and readiness to continue**.",
+     "shots": [
+      {
+       "id": "awol-06",
+       "caption": "Return declaration filled in."
+      }
+     ]
+    },
+    {
+     "text": "Click **Submit return declaration**. The box **Send this request?** appears. Click **Send request**.",
+     "shots": [
+      {
+       "id": "awol-07",
+       "caption": "The Send this request? box."
+      }
+     ]
+    },
+    {
+     "text": "The message says 'Submitted. Graduate School staff will review your structured return declaration and route it to the Dean.' The status is **Return filed**, the policy classification reads **Within Maximum Residence**, and the tracker is on step 2. A note says she cannot cancel the request herself; she must contact the Graduate School office.",
+     "shots": [
+      {
+       "id": "awol-08",
+       "caption": "After sending: Return filed, waiting for Graduate School Staff."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - Staff check and forward",
+   "steps": [
+    {
+     "text": "As GS Staff, open **AWOL & Residency** again and search Maya. The card has moved by itself to **Return review** ('Staff check the written return against the residence limits, then forward it.') and now shows **Next: Graduate School Staff** and the classification **Within Maximum Residence**.",
+     "shots": [
+      {
+       "id": "awol-09",
+       "caption": "Maya's card in Return review."
+      }
+     ]
+    },
+    {
+     "text": "Click **View details**. The window shows the student's written intention and reason, **Returning in**, **Residence limits** (5 normal / 7 absolute) and the **Policy check**: 'Eligible for Dean Review', with Current AWOL status (Pass), Written intent to enroll (Present) and Maximum residence (Pass). Click **Close details**.",
+     "shots": [
+      {
+       "id": "awol-10",
+       "caption": "Request window with the return policy check."
+      }
+     ]
+    },
+    {
+     "text": "Drag the card from **Return review** to **With the Dean**. The box **Forward to Dean** opens ('Return filed to With the Dean'). Type the **Note for the Dean** and click **Forward to Dean**. (The same step is also the **Forward to Dean** button in the request window.)",
+     "shots": [
+      {
+       "id": "awol-11",
+       "caption": "Forward to Dean box."
+      }
+     ]
+    },
+    {
+     "text": "The notice says 'Maya Torres: Forward to Dean: now 'With the Dean'.' The card is in **With the Dean** with the lock line 'Waiting for: Dean'.",
+     "shots": [
+      {
+       "id": "awol-12",
+       "caption": "Board after forwarding."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part D - The Dean decides, and the Registrar report",
+   "steps": [
+    {
+     "text": "Sign in as the Dean, open **AWOL & Residency** and search Maya. The card is in **With the Dean**.",
+     "shots": [
+      {
+       "id": "awol-13",
+       "caption": "Dean's view: Maya waits in With the Dean."
+      }
+     ]
+    },
+    {
+     "text": "Drag the card to **Back in the program**. The box **Approve the return** says 'With the Dean to Return approved' and explains that the approval restores the student's standing (or sends the case on for full re-enrollment). Type the Dean note and click **Approve the return**. The other Dean choices are **Return for revision** and **Deny the return**, both with a comment.",
+     "shots": [
+      {
+       "id": "awol-14",
+       "caption": "Approve the return box."
+      }
+     ]
+    },
+    {
+     "text": "The card leaves With the Dean and lands in **Back in the program** ('The return was approved or the re-enrollment is done. The student is active again.').",
+     "shots": [
+      {
+       "id": "awol-15",
+       "caption": "Dean's board after approving."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff, the card in **Back in the program** shows **Next: Academic Coordinator** and the lock line 'Waiting for: Academic Coordinator': enrollment is a separate step.",
+     "shots": [
+      {
+       "id": "awol-16",
+       "caption": "Staff board: the return is approved."
+      }
+     ]
+    },
+    {
+     "text": "Click **View details**. The status is **Return approved** and all four tracker steps are complete.",
+     "shots": [
+      {
+       "id": "awol-17",
+       "caption": "Request window after approval."
+      }
+     ]
+    },
+    {
+     "text": "Scroll down to the **Registrar list**. It is a list of reports, one row per approved return or residency semester, each with **Download report**. Click **Download report** on Maya's row; the portal gives a file and sends no email. Staff email it through the official channel.",
+     "shots": [
+      {
+       "id": "awol-18",
+       "caption": "Registrar list with the report for Maya's approved return."
+      }
+     ]
+    },
+    {
+     "text": "Sign in again as Maya and open **Return from AWOL**. The status is **Return Approved** and the discussion shows the staff and Dean messages. This closes the slot: leave, return and AWOL all ran on the same board, the same request window and the same Registrar list.",
+     "shots": [
+      {
+       "id": "awol-19",
+       "caption": "Student view: Return Approved."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "AWOL is a policy-derived standing; it cannot be declared by hand. Return from AWOL is the student's request and the Dean's decision. It is not the Residency feature.",
+  "The policy check is advice; only the Dean's decision applies the outcome. Residence limits shown: 5 normal / 7 absolute years for a master's student.",
+  "A card waiting for the student (AWOL column) or the Dean (With the Dean) cannot be dragged by staff; the board shows 'Waiting for: ...'. In the capture, staff drag the Return review card to With the Dean and the Dean drags it to Back in the program; both work in the real page, and Move to... on the card does the same.",
+  "Wording differs a little between boards: after the forward step this board says 'Forward to Dean: now 'With the Dean'', while the Leave and Readmission boards say 'Forwarded to the Dean.' Not wrong, but do not read it as a different step.",
+  "Course enrollment after the return stays a separate action by the Academic Coordinator."
+ ]
+}

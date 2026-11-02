@@ -5,10 +5,11 @@ import csv
 import re
 import tempfile
 import time
+from datetime import date, timedelta
 from pathlib import Path
 
 from .common import Runtime, click_text
-from .helpers_a2 import pick, row_for, scroll_to, shot_at, top, visible_text
+from .helpers_a2 import pick, row_for, scroll_to, top, visible_text
 
 SLUG = "enrollment"
 PROGRAM = "MAED"
@@ -16,6 +17,17 @@ CURRENT = "AY 2026-2027 1st Semester"
 NEXT = "AY 2026-2027 2nd Semester"
 CANDIDATES = ["Cruz, Daniel", "Reyes, Grace", "Santos, Benjamin", "Lim, Adrian"]  # seeded MAED students with nothing taken yet
 STATE: dict = {}
+
+
+
+def _shot(rt: Runtime, page, shot_id: str, **kw) -> str:
+    """rt.shot with a retry: Windows now and then refuses the first write of a PNG (OSError 22)."""
+    for attempt in range(3):
+        try:
+            return rt.shot(page, shot_id, **kw)
+        except OSError:
+            page.wait_for_timeout(700)
+    return rt.shot(page, shot_id, **kw)
 
 
 def _make_class_list() -> Path:
@@ -89,7 +101,7 @@ def run(rt: Runtime) -> None:
     # ---- Part A: class list import --------------------------------------------------------
     def enrollment_home():
         _open_enrollment(rt, staff, CURRENT)
-        rt.shot(staff, f"{SLUG}-01")
+        _shot(rt, staff, f"{SLUG}-01")
 
     rt.step("Open Enrollment for MAED, current semester", enrollment_home)
 
@@ -98,7 +110,7 @@ def run(rt: Runtime) -> None:
         staff.wait_for_timeout(600)
         t = visible_text(staff, "main", 4000)
         rt.note("LOAD RULES: " + t.split("Adding or changing a subject")[0].replace(chr(10), " | ")[-1800:])
-        rt.shot(staff, f"{SLUG}-02")
+        _shot(rt, staff, f"{SLUG}-02")
         staff.get_by_text("Enrollment and academic load: rules applied").first.click()
 
     rt.step("Expand the load rules panel", rules_panel)
@@ -108,7 +120,7 @@ def run(rt: Runtime) -> None:
         staff.get_by_text("Preview class list").first.wait_for()
         staff.wait_for_timeout(900)
         rt.note("PREVIEW: " + staff.locator("[role=presentation]").last.inner_text()[:1500].replace(chr(10), " | "))
-        rt.shot(staff, f"{SLUG}-03")
+        _shot(rt, staff, f"{SLUG}-03")
 
     rt.step("Class list preview", preview)
 
@@ -116,7 +128,7 @@ def run(rt: Runtime) -> None:
         staff.get_by_role("button", name="Confirm import").click()
         staff.get_by_text("Class list imported").first.wait_for()
         rt.note("IMPORT RESULT: " + staff.get_by_text("Class list imported").first.locator("xpath=ancestor::div[3]").inner_text()[:800].replace(chr(10), " | "))
-        rt.shot(staff, f"{SLUG}-04")
+        _shot(rt, staff, f"{SLUG}-04")
         staff.get_by_role("button", name="Done").click()
         rt.settle(staff)
 
@@ -131,15 +143,34 @@ def run(rt: Runtime) -> None:
         rt.settle(staff)
         staff.get_by_text("Clarissa").first.wait_for()
         rt.note("CLASS LIST: " + visible_text(staff, "main", 2500).replace(chr(10), " | "))
-        rt.shot(staff, f"{SLUG}-05")
+        _shot(rt, staff, f"{SLUG}-05")
 
     rt.step("Enrollment Class List shows the imported roster", class_list_screen)
+
+    # ---- Part B (cont.): Monitoring Sheet, read before the single-student and guard parts add more rows -----------------------------------------------------------
+    def monitoring():
+        rt.go(staff, "/monitoring-sheet")
+        sels = staff.locator("select")
+        opts = sels.nth(0).locator("option").all_inner_texts()
+        sels.nth(0).select_option(label=next(o for o in opts if o.startswith("MAED")))
+        staff.wait_for_timeout(800)
+        topts = sels.nth(1).locator("option").all_inner_texts()
+        sels.nth(1).select_option(label=next(o for o in topts if CURRENT in o))
+        rt.settle(staff)
+        row = staff.locator("tr", has_text="GS-2026-ENR-01").first
+        row.scroll_into_view_if_needed()
+        staff.evaluate("window.scrollBy(0, 180)")
+        staff.wait_for_timeout(400)
+        rt.note("MONITORING ROW: " + row.inner_text()[:400].replace(chr(10), " | "))
+        _shot(rt, staff, f"{SLUG}-15")
+
+    rt.step("Monitoring Sheet shows the imported enrollment", monitoring)
 
     # ---- Part C: single student enrollment (next semester, published offerings) -------------
     def single_before():
         STATE["student"] = _pick_single_student(rt, staff)
         rt.note(f"SINGLE STUDENT: {STATE['student']}")
-        rt.shot(staff, f"{SLUG}-06")
+        _shot(rt, staff, f"{SLUG}-06")
 
     rt.step("Open Enrollment for Daniel Cruz, next semester", single_before)
 
@@ -149,7 +180,7 @@ def run(rt: Runtime) -> None:
         chosen.extend(_add_subjects(staff, 2))
         rt.note(f"SINGLE: added {chosen}")
         scroll_to(staff, "Enrollment draft", offset=120, exact=True)
-        rt.shot(staff, f"{SLUG}-07")
+        _shot(rt, staff, f"{SLUG}-07")
 
     rt.step("Select two subjects", single_select)
 
@@ -160,7 +191,10 @@ def run(rt: Runtime) -> None:
         top(staff)
         rt.note("SINGLE RESULT: " + visible_text(staff, "main", 6000).split("Student")[0][-300:].replace(chr(10), " | "))
         staff.get_by_text(re.compile(r"enrol", re.I)).first.wait_for()
-        rt.shot(staff, f"{SLUG}-08")
+        _shot(rt, staff, f"{SLUG}-08")
+        scroll_to(staff, "Curriculum version & study plan draft", offset=90, exact=True)
+        rt.note("STUDY PLAN PANEL: " + visible_text(staff, "main", 12000).split("Curriculum version & study plan draft")[-1][:700].replace(chr(10), " | "))
+        _shot(rt, staff, f"{SLUG}-08b")
 
     rt.step("Confirm the enrollment", single_confirm)
 
@@ -170,11 +204,38 @@ def run(rt: Runtime) -> None:
         pick(staff, "Semester", NEXT)
         rt.settle(staff)
         rt.note("CLASS LIST NEXT: " + visible_text(staff, "main", 2500).replace(chr(10), " | "))
-        rt.shot(staff, f"{SLUG}-09")
+        _shot(rt, staff, f"{SLUG}-09")
 
     rt.step("Class list of the next semester", single_outputs)
 
     # ---- Part D: the guard -----------------------------------------------------------------
+    # The seed dates the running semester as if classes began 3 days ago, so the add-subject window is still open on
+    # any demo day within a week of seeding. To meet the guard, staff move the start date back (and restore it after).
+    def edit_current_start(new_date: str | None, shot_id: str | None):
+        rt.go(staff, "/term-settings")
+        row = staff.locator("tr", has_text=CURRENT).first
+        row.get_by_role("button", name=re.compile("Edit dates")).click()
+        start = staff.locator("input[type=date]").nth(0)
+        start.wait_for()
+        old = start.input_value()
+        target = new_date or STATE["orig_start"]
+        start.fill(target)
+        staff.wait_for_timeout(300)
+        if shot_id:
+            _shot(rt, staff, shot_id)
+        staff.get_by_role("button", name=re.compile("Save dates")).click()
+        staff.wait_for_timeout(1200)
+        rt.settle(staff)
+        rt.note(f"CURRENT SEMESTER start {old} -> {target}")
+        return old
+
+    def start_back():
+        old = edit_current_start("2026-09-01", f"{SLUG}-10s")
+        # a re-run after a stopped run finds the moved date: fall back to the seed's 'began 3 days ago'
+        STATE["orig_start"] = old if old != "2026-09-01" else (date.today() - timedelta(days=3)).isoformat()
+
+    rt.step("Move the current semester's start date back", start_back)
+
     def guard_window():
         # First registration in a semester is not an "addition"; the rule bites once the student already has a
         # subject in it. Register one subject if needed, then try to add another.
@@ -193,7 +254,7 @@ def run(rt: Runtime) -> None:
             codes = _add_subjects(staff, 1)
             rt.note(f"GUARD window attempt {attempt}: tried {codes}")
             scroll_to(staff, "Enrollment draft", offset=120, exact=True)
-            rt.shot(staff, f"{SLUG}-10a")
+            _shot(rt, staff, f"{SLUG}-10a")
             staff.get_by_role("button", name="Confirm enrollment").click()
             staff.wait_for_timeout(2500)
             if staff.get_by_text("A business rule applies to this change").count():
@@ -201,7 +262,7 @@ def run(rt: Runtime) -> None:
         alert = staff.get_by_role("heading", name="A business rule applies to this change").locator("xpath=../../..")
         rt.note("GUARD TEXT: " + alert.inner_text()[:1500].replace(chr(10), " | "))
         scroll_to(staff, "A business rule applies to this change", offset=120, exact=True)
-        rt.shot(staff, f"{SLUG}-10")
+        _shot(rt, staff, f"{SLUG}-10")
 
     rt.step("Add a second subject after the first week: rule panel", guard_window)
 
@@ -211,15 +272,22 @@ def run(rt: Runtime) -> None:
         rt.note(f"GUARD OPTIONS: {opts}")
         sel.select_option(label=next(o for o in opts if "Do not enroll" in o))
         staff.wait_for_timeout(300)
-        rt.shot(staff, f"{SLUG}-11")
         staff.get_by_role("button", name="Save with these decisions").click()
         staff.wait_for_timeout(2500)
         rt.settle(staff)
         top(staff)
         rt.note("GUARD RESULT: " + visible_text(staff, "main", 5000).split("Student")[0][-400:].replace(chr(10), " | "))
-        rt.shot(staff, f"{SLUG}-12")
+        _shot(rt, staff, f"{SLUG}-12")
 
     rt.step("Choose Do not enroll", guard_refuse)
+
+    def start_restore():
+        edit_current_start(None, None)
+        staff.get_by_text(CURRENT).first.wait_for()
+        rt.note("RESTORED: " + staff.locator("tr", has_text=CURRENT).first.inner_text().replace(chr(10), " | "))
+        _shot(rt, staff, f"{SLUG}-12r")
+
+    rt.step("Put the current semester's start date back", start_restore)
 
     def guard_load():
         _open_enrollment(rt, staff, NEXT, STATE['student'])
@@ -227,31 +295,12 @@ def run(rt: Runtime) -> None:
         codes = _add_subjects(staff, 4)
         rt.note(f"GUARD load: added {codes}")
         scroll_to(staff, "Enrollment draft", offset=120, exact=True)
-        rt.shot(staff, f"{SLUG}-13")
+        _shot(rt, staff, f"{SLUG}-13")
         staff.get_by_role("button", name="Confirm enrollment").click()
         staff.get_by_text("A business rule applies to this change").first.wait_for()
         rt.note("LOAD TEXT: " + staff.get_by_role("heading", name="A business rule applies to this change").locator("xpath=../../..").inner_text()[:1500].replace(chr(10), " | "))
         scroll_to(staff, "A business rule applies to this change", offset=120, exact=True)
-        rt.shot(staff, f"{SLUG}-14")
+        _shot(rt, staff, f"{SLUG}-14")
         staff.get_by_role("button", name=re.compile("Cancel, change the selection")).click()
 
     rt.step("Go over the full-time load: rule panel", guard_load)
-
-    # ---- Part E: Monitoring Sheet -----------------------------------------------------------
-    def monitoring():
-        rt.go(staff, "/monitoring-sheet")
-        sels = staff.locator("select")
-        opts = sels.nth(0).locator("option").all_inner_texts()
-        sels.nth(0).select_option(label=next(o for o in opts if o.startswith("MAED")))
-        staff.wait_for_timeout(800)
-        topts = sels.nth(1).locator("option").all_inner_texts()
-        sels.nth(1).select_option(label=next(o for o in topts if CURRENT in o))
-        rt.settle(staff)
-        row = staff.locator("tr", has_text="GS-2026-ENR-01").first
-        row.scroll_into_view_if_needed()
-        staff.evaluate("window.scrollBy(0, 180)")
-        staff.wait_for_timeout(400)
-        rt.note("MONITORING ROW: " + row.inner_text()[:400].replace(chr(10), " | "))
-        rt.shot(staff, f"{SLUG}-15")
-
-    rt.step("Monitoring Sheet shows the imported enrollment", monitoring)

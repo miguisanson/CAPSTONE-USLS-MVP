@@ -1,0 +1,173 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Practicum
+Grace Fernandez · Graduate School Staff
+3
+GF
+Practicum
+
+Track practicum MOA receipt, hours, certificates, completion report, and Dean review for Psychology and MSGC students only. Practicum applies to Psychology and MSGC students only; other programs are not listed.
+
+How this works
+View recent activity
+Rules applied on this screen
+5 rules from the Graduate School policies · 5 need review
+
+1 Awaiting Submission, 1 Documents Review
+
+Dragging a card to another column does the same as the buttons in its case window. On a keyboard or phone, use "Move to…" on the card.
+
+Search requests by name, student number or program
+All programs
+MAPSY
+MSGC
+All statuses
+Documents Under Review
+Not Submitted
+Showing 2 of 2 students
+Board
+Table
+Saved. The student record, queue, and monitoring indicators were updated.
+
+1 more stage to the right → · 3 to the left
+
+Awaiting Submission
+1
+
+Waiting for the student's MOA.
+
+Andrea Villanueva
+
+GS-2026-PRAC-01 · MAPSY
+
+Waiting for documents
+
+Site pending
+
+No hours yet · Eligible
+
+No practicum documents submitted
+
+Next: Student
+
+View details
+
+Waiting for: Student
+
+Submitted
+0
+
+Staff receive the MOA and forward it.
+
+No practicum students here
+
+Eligibility Review
+0
+
+The Academic Coordinator checks the MOA.
+
+No practicum students here
+
+Documents Review
+1
+
+Certificates and hours are being checked.
+
+Paolo Ramirez
+
+GS-2026-PRAC-02 · MSGC
+
+Guidance and Counseling Partner Center
+
+200/200 hrs · Eligible
+
+Submitted Nov 2, 2026
+
+Updated Nov 2, 2026
+
+8 VISIBLE MESSAGES
+
+Status changed from Documents Submitted to Documents Under Review. Next owner: Academic Coordinator.
+
+Next: Academic Coordinator
+
+View details
+
+Waiting for: Academic Coordinator
+
+In Progress
+0
+
+The student is completing the hours.
+
+No practicum students here
+
+Completion Review
+0
+
+Hours verified. The report goes to the Dean.
+
+No practicum students here
+
+Completed
+0
+
+The Dean has the report or has reviewed it.
+
+No practicum students here
+
+Returned
+0
+
+Sent back to the student to correct.
+
+No practicum students here

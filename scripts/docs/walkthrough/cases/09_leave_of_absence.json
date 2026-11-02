@@ -1,0 +1,291 @@
+{
+ "slug": "leave-of-absence",
+ "title": "LOA and AWOL, 1 of 3 - Leave of Absence",
+ "kind": "live",
+ "part": "2h",
+ "presenter": "Migui",
+ "owner": "Student, GS Staff, Dean",
+ "duration": "8 min",
+ "story": [
+  "This is the first of three cases that Migui shows as one slot, 'LOA and AWOL', in this order: Leave of Absence (this case), then {case:readmission} (the student comes back from the leave), then {case:awol} (the student who left and never filed a leave). All three run on the same kind of page: a board with columns, a search row, a Board/Table switch, a request window and a Registrar list.",
+  "Daniel Fernandez, a Master of Arts in Education student, has accepted a work assignment in another city. He asks for a two-semester Leave of Absence in the Student Portal: the semesters he wants to be away, a reason and an explanation. Graduate School Staff move the card on the Leave of Absence board (drag and drop works), read the automatic policy check and forward it to the Dean. The Dean drags the card to Leave scheduled to approve. Staff then start the leave and use the Registrar list: download the file, email it themselves, mark it as sent. The portal never sends that email."
+ ],
+ "accounts": [
+  [
+   "Student demo",
+   "loa.daniel@usls.edu.ph",
+   "Daniel Fernandez, files the request"
+  ],
+  [
+   "Graduate School Staff",
+   "staff@usls.edu.ph",
+   "Leave of Absence board, policy check, forwards to the Dean, starts the leave, Registrar list"
+  ],
+  [
+   "Dean",
+   "dean@usls.edu.ph",
+   "Leave of Absence board, approves"
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   "same for every demo account (shown on the sign-in page of a local copy; hidden on a public site)"
+  ]
+ ],
+ "data": [
+  [
+   "Leave starts",
+   "AY 2026-2027 2nd Semester (upcoming, Jan 10, 2027)"
+  ],
+  [
+   "Leave ends",
+   "AY 2027-2028 1st Semester (Nov 29, 2027), two semesters in total"
+  ],
+  [
+   "Reason",
+   "Employment / professional obligation"
+  ],
+  [
+   "Explanation",
+   "I have accepted a work assignment in another city and cannot carry a study load for the next two semesters."
+  ],
+  [
+   "Staff note to the Dean",
+   "Two semesters is within the handbook limit and no earlier leave is on record. The minimum-residency check is a prototype rule, so the Dean should confirm."
+  ],
+  [
+   "Dean note",
+   "Approved for two semesters. The student is to file a readmission request before the leave ends."
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - The student files the request",
+   "intro": "Before the demo, press the demo student reset for Daniel on the sign-in page, so the case always starts clean.",
+   "steps": [
+    {
+     "text": "Sign in as Daniel Fernandez. In the sidebar under Requests, open **Leave of Absence**. The page title carries the badge **Not submitted**. The form **Ask for a leave of absence** says that a leave can last up to 2 semesters at a time, can be renewed once, and that all leave together can never be more than 4 semesters. It has four fields: **Leave starts**, **Leave ends**, **Reason** and **Tell us what is happening**.",
+     "shots": [
+      {
+       "id": "leave-of-absence-01",
+       "caption": "Student portal, Leave of Absence, empty form."
+      }
+     ]
+    },
+    {
+     "text": "Open **Rules applied on this screen**. It says 9 rules from the Graduate School policies, 3 of them need review. The handbook rules show their source page; the three marked **Needs review** are prototype values that the Graduate School still has to confirm. Say this out loud: the student sees the same rules the staff member will apply.",
+     "shots": [
+      {
+       "id": "leave-of-absence-02",
+       "caption": "Rules panel on the student screen."
+      }
+     ]
+    },
+    {
+     "text": "Choose **Leave starts** = AY 2026-2027 2nd Semester (the second entry in the list) and **Leave ends** = AY 2027-2028 1st Semester. The page says 'That is 2 semesters.' Choose the **Reason** Employment / professional obligation and type the explanation.",
+     "shots": [
+      {
+       "id": "leave-of-absence-03",
+       "caption": "The form filled in."
+      }
+     ]
+    },
+    {
+     "text": "Click **Submit leave request**. A box **Send this request?** repeats the request (from, to, reason) and asks the student to check it. Click **Send request**.",
+     "shots": [
+      {
+       "id": "leave-of-absence-04",
+       "caption": "The Send this request? box."
+      }
+     ]
+    },
+    {
+     "text": "The page now shows the badge **Submitted**, the message 'Submitted. Graduate School staff will review your LOA application.', the leave period (2 semesters), **Waiting for: Graduate School Staff**, and the six-step tracker (Request submitted, Staff review, Dean decision, Leave begins, Return, Back in the program). **Withdraw request** is offered while the request is open.",
+     "shots": [
+      {
+       "id": "leave-of-absence-05",
+       "caption": "After sending: Submitted, waiting for Graduate School Staff."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - Staff on the Leave of Absence board",
+   "intro": "The board is the same page for Leave of Absence, Readmission, AWOL & Residency and Subject Withdrawal. Learn it here once; the next two cases reuse it.",
+   "steps": [
+    {
+     "text": "Sign in as GS Staff and open **Leave of Absence** under Standalone Processes. Type Daniel in the search box (**Search students**). The line above the board says dragging a card does the same as the buttons in its request window, and that on a keyboard or phone the **Move to...** button on the card does it. Daniel's card is in the first column **Submitted** with the flag **Awaiting your review**.",
+     "shots": [
+      {
+       "id": "leave-of-absence-06",
+       "caption": "Leave of Absence board filtered to Daniel: the card is in Submitted."
+      }
+     ]
+    },
+    {
+     "text": "Drag Daniel's card from **Submitted** to **In staff review**. Dragging works in the real page. If a drag does not go through on stage, click **Move to...** on the card and choose the column, which does the same thing. The green notice 'Daniel Fernandez: Review started.' appears above the columns.",
+     "shots": [
+      {
+       "id": "leave-of-absence-07",
+       "caption": "After the drag: the card is in In staff review."
+      }
+     ]
+    },
+    {
+     "text": "Click **Table** (next to **Board**). The same requests appear as a list with the columns Student, Type, What it is about, Status, Next and Notes. Click **Board** to go back.",
+     "shots": [
+      {
+       "id": "leave-of-absence-08",
+       "caption": "The Table view of the same request."
+      }
+     ]
+    },
+    {
+     "text": "Click **View details** on the card. The request window shows the tracker (Staff review is the current step) and **The request**: leave period, reason and what the student wrote. The buttons at the bottom are **Close details**, **Forward to Dean** and **Return to student**.",
+     "shots": [
+      {
+       "id": "leave-of-absence-09",
+       "caption": "Request window for Daniel."
+      }
+     ]
+    },
+    {
+     "text": "Scroll to **Policy check** ('Advice for staff - the Dean decides'). Each line has a result chip: Structured application source (Present), Allowed reason category (Pass), Effective period (Pass), Total leave (Pass), Filing date (Pass) and Minimum residency (**Needs Review**, because it is a prototype rule). The overall advice reads **Needs Review**.",
+     "shots": [
+      {
+       "id": "leave-of-absence-10",
+       "caption": "Policy check in the request window."
+      }
+     ]
+    },
+    {
+     "text": "Click **Forward to Dean**. The box shows 'In staff review to With the Dean', the list **Eligibility result** (leave it on 'Use the policy check result') and **Note for the Dean**. Type the staff note and click **Forward to Dean**.",
+     "shots": [
+      {
+       "id": "leave-of-absence-11",
+       "caption": "Forward to Dean box with the note."
+      }
+     ]
+    },
+    {
+     "text": "The notice says 'Daniel Fernandez: Forwarded to the Dean.' The card is now in **With the Dean** and shows the lock line **Waiting for: Dean**. Staff cannot move a card that is waiting for the Dean; the board says why instead of hiding the card.",
+     "shots": [
+      {
+       "id": "leave-of-absence-12",
+       "caption": "Board after forwarding: the card waits for the Dean."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - The Dean decides",
+   "steps": [
+    {
+     "text": "Sign in as the Dean and open **Leave of Absence** (it has a count badge in the sidebar). It is the same board with the Dean's own one-line description. Search Daniel. The card is in **With the Dean**.",
+     "shots": [
+      {
+       "id": "leave-of-absence-13",
+       "caption": "Dean's view of the board: Daniel waits in With the Dean."
+      }
+     ]
+    },
+    {
+     "text": "Drag the card to **Leave scheduled**. The box **Approve** opens with 'With the Dean to Leave scheduled' and an optional **Note**. Type the Dean note and click **Approve**.",
+     "shots": [
+      {
+       "id": "leave-of-absence-14",
+       "caption": "Approve box."
+      }
+     ]
+    },
+    {
+     "text": "The notice says 'Daniel Fernandez: LOA approved by Dean'. The card is in **Leave scheduled** and carries the flag **Registrar: Pending Handoff**. The other choices on a Dean card are **Return for revision** and **Deny**; both need a comment that the student can read.",
+     "shots": [
+      {
+       "id": "leave-of-absence-15",
+       "caption": "Dean's board after approving."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part D - Staff start the leave and use the Registrar list",
+   "steps": [
+    {
+     "text": "Back as GS Staff, open the Leave of Absence board and search Daniel. The card is in **Leave scheduled** (Approved; the leave has not started yet). Normally the leave starts by itself on its first day (Jan 10, 2027); the button **Refresh leave dates** at the top checks the dates. For the demo, staff start it now.",
+     "shots": [
+      {
+       "id": "leave-of-absence-16",
+       "caption": "Staff board: the approved leave in Leave scheduled."
+      }
+     ]
+    },
+    {
+     "text": "Drag the card to **On leave**. The box **Start the leave now** opens ('Leave scheduled to On leave'). Click **Start the leave now**.",
+     "shots": [
+      {
+       "id": "leave-of-absence-17",
+       "caption": "Start the leave now box."
+      }
+     ]
+    },
+    {
+     "text": "The notice says 'Daniel Fernandez: The leave has started.' and the card is in **On leave** (The student is away. Enrollment is closed.).",
+     "shots": [
+      {
+       "id": "leave-of-absence-18",
+       "caption": "Board after the leave started."
+      }
+     ]
+    },
+    {
+     "text": "Scroll down to the **Registrar list**. It says the portal does not send any email: download the list, email it yourself, then mark it as sent, and mark it as acknowledged when the Registrar confirms. Daniel is in the table with the handoff status **Pending Handoff**.",
+     "shots": [
+      {
+       "id": "leave-of-absence-19",
+       "caption": "Registrar list with Daniel as Pending Handoff."
+      }
+     ]
+    },
+    {
+     "text": "Click **Download list (CSV)** (the **Download list (Excel)** button does the same in Excel). The box **Registrar list downloaded** names the file and says 'No email was sent by the portal.' It tells staff to email the file through the official channel and to wait for the Registrar's acknowledgement. Click **Got it**.",
+     "shots": [
+      {
+       "id": "leave-of-absence-20",
+       "caption": "Registrar list downloaded box."
+      }
+     ]
+    },
+    {
+     "text": "Tick Daniel's row and click **Mark as sent**. The message says the request was marked Sent to Registrar and the handoff status becomes **Sent to Registrar**. **Mark as acknowledged** is used later, when the Registrar answers.",
+     "shots": [
+      {
+       "id": "leave-of-absence-21",
+       "caption": "Daniel marked Sent to Registrar."
+      }
+     ]
+    },
+    {
+     "text": "Sign in again as Daniel and open **Leave of Absence**. The badge is **On leave**, and the Request discussion shows each message the student got at every step (sent to the Dean, approved, the leave began). Hand over to {case:readmission}: a student whose leave is ending.",
+     "shots": [
+      {
+       "id": "leave-of-absence-22",
+       "caption": "Student view: On leave, with the messages."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "The policy check is advice. It cannot approve or deny; only the Dean moves the request to Leave scheduled.",
+  "The check says Needs Review for Daniel because the Minimum residency rule is a prototype rule that this demo student does not satisfy. The Dean still decides. The rules marked Needs review are prototype values pending Graduate School validation.",
+  "Leave counts toward maximum residence; the request window shows 0 of 4 leave semesters approved for Daniel.",
+  "No email is sent. The Registrar list is downloaded and emailed by staff, who then mark it sent and acknowledged.",
+  "Dragging is the same guarded step as the buttons in the request window and Move to... on the card. The server refuses a move the rules do not allow, and a card that only the Dean or the student can move shows 'Waiting for: ...' and cannot be dragged by staff.",
+  "Time dependence: the dates are real (today is Nov 2, 2026), so the semester names in the lists follow the Academic Semesters setup. If the list shifts, pick the 'AY 2026-2027 2nd Semester' entry by name, not by position."
+ ]
+}

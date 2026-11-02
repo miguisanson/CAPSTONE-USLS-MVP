@@ -1,0 +1,188 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Research Gate
+Grace Fernandez · Graduate School Staff
+2
+GF
+Research Gate
+
+Check Form 1, Form 4, or completion evidence and set readiness or revision state. The Academic Coordinator endorses Form 1; the panel chair records each defense verdict.
+
+How this works
+View recent activity
+Rules applied on this screen
+8 rules from the Graduate School policies · 1 needs review
+Research Gate
+Adviser designation
+Saved. The student record, queue, and monitoring indicators were updated.
+Choose a student
+
+Pick the record this action applies to
+
+YM
+
+Selected student
+
+2260004 - Yu, Miguel - MAED
+
+Research Gate record
+
+The stage and checklist are calculated from uploads, endorsements, and workflow results
+
+STUDENT
+
+Miguel Yu
+
+STUDENT ID
+
+2260004
+
+PROGRAM
+
+Master of Arts in Education
+
+ADVISER
+
+Dr. Celeste Tan
+
+RESEARCH TITLE
+
+Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses
+
+CURRENT STAGE
+
+Final Defense
+
+AUTOMATIC RESEARCH PROGRESS
+
+Complete:
+Title Defense
+Complete
+Complete:
+Proposal Defense
+Complete
+3
+Current:
+Final Defense
+Missing Requirements
+4
+Upcoming:
+Completion
+Locked
+
+COMPLETED REQUIREMENTS
+
+0
+
+PENDING REQUIREMENTS
+
+4
+
+Final Defense requirements
+
+Uploaded and pending documents appear together. Open any file to preview it.
+
+Missing Requirements
+
+Final defense endorsement
+
+Upload the final defense endorsement. The assigned adviser reviews and signs the exact uploaded file in-system.
+
+STUDENT UPLOAD · 0/1 FILES
+
+Upload required
+
+Final defense manuscript
+
+Upload the final defense manuscript. The assigned adviser must sign the exact uploaded file before it is complete.
+
+STUDENT UPLOAD · 0/1 FILES
+
+Upload required
+
+Confirmed final defense schedule
+
+Added automatically after staff confirms a shared final defense schedule.
+
+STAFF / SYSTEM MANAGED
+
+Pending confirmed schedule
+
+Final defense result
+
+Recorded by the panel chair after the scheduled final defense; revisions, if any, are confirmed before the stage completes.
+
+STAFF / SYSTEM MANAGED
+
+Pending confirmed schedule
+
+Panel Matching
+
+System-generated from the active paper body after required clearances.
+
+Final panel selected
+Open matching
+
+Dr. Liwayway Bautista · Dr. Patricia Salvador · Dr. Paolo Navarro · Dr. Teodoro Ramos
+
+Verify submitted requirements
+Saved. The student record, queue, and monitoring indicators were updated.
+
+DEFENSE RESULT GATE
+
+Final defense result
+
+Confirm the defense schedule first. The student cannot move to the next Research Gate stage until a passing result is recorded.
+
+Pending confirmed schedule
+
+Read-only for GS staff. The assigned panel chair or panel lead submits the verdict from the Faculty Portal.

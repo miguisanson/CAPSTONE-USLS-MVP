@@ -1,0 +1,141 @@
+{
+ "slug": "student-handoff",
+ "title": "Student Handoff - importing the monitoring workbook",
+ "kind": "reference",
+ "part": "Ref",
+ "presenter": "-",
+ "owner": "GS Staff",
+ "duration": "6 min",
+ "story": [
+  "Student Handoff is step 1 of the lifecycle: the Academic Coordinator's AC Student Monitoring workbook (Excel) arrives from outside the portal and Graduate School staff import it. The import creates each student, the program and the curriculum, marks the subjects already completed, and gives each new student a portal login. The same screen keeps every uploaded file, so an upload can be traced and its conflicts reviewed later.",
+  "The sample workbooks of the project are in the folder Documents/Monitoring_Sheets/Ready_To_Import (one per program). This case uses the MSN (Master of Science in Nursing) sample, trimmed to two new students with time-stamped names and new ID numbers, so the demonstration data are not touched and a re-run does not collide. The workbook layout is the AC template: PROGRAM in cell A1, one student per row, the AY entry on every row and a unit value in each completed subject cell. Students come only from this import; the portal has no screen to type a student in by hand."
+ ],
+ "accounts": [
+  [
+   "Graduate School Staff (Grace Fernandez)",
+   "staff@usls.edu.ph",
+   "Imports the workbook and reviews the result"
+  ]
+ ],
+ "data": [
+  [
+   "Workbook",
+   "MSN_Monitoring_Sheet_walkthrough_<time stamp>.xlsx, made from Documents/Monitoring_Sheets/Ready_To_Import/MSN_Monitoring_Sheet.xlsx"
+  ],
+  [
+   "Students in it",
+   "Alma Walkthru<time stamp> (IDNO 26 followed by the time, AY entry 22-23) and Ben Walkthru<time stamp> (the next IDNO)"
+  ],
+  [
+   "Program",
+   "MSN, 18 curriculum subjects, all marked completed in the sheet"
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Import the workbook",
+   "intro": null,
+   "steps": [
+    {
+     "text": "Sign in as **staff@usls.edu.ph** and open **1 · Student Handoff** under **Lifecycle Workflows**. The page is titled **Student Handoff**, with the buttons **How this works** and **View recent activity** at the top right. The first panel is **Import from monitoring sheet**: a drop area (**Drag & drop your .xlsx here**, or **Browse files**), the button **Import students** (grey until a file is chosen), a panel **Upload history** and, below it, **Onboarding report & Dean approval**. **How this works** opens a short guide: official source data arrives as a file, the platform creates each student, program and curriculum from it, and who uses the page (GS Staff).",
+     "shots": [
+      {
+       "id": "student-handoff-01",
+       "caption": "Student Handoff: the import panel, upload history and the onboarding report for the Dean."
+      }
+     ]
+    },
+    {
+     "text": "Select **Browse files** and choose the workbook. The file name appears in the drop area with **Choose a different file**, and the **Import students** button becomes available.",
+     "shots": [
+      {
+       "id": "student-handoff-02",
+       "caption": "The workbook chosen, ready to import."
+      }
+     ]
+    },
+    {
+     "text": "Select **Import students**. A green result reads: Imported 2 new student(s) and refreshed AY/YR for 0 student(s) from the MSN monitoring sheet (0 already in system or needing verification, 0 conflict(s)). 2 new student portal account(s) created. A chip shows MSN and 18 subjects. The counters read **New students** 2, **Already in system** 0, **Year level refreshed** 0, **Subject cells changed** 36 and **Need your decision** 0. The buttons **Open Monitoring Sheet** and **View Students** follow, and a collapsed list **Imported students** opens to show Alma and Ben.",
+     "shots": [
+      {
+       "id": "student-handoff-03",
+       "caption": "Import result: two new students, 36 cell changes, no conflicts."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - Upload history and the onboarding report",
+   "intro": null,
+   "steps": [
+    {
+     "text": "Select **View upload history**. Every uploaded workbook is listed with its file name, program, number of students, date, the status **Validated** and a **Backup** download button. The text says every uploaded workbook is preserved and a version can be opened to review conflicts between its values and the current record; the counter beside the title reads 1 backup.",
+     "shots": [
+      {
+       "id": "student-handoff-04",
+       "caption": "Upload history: each workbook is preserved with a Validated status and a backup download."
+      }
+     ]
+    },
+    {
+     "text": "Scroll to **Onboarding report & Dean approval**. The panel explains that each import batch is checked, reported to the Dean, and only then recorded as an admission completion, and that the checklist is derived from the import and not ticked by hand. This panel is loaded when the page opens, so straight after the import it can still say **No import batches yet**; select **Refresh** and the new batch appears: **MSN · 2 students · 2 new**, the workbook name, the status **Draft**, four checks (**Admission handoff recorded**, **Student profiles created from the import**, **Program assignment confirmed**, **Validation issues resolved**) and the button **Send onboarding report to Dean**. This walkthrough does not send the report.",
+     "shots": [
+      {
+       "id": "student-handoff-05",
+       "caption": "The onboarding report for the import, shown after Refresh: four checks, status Draft, not yet sent to the Dean."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - Importing the same file again is safe",
+   "intro": null,
+   "steps": [
+    {
+     "text": "Reload the page, choose the same workbook again and select **Import students**. The result now reads: Imported 0 new student(s) ... (2 already in system or needing verification, 0 conflict(s)). The counters show **New students** 0, **Already in system** 2, **Year level refreshed** 0, **Subject cells changed** 0 and **Need your decision** 0. A collapsed list **Already in the system - not imported again** names Alma and Ben. Nothing is duplicated and nothing is overwritten.",
+     "shots": [
+      {
+       "id": "student-handoff-06",
+       "caption": "Second import of the same file: 0 new, 2 already in the system, nothing duplicated."
+      }
+     ]
+    },
+    {
+     "text": "Each upload is still preserved: the **Upload history** counter now reads 2 backups, one for each time the workbook was uploaded."
+    }
+   ]
+  },
+  {
+   "title": "Part D - The imported students on the Monitoring Sheet",
+   "intro": null,
+   "steps": [
+    {
+     "text": "Select **Open Monitoring Sheet** in the import result. The **Monitoring Sheet** opens on the program MSN. The two new students are at the bottom of the grid with every subject cell Completed (C), AY entry 22-23. A yellow banner at the top may report enrollment or profile inconsistency items for the program; it concerns existing demo data, not the new students.",
+     "shots": [
+      {
+       "id": "student-handoff-07",
+       "caption": "The imported students on the MSN grid: every subject completed, as in the workbook."
+      }
+     ]
+    },
+    {
+     "text": "Select the pencil beside Alma Walkthru<stamp> (its label is monitoring record of the student). The record panel shows IDNO, program MSN, AY entry 22-23, the badge **Imported**, the tabs **Subjects**, **Student details** and **Change history**, and **18 of 18 curriculum subjects completed**, with the source of every row shown as **Imported**. Close the panel. Editing and adding rows from here is covered in {case:monitoring-sheet}.",
+     "shots": [
+      {
+       "id": "student-handoff-08",
+       "caption": "An imported student's record: every row is marked Imported."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "The platform does not replace AIMS. The workbook is an export of the Academic Coordinator's monitoring sheet; official grades and enrollment stay in AIMS.",
+  "New students get a portal login with the shared demonstration password.",
+  "A later upload that disagrees with a value entered or corrected in the portal is held for review as a conflict instead of overwriting it.",
+  "Only the sample workbook layout (the AC template) was tested."
+ ]
+}

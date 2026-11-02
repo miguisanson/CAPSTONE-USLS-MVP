@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 
+from .case_01_signin import harden
 from .common import Runtime
 from .helpers_a1 import body, goto_nav, wait_loaded, safe_notes
 
@@ -26,6 +27,7 @@ def open_rules_panel(page, title_pattern: str) -> None:
 
 
 def run(rt: Runtime) -> None:
+    harden(rt)
     safe_notes(rt)
     staff = rt.new_page("staff@usls.edu.ph")
 
@@ -109,22 +111,21 @@ def run(rt: Runtime) -> None:
 
     def drop_dialog():
         # pick a program/student that has subjects enrolled, then open the status dialog (cancelled, nothing saved)
-        selects = staff.locator("main select")
+        selects = staff.locator("main select")  # 0 Program, 1 Academic semester, 2 Student, 3 Curriculum version
         prog = selects.nth(0)
         maed = [o for o in prog.locator("option").all_inner_texts() if o.startswith("MAED")][0]
         prog.select_option(label=maed)
         wait_loaded(staff)
-        stu = selects.nth(3)
-        label = [o for o in stu.locator("option").all_inner_texts() if o.startswith("Roberto Aquino")][0]
+        stu = selects.nth(2)
+        label = [o for o in stu.locator("option").all_inner_texts() if o.startswith("Aquino, Roberto")][0]
         stu.select_option(label=label)
         wait_loaded(staff)
         staff.locator("button[title=\"Change student status\"]").first.click()
         staff.get_by_role("dialog").wait_for()
         staff.wait_for_timeout(800)
         rt.note("drop dialog: " + staff.get_by_role("dialog").inner_text()[:1800].replace("\n", " | "))
-        # the dialog is taller than a 768 px window (see BUG note in the report): enlarge the window to show all of it
-        height = int(staff.get_by_role("dialog").bounding_box()["height"]) + 60
-        staff.set_viewport_size({"width": 1366, "height": min(height, 2600)})
+        # the dialog scrolls inside a 768 px window and would hide its lower half: enlarge the window to show all of it
+        staff.set_viewport_size({"width": 1366, "height": 1500})
         staff.wait_for_timeout(800)
         rt.shot(staff, s(12))
         staff.set_viewport_size({"width": 1366, "height": 768})
@@ -151,7 +152,13 @@ def run(rt: Runtime) -> None:
             goto_nav(rt, student, "Subject Withdrawal", "/student/requests/withdrawal")
             student.wait_for_timeout(800)
             rt.note("student withdrawal: " + student.locator("main").inner_text()[:3500].replace("\n", " | "))
+            open_rules_panel(student, "Rules applied on this screen")
+            student.evaluate("window.scrollTo(0, 0)")
             rt.shot(student, s(15))
+            # close the rules panel again so the full-page picture shows the amber note and the request form
+            student.locator("button[aria-expanded]").filter(has_text=re.compile("Rules applied on this screen", re.I)).first.click()
+            student.wait_for_timeout(600)
+            student.evaluate("window.scrollTo(0, 0)")
             rt.shot(student, s(16), full=True)
         finally:
             student.context.close()
