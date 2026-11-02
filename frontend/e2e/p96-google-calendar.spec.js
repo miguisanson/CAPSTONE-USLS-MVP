@@ -80,6 +80,7 @@ test("faculty sees the real linked account, checks it, then unlinks it without l
   await expect(page.getByRole("heading", { level: 1, name: "My Calendar" })).toBeVisible();
   const card = page.getByRole("region", { name: "Google Calendar connection" });
   await expect(card).toContainText("Connected");
+  await expect(card.getByText("Only events on your main Google calendar (the one with your name) count as busy.")).toBeVisible();
   await expect(card).toContainText("real-owned-calendar@gmail.com");
   await expect(card).toContainText(/Last checked/i);
   await expect(card.getByRole("button", { name: "Reconnect calendar" })).toBeVisible();
@@ -108,4 +109,36 @@ test("faculty sees the real linked account, checks it, then unlinks it without l
   await expect(card).toContainText("Not connected");
   await expect(card.getByRole("button", { name: "Connect Google Calendar" })).toBeVisible();
   expect(calls).toContain("DELETE");
+});
+
+test("faculty whose Google permission expired is told to reconnect, and a refused permission is explained", async ({ page }) => {
+  const contextResponse = await page.request.get("/api/faculty-portal/context");
+  expect(contextResponse.ok()).toBe(true);
+  const portal = await contextResponse.json();
+  const calendar = {
+    provider: "Google Calendar",
+    connected: true,
+    needs_reconnect: true,
+    status: "Reconnect your Google Calendar",
+    connected_email: "real-owned-calendar@gmail.com",
+    connected_at: "2026-10-24T08:00:00",
+    last_synced_at: "2026-10-24T09:30:00",
+    last_error: "Google Calendar access expired; faculty must reconnect",
+  };
+  await page.route("**/api/faculty-portal/context", async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ...portal, faculty: { ...portal.faculty, calendar } }),
+    });
+  });
+
+  await page.goto("/faculty-portal/calendar?calendar=missing-scope");
+  const card = page.getByRole("region", { name: "Google Calendar connection" });
+  await expect(card).toContainText("Reconnect your Google Calendar");
+  await expect(card).not.toContainText("Last check failed");
+  await expect(card.getByText(/reconnect/i).first()).toBeVisible();
+  await expect(card.getByRole("button", { name: "Reconnect calendar" })).toBeVisible();
+  await expect(card).toContainText("Please allow both calendar permissions");
 });
