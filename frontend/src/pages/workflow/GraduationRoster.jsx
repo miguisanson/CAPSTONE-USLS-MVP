@@ -12,8 +12,8 @@ import {
   Printer,
 } from "lucide-react";
 import { api } from "../../api";
-import { useIsPhone } from "../../hooks";
 import { formatDate } from "../../lib/format";
+import { useOpenFilters } from "../leave/useOpenFilter";
 import { Button, DataTable, EmptyState, StatusChip } from "../../components/ui/index.js";
 import WorkflowTimeline, { graduationTimelineSteps } from "../../components/WorkflowTimeline";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
@@ -418,8 +418,6 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
   const [stageGroupId, setStageGroupId] = useState(null);
   const [exportingBatchId, setExportingBatchId] = useState("");
   const [exportNotice, setExportNotice] = useState(null);
-  // A phone cannot hold ten columns: the Dean gets the same cards stacked by stage (I-190). The other roles keep the board.
-  const phoneList = useIsPhone() && accountRole === "dean";
   const reset = useDemoCaseReset("graduation", refetch);
   // A reset answers in the board notice too. The case window closes so the notice is not hidden behind it.
   useEffect(() => {
@@ -430,7 +428,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
   const rows = context.roster || [];
   const canTickBatches = ["staff", "academic_coordinator", "research_coordinator"].includes(accountRole); // the Dean uses the step buttons
   // `secondary` is the completed-course filter (one more control in the shared toolbar).
-  const [filters, setFilters] = useState({ query: "", program: "", status: "", secondary: "", sort: "newest" });
+  const [filters, setFilters] = useOpenFilters({ query: "", program: "", status: "", secondary: "", sort: "newest" });
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
   const statuses = useMemo(() => uniqueValues(rows.map(graduationRowStatus)), [rows]);
   const completedCourseOptions = useMemo(() => {
@@ -450,6 +448,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || row.student.program_code === filters.program)
       && (!filters.status || graduationRowStatus(row) === filters.status)
+      && (!filters.open || graduationRowStatus(row) !== "Not Eligible") // open: every candidate still on the way to the Dean
       && (!filters.secondary || (row.eligibility?.completed_courses || []).some((course) => course.code === filters.secondary));
   }).sort((left, right) => left.student.name.localeCompare(right.student.name)), [rows, filters]);
   const visibleRows = useMemo(
@@ -710,7 +709,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
   return (
     <div className="space-y-4">
       {/* No card title and no loose line under the header: the page header says it all, with who does what in its description (finding 11, I-157). */}
-      <BoardSummary line={summaryLine} windowName="details window" showHint={!phoneList} />
+      <BoardSummary line={summaryLine} windowName="details window" />
       {accountRole === "dean" && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <Button icon={Download} loading={exportingBatchId === "all"} disabled={!approvedGroups.length} onClick={() => exportApproved(approvedGroups, "all")} className="max-sm:w-full">
@@ -723,7 +722,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           </p>
         </div>
       )}
-      <BoardFilterRow toggle={phoneList ? null : <ViewToggle value={view} onChange={setView} />}>
+      <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
         <RosterFilters
           filters={filters}
           setFilters={setFilters}
@@ -747,30 +746,12 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           onClear={() => setSelectedIds(new Set())}
         />
       )}
-      {(view !== "board" || phoneList) && <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />}
-      {phoneList ? (
-        boardItems.length ? (
-          <section aria-label="Graduation candidates by stage" className="space-y-5">
-            {boardColumns.map((column) => {
-              const items = boardItems.filter((item) => graduationBoardColumnKey(item) === column.key);
-              if (!items.length) return null;
-              return (
-                <div key={column.key} className="space-y-2">
-                  <h3 className="text-sm font-semibold text-ink">{column.label} <span className="meta">({items.length})</span></h3>
-                  <ul className="space-y-3">
-                    {items.map((item) => <li key={graduationBoardItemId(item)}>{renderGraduationBoardCard(item)}</li>)}
-                  </ul>
-                </div>
-              );
-            })}
-          </section>
-        ) : (
-          <EmptyState title="No candidates match these filters" hint="Clear a filter to see more." />
-        )
-      ) : view === "board" ? (
+      {view !== "board" && <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />}
+      {view === "board" ? (
         <StageBoard
           boardNotice={boardNotice}
           ariaLabel="Graduation workflow Kanban board"
+          phoneAriaLabel="Graduation candidates by stage"
           columns={boardColumns}
           items={boardItems}
           getItemId={graduationBoardItemId}

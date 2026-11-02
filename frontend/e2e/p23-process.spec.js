@@ -12,7 +12,7 @@
 //     label, which one is current, which are done;
 //   - the process-gate banner: a refused "Generate report" and a failed curriculum lookup show their server message; a
 //     real report then shows its status chip and "Send to Dean";
-//   - at 390 px a board scrolls inside its own region and the page never scrolls sideways.
+//   - at 390 px a board is a stacked list of cards by stage (p104) and the page never scrolls sideways.
 // Words only a screen reader hears changed on purpose (old "(Done)" / "(Now)", new "Complete:" / "Current:"), so those are
 // matched with either wording. Demo data used: Therese Lacson, Maya Torres, Benjamin Santos, Clarisse Tan, Elena Mendoza,
 // Adrian Lim, Maria Dela Cruz and graduation candidates Bianca Santos (no other spec uses them). Only the "Generate report"
@@ -263,18 +263,15 @@ test.describe("P2.3 shared process components", () => {
     for (const [slug, region] of [
       ["leave-of-absence", "Leave of absence board"],
       ["awol", "AWOL and residency board"],
-      ["graduation", "Graduation workflow Kanban board"],
+      ["graduation", "Graduation candidates by stage"],
     ]) {
-      test(`${slug}: the board scrolls inside itself and the page does not`, async ({ page }) => {
+      // CHANGED BY p104 (I-199): on a phone every staff board is a stacked list of cards by stage, not a board that scrolls inside itself.
+      test(`${slug}: a stacked list by stage and the page does not scroll sideways`, async ({ page }) => {
         await page.goto(`/workflow/${slug}`);
-        const board = page.getByRole("region", { name: region });
-        await expect(board).toBeVisible();
-        const sizes = await board.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, overflowX: getComputedStyle(el).overflowX }));
-        expect(sizes.overflowX).toBe("auto");
-        expect(sizes.scroll).toBeGreaterThan(sizes.client + 50); // there is more board than fits
-        expect(await noOverflow(page)).toBe(true);
-        await board.evaluate((el) => (el.scrollLeft = 200));
-        expect(await board.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+        const list = page.getByRole("region", { name: region });
+        await expect(list).toBeVisible();
+        expect(await list.evaluate((el) => getComputedStyle(el).overflowX)).not.toBe("auto");
+        expect(await list.locator("section").count(), "one group per stage that has cards").toBeGreaterThan(0);
         expect(await noOverflow(page)).toBe(true);
         await page.screenshot({ path: join(SHOTS, `board-${slug}-390.png`), fullPage: true });
       });

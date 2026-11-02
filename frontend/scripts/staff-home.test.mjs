@@ -86,15 +86,15 @@ test("actions: dueSoon counts own tasks that are not overdue and fall due within
 
 test("where a task opens: its own action_url, else the workflow page its title names, else the student record, else the work queue", () => {
   const to = (title, role = "staff", extra = {}) => taskTarget(task("Graduate School Staff", title, "2026-10-20", extra), role).to;
-  assert.equal(to("Anything", "staff", { action_url: "/workflow/awol" }), "/workflow/awol");
-  assert.equal(to("Record and forward practicum MOA"), "/workflow/practicum");
-  assert.equal(to("Record and forward withdrawal request"), "/workflow/withdrawal");
-  assert.equal(to("Prepare graduation endorsement list"), "/workflow/graduation");
-  assert.equal(to("Export endorsed list for manual Registrar email"), "/workflow/graduation");
+  assert.equal(to("Anything", "staff", { action_url: "/workflow/awol" }), "/workflow/awol?show=open", "every request board opens on the open requests (I-198)");
+  assert.equal(to("Record and forward practicum MOA"), "/workflow/practicum?show=open");
+  assert.equal(to("Record and forward withdrawal request"), "/workflow/withdrawal?show=open");
+  assert.equal(to("Prepare graduation endorsement list"), "/workflow/graduation?show=open");
+  assert.equal(to("Export endorsed list for manual Registrar email"), "/workflow/graduation?show=open");
   assert.equal(to("Complete admission handoff missing items"), "/workflow/student-handoff");
   assert.equal(to("Resolve missing curriculum subjects"), "/course-adjustments");
   assert.equal(to("Tell the Registrar the approved leave was cancelled"), "/workflow/leave-of-absence?show=open", "a leave task opens the board on the open requests (I-196)");
-  assert.equal(to("Review student readmission request"), "/workflow/readmission");
+  assert.equal(to("Review student readmission request"), "/workflow/readmission?show=open");
   assert.equal(to("Send the adviser application to the Dean"), "/workflow/research-gate?view=adviser");
   assert.equal(to("Receive Forms 3.2 and 3.3 (advising contract)"), "/workflow/research-gate?view=adviser");
   assert.equal(to("Something unknown"), "/students/7", "staff may open the student record");
@@ -218,7 +218,7 @@ test("where a task opens (I-109): a coordinator is never sent to a page its role
   assert.equal(ac("Schedule the proposal defense"), "/students/7", "Defense Scheduling is the Research Coordinator's page");
   assert.equal(ac("Complete admission handoff missing items"), "/students/7");
   assert.equal(ac("Review student readmission request", { action_url: "/workflow/readmission" }), "/students/7");
-  assert.equal(ac("Record and forward practicum MOA"), "/workflow/practicum", "the Academic Coordinator keeps its own pages");
+  assert.equal(ac("Record and forward practicum MOA"), "/workflow/practicum?show=open", "the Academic Coordinator keeps its own pages");
   assert.equal(ac("Resolve missing curriculum subjects"), "/course-adjustments");
   const rc = (title, extra = {}) => taskTarget(task("Research Coordinator", title, "2026-10-20", extra), "research_coordinator").to;
   assert.equal(rc("Schedule the proposal defense"), "/workflow/defense-scheduling");

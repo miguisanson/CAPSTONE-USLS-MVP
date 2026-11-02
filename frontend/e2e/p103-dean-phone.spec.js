@@ -147,7 +147,8 @@ test.describe("Dean Graduation on a phone (I-190)", () => {
     await expect(list).toBeVisible();
     await expect(page.getByRole("region", { name: "Graduation workflow Kanban board" })).toHaveCount(0);
     await expect(page.getByText(/more stages? to the right/)).toHaveCount(0);
-    await expect(page.getByRole("group", { name: "Choose how to show the requests" })).toHaveCount(0);
+    // CHANGED BY p104 (I-199): the Board/Table toggle is on every phone board now, the Dean's included.
+    await expect(page.getByRole("group", { name: "Choose how to show the requests" })).toBeVisible();
     await expect(list.getByRole("heading", { name: /Approved, ready to export/ })).toBeVisible();
     await expect(list.getByRole("button", { name: `View details for ${BATCH}` })).toBeVisible();
     expect(await noOverflow(page), "the page does not scroll sideways").toBe(true);

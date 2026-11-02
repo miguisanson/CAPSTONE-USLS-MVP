@@ -316,10 +316,11 @@ test.describe("P7.7 Graduation actions as the Dean", () => {
 test.describe("P7.7 Graduation at 390 px", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 390, height: 844 } });
 
-  test("the board and the table scroll inside themselves, the page does not", async ({ page }) => {
+  // CHANGED BY p104 (I-199): at 390 px the board is a stacked list of cards by stage (its own region name); the table still scrolls inside itself.
+  test("the stacked list and the table fit the screen, the page does not scroll sideways", async ({ page }) => {
     await mockRoster(page, staffScenario);
     await page.goto("/workflow/graduation");
-    await expect(page.getByRole("region", { name: BOARD })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Graduation candidates by stage" })).toBeVisible();
     await shot(page, "staff-board-390.png");
     expect(await noOverflow(page), "board").toBe(true);
     await page.getByRole("group", { name: TOGGLE }).getByRole("button", { name: "Table" }).click();

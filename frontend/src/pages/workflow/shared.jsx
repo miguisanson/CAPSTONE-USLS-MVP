@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock, Eye, FileCheck, Info, RotateCcw, Send, SlidersHorizontal, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Eye, FileCheck, Info, RotateCcw, Send, SlidersHorizontal, X, XCircle } from "lucide-react";
 import { api } from "../../api";
 import { Button, Card, EmptyState, Field, HistoryList, HistoryPanel, InlineNotice, Input, Modal, SearchInput, Select, StatCard, StatusChip, Textarea } from "../../components/ui/index.js";
 import StepDialog from "../../components/StepDialog";
@@ -393,7 +393,14 @@ export function RosterFilters({ filters, setFilters, programs, statuses, seconda
         )}
       </div>
       <div className="meta mt-2 flex flex-wrap items-center justify-between gap-2">
-        <span>Showing {count} of {total} {noun}</span>
+        <span className="inline-flex flex-wrap items-center gap-2">
+          Showing {count} of {total} {noun}
+          {filters.open && (
+            <Button variant="secondary" size="sm" icon={X} aria-label="Open requests only: select to show every request" onClick={() => setFilters((current) => ({ ...current, open: false }))}>
+              Open requests only
+            </Button>
+          )}
+        </span>
         {active > 0 && (
           <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={clearFilters}>
             Clear {active} filter{active === 1 ? "" : "s"}
