@@ -41,6 +41,7 @@ from app import (  # noqa: E402
     practicum_required_hours,
     student_portal_recommendations,
     student_priority,
+    student_matches_search,
     sync_automatic_awol_statuses,
 )
 
@@ -244,6 +245,41 @@ class ProcessLogicTests(unittest.TestCase):
         self.assertEqual(len(mine), 1, "the returned practicum report vanished from the Dean's overview")
         self.assertEqual(mine[0]["status"], "Completed")
         self.assertNotIn(record_id, [row["id"] for row in approvals["workflow_pending"] if row["type"] == "practicum"])
+
+    def test_student_search_finds_a_full_name_in_either_order(self):
+        """I-188: every word must match some field; a single word behaves as before."""
+        for query in ("Isabel Flores", "Flores Isabel", "isabel  flores", "2260007", "Hector Ong"):
+            response = self.staff().get("/api/students", query_string={"q": query})
+            self.assertEqual(response.status_code, 200, query)
+            numbers = {row["student_number"] for row in response.get_json()["items"]}
+            self.assertTrue(numbers & {"2260007", "2360008"}, f"{query!r} found {sorted(numbers)}")
+            if " " in query.strip() and "Hector" not in query:
+                self.assertEqual(numbers, {"2260007"}, query)
+        with app.app_context():
+            self.assertTrue(student_matches_search(self.student_named("2260007"), "Flores Isabel"))
+            self.assertFalse(student_matches_search(self.student_named("2260007"), "Isabel Ong"))
+
+    # ---- I-181: the demo has a history, so the Reports compare with the earlier terms ----------------------------
+    def test_the_reports_have_two_earlier_terms_of_decided_cases_to_compare_with(self):
+        staff = self.staff()
+        summary = staff.get("/api/reports/summary").get_json()
+        tiles = {tile["key"]: tile for tile in summary["tiles"]}
+        self.assertEqual(tiles["active"]["comparison"]["kind"], "previous_term", tiles["active"]["comparison"])
+        self.assertGreater(tiles["active"]["comparison"]["previous"], 50)
+        self.assertEqual(tiles["decide_days"]["comparison"]["kind"], "previous_term", tiles["decide_days"]["comparison"])
+        self.assertGreaterEqual(tiles["decide_days"]["count"], 3)  # decisions in the first days of this term
+        previous = staff.get("/api/reports/decisions", query_string={"term": "previous"}).get_json()
+        overall = previous["speed"]["overall"]
+        self.assertIsNotNone(overall["last_term"], "no decisions in the term before the previous one")
+        self.assertGreaterEqual(overall["this_term"]["count"], 15)
+        self.assertGreaterEqual(overall["last_term"]["count"], 12)
+        self.assertLess(overall["this_term"]["median_days"], 7)
+        self.assertGreater(overall["this_term"]["p90_days"], overall["this_term"]["median_days"])  # a slow tail
+        totals = previous["outcomes"]["totals"]
+        self.assertGreater(totals["approved"], 0)
+        self.assertGreater(totals["denied"], 0)
+        processes = {row["process"] for row in previous["outcomes"]["rows"] if row["total"]}
+        self.assertTrue({"leave-of-absence", "readmission", "withdrawal", "practicum", "graduation", "adviser", "awol"} <= processes, processes)
 
     def test_a_defense_request_needs_a_real_future_date_and_no_booking_already_in_place(self):
         client = self.student_client("GS-2026-UD-01")  # Proposal Defense already booked for this student
