@@ -42,6 +42,7 @@ Calendar redirect address. Then open `.env` in Notepad and set:
 | Line | What to put |
 |---|---|
 | `SECRET_KEY=` | a long random text (run `python -c "import secrets; print(secrets.token_hex(32))"`), so testers stay signed in after a restart |
+| `DEMO_SHOW_ACCOUNTS=0` | **Add this line.** It stops the public sign-in page from listing the demo logins and the shared password (see step 4). Staff can still use the "Reset demo case" button |
 | `GOOGLE_API_KEY=` | your Gemini key (free at aistudio.google.com/apikey), or leave empty: the Policy Assistant then uses local search only |
 | `GOOGLE_CALENDAR_*` | see step 5; leave empty to skip Google Calendar (the page shows a preview only) |
 
@@ -65,8 +66,10 @@ schtasks /Create /TN "USLS UAT" /SC ONLOGON /TR "cmd /c cd /d <PROJECT FOLDER> &
 ## 4. Demo logins
 
 The password is the shared demo password. It is not written in the README: it is the value
-`SIM_STUDENT_PASSWORD` in `app.py`, and while `DEMO_MODE=1` (the default) the sign-in page shows it
-inside the **Demo accounts** panel. Give testers the password privately.
+`SIM_STUDENT_PASSWORD` in `app.py`. With `DEMO_SHOW_ACCOUNTS=0` (step 2) the public sign-in page shows
+no **Demo accounts** panel and the two lists behind it answer "not found", so strangers cannot read
+the password. **Hand each tester their login privately** (the table below plus the password, by
+message or e-mail). On your own PC, leave `DEMO_SHOW_ACCOUNTS` unset and the panel works as before.
 
 | Role | E-mail |
 |---|---|
@@ -79,13 +82,23 @@ inside the **Demo accounts** panel. Give testers the password privately.
 | Student (Miguel Yu, research) | `student@usls.edu.ph` |
 
 More student logins, one per workflow (practicum, graduation, withdrawal, enrollment, leave,
-readmission, AWOL, ...), are listed in the same Demo accounts panel. A login disappears from that
-panel once someone changes its password; re-seeding brings it back.
+readmission, AWOL, ...), are listed in the Demo accounts panel when it is switched on (open it locally
+with `DEMO_SHOW_ACCOUNTS` unset, or read the student e-mails from the demo-accounts table you keep for
+the testers). A login disappears from that panel once someone changes its password; re-seeding brings
+it back.
 
-**Security warning.** With `DEMO_MODE=1` anybody who finds the address can open that panel, read the
-password and sign in as Administrator. Before sharing the link, either put **Cloudflare Access** in
+Only Graduate School staff and the administrator can reset a demo case. Students and faculty get a
+"Only Graduate School staff can reset a demo case" message.
+
+Other protections for the public site: each account may ask the Policy Assistant 30 questions an hour
+(`ASSISTANT_MAX_PER_HOUR`), uploads over 30 MB are refused with a clear message (`MAX_UPLOAD_MB`), and
+every page carries basic browser security headers. There is no Content-Security-Policy yet.
+
+**Security warning.** If you leave `DEMO_SHOW_ACCOUNTS` on (the default) while the site is public,
+anybody who finds the address can open that panel, read the password and sign in as Administrator.
+Set `DEMO_SHOW_ACCOUNTS=0`, and for extra safety put **Cloudflare Access** in
 front (Zero Trust > Access > Applications > Self-hosted > `miguisanson.dev`, an "Allow" policy for
-the testers' e-mail addresses, free up to 50 people), or set `DEMO_MODE=0` and hand out passwords
+the testers' e-mail addresses, free up to 50 people), or, for the strictest setup, set `DEMO_MODE=0` and hand out passwords
 yourself. `DEMO_MODE=0` also removes the demo Reset buttons and gives new student accounts random
 passwords. If you use Access, add a "Bypass" rule for the path `/api/calendar/feed/*` so calendar
 subscriptions keep working.

@@ -217,5 +217,30 @@ class SqlitePragmaTests(HardeningBase):
             self.assertEqual(db.session.execute(app_module.text("PRAGMA busy_timeout")).scalar(), 5000)
 
 
+class SeededLeaveTests(unittest.TestCase):
+    """Item 8: the demo leave must still be a leave on the day the seed is built."""
+
+    @classmethod
+    def setUpClass(cls):
+        with app.app_context():
+            app_module.build_demo_database()
+
+    @classmethod
+    def tearDownClass(cls):
+        with app.app_context():
+            db.session.remove()
+
+    def test_item8_therese_lacson_is_on_leave_not_return_due(self):
+        from datetime import date, timedelta
+        with app.app_context():
+            student = Student.query.filter_by(student_number="GS-2026-READ-01").one()
+            case = app_module.LeaveCase.query.filter_by(
+                student_id=student.id, kind=app_module.KIND_LOA, source="demo").one()
+            due_days = int(app_module.rule_value("leave.return_due_days", 30) or 30)
+            end = app_module.leave_end_date(case)
+            self.assertEqual(case.status, "On Leave")
+            self.assertGreater(end - timedelta(days=due_days), date.today(), "her leave would flip to Return Due")
+
+
 if __name__ == "__main__":
     unittest.main()
