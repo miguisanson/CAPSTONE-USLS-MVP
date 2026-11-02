@@ -1,5 +1,17 @@
 # State
 
+## PAUSED for 5-hour limit (2026-11-03) — exact next steps
+
+1. `pkt/fable2` (wt/fable2) may have finished: review + merge (frontend: I-211, I-212 ui, I-214, I-217; spec p105-fable-fixes).
+2. Start `pkt/fable1` (app.py): I-209 `DEMO_PASSWORD` env override in the seed (UAT.md: set it in .env, re-seed); I-212
+   server flag `demo_account` on /api/auth/me + refuse change-password for seeded demo accounts in DEMO_MODE; I-213
+   report tile texts (F-07..F-10); I-214 `actor_name` in histories; I-215 panel-matching Gemini cache + 1 retry; I-216
+   roster roles, str(exc), CSV formula escape, ProxyFix x_host=0.
+3. Then Mac gate + Mac e2e, walkthrough case 20 re-capture. Stop at 80% weekly (`WEEKLY BUDGET`), no resume after the
+   weekly reset (owner).
+4. sweep2 merged: I-201..I-206, I-210 fixed (tests/test_sweep2.py, p105-sweep2); I-207 partial; sidebar numbering gap
+   needs the owner's call.
+
 ## CURRENT RUN (2026-11-02, v6.1) — read this first
 
 - **Branch `v6.1-migui`** from `v6.0-natalie` @ 80dd1aa (IM28). UAT on `https://miguisanson.dev` from Wed 2026-11-04,
