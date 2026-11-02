@@ -530,6 +530,7 @@ class Student(db.Model):
     withdrawal_applications = db.relationship("WithdrawalApplication", backref="student", lazy=True, cascade="all, delete-orphan")
     graduation_endorsements = db.relationship("GraduationEndorsement", backref="student", lazy=True, cascade="all, delete-orphan")
     workflow_messages = db.relationship("WorkflowMessage", backref="student", lazy=True, cascade="all, delete-orphan")
+    stage_events = db.relationship("StudentStageEvent", backref="student", lazy=True, cascade="all, delete-orphan")
 
     @property
     def name(self) -> str:
@@ -1699,6 +1700,41 @@ class TransactionLog(db.Model):
     reflected_in_aims = db.Column(db.Boolean, nullable=False, default=False)
     reflected_at = db.Column(db.DateTime)
     reflected_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+
+
+class StudentStageEvent(db.Model):
+    """One row each time a student's lifecycle stage really changes (reports spec B1, AD10).
+
+    The stage clock ("days in stage") is the days since the latest event into the current stage, so an
+    unrelated edit of the student never resets it. Written only by the two hooks below.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False, index=True)
+    from_stage = db.Column(db.String(60))  # None for the first event of a student
+    to_stage = db.Column(db.String(60), nullable=False)
+    changed_at = db.Column(db.DateTime, nullable=False, default=now_utc)
+
+
+@event.listens_for(Student, "after_insert")
+def _student_first_stage_event(mapper, connection, student):
+    connection.execute(StudentStageEvent.__table__.insert().values(
+        student_id=student.id, from_stage=None, to_stage=student.current_stage or "Admission", changed_at=now_utc(),
+    ))
+
+
+@event.listens_for(Student, "before_update")
+def _student_stage_change_event(mapper, connection, student):
+    """The one place the stage clock is written: any assignment to current_stage, wherever it happens."""
+    if not _sa_get_history(student, "current_stage").has_changes():
+        return
+    # An attribute expired by an earlier commit has no old value in memory, so ask the table (the UPDATE has not run yet).
+    old = connection.execute(
+        db.select(Student.__table__.c.current_stage).where(Student.__table__.c.id == student.id)
+    ).scalar()
+    if old != student.current_stage:
+        connection.execute(StudentStageEvent.__table__.insert().values(
+            student_id=student.id, from_stage=old, to_stage=student.current_stage, changed_at=now_utc(),
+        ))
 
 
 # ---------------------------------------------------------------------------
@@ -5127,6 +5163,32 @@ def workflow_actor_label(account: UserAccount) -> str:
 STALL_WARN_DAYS = 120
 STALL_HIGH_DAYS = 210
 
+def stage_entered_map(student_ids=None) -> dict:
+    """{(student_id, stage): when the student last moved into that stage}, from the stage events, in one query."""
+    query = StudentStageEvent.query.order_by(StudentStageEvent.changed_at, StudentStageEvent.id)
+    if student_ids is not None:
+        query = query.filter(StudentStageEvent.student_id.in_(list(student_ids)))
+    return {(e.student_id, e.to_stage): e.changed_at for e in query.all()}
+
+
+def stage_entered_at(student: Student, entered=None):
+    """When the student entered the stage they are in now. `entered` is an optional stage_entered_map()."""
+    if entered is None:
+        event_row = (
+            StudentStageEvent.query.filter_by(student_id=student.id, to_stage=student.current_stage)
+            .order_by(StudentStageEvent.changed_at.desc(), StudentStageEvent.id.desc()).first()
+        )
+        moment = event_row.changed_at if event_row else None
+    else:
+        moment = entered.get((student.id, student.current_stage))
+    return moment or student.created_at or now_utc()  # no event on record: the record's own start
+
+
+def stage_days(student: Student, entered=None) -> int:
+    """Days in the current stage: since the latest event into it, never reset by an unrelated edit."""
+    return max((now_utc() - stage_entered_at(student, entered)).days, 0)
+
+
 def student_indicators(student: Student) -> dict:
     """Computed indicators for one student (Table 13 in the proposal)."""
     audit = compute_course_audit(student)
@@ -5151,8 +5213,7 @@ def student_indicators(student: Student) -> dict:
     last_log = (
         TransactionLog.query.filter_by(student_id=student.id).order_by(TransactionLog.created_at.desc()).first()
     )
-    anchor = student.updated_at or student.created_at or now_utc()
-    days_in_stage = max((now_utc() - anchor).days, 0)
+    days_in_stage = stage_days(student)
     next_owner = (last_log.next_owner if last_log else None) or (open_tasks[0].owner_role if open_tasks else None)
     return {
         "stage": student.current_stage,
@@ -5430,17 +5491,12 @@ def portfolio_recommendations(limit: int = 150) -> dict:
             f"Escalate “{t.title}” to {t.owner_role} — {d} day(s) past due.",
             t.owner_role, bonus=min(d * 2, 32)), t.student))
 
-    cutoff = now_utc() - timedelta(days=STALL_WARN_DAYS)
-    for s in (
-        Student.query.filter(
-            Student.standing == "Active",
-            Student.current_stage != "Completed",
-            Student.updated_at < cutoff,
-        )
-        .order_by(Student.updated_at.asc())
-        .all()
-    ):
-        d = max((now_utc() - (s.updated_at or s.created_at)).days, 0)
+    entered = stage_entered_map()
+    stalled = [
+        (stage_days(s, entered), s)
+        for s in Student.query.filter(Student.standing == "Active", Student.current_stage != "Completed").all()
+    ]
+    for d, s in sorted((item for item in stalled if item[0] >= STALL_WARN_DAYS), key=lambda item: -item[0]):
         owner = "Research Coordinator" if s.current_stage in (
             "Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense"
         ) else "Academic Coordinator" if s.current_stage == "Coursework" else STAFF_OWNER
@@ -14742,6 +14798,53 @@ def register_routes(app: Flask) -> None:
     def reports_graduation():
         return report_response("graduation", request.args)
 
+    # Reports v2 (I-141, AD10): the summary strip and the list behind each of its numbers.
+    @app.route("/api/reports/summary")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
+    def reports_summary():
+        return jsonify(report_summary(request.args))
+
+    @app.route("/api/reports/attention")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def reports_attention():
+        payload = report_attention(request.args)
+        return v2_list_response(payload, "Students who need attention", [
+            ("student", "Student"), ("program", "Program"), ("stage", "Stage"), ("level", "Risk"), ("detail", "Main reason"),
+            ("days_in_stage", "Days in stage"), ("owner", "Next owner")], payload["rows"], request.args)
+
+    @app.route("/api/reports/stages")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def reports_stages():
+        payload = report_stages(request.args)
+        return v2_list_response(payload, "Where students get stuck", [
+            ("student", "Student"), ("program", "Program"), ("stage", "Stage"), ("days_in_stage", "Days in stage"),
+            ("zone", "Zone")], payload["students"], request.args)
+
+    @app.route("/api/reports/records-to-fix")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator")
+    def reports_records_to_fix():
+        payload = report_records_to_fix(request.args)
+        return v2_list_response(payload, "Records to fix", [
+            ("student", "Student"), ("program", "Program"), ("stage", "Stage"), ("detail", "What is missing")], payload["rows"], request.args)
+
+    @app.route("/api/reports/decisions")
+    @require_api_login("staff", "academic_coordinator", "dean")
+    def reports_decisions():
+        return jsonify(report_decisions(request.args))
+
+    @app.route("/api/reports/cycle-times")
+    @require_api_login("staff", "academic_coordinator")
+    def reports_cycle_times():
+        return jsonify(report_cycle_times(request.args))
+
+    @app.route("/api/reports/summary/<key>")
+    @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
+    def reports_summary_list(key: str):
+        listing = report_summary_list(key, request.args)
+        if listing is None:
+            return jsonify({"error": "There is no such summary number."}), 404
+        return v2_list_response(listing, listing["title"], [(c["key"], c["label"]) for c in listing["columns"]], listing["rows"], request.args)
+
     # ---- BPMN 1 Admission: Dean onboarding gate --------------------------
     @app.route("/api/onboarding/reviews")
     @require_api_login("staff", "academic_coordinator", "dean")
@@ -23376,11 +23479,13 @@ def workflow_case_is_closed(slug: str, student_id: int, latest_entry: Transactio
     return record.status in WORKFLOW_FINAL_STATUSES.get(slug, ())
 
 
-def queue_aging_report(student_ids: list[int]) -> dict:
-    """Open case backlog per process area with age buckets (Table 13: aging)."""
-    if not student_ids:
-        return {"count": 0, "rows": [], "columns": QUEUE_AGING_COLUMNS, "totals": {}}
-    rows = []
+def queue_open_cases(student_ids: list[int]) -> list[dict]:
+    """Every open case: per process area and student, the latest log entry still names someone as next owner.
+
+    One row per case: {slug, label, student_id, age_days, next_owner}. The aging report counts these; the Reports
+    summary lists them.
+    """
+    cases = []
     for slug, label in QUEUE_PROCESS_AREAS:
         # The latest log entry per student for this process is the point the
         # case has been waiting from. A case is open when the last recorded
@@ -23395,11 +23500,22 @@ def queue_aging_report(student_ids: list[int]) -> dict:
         )
         for entry in query.all():
             latest[entry.student_id] = entry
-        ages = [
-            _days_since(entry.created_at)
+        cases.extend(
+            {"slug": slug, "label": label, "student_id": student_id, "age_days": _days_since(entry.created_at), "next_owner": entry.next_owner}
             for student_id, entry in latest.items()
             if not workflow_case_is_closed(slug, student_id, entry)
-        ]
+        )
+    return cases
+
+
+def queue_aging_report(student_ids: list[int]) -> dict:
+    """Open case backlog per process area with age buckets (Table 13: aging)."""
+    if not student_ids:
+        return {"count": 0, "rows": [], "columns": QUEUE_AGING_COLUMNS, "totals": {}}
+    open_cases = queue_open_cases(student_ids)
+    rows = []
+    for slug, label in QUEUE_PROCESS_AREAS:
+        ages = [case["age_days"] for case in open_cases if case["slug"] == slug]
         if not ages:
             continue
         buckets = {label_: 0 for _, _, label_ in AGE_BUCKETS}
@@ -24418,7 +24534,7 @@ def report_at_risk(args) -> dict:
             .order_by(Task.due_at.asc())
             .first()
         )
-        last_update = (student.updated_at or student.created_at or now_utc()).date()
+        last_update = stage_entered_at(student).date()
         started = [overdue.due_at] if overdue else []
         if indicators["days_in_stage"] >= STALL_WARN_DAYS and student.current_stage != "Completed":
             started.append(last_update)
@@ -24806,6 +24922,593 @@ def report_response(name: str, args):
     else:
         data, mime = report_pdf_bytes(result), "application/pdf"
     return Response(data, mimetype=mime, headers={"Content-Disposition": f'attachment; filename="{stem}.{fmt}"'})
+
+
+def v2_list_response(payload: dict, title: str, columns: list, rows: list, args):
+    """JSON for the screen; ?format=xlsx|pdf downloads the same rows with the helper the five IM20 reports use."""
+    fmt = (args.get("format") or "json").strip().lower()
+    if fmt not in REPORT_FORMATS:
+        return jsonify({"error": "Choose xlsx or pdf for an export."}), 400
+    if fmt == "json":
+        return jsonify(payload)
+    result = {
+        "title": title, "columns": [{"key": key, "label": label} for key, label in columns], "rows": rows, "count": len(rows),
+        "filters": {key: value for key, value in payload["filters"].items() if value},
+        "options": {"programs": [{"id": p.id, "code": p.code} for p in Program.query.all()]},
+        "empty": "Nothing to list for these filters.",
+    }
+    stem = f"usls-gs-report-{re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')}-{date.today().isoformat()}"
+    data, mime = (report_workbook_bytes(result), REPORT_XLSX_MIME) if fmt == "xlsx" else (report_pdf_bytes(result), "application/pdf")
+    return Response(data, mimetype=mime, headers={"Content-Disposition": f'attachment; filename="{stem}.{fmt}"'})
+
+
+# ---------------------------------------------------------------------------
+# Reports v2 (I-141, AD10, spec research/REPORTS-SPEC-2026-11-02.md; payloads in research/REPORTS-API-2026-11-02.md)
+# One question per report, every number with a comparison, every count opens the list behind it. Reads only.
+# All endpoints take the filters program_id, cohort ("24-25" or "2024-2025") and term (a label; default the active term).
+# Payloads, so the frontend packet needs no reading of the code:
+#   GET /api/reports/summary  -> {filters, term:{label,start,end}|null, previous_term|null, tiles:[six, in order
+#       active, behind, waiting, decide_days, defenses, graduation]}; a tile is {key, label, value, unit, count?, of?,
+#       detail?, comparison, drill:{url:"/api/reports/summary/<key>", params}}; comparison is
+#       {kind:"previous_term", label, previous, delta, text} | {kind:"target", target, met, text} | {kind:"none", text}.
+#   GET /api/reports/summary/<key> -> {key, title, count, filters, columns, rows:[{student_id, student, student_number,
+#       program, stage, detail}]} (404 for an unknown key).
+# ---------------------------------------------------------------------------
+# Targets. The business-rules register (BusinessRule) holds policy rules the workflows enforce; these are
+# reporting goals the Graduate School has not set yet, so they are constants until it does.
+# shortcut: constants, not register rows; move them to the register once the Graduate School confirms them.
+REPORT_TARGET_BEHIND_PERCENT = 10  # share of active students behind schedule that is acceptable
+REPORT_TARGET_WAITING = 0  # requests waiting longer than REPORT_WAITING_DAYS
+REPORT_WAITING_DAYS = 7
+DEFENSE_LOOKAHEAD_DAYS = 30
+DEAN_AGE_BANDS = [(0, 3, "0-3 days"), (4, 7, "4-7 days"), (8, 14, "8-14 days"), (15, None, "15+ days")]
+
+# The processes that wait for a Dean decision, in the order the Dean pages list them.
+DECISION_PROCESSES = [
+    ("course-adjustments", "Course Adjustments"),
+    ("leave-of-absence", "Leave of Absence"),
+    ("readmission", "Readmission"),
+    ("awol", "AWOL & Residency"),
+    ("withdrawal", "Subject Withdrawal"),
+    ("practicum", "Practicum Reports"),
+    ("graduation", "Graduation Endorsement"),
+    ("adviser", "Adviser Designation"),
+    ("coursework", "Coursework Report"),
+    ("onboarding", "Onboarding Report"),
+]
+DECISION_PROCESS_LABELS = dict(DECISION_PROCESSES)
+
+
+def _percentile(values: list[float], pct: float) -> float | None:
+    """Nearest-rank percentile (the 90th of 10 values is the 9th smallest). None for no values."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    rank = max(math.ceil(pct / 100.0 * len(ordered)), 1)
+    return round(float(ordered[rank - 1]), 1)
+
+
+def _days_between(start, end) -> float:
+    return max((end - start).total_seconds() / 86400.0, 0.0)
+
+
+def _normal_cohort(label: str) -> str:
+    """'2024-2025' and '24-25' name the same entry cohort."""
+    label = (label or "").strip()
+    match = re.fullmatch(r"(\d{4})\s*-\s*(\d{4})", label)
+    return f"{match.group(1)[2:]}-{match.group(2)[2:]}" if match else label
+
+
+def report_scope(args) -> dict:
+    """The filters every Reports v2 endpoint shares: program, entry cohort and term (default: the active term)."""
+    program_id = safe_int(_filter_value(args, "program_id")) or None
+    cohort = _normal_cohort(_filter_value(args, "cohort"))
+    label = _filter_value(args, "term")
+    term = AcademicTerm.query.filter_by(label=label).first() if label else get_active_term()
+    previous = (
+        AcademicTerm.query.filter(AcademicTerm.end_date < term.start_date)
+        .order_by(AcademicTerm.end_date.desc()).first()
+        if term else None
+    )
+    query = Student.query.join(Program)
+    if program_id:
+        query = query.filter(Student.program_id == program_id)
+    students = [s for s in query.order_by(Student.id).all() if not cohort or _cohort_entry_label(s) == cohort]
+    return {
+        "filters": {"program_id": program_id, "cohort": cohort, "term": term.label if term else (label or None)},
+        "term": term, "previous": previous, "students": students,
+        "ids": {s.id for s in students}, "by_id": {s.id: s for s in students},
+    }
+
+
+def _term_range(term):
+    """(first day, last day) of a term; no term matches nothing."""
+    return (term.start_date, term.end_date) if term else (date.max, date.min)
+
+
+def _moment_in(moment, term) -> bool:
+    low, high = _term_range(term)
+    return moment is not None and low <= moment.date() <= high
+
+
+def _term_json(term):
+    return {"label": term.label, "start": term.start_date.isoformat(), "end": term.end_date.isoformat()} if term else None
+
+
+def _student_row(student: Student, detail: str, **extra) -> dict:
+    return {
+        "student_id": student.id, "student": student.name, "student_number": student.student_number,
+        "program": student.program.code if student.program else "", "stage": student.current_stage,
+        "detail": detail, **extra,
+    }
+
+
+def student_is_active(student: Student) -> bool:
+    return student.standing == "Active" and student.current_stage not in TERMINAL_STAGES
+
+
+def decision_cases() -> list[dict]:
+    """Every case that has gone to the Dean, open or decided, in one shape.
+
+    {process, student_id, program_id, title, started_at (when it was forwarded), decided_at (None while open),
+    outcome ('approved' / 'returned' / 'denied', None while open)}. Course plans, coursework and onboarding reports
+    belong to a program, not a student, so their student_id is None.
+    """
+    cases: list[dict] = []
+
+    def add(process, student_id, program_id, title, started_at, decided_at, outcome, is_open):
+        if started_at is None or not (is_open or decided_at is not None):
+            return
+        cases.append({
+            "process": process, "student_id": student_id, "program_id": program_id, "title": title,
+            "started_at": started_at, "decided_at": None if is_open else decided_at,
+            "outcome": None if is_open else outcome,
+        })
+
+    def outcome_of(word):
+        word = (word or "").lower()
+        return "denied" if word.startswith("denied") or word == "not approved" else "returned" if word.startswith("returned") else "approved"
+
+    students = {sid: pid for sid, pid in db.session.query(Student.id, Student.program_id).all()}
+    for item in LeaveCase.query.all():
+        add(SLUG_FOR_KIND.get(item.kind, "leave-of-absence"), item.student_id, students.get(item.student_id), KIND_LABELS.get(item.kind, item.kind),
+            item.forwarded_at or item.submitted_at, item.decided_at, outcome_of(item.status), item.status == "Dean Review")
+    for item in AwolCase.query.all():
+        is_open = item.status == "Dean Review" and item.dean_decision == "Pending"
+        done = item.dean_decision in ("Approved", "Denied", "Returned", "Approved for Re-enrollment Review")
+        if is_open or done:
+            add("awol", item.student_id, students.get(item.student_id), "Return from AWOL", item.return_requested_at or item.updated_at,
+                item.decided_at or item.updated_at, outcome_of(item.dean_decision), is_open)
+    for item in WithdrawalApplication.query.all():
+        is_open = item.status == "Dean Review" and item.dean_decision == "Pending"
+        done = item.dean_decision in ("Approved", "Denied", "Returned")
+        if is_open or done:
+            add("withdrawal", item.student_id, students.get(item.student_id), "Subject withdrawal", item.created_at,
+                item.decided_at or item.updated_at, outcome_of(item.dean_decision), is_open)
+    for item in PracticumRecord.query.all():
+        add("practicum", item.student_id, students.get(item.student_id), "Practicum status report", item.report_sent_at,
+            item.dean_reviewed_at, "approved", item.status == "Report Sent to Dean")
+    for item in GraduationEndorsement.query.all():
+        add("graduation", item.student_id, students.get(item.student_id), "Graduation endorsement", item.submitted_at,
+            item.dean_decision_at, outcome_of(item.endorsement_status), item.endorsement_status == "Ready for Dean Review")
+    for item in AdviserAppointment.query.all():
+        add("adviser", item.student_id, students.get(item.student_id), "Adviser designation", item.forwarded_at, item.decided_at,
+            outcome_of(item.status), item.status == ADVISER_STATUS_DELIBERATION)
+    program_ids = {code: pid for pid, code in db.session.query(Program.id, Program.code).all()}
+    for item in CourseworkReport.query.all():
+        add("coursework", None, item.program_id, f"Coursework report {item.term_label or ''}".strip(), item.sent_at,
+            item.dean_decision_at, outcome_of(item.dean_decision), item.sent_at is not None and item.dean_decision is None)
+    for item in OnboardingReview.query.all():
+        add("onboarding", None, program_ids.get(item.program_code), f"Onboarding report {item.program_code or ''}".strip(),
+            item.submitted_at, item.dean_decision_at, outcome_of(item.dean_decision), item.status == "Dean Review")
+    for item in CourseOfferingPlan.query.all():
+        if item.status in ("Submitted", "Approved", "Published", "Returned"):
+            add("course-adjustments", None, item.program_id, "Course offering plan", item.submitted_at,
+                item.approved_at or item.updated_at, outcome_of(item.status), item.status == "Submitted")
+    return cases
+
+
+def case_in_scope(case: dict, scope: dict) -> bool:
+    """A student's case follows the student filters; a program-level case follows the program filter only."""
+    if case["student_id"] is not None:
+        return case["student_id"] in scope["ids"]
+    return not scope["filters"]["cohort"] and (not scope["filters"]["program_id"] or case["program_id"] == scope["filters"]["program_id"])
+
+
+def _decision_days(cases: list[dict], term) -> list[float]:
+    return [_days_between(c["started_at"], c["decided_at"]) for c in cases if c["decided_at"] is not None and _moment_in(c["decided_at"], term)]
+
+
+def _compare_previous(value, previous_value, scope, unit_text: str = "", empty_text: str = "") -> dict:
+    """The 'compared with' line of a tile: last term's number, the change, or why there is none."""
+    if scope["previous"] is None:
+        return {"kind": "none", "text": "no earlier term yet"}
+    if previous_value is None or value is None:
+        return {"kind": "none", "text": empty_text or f"nothing recorded for {scope['previous'].label}"}
+    delta = round(value - previous_value, 1) if isinstance(value, float) or isinstance(previous_value, float) else value - previous_value
+    return {
+        "kind": "previous_term", "label": scope["previous"].label, "previous": previous_value, "delta": delta,
+        "text": f"{previous_value}{unit_text} in {scope['previous'].label}",
+    }
+
+
+def _target_comparison(value, target, unit: str = "") -> dict:
+    return {"kind": "target", "target": target, "met": value is not None and value <= target, "text": f"target {target}{unit}"}
+
+
+def summary_tiles(args) -> tuple[dict, list[dict]]:
+    """The six numbers (spec section 3). Each tile also carries `rows`, the students behind it."""
+    scope = report_scope(args)
+    term, previous = scope["term"], scope["previous"]
+    students = scope["students"]
+    active = [s for s in students if student_is_active(s)]
+    today = date.today()
+
+    # 1. Active students, against the students enrolled in the previous term.
+    enrolled_before = None
+    if previous is not None:
+        enrolled_before = len({
+            sid for (sid,) in db.session.query(TermEnrollment.student_id)
+            .filter(TermEnrollment.term_id == previous.id, TermEnrollment.status.in_(["Confirmed", "Enrolled"])).all()
+            if sid in scope["ids"]
+        }) or None
+    tile_active = {
+        "key": "active", "label": "Active students", "value": len(active), "unit": "students",
+        "comparison": _compare_previous(len(active), enrolled_before, scope, empty_text=f"no enrollment records for {previous.label}" if previous else ""),
+        "rows": [_student_row(s, f"{s.current_stage}, {s.risk_level}") for s in active],
+    }
+
+    # 2. Behind schedule: share of active students marked At Risk or Delayed.
+    behind = [s for s in active if s.risk_level in AT_RISK_LEVELS]
+    share = round(len(behind) / len(active) * 100.0, 1) if active else 0.0
+    tile_behind = {
+        "key": "behind", "label": "Behind schedule", "value": share, "unit": "%", "count": len(behind), "of": len(active),
+        "comparison": _target_comparison(share, REPORT_TARGET_BEHIND_PERCENT, "%"),
+        "rows": [_student_row(s, s.risk_level) for s in behind],
+    }
+
+    # 3. Requests waiting longer than a week (the open cases of queue_aging_report, one row per case).
+    waiting_cases = [c for c in queue_open_cases(sorted(scope["ids"])) if c["age_days"] > REPORT_WAITING_DAYS]
+    tile_waiting = {
+        "key": "waiting", "label": f"Requests waiting more than {REPORT_WAITING_DAYS} days", "value": len(waiting_cases), "unit": "requests",
+        "comparison": _target_comparison(len(waiting_cases), REPORT_TARGET_WAITING),
+        "rows": [
+            _student_row(scope["by_id"][c["student_id"]], f"{c['label']}: waiting {c['age_days']} days, next {c['next_owner'] or 'not named'}", age_days=c["age_days"])
+            for c in sorted(waiting_cases, key=lambda c: -c["age_days"])
+        ],
+    }
+
+    # 4. Median days from forwarding to the Dean's decision, decisions made in the term.
+    cases = [c for c in decision_cases() if case_in_scope(c, scope)]
+    days_now = _decision_days(cases, term)
+    days_before = _decision_days(cases, previous) if previous else []
+    median_now = round(_median(days_now), 1) if days_now else None
+    median_before = round(_median(days_before), 1) if days_before else None
+    tile_decide = {
+        "key": "decide_days", "label": "Median days to decide", "value": median_now, "unit": "days", "count": len(days_now),
+        "comparison": _compare_previous(median_now, median_before, scope, " days", f"no decisions in {previous.label}" if previous else ""),
+        "rows": [
+            {"student_id": c["student_id"], "student": scope["by_id"][c["student_id"]].name if c["student_id"] else c["title"],
+             "student_number": scope["by_id"][c["student_id"]].student_number if c["student_id"] else "", "program": "",
+             "stage": "", "detail": f"{DECISION_PROCESS_LABELS[c['process']]}: decided in {round(_days_between(c['started_at'], c['decided_at']), 1)} days ({c['outcome']})"}
+            for c in cases if c["decided_at"] is not None and _moment_in(c["decided_at"], term)
+        ],
+    }
+
+    # 5. Defenses held this term; with those in the next 30 days and those still waiting for a verdict.
+    def defense_rows(when, in_term=None):
+        params = {"program_id": scope["filters"]["program_id"] or "", "when": when, "term": in_term.label if in_term else ""}
+        return [r for r in report_defenses(params)["rows"] if r["student_id"] in scope["ids"]]
+
+    held = defense_rows("Held", term) if term else []
+    upcoming = [r for r in defense_rows("Upcoming") if r["date"] <= (today + timedelta(days=DEFENSE_LOOKAHEAD_DAYS)).isoformat()]
+    awaiting = defense_rows("Awaiting verdict")
+    held_before = len(defense_rows("Held", previous)) if previous else None
+    tile_defenses = {
+        "key": "defenses", "label": "Defenses held", "value": len(held), "unit": "defenses",
+        "detail": {"held": len(held), "next_30_days": len(upcoming), "awaiting_verdict": len(awaiting)},
+        "comparison": _compare_previous(len(held), held_before, scope),
+        "rows": [
+            _student_row(scope["by_id"][r["student_id"]], f"{label}: {r['defense_type']} on {r['date']}")
+            for label, group in (("Held", held), ("Next 30 days", upcoming), ("Awaiting verdict", awaiting)) for r in group
+        ],
+    }
+
+    # 6. Graduation: endorsements sent to the Dean in the term, and the candidates who are ready now.
+    endorsements = [e for e in GraduationEndorsement.query.all() if e.student_id in scope["ids"]]
+    endorsed_now = [e for e in endorsements if _moment_in(e.submitted_at, term)]
+    endorsed_before = len([e for e in endorsements if _moment_in(e.submitted_at, previous)]) if previous else None
+    endorsed_ids = {e.student_id for e in endorsements}
+    ready_now = [
+        s for s in students
+        if s.current_stage in GRADUATION_CANDIDATE_STAGES and s.id not in endorsed_ids and graduation_eligibility(s)["status"] == "Eligible"
+    ]
+    tile_graduation = {
+        "key": "graduation", "label": "Graduation-ready", "value": len(endorsed_now), "unit": "students",
+        "detail": {"endorsed_this_term": len(endorsed_now), "eligible_now": len(ready_now)},
+        "comparison": _compare_previous(len(endorsed_now), endorsed_before, scope),
+        "rows": [
+            _student_row(scope["by_id"][e.student_id], f"Endorsement {e.endorsement_status}, sent {e.submitted_at.date().isoformat()}")
+            for e in endorsed_now
+        ] + [_student_row(s, "Eligible, not yet endorsed") for s in ready_now],
+    }
+    return scope, [tile_active, tile_behind, tile_waiting, tile_decide, tile_defenses, tile_graduation]
+
+
+def report_summary(args) -> dict:
+    scope, tiles = summary_tiles(args)
+    public = []
+    for tile in tiles:
+        tile = {k: v for k, v in tile.items() if k != "rows"}
+        tile["drill"] = {"url": f"/api/reports/summary/{tile['key']}", "params": {k: v for k, v in scope["filters"].items() if v}}
+        public.append(tile)
+    return {"filters": scope["filters"], "term": _term_json(scope["term"]), "previous_term": _term_json(scope["previous"]), "tiles": public}
+
+
+def report_summary_list(key: str, args) -> dict | None:
+    scope, tiles = summary_tiles(args)
+    tile = next((t for t in tiles if t["key"] == key), None)
+    if tile is None:
+        return None
+    return {
+        "key": key, "title": tile["label"], "count": len(tile["rows"]), "filters": scope["filters"],
+        "columns": [{"key": k, "label": label} for k, label in (
+            ("student", "Student"), ("program", "Program"), ("stage", "Stage"), ("detail", "Why it is counted"))],
+        "rows": tile["rows"],
+    }
+
+
+# ---- B3: S1 attention, S2 stages, S8 records to fix ------------------------------------------------------------
+# GET /api/reports/attention -> {filters, count, levels:{"At Risk of Delay":n,"Delayed":n}, causes:[{key,label,count}],
+#     rows:[{student_id, student, student_number, program, stage, level, causes:[key], reasons:[text], days_in_stage,
+#     owner, detail}]}; ?cause=<key> keeps the rows of one cause (the counts stay whole).
+# GET /api/reports/stages -> {filters, thresholds:{warn,high}, rows:[{stage, students, median_days, p90_days,
+#     longest_days, green, yellow, red}], count, students:[{student_id, ..., stage, days_in_stage, zone}]};
+#     ?stage=&zone= narrow `students` (the rows stay whole).
+# GET /api/reports/records-to-fix -> {filters, count, counts:{research_case, adviser, both}, rows:[{student_id, ...,
+#     missing:["research_case"|"adviser"], detail}]}; ?missing= keeps one kind.
+ATTENTION_CAUSES = [
+    ("stalled", "No progress recorded for a long time", "no progress update has been recorded"),
+    ("overdue_tasks", "Overdue actions", "overdue action"),
+    ("missing_documents", "Required documents missing", "required document"),
+    ("awol", "AWOL", "AWOL status"),
+    ("coursework_behind", "Coursework behind the suggested year", "past its suggested course year"),
+    ("subject_not_offered", "Needed subject not offered", "is needed next but is not offered"),
+]
+ATTENTION_CAUSE_LABELS = {key: label for key, label, _ in ATTENTION_CAUSES}
+RESEARCH_STAGES_OPEN = ("Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense")
+ZONE_ORDER = ("green", "yellow", "red")
+
+
+def _cause_key(reason: str) -> str:
+    return next((key for key, _label, phrase in ATTENTION_CAUSES if phrase in reason), "other")
+
+
+def stall_zone(days: int) -> str:
+    """Green until STALL_WARN_DAYS, yellow until STALL_HIGH_DAYS, red from there (the same lines the risk model uses)."""
+    return "red" if days >= STALL_HIGH_DAYS else "yellow" if days >= STALL_WARN_DAYS else "green"
+
+
+def report_attention(args) -> dict:
+    scope = report_scope(args)
+    wanted = _filter_value(args, "cause")
+    entered = stage_entered_map(scope["ids"])
+    rows = []
+    for student in scope["students"]:
+        if student.current_stage in TERMINAL_STAGES:
+            continue
+        assessment = student_priority(student)
+        if assessment["level"] not in AT_RISK_LEVELS:
+            continue
+        advice = student_recommendations(student)
+        owner = advice["recommendations"][0]["owner"] if advice["recommendations"] else (
+            normalize_owner_label(advice["indicators"]["next_owner"]) or STAFF_OWNER)
+        keys = list(dict.fromkeys(_cause_key(reason) for reason in assessment["causes"]))
+        rows.append({
+            **_student_row(student, assessment["reason"]),
+            "level": assessment["level"], "causes": keys, "reasons": assessment["causes"],
+            "days_in_stage": stage_days(student, entered), "owner": owner,
+        })
+    tally: dict[str, int] = {}
+    for row in rows:
+        for key in row["causes"]:
+            tally[key] = tally.get(key, 0) + 1
+    causes = [
+        {"key": key, "label": ATTENTION_CAUSE_LABELS.get(key, "Other"), "count": count}
+        for key, count in sorted(tally.items(), key=lambda item: (-item[1], item[0]))
+    ]
+    levels = {level: sum(1 for row in rows if row["level"] == level) for level in AT_RISK_LEVELS}
+    rows.sort(key=lambda row: (row["level"] != "Delayed", -row["days_in_stage"], row["student"]))
+    if wanted:
+        rows = [row for row in rows if wanted in row["causes"]]
+    return {"filters": scope["filters"], "count": len(rows), "levels": levels, "causes": causes, "rows": rows}
+
+
+def report_stages(args) -> dict:
+    scope = report_scope(args)
+    wanted_stage, wanted_zone = _filter_value(args, "stage"), _filter_value(args, "zone")
+    entered = stage_entered_map(scope["ids"])
+    people = []
+    for student in scope["students"]:
+        if not student_is_active(student):
+            continue
+        days = stage_days(student, entered)
+        people.append({**_student_row(student, f"{days} days in {student.current_stage}"), "days_in_stage": days, "zone": stall_zone(days)})
+    rows = []
+    for stage in (s for s in STAGES if s not in TERMINAL_STAGES):
+        days = [p["days_in_stage"] for p in people if p["stage"] == stage]
+        zones = [p["zone"] for p in people if p["stage"] == stage]
+        rows.append({
+            "stage": stage, "students": len(days),
+            "median_days": round(_median([float(d) for d in days]), 1) if days else None,
+            "p90_days": _percentile([float(d) for d in days], 90), "longest_days": max(days) if days else None,
+            **{zone: zones.count(zone) for zone in ZONE_ORDER},
+        })
+    people.sort(key=lambda p: (-p["days_in_stage"], p["student"]))
+    listed = [p for p in people if (not wanted_stage or p["stage"] == wanted_stage) and (not wanted_zone or p["zone"] == wanted_zone)]
+    return {
+        "filters": scope["filters"], "thresholds": {"warn": STALL_WARN_DAYS, "high": STALL_HIGH_DAYS},
+        "rows": rows, "count": len(listed), "students": listed,
+    }
+
+
+def report_records_to_fix(args) -> dict:
+    scope = report_scope(args)
+    wanted = _filter_value(args, "missing")
+    ids = [s.id for s in scope["students"] if s.current_stage in RESEARCH_STAGES_OPEN]
+    with_case = {sid for (sid,) in db.session.query(ResearchCase.student_id).filter(ResearchCase.student_id.in_(ids)).distinct().all()} if ids else set()
+    rows = []
+    for student in scope["students"]:
+        if student.current_stage not in RESEARCH_STAGES_OPEN:
+            continue
+        missing = []
+        if student.id not in with_case:
+            missing.append("research_case")
+        if not adviser_faculty_ids_for_student(student):
+            missing.append("adviser")
+        if missing:
+            text = " and ".join({"research_case": "no research record", "adviser": "no adviser"}[m] for m in missing)
+            rows.append({**_student_row(student, f"{student.current_stage}: {text}"), "missing": missing})
+    counts = {
+        "research_case": sum(1 for r in rows if "research_case" in r["missing"]),
+        "adviser": sum(1 for r in rows if "adviser" in r["missing"]),
+        "both": sum(1 for r in rows if len(r["missing"]) == 2),
+    }
+    if wanted:
+        rows = [r for r in rows if wanted in r["missing"]]
+    return {"filters": scope["filters"], "count": len(rows), "counts": counts, "rows": rows}
+
+
+# ---- B5: D1-D3 Dean decisions, S4 office cycle times -----------------------------------------------------------
+# GET /api/reports/decisions -> {filters, term, previous_term,
+#     waiting:{bands:[four labels], total, rows:[{process, label, total, oldest_days, bands:{label:n}}]},
+#     speed:{rows:[{process, label, this_term:S, last_term:S|null, change_days}], overall:{this_term:S, last_term:S|null}},
+#     outcomes:{rows:[{process, label, approved, returned, denied, total}], totals:{...}},
+#     cases:[{process, label, student_id|null, student, title, state:"waiting"|"decided", days, band?, outcome?, decided_at?}]}
+#     with S = {count, median_days, p90_days} (days are null for no cases). Every process of DECISION_PROCESSES is a row.
+#     Only decisions made in the term are in `speed` and `outcomes`; `waiting` is the situation now.
+# GET /api/reports/cycle-times -> {filters, count, rows:[{slug, process_area, open_cases, bucket_0_7, bucket_8_14,
+#     bucket_15_30, bucket_over_30, median_age_days, oldest_age_days, closed_cases, median_cycle_days, p90_cycle_days}],
+#     scheduling:{rows, columns} (scheduling_cycle_report), cases:[open cases {slug, process_area, student_id, student,
+#     days, next_owner}]}. A cycle is first log entry to the entry that closed the case; with an explicit ?term= only
+#     cycles that closed in it count.
+def _age_band(days: int) -> str:
+    return next(label for low, high, label in DEAN_AGE_BANDS if days >= low and (high is None or days <= high))
+
+
+def _time_stats(values: list[float]) -> dict:
+    return {
+        "count": len(values),
+        "median_days": round(_median(values), 1) if values else None,
+        "p90_days": _percentile(values, 90),
+    }
+
+
+def report_decisions(args) -> dict:
+    scope = report_scope(args)
+    term, previous = scope["term"], scope["previous"]
+    cases = [c for c in decision_cases() if case_in_scope(c, scope)]
+    # Like the Dean's own lists, a graduation endorsement only waits while the student is eligible.
+    cases = [
+        c for c in cases
+        if not (c["process"] == "graduation" and c["decided_at"] is None and not graduation_eligibility(db.session.get(Student, c["student_id"]))["eligible"])
+    ]
+    band_labels = [label for _, _, label in DEAN_AGE_BANDS]
+
+    def who(case):
+        student = scope["by_id"].get(case["student_id"])
+        return (student.name, student.student_number) if student else (case["title"], "")
+
+    waiting = [dict(c, days=_days_since(c["started_at"])) for c in cases if c["decided_at"] is None]
+    decided_now = [dict(c, days=_days_between(c["started_at"], c["decided_at"])) for c in cases if c["decided_at"] is not None and _moment_in(c["decided_at"], term)]
+    decided_before = [dict(c, days=_days_between(c["started_at"], c["decided_at"])) for c in cases if c["decided_at"] is not None and previous and _moment_in(c["decided_at"], previous)]
+
+    waiting_rows, speed_rows, outcome_rows = [], [], []
+    for process, label in DECISION_PROCESSES:
+        mine = [c for c in waiting if c["process"] == process]
+        waiting_rows.append({
+            "process": process, "label": label, "total": len(mine), "oldest_days": max((c["days"] for c in mine), default=None),
+            "bands": {band: sum(1 for c in mine if _age_band(c["days"]) == band) for band in band_labels},
+        })
+        now_days = [c["days"] for c in decided_now if c["process"] == process]
+        before_days = [c["days"] for c in decided_before if c["process"] == process]
+        this_term, last_term = _time_stats(now_days), (_time_stats(before_days) if before_days else None)
+        speed_rows.append({
+            "process": process, "label": label, "this_term": this_term, "last_term": last_term,
+            "change_days": round(this_term["median_days"] - last_term["median_days"], 1) if last_term and this_term["median_days"] is not None else None,
+        })
+        done = [c for c in decided_now if c["process"] == process]
+        counts = {outcome: sum(1 for c in done if c["outcome"] == outcome) for outcome in ("approved", "returned", "denied")}
+        outcome_rows.append({"process": process, "label": label, **counts, "total": len(done)})
+    totals = {key: sum(row[key] for row in outcome_rows) for key in ("approved", "returned", "denied", "total")}
+    listed = []
+    for c in sorted(waiting, key=lambda c: -c["days"]):
+        name, _number = who(c)
+        listed.append({
+            "process": c["process"], "label": DECISION_PROCESS_LABELS[c["process"]], "student_id": c["student_id"], "student": name,
+            "title": c["title"], "state": "waiting", "days": c["days"], "band": _age_band(c["days"]), "outcome": None,
+        })
+    for c in sorted(decided_now, key=lambda c: c["decided_at"], reverse=True):
+        name, _number = who(c)
+        listed.append({
+            "process": c["process"], "label": DECISION_PROCESS_LABELS[c["process"]], "student_id": c["student_id"], "student": name,
+            "title": c["title"], "state": "decided", "days": round(c["days"], 1), "outcome": c["outcome"], "decided_at": c["decided_at"].isoformat(),
+        })
+    overall_before = [c["days"] for c in decided_before]
+    return {
+        "filters": scope["filters"], "term": _term_json(term), "previous_term": _term_json(previous),
+        "waiting": {"bands": band_labels, "total": len(waiting), "rows": waiting_rows},
+        "speed": {"rows": speed_rows, "overall": {
+            "this_term": _time_stats([c["days"] for c in decided_now]),
+            "last_term": _time_stats(overall_before) if overall_before else None,
+        }},
+        "outcomes": {"rows": outcome_rows, "totals": totals},
+        "cases": listed,
+    }
+
+
+def report_cycle_times(args) -> dict:
+    scope = report_scope(args)
+    ids = sorted(scope["ids"])
+    chosen = AcademicTerm.query.filter_by(label=_filter_value(args, "term")).first() if _filter_value(args, "term") else None
+    aging = {row["process_area"]: row for row in queue_aging_report(ids)["rows"]} if ids else {}
+    open_cases = queue_open_cases(ids) if ids else []
+    rows = []
+    for slug, label in QUEUE_PROCESS_AREAS:
+        # shortcut: one case per student and process (the log has no case id); a student's second case of the same
+        # kind extends the first. Upgrade when the log carries a case reference.
+        history: dict[int, list[TransactionLog]] = {}
+        if ids:
+            for entry in TransactionLog.query.filter(TransactionLog.transaction_slug == slug, TransactionLog.student_id.in_(ids)).order_by(
+                    TransactionLog.created_at.asc(), TransactionLog.id.asc()).all():
+                history.setdefault(entry.student_id, []).append(entry)
+        cycles = [
+            _days_between(entries[0].created_at, entries[-1].created_at)
+            for student_id, entries in history.items()
+            if len(entries) >= 2 and workflow_case_is_closed(slug, student_id, entries[-1])
+            and (chosen is None or _moment_in(entries[-1].created_at, chosen))
+        ]
+        base = aging.get(label)
+        if base is None and not cycles:
+            continue
+        rows.append({
+            "slug": slug, "process_area": label,
+            "open_cases": base["open_cases"] if base else 0,
+            "bucket_0_7": base["bucket_0_7"] if base else 0, "bucket_8_14": base["bucket_8_14"] if base else 0,
+            "bucket_15_30": base["bucket_15_30"] if base else 0, "bucket_over_30": base["bucket_over_30"] if base else 0,
+            "median_age_days": base["median_age_days"] if base else None, "oldest_age_days": base["oldest_age_days"] if base else None,
+            "closed_cases": len(cycles),
+            "median_cycle_days": round(_median(cycles), 1) if cycles else None, "p90_cycle_days": _percentile(cycles, 90),
+        })
+    cases = [
+        {"slug": c["slug"], "process_area": c["label"], "student_id": c["student_id"], "student": scope["by_id"][c["student_id"]].name,
+         "student_number": scope["by_id"][c["student_id"]].student_number, "days": c["age_days"], "next_owner": c["next_owner"]}
+        for c in sorted(open_cases, key=lambda c: -c["age_days"])
+    ]
+    return {
+        "filters": scope["filters"], "count": len(rows), "rows": rows,
+        "scheduling": scheduling_cycle_report(ids), "cases": cases,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -37914,6 +38617,33 @@ def spread_seed_history(today: date | None = None) -> int:
     return moved
 
 
+def seed_stage_events(today: date | None = None) -> int:
+    """Give every demo student one stage event, so the stage clock has something to count from (B1).
+
+    The seeders assign stages directly, so the hook wrote events stamped "now"; they are replaced here.
+    TransactionLog carries workflow statuses, not stages, so it cannot date a stage entry. Instead each
+    student gets a fixed dwell time (arithmetic on the id, no randomness): 5-104 days for most, 121-200
+    (yellow) for about one in twelve and over 210 (red) for about one in forty, so the stage reports
+    show every zone. Returns the number of events written.
+    """
+    today = today or date.today()
+    StudentStageEvent.query.delete()
+    count = 0
+    for student in Student.query.order_by(Student.id).all():
+        if student.id % 41 == 7:
+            dwell = 211 + student.id % 30
+        elif student.id % 12 == 5:
+            dwell = 121 + (student.id * 7) % 80
+        else:
+            dwell = 5 + (student.id * 37) % 100
+        moment = datetime.combine(today - timedelta(days=dwell), time(8, 0)) + timedelta(minutes=(student.id * 47) % 600)
+        db.session.add(StudentStageEvent(student_id=student.id, from_stage=None, to_stage=student.current_stage, changed_at=moment))
+        count += 1
+    db.session.commit()
+    ensure_delay_status_consistency()  # the stage clock feeds the risk level
+    return count
+
+
 def seed_bianca_mendoza_enrollment() -> None:
     """Give the official DBA roster student her current semester/account fixture."""
     student = Student.query.filter_by(student_number="2560052").first()
@@ -39312,7 +40042,8 @@ def build_demo_database() -> dict:
         ensure_onboarding_reviews()
         generate_reminders()  # the reminders that are due today (a page view no longer makes them)
         db.session.commit()
-        spread_seed_history()  # last, so nothing is stamped after it: history over the previous weeks
+        spread_seed_history()  # history over the previous weeks
+        seed_stage_events()  # last: the stage clock, and the risk levels that read it
         return sync_result
 
 

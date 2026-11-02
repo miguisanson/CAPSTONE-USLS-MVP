@@ -43,6 +43,7 @@ from app import (  # noqa: E402
     Program,
     ScheduleRequest,
     Student,
+    StudentStageEvent,
     Task,
     TransactionLog,
     UserAccount,
@@ -127,9 +128,10 @@ class ReportsIm20Base(unittest.TestCase):
             _task(cls.s3, "Upload MOA", "Student", TODAY + timedelta(days=5))
             _task(cls.s5, "Old filing", "Graduate School Staff", TODAY - timedelta(days=90), status="Done")
 
-            # s4 has had no recorded update for 130 days: that is what is late, and since when.
+            # s4 moved into its stage 130 days ago and has not moved since: that is what is late, and since when
+            # (the stage clock is the stage events, no longer the last edit).
             cls.s4_anchor = now_utc() - timedelta(days=130, hours=1)
-            cls.s4.updated_at = cls.s4_anchor
+            StudentStageEvent.query.filter_by(student_id=cls.s4.id).update({"changed_at": cls.s4_anchor})
 
             # A pending request: s3's withdrawal has waited with the Dean for 20 days. A closed one
             # (next owner "None") for s5 must not be listed.
