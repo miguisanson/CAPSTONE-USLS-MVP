@@ -3,7 +3,6 @@ import {
   FileCheck,
   FileText,
   Briefcase,
-  GraduationCap,
   ArrowUpRight,
   Eye,
   Download,
@@ -13,8 +12,7 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { formatDate } from "../../lib/format";
-import { InlineNotice, SectionTitle } from "../../components/ui/index.js";
-import { Button, DataTable, EmptyState, StatusChip } from "../../components/ui/index.js";
+import { Button, DataTable, EmptyState, InlineNotice, StatusChip } from "../../components/ui/index.js";
 import WorkflowTimeline, { graduationTimelineSteps } from "../../components/WorkflowTimeline";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
 import StageBoard, { BoardSummary, boardSummaryLine } from "../../components/StageBoard";
@@ -691,7 +689,8 @@ export function GraduationRoster({ context, submit, submitting, refreshing, resu
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="Graduation endorsement candidates" subtitle={`${WORKFLOW_ROLE_LABELS[accountRole]} view · AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns the endorsement export`} icon={GraduationCap} />
+      {/* No card title: the page header already says "Graduation Endorsement" (consistency finding 11); who does what stays as a line. */}
+      <p className="text-sm text-slate-500">{`${WORKFLOW_ROLE_LABELS[accountRole]} view · AC checks coursework, Research validates evidence, Staff prepares, and the Dean owns the endorsement export`}</p>
       {messageNotice && <div aria-live="polite" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">{messageNotice}</div>}
       {exportError && <InlineNotice tone="danger">{exportError}</InlineNotice>}
       <DemoResetFeedback message={reset.resetMessage} error={reset.resetError} />

@@ -28,19 +28,19 @@ const STUDENT_LIFECYCLE_DEMOS = [
   },
   {
     workflow: "research",
-    title: "4–6 · Research, Panel & Defense",
+    title: "5–7 · Research, Panel & Defense",
     description: "Courses and comprehensive exam complete; ready for Title Defense requirements.",
     icon: GitBranch,
   },
   {
     workflow: "practicum",
-    title: "7 · Practicum",
+    title: "8 · Practicum",
     description: "Psychology and MSGC students only; prerequisites complete.",
     icon: BriefcaseBusiness,
   },
   {
     workflow: "graduation",
-    title: "8 · Graduation",
+    title: "9 · Graduation",
     description: "All prior requirements complete; ready for Graduation.",
     icon: GraduationCap,
   },

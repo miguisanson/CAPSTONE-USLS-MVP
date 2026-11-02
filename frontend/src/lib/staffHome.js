@@ -42,13 +42,15 @@ const sortTasks = (tasks) => [...tasks].sort(byUrgency);
 const workQueuePath = (owner, search = "") => `/work-queue?owner=${encodeURIComponent(owner)}${search ? `&q=${encodeURIComponent(search)}` : ""}`;
 
 // Where a task is handled, by what its title names. Order matters: the first match wins. The button's words are
-// "Open <page name>" from labels.js (I-116), never typed here.
+// "Open <page name>" from labels.js (I-116), never typed here. A third item `true` opens the page on the task's student
+// (`?student_id=`), for a page that works on one student at a time (Research Gate, I-129).
 const TITLE_TARGETS = [
   [/awol|refresher|return declaration|maximum residence/i, "/workflow/awol"],
   [/readmi/i, "/workflow/readmission"],
   [/leave/i, "/workflow/leave-of-absence"],
   [/practicum/i, "/workflow/practicum"],
   [/withdrawal/i, "/workflow/withdrawal"],
+  [/concept paper|submitted form 1|form 1.*(submitted|endorse)/i, "/workflow/research-gate", true],
   [/graduation|endorse/i, "/workflow/graduation"],
   [/adviser|advisor|forms? 3/i, "/workflow/research-gate?view=adviser"],
   [/panel/i, "/workflow/panel-matching"],
@@ -89,9 +91,12 @@ export const canOpen = (to, role) => {
  */
 export function taskTarget(task, role) {
   if (task.action_url && canOpen(task.action_url, role)) return { to: task.action_url, label: openPageLabel(task.action_url, task.action_label || "Open") };
-  for (const [pattern, to] of TITLE_TARGETS) {
+  for (const [pattern, to, withStudent] of TITLE_TARGETS) {
     if (pattern.test(task.title || "")) {
-      if (canOpen(to, role)) return { to, label: openPageLabel(to) };
+      if (canOpen(to, role)) {
+        const path = withStudent && task.student_id ? `${to}?student_id=${encodeURIComponent(task.student_id)}` : to;
+        return { to: path, label: openPageLabel(to) };
+      }
       break; // the page the title names is not this role's: fall through to the record or the queue
     }
   }
@@ -151,14 +156,28 @@ const namesOf = (tasks) => {
 };
 
 /**
+ * Whether a task another owner holds is about a process this coordinator works in (I-129). The payload has no process
+ * field, so it is read from the page the task belongs to - its own action_url, else the page its title names (the same
+ * table taskTarget uses) - and counts only if the coordinator can open that page. A task whose page cannot be told is not
+ * listed. Staff and the administrator open every page, so they are not narrowed.
+ */
+export function aboutOwnProcess(task, role) {
+  if (!COORDINATOR_PAGES[role]) return true;
+  if (task.action_url) return canOpen(task.action_url, role);
+  for (const [pattern, to] of TITLE_TARGETS) if (pattern.test(task.title || "")) return canOpen(to, role);
+  return false;
+}
+
+/**
  * "Waiting on others": open tasks the viewer's office does not hold (another office, or the student). The viewer has
  * nothing to do for them, so they never appear under "Needs your action". Each row opens that owner's work queue.
+ * A coordinator sees only the ones about their own process (aboutOwnProcess); the other offices' work is not theirs.
  * I-083: tasks with the same title held by the same owner (the system's automatic alerts) are ONE row with a count.
  * @returns { items (overdue first), total (the tasks, not the rows) }
  */
 export function officeWaiting(tasks, role) {
   const office = officeOf(role);
-  const held = sortTasks((tasks || []).filter((task) => ownerLabel(task.owner_role) !== office));
+  const held = sortTasks((tasks || []).filter((task) => ownerLabel(task.owner_role) !== office && aboutOwnProcess(task, role)));
   const groups = new Map(); // insertion order = the most urgent task of each group first
   for (const task of held) {
     const key = `${ownerLabel(task.owner_role)}|${String(task.title || "").trim().toLowerCase()}`;

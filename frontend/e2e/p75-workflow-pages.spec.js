@@ -220,7 +220,7 @@ test.describe("Research Gate (research coordinator)", () => {
   test.use({ storageState: authFile("research-coordinator"), viewport: { width: 1366, height: 768 } });
 
   test("record, progress, requirement rows and the coordinator's own buttons", async ({ page }) => {
-    await openFromSidebar(page, /4 · Research Gate/, "/workflow/research-gate?student_id=146");
+    await openFromSidebar(page, /5 · Research Gate/, "/workflow/research-gate?student_id=146");
     await expect(main(page).getByRole("heading", { level: 1, name: "Research Gate" })).toBeVisible();
     await expect(main(page).getByRole("heading", { level: 2, name: "Research Gate record" })).toBeVisible();
     for (const text of ["Nico Barrientos", "GS-2026-UD-01", "Dr. Paolo Navarro", "Reorder Point Policies and Service Levels for a Regional Hardware Distributor"]) {
@@ -249,7 +249,7 @@ test.describe("Research Gate (research coordinator)", () => {
   });
 
   test("with no student chosen it asks for one", async ({ page }) => {
-    await openFromSidebar(page, /4 · Research Gate/);
+    await openFromSidebar(page, /5 · Research Gate/);
     await page.evaluate(() => window.localStorage.removeItem("workflowStudentId"));
     await page.goto("/workflow/research-gate");
     await expect(main(page).getByRole("heading", { level: 2, name: "Choose a student" })).toBeVisible();
@@ -261,7 +261,7 @@ test.describe("Panel Matching (research coordinator)", () => {
   test.use({ storageState: authFile("research-coordinator"), viewport: { width: 1366, height: 768 } });
 
   test("ranked candidates, suggested seats, the evidence row, the seat selectors", async ({ page }) => {
-    await openFromSidebar(page, /5 · Panel Matching/, "/workflow/panel-matching?student_id=125");
+    await openFromSidebar(page, /6 · Panel Matching/, "/workflow/panel-matching?student_id=125");
     await expect(main(page).getByRole("heading", { level: 1, name: "Panel Matching" })).toBeVisible();
     await expect(main(page).getByRole("heading", { level: 2, name: "Panel recommendation workspace" })).toBeVisible();
     await expect(main(page).getByRole("link", { name: /Faculty profiles/ })).toHaveAttribute("href", "/faculty");
@@ -310,7 +310,7 @@ test.describe("Panel Matching (research coordinator)", () => {
   });
 
   test("a panel already recorded is shown as final", async ({ page }) => {
-    await openFromSidebar(page, /5 · Panel Matching/, "/workflow/panel-matching?student_id=146");
+    await openFromSidebar(page, /6 · Panel Matching/, "/workflow/panel-matching?student_id=146");
     await expect(main(page).getByText("Final panel selected")).toBeVisible();
     await expect(main(page).getByRole("button", { name: "Update final panel" })).toBeEnabled();
   });
@@ -320,7 +320,7 @@ test.describe("Defense Scheduling (staff)", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
 
   test("tabs, readiness, matched panel, and the controls for a booked defense", async ({ page }) => {
-    await openFromSidebar(page, /6 · Defense Scheduling/, "/workflow/defense-scheduling?student_id=146");
+    await openFromSidebar(page, /7 · Defense Scheduling/, "/workflow/defense-scheduling?student_id=146");
     await expect(main(page).getByRole("heading", { level: 1, name: "Defense Scheduling" })).toBeVisible();
     await expect(main(page).getByRole("tab", { name: "Scheduling" })).toBeVisible();
     await expect(main(page).getByRole("tab", { name: "Calendar" })).toBeVisible();

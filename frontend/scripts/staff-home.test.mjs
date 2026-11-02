@@ -264,3 +264,36 @@ test("where each role lands (I-066): every back-office role has the Dashboard at
   assert.equal(homePath("registrar"), "/", "an unknown role falls back to '/'");
   assert.equal(homePath(undefined), "/login");
 });
+
+// ---------------------------------------------------------------------------------------------------- conE (I-129)
+test("where a task opens (I-129): a concept-paper review opens Research Gate on that student", () => {
+  const rc = taskTarget(task("Research Coordinator", "Review submitted Three concept papers", "2026-10-20", { student_id: 77 }), "research_coordinator");
+  assert.equal(rc.to, "/workflow/research-gate?student_id=77");
+  assert.equal(rc.label, "Open Research Gate");
+  const staff = taskTarget(task("Graduate School Staff", "Review submitted Form 1 - Application for Title Defense", "2026-10-20", { student_id: 12 }), "staff");
+  assert.equal(staff.to, "/workflow/research-gate?student_id=12");
+  assert.equal(taskTarget(task("Research Coordinator", "Review submitted Three concept papers", "2026-10-20", { student_id: null }), "research_coordinator").to, "/workflow/research-gate", "no student: the page itself");
+  assert.equal(taskTarget(task("Research Coordinator", "Schedule the proposal defense", "2026-10-20"), "research_coordinator").to, "/workflow/defense-scheduling", "other titles are unchanged");
+});
+
+test("waiting (I-129): a coordinator sees only work about its own process; staff and the administrator still see everything", () => {
+  const tasks = [
+    task("Dean", "Review automatic AWOL policy alert", "2026-10-20"),
+    task("Graduate School Staff", "Tell the Registrar the approved leave was cancelled", "2026-10-20"),
+    task("Dean", "Decide on the readmission request", "2026-10-20"),
+    task("Student", "Upload the signed withdrawal form", "2026-10-20"),
+    task("Academic Coordinator", "Endorse Form 1 and the three concept papers", "2026-10-20"),
+    task("Dean", "Appoint the panel for the title defense", "2026-10-20"),
+    task("Student", "Something nobody can place", "2026-10-20"),
+    task("Dean", "Anything", "2026-10-20", { action_url: "/workflow/defense-scheduling" }),
+    task("Research Coordinator", "Review submitted Three concept papers", "2026-10-20"),
+  ];
+  const rc = officeWaiting(tasks, "research_coordinator");
+  assert.deepEqual(rc.items.map((i) => i.title), ["Endorse Form 1 and the three concept papers", "Appoint the panel for the title defense", "Anything"]);
+  assert.equal(rc.total, 3, "the total counts what is listed");
+  const ac = officeWaiting(tasks, "academic_coordinator").items.map((i) => i.title);
+  assert.ok(ac.includes("Review automatic AWOL policy alert"), "AWOL is the Academic Coordinator's page");
+  assert.ok(!ac.includes("Decide on the readmission request") && !ac.includes("Something nobody can place"));
+  assert.equal(officeWaiting(tasks, "staff").total, 8, "staff are not narrowed");
+  assert.equal(officeWaiting(tasks, "admin").total, 8, "the administrator works as the Graduate School office and is not narrowed")
+});

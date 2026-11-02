@@ -168,7 +168,7 @@ test.describe("faculty advisees on a phone", () => {
     const portal = await (await context.request.get("/api/faculty-portal/context")).json();
     expect(portal.advisees.length, "the faculty login has advisees").toBeGreaterThan(0);
     await page.goto("/faculty-portal/advisees");
-    await expect(page.getByRole("heading", { name: "Your advisees" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contracts and signatures" })).toBeVisible();
     await page.waitForLoadState("networkidle");
     for (const entry of portal.advisees) {
       const card = main(page).locator("li", { hasText: entry.student.student_number }).filter({ hasText: "Needs signature" });

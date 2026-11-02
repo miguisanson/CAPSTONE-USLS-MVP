@@ -61,13 +61,14 @@ const NAV_GROUPS = [
       { to: "/workflow/student-handoff", label: stepLabel(1, PAGE.studentHandoff), icon: UserPlus },
       { to: "/course-adjustments", label: stepLabel(2, PAGE.courseAdjustments), icon: SlidersHorizontal },
       { to: "/enrollment", label: stepLabel(3, PAGE.enrollment), icon: BookPlus },
-      // Not a numbered step: a read-only check of subjects against the curriculum, done before the research gate (I-101).
-      { to: "/workflow/course-audit", label: PAGE.courseAudit, icon: ClipboardCheck },
-      { to: "/workflow/research-gate", label: stepLabel(4, PAGE.researchGate), icon: FileCheck },
-      { to: "/workflow/panel-matching", label: stepLabel(5, PAGE.panelMatching), icon: UsersRound },
-      { to: "/workflow/defense-scheduling", label: stepLabel(6, PAGE.defenseScheduling), icon: CalendarCheck },
-      { to: "/workflow/practicum", label: stepLabel(7, PAGE.practicum), icon: Briefcase },
-      { to: "/workflow/graduation", label: stepLabel(8, PAGE.graduationEndorsement), icon: GraduationCap },
+      // A read-only check of subjects against the curriculum, done before the research gate (I-101). Every lifecycle
+      // step is numbered, in the order of the sidebar (consistency finding 15).
+      { to: "/workflow/course-audit", label: stepLabel(4, PAGE.courseAudit), icon: ClipboardCheck },
+      { to: "/workflow/research-gate", label: stepLabel(5, PAGE.researchGate), icon: FileCheck },
+      { to: "/workflow/panel-matching", label: stepLabel(6, PAGE.panelMatching), icon: UsersRound },
+      { to: "/workflow/defense-scheduling", label: stepLabel(7, PAGE.defenseScheduling), icon: CalendarCheck },
+      { to: "/workflow/practicum", label: stepLabel(8, PAGE.practicum), icon: Briefcase },
+      { to: "/workflow/graduation", label: stepLabel(9, PAGE.graduationEndorsement), icon: GraduationCap },
     ],
   },
   {
@@ -107,6 +108,16 @@ const ROLE_PATHS = {
   // Protocol: the Research Coordinator nominates the panel and informs panel and student of the date.
   research_coordinator: new Set(["/", "/workflow/research-gate", "/workflow/panel-matching", "/workflow/defense-scheduling", "/workflow/graduation", "/monitoring-sheet", "/work-queue", "/assistant", "/business-rules"]),
 };
+
+/** "Dr. Liwayway Bautista (Faculty)" -> "Dr. Liwayway Bautista" when the role follows the name in brackets. */
+function nameWithoutRole(name, ...roles) {
+  const text = String(name || "").trim();
+  const match = text.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
+  if (!match) return text;
+  const said = match[2].trim().toLowerCase();
+  const known = roles.some((role) => said === String(role || "").toLowerCase()) || Object.values(ROLE_LABELS).some((label) => label.toLowerCase() === said);
+  return known && match[1] ? match[1].trim() : text;
+}
 
 function NavItem({ to, label, icon: Icon, end, onClick, matches, badge }) {
   const { pathname } = useLocation();
@@ -236,6 +247,10 @@ export default function Layout({ children }) {
     document.title = pageTitle ? `${pageTitle} · USLS Graduate School` : "USLS Graduate School";
   }, [pageTitle]);
 
+  // "Name · Role", the role said once: a name that already ends in its role ("Dr. X (Faculty)") is not repeated.
+  const roleLabel = user?.program || ROLE_LABELS[user?.role] || "Staff";
+  const identity = `${nameWithoutRole(user?.full_name, roleLabel, user?.role) || "Graduate School Staff"} · ${roleLabel}`;
+
   const initials = (user?.full_name || "GS")
     .split(/\s+/)
     .filter(Boolean)
@@ -272,8 +287,8 @@ export default function Layout({ children }) {
           <Button variant="icon" icon={Menu} aria-label="Open menu" onClick={() => setMobileOpen(true)} className="lg:hidden" />
           <Breadcrumb path={location.pathname} current={current} role={user?.role} />
           <div className="ml-auto flex min-w-0 shrink-0 items-center gap-3">
-            <span className="hidden max-w-[16rem] truncate rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-block xl:max-w-[24rem]" title={`${user?.full_name || "Graduate School Staff"} · ${user?.program || ROLE_LABELS[user?.role] || "Staff"}`}>
-              {user?.full_name || "Graduate School Staff"} · {user?.program || ROLE_LABELS[user?.role] || "Staff"}
+            <span className="hidden max-w-[16rem] truncate rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-block xl:max-w-[24rem]" title={identity}>
+              {identity}
             </span>
             <NotificationBell />
             <Button variant="icon" icon={LogOut} aria-label="Sign out" onClick={logout} />

@@ -41,6 +41,22 @@ function compare(a, b) {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
 }
 
+const isSortableValue = (v) => typeof v === "string" || typeof v === "number" || v instanceof Date;
+
+/**
+ * Whether a column header sorts. An explicit `sortable` on the column wins. Otherwise (conformity, finding 15: every list
+ * sorts alike) a column sorts when the table sorts its own rows and the column has a text header and either a
+ * `sortValue` or a plain text / number / date field in the rows. Columns without a text header (an "Open" column), without
+ * a field to read (an Action column built from `cell` alone) and tables the server pages or sorts are left alone.
+ */
+function columnSortable(col, rows, tableSorts) {
+  if (col.sortable !== undefined) return Boolean(col.sortable);
+  if (!tableSorts) return false;
+  if (typeof col.header !== "string" || !col.header.trim()) return false;
+  if (col.sortValue) return true;
+  return rows.some((row) => isSortableValue(row[col.key]));
+}
+
 function SortIcon({ dir }) {
   const Icon = dir === "asc" ? ArrowUp : dir === "desc" ? ArrowDown : ArrowUpDown;
   return <Icon className={cx("h-3.5 w-3.5 shrink-0", dir ? "text-brand-700" : "text-slate-400")} aria-hidden="true" />;
@@ -48,7 +64,8 @@ function SortIcon({ dir }) {
 
 /**
  * @param columns   [{ key, header, cell(row, index), align, sortable, sortValue(row), hideBelow, className, width }]
- *                  `header` is text or a node. `cell` defaults to row[key]. `sortValue` defaults to row[key] and is
+ *                  `sortable` is on by default for a column with a text header and a text, number or date value (see
+ *                  columnSortable); `sortable: false` opts a column out. `header` is text or a node. `cell` defaults to row[key]. `sortValue` defaults to row[key] and is
  *                  also what the search box and the CSV export read. `hideBelow` ("sm" | "md" | "lg" | "xl") hides
  *                  the column on narrower screens. `width` is any CSS width.
  * @param rows      array of row objects
@@ -70,6 +87,7 @@ function SortIcon({ dir }) {
  *                  caller fetches the page. (Default server page size is 25.)
  * @param csv       true | { filename, columns: [{ header, value(row) }] }: Export CSV button. Exports every row that
  *                  matches the search and sort (client mode), or the rows given (server mode)
+ * @param sortable  false turns off the default sorting for the whole table (a column can still say `sortable: true`)
  * @param sort      { key, dir: "asc" | "desc" } to control sorting; with onSort(key, dir) (dir null = cleared) the
  *                  caller sorts, otherwise the table sorts its own rows
  */
@@ -91,6 +109,7 @@ export function DataTable({
   pageSize,
   pagination,
   csv,
+  sortable = true,
   sort,
   onSort,
   className = "",
@@ -99,6 +118,13 @@ export function DataTable({
   const serverPaged = Boolean(pagination);
   const sortControlled = typeof onSort === "function";
   const searchControlled = Boolean(searchable && typeof searchable === "object" && "value" in searchable);
+  // The table sorts its own rows unless the caller sorts (onSort) or the server pages; then only a column that says
+  // `sortable: true` shows a sort button.
+  const tableSorts = sortable !== false && !sortControlled && !serverPaged;
+  const sortableKeys = useMemo(
+    () => new Set(columns.filter((col) => columnSortable(col, rows, tableSorts)).map((col) => col.key)),
+    [columns, rows, tableSorts],
+  );
 
   const [innerSort, setInnerSort] = useState(null);
   const [innerSearch, setInnerSearch] = useState("");
@@ -265,12 +291,13 @@ export function DataTable({
               <tr>
                 {columns.map((col, ci) => {
                   const dir = sortState && sortState.key === col.key ? sortState.dir : null;
+                  const canSort = sortableKeys.has(col.key);
                   const align = col.align || "left";
                   return (
                     <th
                       key={col.key}
                       scope="col"
-                      aria-sort={col.sortable ? (dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none") : undefined}
+                      aria-sort={canSort ? (dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none") : undefined}
                       style={col.width ? { width: col.width } : undefined}
                       className={cx(
                         "eyebrow whitespace-nowrap px-3 py-2.5",
@@ -282,7 +309,7 @@ export function DataTable({
                         col.className,
                       )}
                     >
-                      {col.sortable ? (
+                      {canSort ? (
                         <button
                           type="button"
                           onClick={() => toggleSort(col)}
