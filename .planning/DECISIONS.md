@@ -61,3 +61,16 @@ Owner's words: "make a new branch call it v5.3-migui_test … use 4 helpers, mak
 | IM27 | **All decisions are the agent's; bolder improvements are allowed on this branch.** | No QUESTION rows wait for the owner — the main session picks the recommended option and logs it as `AD#`. IM6 "not a redesign" is relaxed: a clearly better layout, flow or wording may replace the old one, as long as tests stay green, the demo flows keep working and the AIMS read-only rule (Rule 4) holds. |
 | AD8 | 2026-10-22 | I-094 is not changed: the default demo student (Miguel Yu) is at Final Defense with all coursework done, so he has nothing to withdraw; the withdrawal demo uses the two withdrawal demo students (Elena Navarro, Joshua Lim). | The withdrawal window is the first two weeks of a semester (registrar calendar); inventing a current subject for a Final Defense student would contradict the record (I-061). |
 | AD9 | 2026-10-22 | I-130: a case in Dean Review is locked for staff on every board ("Waiting for: Dean"); staff can no longer "Return to student" a withdrawal while the Dean holds it. | Same-kind boards behave the same (IM24): LOA, readmission and AWOL already lock at Dean Review; the Dean owns that decision and can return it. Server change in `standalone_process.py`, test first. |
+
+## 2026-11-02 — owner starts v6.1 (grill-me before UAT)
+
+Owner's words (summary): review Natalie's v6.0 changes (Google Calendar, .env), new branch `v6.1-migui`, run bug-fix and improvement loops non-stop until 80% of the weekly limit, Fable review at the end, do not make teammates' changes too drastic, multi-machine with at most 3 agents, UAT on miguisanson.dev from Wednesday 2026-11-04.
+
+| # | Decision | What it means for the work |
+|---|---|---|
+| IM28 | **Work lands on `v6.1-migui`** (cut from `v6.0-natalie` at 80dd1aa). It is the one line for UAT; teammates pull it and branch off it. | `v6.0-natalie` and older branches are not touched. Pushed as work lands. |
+| IM29 | **UAT is served from this PC** through a Cloudflare Tunnel at **`https://miguisanson.dev`** (bare domain). | Production serving (not the Flask dev server), HTTPS cookies, proxy headers, Google redirect URI on the new address. The PC must stay on and awake from Wednesday. |
+| IM30 | **UAT uses the demo seed** (`npm run seed`), one login per role. No real student data online. | A reset is just a re-seed. Public exposure means demo-only shortcuts (reset buttons, known passwords) must be reviewed for a public site. |
+| IM31 | **No e-mail sending for UAT** — notifications stay in the in-app bell. | Nothing new to build; Google Calendar events already reach connected faculty. |
+| IM32 | **Dev kit: Ponytail + Caveman (lite level) in every project**, like Superpowers/GSD. | Installed user-level; dev-kit-setup lists and checks them. Replies to the owner stay plain English (lite). |
+| IM33 | **At most 3 agents at once; the Mac is the preferred worker** for long test runs when it is online (Tailscale), else this PC. | Still one `app.py` editor at a time. Fable does one full review at the end. Run stops at 80% of the weekly limit. |
