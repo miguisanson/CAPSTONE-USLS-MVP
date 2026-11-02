@@ -238,26 +238,33 @@ test.describe("Defense scheduling and the availability workspace", () => {
     await expect(main(page).getByLabel("From", { exact: true })).toBeVisible();
     await expect(main(page).getByLabel("To", { exact: true })).toBeVisible();
     await expect(main(page).getByText("Availability overlap", { exact: true })).toBeVisible();
-    await expect(main(page).getByRole("button", { name: /Thu, Nov 5, 2026 08:00: 5 of 5 available, selectable/ })).toBeVisible();
+    // Dates follow today's date (14-day lead time, seed relative to its day): read them from the page, never hard-code them.
+    const freeCells = main(page).getByRole("button", { name: /\d{2}:\d{2}: 5 of 5 available, selectable/ });
+    await expect(freeCells.first()).toBeVisible();
     await expect(main(page).getByRole("button", { name: /17:00: 0 of 5 available/ }).first()).toBeDisabled();
     await expect(main(page).getByText("Panel availability", { exact: true })).toBeVisible();
     await expect(main(page).getByText("5 participants")).toBeVisible();
     await expect(main(page).getByText("Overlap found").first()).toBeVisible();
     await expect(main(page).getByText("Best shared options")).toBeVisible();
-    await expect(main(page).getByText("639 conflict-free found")).toBeVisible();
+    await expect(main(page).getByText(/\d+ conflict-free found/)).toBeVisible();
     await expect(main(page).getByText(/Earliest option/)).toBeVisible();
     await shotsAt(page, "availability");
 
     await expect(main(page).getByText("Selected proposed schedule")).toHaveCount(0);
     await main(page).getByRole("button", { name: /Earliest option/ }).click();
     await expect(main(page).getByText("Selected proposed schedule")).toBeVisible();
-    await expect(main(page).getByLabel(/Selected date/)).toHaveValue("2026-11-05");
-    await expect(main(page).getByLabel(/Start time/)).toHaveValue("08:00");
-    await expect(main(page).getByLabel(/End time/)).toHaveValue("10:00");
-    // a cell of the grid picks a slot too
-    await main(page).getByRole("button", { name: /Fri, Nov 6, 2026 09:00: 5 of 5 available, selectable/ }).click();
-    await expect(main(page).getByLabel(/Selected date/)).toHaveValue("2026-11-06");
-    await expect(main(page).getByLabel(/Start time/)).toHaveValue("09:00");
+    await expect(main(page).getByLabel(/Selected date/)).toHaveValue(/^\d{4}-\d{2}-\d{2}$/);
+    await expect(main(page).getByLabel(/Start time/)).toHaveValue(/^\d{2}:\d{2}$/);
+    await expect(main(page).getByLabel(/End time/)).toHaveValue(/^\d{2}:\d{2}$/);
+    // a cell of the grid picks a slot too: the form takes that cell's date and hour
+    const cell = freeCells.nth(1);
+    const cellName = await cell.getAttribute("aria-label") || await cell.textContent();
+    const [, cellDay, cellTime] = cellName.match(/^(\w{3}, \w{3} \d{1,2}, \d{4}) (\d{2}:\d{2})/);
+    await cell.click();
+    const d = new Date(`${cellDay} 12:00`);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    await expect(main(page).getByLabel(/Selected date/)).toHaveValue(iso);
+    await expect(main(page).getByLabel(/Start time/)).toHaveValue(cellTime);
   });
 
   test("a student with no panel: the notice, no options, the book button stays disabled", async ({ page }) => {
