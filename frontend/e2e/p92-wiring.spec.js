@@ -1,3 +1,4 @@
+// e2e-writes: maintenance-sweeps
 // Packet "wire" (I-071, I-072, I-066 / F-12): wires the pages to the backend that stopped writing on GET and on login.
 // Written BEFORE the change and red on the old pages. Through the real UI:
 //   - the notification bell asks the server to make the due reminders (POST /api/notifications/refresh) on mount, and

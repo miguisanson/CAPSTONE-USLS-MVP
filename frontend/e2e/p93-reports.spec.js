@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet P9.3 (owner decision IM20): Reports are five real reports and a short analytics section.
 // Written BEFORE the change and red on the old page (a wall of 11 report tabs and 8 analytics tabs above 8 tiles).
 // Through the real UI as Graduate School staff (and the Academic Coordinator for the role gate), read-only:

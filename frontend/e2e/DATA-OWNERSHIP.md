@@ -47,6 +47,7 @@ Measured with a serial run (`--workers=1`), matching every `POST/PUT/PATCH/DELET
 | `p72-dean-faculty-home` | martin | Martin Gonzales files a leave of absence, staff forward it to the Dean |
 | `p79-dean-ux` | clarissa | Clarissa (enrollment-clarissa) files a leave of absence, staff forward it (was Martin, shared with p72: collision fixed) |
 | `p90-reads` | leave-sync | one click on "Refresh leave dates" (`POST /api/leave-cases/sync`: starts leaves that begin today, flags returns due, proposes AWOL for EVERY leave case) |
+| `p92-wiring` | maintenance-sweeps | staff and admin "Refresh data" (`POST /api/maintenance/refresh`: the same leave/AWOL/risk sweeps as a nightly run) and the bell's `POST /api/notifications/refresh` (due reminders). Readers of leave-case state must not assume the sweeps have not run (same rule as p90's leave sync) |
 
 Every other spec declares `none`. `POST /api/assistant`, `/api/student-portal/assistant`, `/api/enrollment/class-list-preview`
 and `/api/policy-documents/test-question` are POSTs that change no rows. Specs that look like writers but answer the write

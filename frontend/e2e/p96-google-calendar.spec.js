@@ -1,3 +1,4 @@
+// e2e-writes: none
 // R-015/R-016. Faculty link status and controls live only on My Calendar.
 // Google itself is not contacted: the browser test fixes the API contract and the real OAuth flow is covered by unittest.
 import { test, expect } from "@playwright/test";

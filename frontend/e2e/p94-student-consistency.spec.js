@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet conD (consistency sweep IM24, findings 8, 9, 12 and the student part of 14; I-128).
 // Pins that student pages of the same kind look and read alike:
 //   8   the student Policy Assistant has the same chat-plus-rail layout as the Dean's, with "How this works";

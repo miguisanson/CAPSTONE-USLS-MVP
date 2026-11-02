@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet conE (consistency findings 11 and 15, issue I-129): the non-student pages behave like each other.
 // Written BEFORE the change (red on the old code). Through the real UI, read only; data that another spec could change is
 // replaced by a mocked API answer (e2e/README.md, "Specs share one database"), so the order of the specs does not matter.

@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet conC (owner rule IM24; issues I-123, I-126, part of I-128; consistency sweep 2026-10-22, findings 2, 6 and 13).
 // Every page under /workflow/<slug> is one family. Written BEFORE the change; red on the old code. Through the real UI as
 // Graduate School staff, read-only (windows are opened and closed, nothing is saved). Order-independent: no seeded count or

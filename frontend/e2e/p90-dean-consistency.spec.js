@@ -1,3 +1,4 @@
+// e2e-writes: none
 // Packet conA (I-122, I-127 and part of I-128; .planning/research/CONSISTENCY-2026-10-22.md findings 1, 7 and 10).
 // Owner rule IM24: pages of the same kind behave the same. Written BEFORE the change; red on the old code.
 // Through the real UI, as the Dean. Read only: every answer that needs a fixed scenario is edited in the browser with
