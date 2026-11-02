@@ -14,20 +14,42 @@ condition in that file is hit, the owner types `stop`, or
 `QUESTION` rows in `.planning/ISSUES.md` plus a line under "Waiting on you" in
 `.planning/BOARD.md`, and work continues on other items; use grill-me only
 while the owner is present. **Usage limits are not a stop:** before the
-window runs out, commit, push `v5.2-migui_again`, and write the exact next
-step into `.planning/STATE.md` so the next session (or the scheduled resume
-task) picks it up.
+window runs out, commit, push the working branch (see below), and write the
+exact next step into `.planning/STATE.md` so the next session (or the
+scheduled resume task) picks it up. **Stop at 80% of the weekly limit**
+(IM33): finish the current step, save, push, report.
+
+## Current run: v6.1 — UAT from Wednesday 2026-11-04 (IM28–IM33)
+
+- **Branch `v6.1-migui`** (from Natalie's `v6.0-natalie`). It is the one line
+  for UAT; push as work lands. Older branches are not touched.
+- **Priority:** anything that would embarrass us in UAT first — red gate,
+  crashes, broken flows, the public-site hardening for `https://miguisanson.dev`
+  (served from this PC through a Cloudflare Tunnel, `UAT.md`), Google Calendar
+  robustness — then `ISSUES.md` rows, then consistency (IM24), then UI and
+  database improvements. Do not redo teammates' work drastically: fix and
+  extend it in their style.
+- **Max 3 agents at once** (IM33), still one `app.py` editor at a time.
+  Read-only reviewers count toward the 3. One Fable full review at the end of
+  the run (`model: "fable"`, read-only, findings filed as I-rows).
+- **Machines:** long test runs go to the Mac when it is online
+  (`bash E:/Github_Projects/dev-kit/workers/pc/run-job.sh CAPSTONE-USLS-MVP <dir>`
+  picks a free machine and falls back to this PC). Check Tailscale first; never
+  wait for an offline machine. This PC hosts UAT — do not run heavy jobs here
+  while testers are on the site if the Mac is free.
+- **Token use:** Ponytail (reuse before writing new code) and Caveman at
+  *lite* are installed (IM32); replies to the owner stay plain English.
 
 ## Ground rules (these override any skill's defaults)
 
 1. Read `CLAUDE.md` and `AGENTS.md` first. AGENTS.md "The process: one owner
    per job" decides which skill does which job. Use every skill that owns a
    job. Do **not** use the ones it marks as not used.
-2. **Since 2026-10-17 the project is in improvement mode (v5.2).** Work lands
-   on branch `v5.2-migui_again`; the order is `.planning/ROADMAP.md` (owner
+2. **Since 2026-10-17 the project is in improvement mode.** Work lands on the
+   branch named in "Current run" above; the order is `.planning/ROADMAP.md` (owner
    decision IM8: data → walkthroughs → section J bugs → backend split →
    design system → performance), fed by `.planning/ISSUES.md`. The owner's
-   decisions are `.planning/DECISIONS.md` (IM1–IM15); the owner reads
+   decisions are `.planning/DECISIONS.md` (IM1–IM33); the owner reads
    `.planning/BOARD.md` — keep it current with STATE.md. For an unattended
    run the same command runs `.planning/IMPROVE.md`.
    **Consistency is the owner's top concern (IM24).** Every session runs the
