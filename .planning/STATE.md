@@ -12,6 +12,7 @@
   `UAT.md`, cloudflared example, read-only public-exposure audit -> next app.py packet); dev-kit agent (Ponytail +
   Caveman lite in the kit, Python/unittest support in `workers/` + `workers/projects/CAPSTONE-USLS-MVP.conf`, edits left
   uncommitted in dev-kit).
+- **Auto-resume:** scheduled task `oathbound-keep-going` (every 30 min, while `E:/DevCache/dev-kit-workers/autopilot.on` exists) resumes session `local_51b87609-0806-4cf8-87f2-0c79290158d8` after a turn ending `PAUSED for 5-hour limit`; stop at 80% weekly with `WEEKLY BUDGET`, resumed after the weekly reset (Wed 2026-11-04 02:00 PH). Extra usage is OFF on the account (no charges).
 - **Machines:** Mac and Lenovo were OFFLINE on Tailscale at 2026-11-02 start; everything runs on this PC until they are on.
 - **MERGED `pkt/uat`** (I-138): `npm run uat` = waitress + ProxyFix (`scripts/serve_uat.py`, test `tests/test_uat_serving.py` 7/7), `.env.example`, setup-env `--uat`, `UAT.md`, `deploy/cloudflared/config.yml.example`. Its public-exposure audit -> next app.py packet `pkt/harden` (after pkt/cal): empty env values = unset, `DEMO_SHOW_ACCOUNTS` switch (demo-accounts endpoints publish the shared password + admin e-mail), demo reset staff/admin only, assistant per-account rate limit, `MAX_CONTENT_LENGTH`, security headers, SQLite WAL + busy_timeout.
 - **pkt/a11y2** (I-120) still has only a stash in `wt/a11y2`; redo it later from the brief.
