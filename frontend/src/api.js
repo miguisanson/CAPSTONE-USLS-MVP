@@ -461,6 +461,7 @@ export const api = {
   evaluateConceptPaper: (evidenceId) =>
     request(`/research-evidence/${evidenceId}/concept-paper-compliance`, { method: "POST", body: JSON.stringify({}) }),
   form1Endorsements: () => request("/research-gate/form1-endorsements"),
+  researchGateOverview: () => request("/research-gate/overview"),
   endorseForm1: (studentId, payload) =>
     request(`/research-gate/form1-endorsements/${studentId}`, {
       method: "POST",

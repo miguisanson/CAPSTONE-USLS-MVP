@@ -9,15 +9,17 @@ import { api } from "../../api";
 import { Button, EmptyState, Field, InlineNotice, SectionCard, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { STUDENT_REQUEST_VIEW_BY_SLUG } from "./shared";
+import { PAGE } from "../../lib/labels.js";
 
+// The same names the sidebar and the page titles use (I-207).
 const WORKFLOW_LABELS = {
-  "leave-of-absence": "Leave of Absence",
-  readmission: "Readmission",
-  "course-audit": "Course Audit",
-  awol: "AWOL / Residency",
-  practicum: "Practicum",
-  withdrawal: "Withdrawal",
-  graduation: "Graduation",
+  "leave-of-absence": PAGE.leaveOfAbsence,
+  readmission: PAGE.readmission,
+  "course-audit": PAGE.courseAudit,
+  awol: PAGE.returnFromAwol,
+  practicum: PAGE.practicum,
+  withdrawal: PAGE.subjectWithdrawal,
+  graduation: PAGE.graduationEndorsement,
 };
 const FILTER_OPTIONS = [{ value: "all", label: "All workflows" }, ...Object.entries(WORKFLOW_LABELS).map(([value, label]) => ({ value, label }))];
 

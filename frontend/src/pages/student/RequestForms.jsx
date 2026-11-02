@@ -409,7 +409,12 @@ export function AwolReturnRequestForm({ data, onSaved }) {
   return (
     <div className="space-y-4">
       <ProcessCaseList cases={data.standalone_cases?.awol || []} />
-      <LeaveBanner banner={data.leave_overview?.banner} hideLink />
+      <LeaveBanner
+        banner={data.leave_overview?.banner || ((student.standing === "AWOL" || student.enrollment_tag === "AWOL")
+          ? { tone: "bad", title: "Your record is marked AWOL", text: "You cannot enroll until a return request is approved." }
+          : null)}
+        hideLink
+      />
       {student.enrollment_tag === "Residency" && (
         <InlineNotice tone="info">
           You are enrolled in residency without subjects for an approved academic purpose. Check the workflow status for the recorded semester and purpose.

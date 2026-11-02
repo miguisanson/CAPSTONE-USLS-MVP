@@ -411,7 +411,7 @@ test.describe("P82 student pages (pinned)", () => {
       await expect(main(s.page)).toContainText("Clarification requests, staff replies and questions about your active requests.");
       await expect(h2s(s.page)).toHaveText(["Inbox / Messages"]);
       await expect(main(s.page)).toContainText("No messages in this view");
-      await expect(main(s.page).getByLabel("Filter messages").locator("option")).toHaveText(["All workflows", "Leave of Absence", "Readmission", "Course Audit", "AWOL / Residency", "Practicum", "Withdrawal", "Graduation"]);
+      await expect(main(s.page).getByLabel("Filter messages").locator("option")).toHaveText(["All workflows", "Leave of Absence", "Readmission", "Course Audit", "Return from AWOL", "Practicum", "Subject Withdrawal", "Graduation Endorsement"]);
     } finally {
       await s.finish();
     }

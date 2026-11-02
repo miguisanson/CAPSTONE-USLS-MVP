@@ -380,9 +380,12 @@ export function PanelMatchingForm({ context, studentId, submit, submitting, refe
         </Card>
       )}
 
-      <Button type="submit" disabled={!profile.ready || !selectionComplete} loading={submitting} icon={CheckCircle2} className="w-full sm:w-auto">
-        {submitting ? "Finalizing…" : finalizedPanel.length === roles.length ? "Update final panel" : "Finalize selected panel"}
-      </Button>
+      <div className="space-y-2">
+        <Button type="submit" disabled={!profile.ready || !selectionComplete} loading={submitting} icon={CheckCircle2} className="w-full sm:w-auto" aria-describedby="finalize-panel-note">
+          {submitting ? "Finalizing…" : finalizedPanel.length === roles.length ? "Update final panel" : "Finalize selected panel"}
+        </Button>
+        <p id="finalize-panel-note" className="meta">Each new panel member is invited at once (Panel Invitations and their bell) and can accept or decline.</p>
+      </div>
     </form>
   );
 }

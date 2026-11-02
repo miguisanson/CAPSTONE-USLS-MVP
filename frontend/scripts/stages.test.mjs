@@ -62,3 +62,19 @@ test("the steps follow the list the API sends, not a hard-coded one", () => {
   assert.deepEqual(steps.map((s) => s.label), ["Admission", "Coursework", "Writing"]);
   assert.deepEqual(states(steps), ["complete", "current", "upcoming"]);
 });
+
+// I-206: a student who is off the path (AWOL, on leave) still did the work of the earlier stages; My Progress shows it.
+test("an off-track student's finished work still shows as complete", () => {
+  const done = { courseAudit: { completed: [1, 2, 3, 4], missing_count: 0 }, comprehensivePassed: true };
+  assert.deepEqual(states(stageSteps("AWOL", API_STAGES, done)).slice(0, 4), ["complete", "complete", "complete", "upcoming"]);
+  const partial = { courseAudit: { completed: [1, 2, 3, 4], missing_count: 14 }, comprehensivePassed: false };
+  assert.deepEqual(states(stageSteps("LOA", API_STAGES, partial)).slice(0, 3), ["complete", "current", "upcoming"]);
+  const none = { courseAudit: { completed: [], missing_count: 18 }, comprehensivePassed: false };
+  assert.deepEqual(states(stageSteps("AWOL", API_STAGES, none)).slice(0, 2), ["complete", "upcoming"]);
+});
+
+test("the record changes nothing on the path or when completed", () => {
+  const rec = { courseAudit: { completed: [1], missing_count: 0 }, comprehensivePassed: true };
+  assert.deepEqual(stageSteps("Writing", API_STAGES, rec), stageSteps("Writing", API_STAGES));
+  assert.deepEqual(stageSteps("Completed", API_STAGES, rec), stageSteps("Completed", API_STAGES));
+});

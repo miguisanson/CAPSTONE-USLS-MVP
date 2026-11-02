@@ -46,9 +46,12 @@ export function lifecycleStages(stages = DEFAULT_STAGES) {
  * Stepper steps for a student's current stage.
  * @param stage   `student.current_stage`
  * @param stages  `meta.stages` from the API (optional)
+ * @param record  optional `{ courseAudit, comprehensivePassed }`: for a student who is off the path (on leave, AWOL...) the
+ *                steps whose work is done show `complete` (Admission always; Coursework when no subject is missing, `current`
+ *                while some are done and some are not; Comprehensive Exam when passed and coursework is complete) (I-206)
  * @returns       [{ key, label, state }] - state is complete | current | upcoming | stopped
  */
-export function stageSteps(stage, stages = DEFAULT_STAGES) {
+export function stageSteps(stage, stages = DEFAULT_STAGES, record = null) {
   const path = lifecycleStages(stages);
   const at = path.indexOf(stage);
   const steps = path.map((label, i) => ({
@@ -57,6 +60,18 @@ export function stageSteps(stage, stages = DEFAULT_STAGES) {
     state: stage === "Completed" ? "complete" : at < 0 ? "upcoming" : i < at ? "complete" : i === at ? "current" : "upcoming",
   }));
   if (stage === "Completed") steps.push({ key: stage, label: stage, state: "complete" });
-  else if (isOffTrack(stage)) steps.push({ key: stage, label: stage, state: "stopped" });
+  else if (isOffTrack(stage)) {
+    if (record) {
+      const audit = record.courseAudit || {};
+      const coursework = (audit.completed || []).length > 0 && !audit.missing_count;
+      const started = (audit.completed || []).length > 0;
+      for (const step of steps) {
+        if (step.label === "Admission") step.state = "complete";
+        else if (step.label === "Coursework") step.state = coursework ? "complete" : started ? "current" : "upcoming";
+        else if (step.label === "Comprehensive Exam" && coursework && record.comprehensivePassed) step.state = "complete";
+      }
+    }
+    steps.push({ key: stage, label: stage, state: "stopped" });
+  }
   return steps;
 }

@@ -216,8 +216,9 @@ TRANSITIONS = {
 
 
 def actor_key(account_role: str) -> str:
-    """The role a move is checked against. An administrator only reads these two boards."""
-    return account_role
+    """The role a move is checked against: the one rule for every process board (I-210).
+    The administrator acts as Graduate School staff, everyone else is their own role."""
+    return "staff" if account_role == "admin" else account_role
 
 
 def transitions_from(slug: str, status: str, kind: str, role: str) -> list[dict]:
@@ -244,6 +245,7 @@ def any_transition_named(slug: str, action: str, kind: str) -> dict | None:
 
 def refusal_reason(slug: str, status: str, action: str, kind: str, role: str) -> str:
     """A plain sentence for a move that is not allowed, in the same words for every process."""
+    role = actor_key(role)
     info = status_by_key(slug).get(status, {})
     label = info.get("label", status)
     named = any_transition_named(slug, action, kind)

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { BookOpen, CalendarClock, CheckCircle2, Eye, Gavel, Hourglass, History } from "lucide-react";
 import { api } from "../../api";
 import { Button, Card, EmptyState, Field, Input, InlineNotice, SectionTitle, Select, StatusChip, Textarea } from "../../components/ui/index.js";
-import { formatDate } from "../../lib/format";
+import { formatDate, formatDateTime } from "../../lib/format";
 
 // The Verdicts page (I-090). Three groups, most urgent first:
 //   1. "Needs your verdict"   - defenses where this member can record the verdict (with the papers and the form)
@@ -65,7 +65,7 @@ function VerdictResult({ verdict }) {
     <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
       <p className="text-sm font-semibold text-emerald-800">Verdict: {verdict.label || verdict.result}{verdict.selected_title ? ` · ${verdict.selected_title}` : ""}</p>
       <p className="mt-1 text-xs text-emerald-700">
-        Submitted by {verdict.chair_name} · {new Date(verdict.submitted_at).toLocaleString()}{verdict.revision_status ? ` · ${verdict.revision_status}` : ""}
+        Submitted by {verdict.chair_name} · {formatDateTime(verdict.submitted_at)}{verdict.revision_status ? ` · ${verdict.revision_status}` : ""}
       </p>
       {verdict.follow_up && <p className="mt-1 text-xs text-emerald-700">{verdict.follow_up}</p>}
       {verdict.remarks && <p className="mt-2 text-sm text-slate-700">{verdict.remarks}</p>}

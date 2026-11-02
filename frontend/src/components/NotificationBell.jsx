@@ -110,7 +110,7 @@ export default function NotificationBell() {
   }
 
   return (
-    <div className="relative" ref={wrapper}>
+    <div className="relative max-sm:static" ref={wrapper}>
       <Button
         variant="icon"
         icon={Bell}
@@ -127,7 +127,7 @@ export default function NotificationBell() {
         )}
       </Button>
       {open && (
-        <div role="region" aria-label="Notifications" className="absolute right-0 z-header mt-2 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift">
+        <div role="region" aria-label="Notifications" className="absolute right-0 z-header mt-2 w-[22rem] max-w-[calc(100vw-2rem)] max-sm:inset-x-4 max-sm:top-full max-sm:mt-0 max-sm:w-auto overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lift">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <p className="font-display text-sm font-semibold text-ink">Notifications</p>
             <button type="button" onClick={readAll} disabled={!unread} className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:underline disabled:cursor-default disabled:text-slate-300 disabled:no-underline">

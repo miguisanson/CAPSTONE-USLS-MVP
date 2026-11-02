@@ -28,7 +28,7 @@ export function ProgressPanel({ data }) {
           You are on Leave of Absence, so you cannot enroll in subjects. The time on leave still counts toward your maximum residence. Readmission becomes available while this status is active.
         </InlineNotice>
       )}
-      <Stepper steps={stageSteps(student.current_stage, stages)} compact className="mb-5" />
+      <Stepper steps={stageSteps(student.current_stage, stages, { courseAudit: course_audit, comprehensivePassed: student.comprehensive_exam_status === "Passed" })} compact className="mb-5" />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <div className="mb-1 flex items-center justify-between text-sm">

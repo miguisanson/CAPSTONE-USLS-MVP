@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { BookOpen, CalendarClock, CheckCircle2, Eye, FileSignature, Gavel, Users } from "lucide-react";
 import { api } from "../api";
 import { Card, EmptyState, SectionTitle, StatusChip } from "./ui/index.js";
-import { formatDate } from "../lib/format";
+import { formatDate, formatDateTime } from "../lib/format";
 import SignaturePad from "./SignaturePad";
 
 const TITLE_GATE = "Form 1 - Title Defense";
@@ -17,7 +17,13 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
   const showSignatures = view === "all" || view === "signatures";
   const showPanels = view === "all" || view === "papers" || view === "verdicts";
   const panelRows = view === "verdicts" ? panels.filter((panel) => panel.defense) : panels;
-  const papers = useMemo(() => advisees.flatMap((row) => row.documents.map((document) => ({ ...document, student: row.student }))), [advisees]);
+  // Unsigned documents first (the ones that need the adviser), then the signed ones, newest upload first.
+  const papers = useMemo(
+    () => advisees.flatMap((row) => row.documents.map((document) => ({ ...document, student: row.student })))
+      .sort((a, b) => Boolean(a.approval) - Boolean(b.approval) || String(b.uploaded_at || "").localeCompare(String(a.uploaded_at || ""))),
+    [advisees],
+  );
+  const pendingCount = papers.filter((paper) => !paper.approval).length;
   const revisionReviews = useMemo(
     () => advisees.flatMap((row) => (row.revision_reviews || []).map((verdict) => ({ ...verdict, student: row.student }))),
     [advisees]
@@ -73,9 +79,12 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
     {notice && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-4 w-4" />{notice}</div>}
     {showSignatures && <Card pad="none" className="p-6">
       <SectionTitle title="Adviser paper signatures" subtitle="Review and sign the exact manuscript version uploaded by your assigned advisees" icon={FileSignature} />
-      {!papers.length ? <EmptyState icon={FileSignature} title="No adviser documents yet" hint="Proposal manuscripts, proposal/final endorsements, and final manuscripts appear here after an assigned advisee uploads them." /> : <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]">
-        <div className="space-y-2">{papers.map((paper) => <button key={paper.id} type="button" disabled={Boolean(paper.approval)} onClick={() => setSelectedPaper(paper)} className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedPaper?.id === paper.id ? "border-brand-300 bg-brand-50" : "border-slate-200 bg-white hover:bg-slate-50"} disabled:cursor-default`}><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{paper.student.name}</p><p className="text-xs text-slate-500">{paper.document_type} · {paper.gate}</p></div><StatusChip status={paper.approval?.status || "Needs signature"} dot={false} /></div><p className="mt-2 text-sm text-slate-700">{paper.name}</p><div className="mt-2 flex flex-wrap items-center gap-3"><a href={paper.url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"><Eye className="h-3.5 w-3.5" />Open document</a><span className="text-xs text-slate-400">Uploaded {formatDate(paper.uploaded_at)}</span></div>{paper.approval && <p className="mt-2 text-xs font-semibold text-emerald-700">Signed by {paper.approval.adviser_name} · {new Date(paper.approval.signed_at).toLocaleString()}</p>}</button>)}</div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">{selectedPaper ? <><p className="text-sm font-semibold text-ink">Sign {selectedPaper.name}</p><p className="mb-3 mt-1 text-xs text-slate-500">Student: {selectedPaper.student.name}. Review the file before signing this exact version.</p><SignaturePad resetKey={selectedPaper.id} onChange={setSignature} ariaLabel="Faculty adviser signature canvas" /><button type="button" onClick={signPaper} disabled={busy || !signature} className="btn-primary mt-4 w-full cursor-pointer"><FileSignature className="h-4 w-4" />{busy ? "Saving signature…" : "Sign this document"}</button></> : <EmptyState icon={FileSignature} title="Choose a pending document" hint="Select an unsigned document to review and sign it." />}</div>
+      {!papers.length ? <EmptyState icon={FileSignature} title="No adviser documents yet" hint="Proposal manuscripts, proposal/final endorsements, and final manuscripts appear here after an assigned advisee uploads them." /> : <div className={`mt-4 grid gap-5 ${pendingCount ? "lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]" : ""}`}>
+        <div className="space-y-2">
+          {!pendingCount && <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600" role="status">Nothing is waiting for your signature. The documents you signed are listed below.</p>}
+          {papers.map((paper) => <div key={paper.id} className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedPaper?.id === paper.id ? "border-brand-300 bg-brand-50" : "border-slate-200 bg-white"}`}><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{paper.student.name}</p><p className="text-xs text-slate-500">{paper.document_type} · {paper.gate}</p></div><StatusChip status={paper.approval?.status || "Needs signature"} dot={false} /></div><p className="mt-2 text-sm text-slate-700">{paper.name}</p><div className="mt-2 flex flex-wrap items-center gap-3"><a href={paper.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"><Eye className="h-3.5 w-3.5" />Open document</a>{!paper.approval && <button type="button" onClick={() => setSelectedPaper(paper)} aria-pressed={selectedPaper?.id === paper.id} className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"><FileSignature className="h-3.5 w-3.5" />Review and sign</button>}<span className="text-xs text-slate-400">Uploaded {formatDate(paper.uploaded_at)}</span></div>{paper.approval && <p className="mt-2 text-xs font-semibold text-emerald-700">Signed by {paper.approval.adviser_name} · {formatDateTime(paper.approval.signed_at)}</p>}</div>)}
+        </div>
+        {pendingCount > 0 && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">{selectedPaper ? <><p className="text-sm font-semibold text-ink">Sign {selectedPaper.name}</p><p className="mb-3 mt-1 text-xs text-slate-500">Student: {selectedPaper.student.name}. Review the file before signing this exact version.</p><SignaturePad resetKey={selectedPaper.id} onChange={setSignature} ariaLabel="Faculty adviser signature canvas" /><button type="button" onClick={signPaper} disabled={busy || !signature} className="btn-primary mt-4 w-full cursor-pointer"><FileSignature className="h-4 w-4" />{busy ? "Saving signature…" : "Sign this document"}</button></> : <EmptyState icon={FileSignature} title="Choose a pending document" hint="Select an unsigned document to review and sign it." />}</div>}
       </div>}
     </Card>}
 
@@ -107,7 +116,7 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
           {panel.defense && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-brand-800"><CalendarClock className="h-4 w-4" /><span className="font-semibold">{panel.defense.defense_type} · {formatDate(panel.defense.preferred_date)} {panel.defense.start_time || ""}</span><StatusChip status={panel.defense.display_status || panel.defense.status} dot={false} /></div>}
           {verdict && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
             <p className="text-sm font-semibold text-emerald-800">Verdict: {verdict.label || verdict.result}{verdict.selected_title ? ` · ${verdict.selected_title}` : ""}</p>
-            <p className="mt-1 text-xs text-emerald-700">Submitted by {verdict.chair_name} · {new Date(verdict.submitted_at).toLocaleString()}{verdict.revision_status ? ` · ${verdict.revision_status}` : ""}</p>
+            <p className="mt-1 text-xs text-emerald-700">Submitted by {verdict.chair_name} · {formatDateTime(verdict.submitted_at)}{verdict.revision_status ? ` · ${verdict.revision_status}` : ""}</p>
             {verdict.follow_up && <p className="mt-1 text-xs text-emerald-700">{verdict.follow_up}</p>}
             {verdict.remarks && <p className="mt-2 text-sm text-slate-700">{verdict.remarks}</p>}
             {verdict.correction_reason && <p className="mt-2 text-xs text-slate-600">Corrected from {verdict.original_result}: {verdict.correction_reason}</p>}

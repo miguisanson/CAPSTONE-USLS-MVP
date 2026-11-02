@@ -152,6 +152,63 @@ class Sweep2Tests(unittest.TestCase):
         self.assertEqual(self._client("academic_coordinator").get("/api/research-gate/overview").status_code, 200)
         self.assertEqual(self._client("staff").get("/api/research-gate/overview").status_code, 200)
 
+    # ------------------------------------------------------------------ I-206 (faculty bell)
+    def test_faculty_bell_lists_a_panel_invitation_that_is_still_waiting(self):
+        from app import PanelInvitation
+        client = self._client("faculty", "liwayway.bautista@usls.edu.ph")
+        with app.app_context():
+            account = UserAccount.query.filter_by(email="liwayway.bautista@usls.edu.ph").first()
+            waiting = PanelInvitation.query.filter_by(faculty_id=account.faculty_id, status="Invited").count()
+        self.assertGreater(waiting, 0, "the seed gives Dr. Bautista a waiting invitation")
+        body = client.post("/api/notifications/refresh").get_json()
+        invited = [item for item in body["items"] if item["kind"] == "panel_invited"]
+        self.assertEqual(len(invited), waiting, body)
+        self.assertIn("panel of", invited[0]["title"])
+        self.assertEqual(invited[0]["link"], "/faculty-portal/invitations")
+        again = client.post("/api/notifications/refresh").get_json()
+        self.assertEqual(len([item for item in again["items"] if item["kind"] == "panel_invited"]), waiting, "refresh is idempotent")
+
+    def test_research_lock_says_what_is_really_missing(self):
+        # Maya passed the comprehensive exam (My Profile says so) but still owes subjects: the lock must not say "exam not passed".
+        data = self._context("awol.maya@usls.edu.ph")
+        self.assertEqual(data["student"]["comprehensive_exam_status"], "Passed")
+        status = data["research_progress"]["status"]
+        self.assertTrue(status.startswith("Locked"), status)
+        self.assertNotIn("not passed", status)
+        self.assertIn("subjects", status.lower())
+
+    # ------------------------------------------------------------------ I-210 (admin acts as staff on every process board)
+    def _first_staff_move(self, slug):
+        staff = self._client("staff")
+        cases = staff.get(f"/api/process-cases?slug={slug}").get_json()["cases"]
+        for case in cases:
+            for action in case.get("actions", []):
+                if not action.get("needs_comment") and action.get("action") in {"forward", "review", "verify", "confirm"}:
+                    return case, action
+        return None, None
+
+    def test_admin_sees_and_applies_the_same_staff_moves_on_withdrawal_and_awol_boards(self):
+        import standalone_process as sp
+        self.assertEqual(sp.actor_key("admin"), "staff")
+        self.assertEqual(sp.actor_key("dean"), "dean")
+        admin = self._client("admin")
+        staff = self._client("staff")
+        for slug in ("withdrawal", "awol"):
+            staff_cases = {c["ref"]: [a["action"] for a in c["actions"]] for c in staff.get(f"/api/process-cases?slug={slug}").get_json()["cases"]}
+            admin_cases = {c["ref"]: [a["action"] for a in c["actions"]] for c in admin.get(f"/api/process-cases?slug={slug}").get_json()["cases"]}
+            self.assertEqual(admin_cases, staff_cases, slug)
+            if slug == "awol":  # the withdrawal move is spent by the forward test below, whatever the order
+                self.assertTrue(any(staff_cases.values()), "the seed has a staff move on the AWOL board")
+
+    def test_admin_forward_on_a_withdrawal_is_accepted_not_refused(self):
+        case, action = self._first_staff_move("withdrawal")
+        self.assertIsNotNone(case, "a withdrawal with a staff forward step")
+        response = self._client("admin").post(
+            f"/api/process-cases/withdrawal/{case['ref']}/transition", json={"action": action["action"]},
+        )
+        self.assertNotEqual(response.status_code, 409, response.get_json())
+        self.assertNotIn("can only be done by", str(response.get_json()))
+
 
 if __name__ == "__main__":
     unittest.main()

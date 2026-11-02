@@ -519,8 +519,9 @@ test.describe("Defense Schedule", () => {
     await openFromSidebar(page, "Defense Schedule", "Defense Schedule");
     await expect(page.getByText("Defenses scheduled for the panels you sit on. Keep your availability current so staff can confirm dates.")).toBeVisible();
     const table = tableWith(page, "Date / time");
-    expect(await headerNames(table)).toEqual(["Student", "Defense", "Date / time", "Mode / venue", "My role", "Status", "Calendar"]);
-    const first = table.locator("tbody tr").first();
+    expect(await headerNames(table)).toEqual(["Student", "Status", "Defense", "Date / time", "Mode / venue", "My role", "Calendar"]);
+    // CHANGED BY p105 (I-206): upcoming defenses first, then the earlier ones latest first, so the row is found by name
+    const first = table.locator("tbody tr").filter({ hasText: "Hector Ong" }).filter({ hasText: "Title Defense" }).first();
     await expect(first).toContainText("Hector Ong");
     await expect(first).toContainText("Reflective Practice Models for Graduate Educators");
     await expect(first).toContainText("Title Defense");
@@ -531,15 +532,17 @@ test.describe("Defense Schedule", () => {
     await expect(first).toContainText("Graduate School Conference Room");
     await expect(first).toContainText("Content Specialist");
     await expect(first).toContainText("Finished");
-    const ics = first.getByRole("link", { name: "Add to calendar" });
-    await expect(ics).toHaveAttribute("download", "");
-    expect(await ics.getAttribute("href")).toBeTruthy();
+    // CHANGED BY p105 (I-206): a finished defense has nothing to add to a calendar; the link is for defenses still to come
+    await expect(first.getByRole("link", { name: "Add to calendar" })).toHaveCount(0);
     const withDefense = (await portalContext(page)).panels.filter((panel) => panel.defense);
     expect(await table.locator("tbody tr").count(), "one row per scheduled defense the API lists").toBe(withDefense.length);
-    // sorted by date, oldest first
-    const dates = await table.locator("tbody tr td:nth-child(3)").evaluateAll((els) => els.map((e) => e.textContent));
+    // upcoming defenses first (soonest first), then the earlier ones (latest first)
+    const dates = await table.locator("tbody tr td:nth-child(4)").evaluateAll((els) => els.map((e) => e.textContent));
     const stamp = (text) => Date.parse(text.replace(" · ", " ").replace("Philippine time", ""));
-    for (let i = 1; i < dates.length; i++) expect(stamp(dates[i]), `row ${i} is not after row ${i - 1}`).toBeGreaterThanOrEqual(stamp(dates[i - 1]));
+    const upcoming = dates.filter((text) => stamp(text) >= Date.now() - 86400000);
+    const earlier = dates.filter((text) => stamp(text) < Date.now() - 86400000);
+    expect(dates.slice(0, upcoming.length).map(stamp), "upcoming first").toEqual(upcoming.map(stamp).sort((a, b) => a - b));
+    expect(dates.slice(upcoming.length).map(stamp), "earlier ones latest first").toEqual(earlier.map(stamp).sort((a, b) => b - a));
     await expect(page.getByRole("link", { name: "Open my calendar" })).toHaveAttribute("href", "/faculty-portal/calendar");
     await expect(page.getByRole("link", { name: "My availability" }).first()).toBeVisible();
     await shots(page, "defenses");

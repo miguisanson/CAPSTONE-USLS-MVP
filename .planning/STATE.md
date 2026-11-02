@@ -35,6 +35,9 @@
 - **In flight:** `pkt/be6` (only app.py editor: I-183 seed inconsistencies, I-195 PH dates, I-193 one active count +
   Dean roles on stages/attention, I-197 deliberate history); `pkt/staffux` (I-198 ?show=open on every board, I-199
   every staff board as a card list on phones); Mac gate + full e2e on the logic2 merge -> gate61/mac_logic2.txt, e2e7.txt.
+- **`pkt/sweep2`** (wt/sweep2, ready to merge after gate): persona sweep 2 I-201..I-207 + I-158 (AD12). app.py: faculty directory for the Research
+  Coordinator, student_standing_summary, assistant next step, /api/research-gate/overview, research_lock_status, invitation reminders.
+  Tests: tests/test_sweep2.py, e2e/p105-sweep2.spec.js, scripts/stages.test.mjs. Skipped: sidebar numbering gap (p21/p95 pin it).
 - **Next:** merge be6 + staffux, gates; persona sweep 2 (student-leave, faculty-rare, coordinator-research) from wt/gate
   (not while e2e runs there); walkthrough case 20 re-capture; **Fable full review at ~70% weekly** (63% at 22:45),
   then fix its P1s; stop at 80% (`WEEKLY BUDGET`); no auto-resume after the weekly reset (owner).

@@ -177,7 +177,7 @@ export default function StudentOverview() {
       extra={
         <>
           <SectionCard as="section" title="Your lifecycle" subtitle={`You are at: ${student.current_stage}`} icon={Route}>
-            <Stepper steps={stageSteps(student.current_stage, data.stages)} />
+            <Stepper steps={stageSteps(student.current_stage, data.stages, { courseAudit: data.course_audit, comprehensivePassed: student.comprehensive_exam_status === "Passed" })} />
           </SectionCard>
           <PageLinks data={data} />
         </>

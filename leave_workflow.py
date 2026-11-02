@@ -11,6 +11,8 @@ lives on the case row, never in free text.
 
 from __future__ import annotations
 
+from standalone_process import actor_key
+
 KIND_LOA = "LOA"
 KIND_EXTENSION = "LOA_EXTENSION"
 KIND_READMISSION = "READMISSION"
@@ -162,8 +164,8 @@ TRANSITIONS = [
 
 
 def role_key(account_role: str) -> str:
-    """Admin acts as Graduate School staff; everything else is its own role."""
-    return "staff" if account_role == "admin" else account_role
+    """Admin acts as Graduate School staff; everything else is its own role (the same rule as standalone_process.actor_key)."""
+    return actor_key(account_role)
 
 
 def transitions_from(status: str, kind: str, role: str) -> list[dict]:

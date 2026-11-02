@@ -2634,6 +2634,14 @@ def monitoring_research_milestones(student: Student) -> dict:
     }
 
 
+def research_lock_status(prerequisite: dict) -> str:
+    """Why research is locked, from the same record My Profile shows: the exam status and the subjects still owed (I-206)."""
+    if not prerequisite["eligible"]:
+        left = prerequisite["missing_subjects"]
+        return f"Locked - {left} required subject{'s' if left != 1 else ''} still to complete before research"
+    return "Locked - comprehensive exam not passed"
+
+
 def require_research_prerequisite(student: Student) -> dict:
     require_open_standing(student, "the research process")
     prerequisite = comprehensive_exam_eligibility(student)
@@ -11043,6 +11051,11 @@ def assistant_asks_personal(question: str) -> bool:
 
 def _plain_date(value) -> str:
     return value.strftime("%b %d, %Y").replace(" 0", " ") if value else "no date"
+
+
+def _plain_clock(value) -> str:
+    """5:00 PM, the 12-hour clock the app shows everywhere (I-207)."""
+    return value.strftime("%I:%M %p").lstrip("0") if value else "--:--"
 
 
 def student_assistant_record(student: Student) -> dict:
@@ -29222,7 +29235,7 @@ def schedule_slot_problems(student: Student, schedule: ScheduleRequest, panel: l
         schedule.preferred_date, schedule.start_time) <= manila_now() else []
     problems.extend(declined_invitation_problems(student, panel))
     problems.extend(
-        f"{name} is not available {schedule.start_time.strftime('%H:%M')}-{schedule.end_time.strftime('%H:%M')} on {schedule.preferred_date.isoformat()}"
+        f"{name} is not available {_plain_clock(schedule.start_time)}-{_plain_clock(schedule.end_time)} on {_plain_date(schedule.preferred_date)}"
         for name in unavailable
     )
     problems.extend(
@@ -29483,7 +29496,7 @@ def evaluate_schedule_slot(
         )
     matched_count, unavailable, not_entered = slot_availability(participants, day, start, end, ignore_schedule) if participants else (0, [], [])
     for name in unavailable:
-        hard.append(f"{name} is not available {start.strftime('%H:%M')}-{end.strftime('%H:%M')} on {day.isoformat()}")
+        hard.append(f"{name} is not available {_plain_clock(start)}-{_plain_clock(end)} on {_plain_date(day)}")
     if not_entered:
         soft.append(
             f"{', '.join(not_entered)} {'has' if len(not_entered) == 1 else 'have'} not entered availability, "
@@ -31059,6 +31072,16 @@ def generate_reminders(account: UserAccount | None = None, today: date | None = 
                 link="/faculty-portal/availability", related_type="faculty", related_id=faculty.id,
                 dedupe_key=f"availability_missing:{faculty.id}",
             )
+        # An invitation that is still waiting for an answer shows in the bell (same key as when the seat was made).
+        for invitation in PanelInvitation.query.filter_by(faculty_id=faculty.id, status="Invited").all():
+            if invitation.student:
+                add(
+                    person, "panel_invited",
+                    f"You are invited to the {RESEARCH_GATE_DEFENSE_TYPES.get(invitation.gate, 'defense')} panel of {invitation.student.name}",
+                    f"Role: {invitation.panel_role}. Accept or decline in Panel Invitations.",
+                    link="/faculty-portal/invitations", related_type="panel_invitation", related_id=invitation.id,
+                    dedupe_key=f"panel_invited:{invitation.id}",
+                )
         overdue_days = int(rule_value("defense.availability_reminder_days", 3))
         for request_row in AvailabilityRequest.query.filter_by(faculty_id=faculty.id, status="Open").all():
             if request_row.created_at and (today - request_row.created_at.date()).days >= overdue_days:
@@ -34753,7 +34776,7 @@ def research_requirement_state(
     if not presentation:
         return {"status": doc.status if doc else "Missing", "status_label": doc.status if doc else "Missing"}
     if student and not comprehensive_exam_eligibility(student)["research_allowed"]:
-        return {"status": "Locked", "status_label": "Locked until comprehensive exam is passed"}
+        return {"status": "Locked", "status_label": research_lock_status(comprehensive_exam_eligibility(student))}
     if student:
         _, demo_config = workflow_demo_config_for_student(student)
         verified_demo_case = (
@@ -35131,7 +35154,7 @@ def sync_research_progress(student: Student, submitted_title: str = "") -> tuple
         return research_case, {
             "stage": "Title Defense",
             "gate": "Form 1 - Title Defense",
-            "status": "Locked - comprehensive exam not passed",
+            "status": research_lock_status(prerequisite),
             "stage_index": 0,
             "stages": [
                 {"name": name, "gate": gate, "complete": False, "status": "Locked"}
