@@ -1,5 +1,23 @@
 # State
 
+## CURRENT RUN (2026-11-02, v6.1) — read this first
+
+- **Branch `v6.1-migui`** from `v6.0-natalie` @ 80dd1aa (IM28). UAT on `https://miguisanson.dev` from Wed 2026-11-04,
+  served from this PC via Cloudflare Tunnel (IM29), demo seed (IM30), no e-mail (IM31). Decisions IM28-IM33.
+- **Merged on v6.1:** paused v5.3 packets `pkt/iso`, `pkt/conE`, `pkt/rep` (conflicts only in p51/p62 specs, resolved
+  keeping both sides). Full Python gate on b629b82 running in `wt/gate` -> `E:/Temp/claude/gate61/merge3.txt`.
+  Still to run on the merged code: `npm run e2e` (p93 reports + p95 + p51/p62/p96), `check:ui:strict`.
+- **In flight (max 3 agents, IM33):** `pkt/cal` in `wt/cal` (only app.py editor: calendar review fixes I-134..I-137);
+  `pkt/uat` in `wt/uat` (no app.py: waitress+ProxyFix entry `npm run uat`, `.env.example`, setup-env calendar lines,
+  `UAT.md`, cloudflared example, read-only public-exposure audit -> next app.py packet); dev-kit agent (Ponytail +
+  Caveman lite in the kit, Python/unittest support in `workers/` + `workers/projects/CAPSTONE-USLS-MVP.conf`, edits left
+  uncommitted in dev-kit).
+- **Machines:** Mac and Lenovo were OFFLINE on Tailscale at 2026-11-02 start; everything runs on this PC until they are on.
+- **pkt/a11y2** (I-120) still has only a stash in `wt/a11y2`; redo it later from the brief.
+- **Next after the three land:** review + merge pkt/cal then pkt/uat; app.py packet for the public-exposure audit
+  findings; e2e on merged code; then IMPROVE.md loop (ISSUES P1/P2, consistency sweep, UI/database improvements);
+  Fable full review at the end; stop at 80% weekly.
+
 ## ACTIVE RUN UPDATE (2026-10-27) - faculty calendar UI refinement complete
 
 - **Branch and scope:** `v6.0-natalie` only; version 5.3 was not touched. This packet changed frontend presentation and Playwright expectations only. No backend, database, OAuth, calendar-sync, availability, or defense-scheduling behavior changed.
