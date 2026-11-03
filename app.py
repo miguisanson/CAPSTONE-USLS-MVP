@@ -15602,6 +15602,7 @@ def register_routes(app: Flask) -> None:
         db.session.add(faculty)
         db.session.flush()
         account = ensure_faculty_user_account(faculty, temporary_password)
+        account.must_change_password = not is_demo_account(account)  # staff-set password is temporary (I-216)
         # No working hours are invented: the faculty member (or staff) enters them, and until then
         # the scheduler shows "availability not entered".
         db.session.commit()
@@ -15765,6 +15766,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": str(exc)}), 409
         if new_password:
             account.password_hash = generate_password_hash(new_password)
+            account.must_change_password = not is_demo_account(account)  # staff-set password is temporary (I-216)
         db.session.commit()
         return jsonify({
             "ok": True,
