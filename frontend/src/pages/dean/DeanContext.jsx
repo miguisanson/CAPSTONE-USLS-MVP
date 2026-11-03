@@ -45,14 +45,15 @@ export function DeanProvider({ children }) {
     setActErr("");
   }, [location.pathname]);
 
-  // The adviser queue is decided on its own page; refresh the sidebar number when the Dean moves around.
+  // New reports arrive while the Dean is signed in (I-009): reload the approvals and the adviser queue
+  // (sidebar numbers, boards) whenever the Dean moves to another page.
   const adviserFirstRun = useRef(true);
   useEffect(() => {
     if (adviserFirstRun.current) {
       adviserFirstRun.current = false;
       return;
     }
-    refetchAdviser();
+    refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
