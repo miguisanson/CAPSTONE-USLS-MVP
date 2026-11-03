@@ -1,16 +1,15 @@
 # State
 
-## PAUSED for 5-hour limit (2026-11-03) — exact next steps
+## HANDED OFF (2026-11-03 morning) — read `.planning/HANDOFF-v6.1.md` first
 
-1. `pkt/fable2` is FINISHED (244dd5b) but NOT merged: merge conflict in `frontend/src/components/SubjectNeedsReport.jsx` (sweep2 and fable2 both changed its date formatting; keep one formatDateTime call), then merge; its run also left p103 ("N with Active standing" now "N active students") and p51 (first row not Hector Ong) to update. Then review + merge (frontend: I-211, I-212 ui, I-214, I-217; spec p105-fable-fixes).
-2. Start `pkt/fable1` (app.py): I-209 `DEMO_PASSWORD` env override in the seed (UAT.md: set it in .env, re-seed); I-212
-   server flag `demo_account` on /api/auth/me + refuse change-password for seeded demo accounts in DEMO_MODE; I-213
-   report tile texts (F-07..F-10); I-214 `actor_name` in histories; I-215 panel-matching Gemini cache + 1 retry; I-216
-   roster roles, str(exc), CSV formula escape, ProxyFix x_host=0.
-3. Then Mac gate + Mac e2e, walkthrough case 20 re-capture. Stop at 80% weekly (`WEEKLY BUDGET`), no resume after the
-   weekly reset (owner).
-4. sweep2 merged: I-201..I-206, I-210 fixed (tests/test_sweep2.py, p105-sweep2); I-207 partial; sidebar numbering gap
-   needs the owner's call.
+- Owner: "finish up … I plan to let someone else develop". The v6.1 run is closed; auto-resume is OFF.
+- Everything is merged on `v6.1-migui` and pushed; no helper worktrees or `pkt/*` branches left from this run.
+- Last gates: Mac Python 875/0 (before the final pkt/fable1 merge; fable1's own run 425 targeted tests OK); Mac e2e
+  see `E:/Temp/claude/gate61/mac_e2e_final.txt`; build + `check:ui --strict` zeros after the last merge.
+- Open work: HANDOFF-v6.1.md "Open work" (I-207, I-208, I-213 F-10, I-214/I-215 AI leftovers, I-216 .ics + forced
+  password change, walkthrough case 20 re-capture, Graduate School questions I-167/I-170/I-174).
+- Before UAT the owner must: Cloudflare login + Access, Google client ID/secret, testers as Google test users,
+  `DEMO_PASSWORD` in `.env`, then `npm run build:web`, `npm run seed`, `npm run uat`.
 
 ## CURRENT RUN (2026-11-02, v6.1) — read this first
 

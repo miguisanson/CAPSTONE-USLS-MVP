@@ -62,8 +62,8 @@ rules.
 `.claude/skills/persona-uat` (human-like testers per role). Reviews: `research/FULL-REVIEW-2026-11-03.md` (Fable).
 
 ## Open work (most important first)
-1. Anything STATE.md lists as not yet merged (the last backend packet `pkt/fable1`: DEMO_PASSWORD, report tile texts,
-   roster access, x_host=0, CSV escape).
+1. (Done: the last backend packet `pkt/fable1` — DEMO_PASSWORD, report tile texts,
+   roster access, x_host=0, CSV escape — is merged; re-seed with DEMO_PASSWORD set.)
 2. ISSUES.md rows still `open`: I-207 (sidebar numbering — owner's call), I-208 (Mac e2e font/pixel checks), I-214..
    I-217 leftovers (Gemini citations/injection delimiters/panel-matching cache, faculty .ics, raw dates in
    FacultyVerdicts/FacultyResearchWorkspace), I-167/I-170/I-174 (Graduate School questions).
