@@ -149,14 +149,16 @@ Stakeholder meeting 2026-11-04. Owner asked for, in this order:
    tunnel token from a file the owner fills), `deploy/DOCKER.md` (helper C). Owner: domain NOT yet on Cloudflare;
    public sign-in page SHOWS the demo accounts (DEMO_SHOW_ACCOUNTS=1, owner choice, risk told).
 7. Then polish / improvement / optimization loop (IMPROVE.md) until 10:00 Manila.
-**Progress (02:10 Nov 4):** ALL 5 DELIVERABLES DONE + pushed (entry point `Documents/CAPSTONE_ONLY/Demo_Migui/README-FOR-MIGUI.md`).
-Owner: leave the domain/Cloudflare to him; keep looping. MERGED on v6.1 after gates: night1..7 (last Python 925 OK; e2e 773, the
-one fail I-235 flaky). Teammate Myrine pushed teaching-timetable work (I-226..I-234 rows are hers) at 02:00; merged into
-v6.1 (793a17b), ISSUES conflict resolved (my flaky row renumbered I-235). ALWAYS `git fetch` + merge origin before pushing.
-IN GATE (round 5 = v6.1 incl. Myrine + pkt/night8 seed realism F-25: advisers for research students, Completed waits for the Dean's
-endorsement approval): Python -> gate-night/pc_r5.txt (wt/gatebase), e2e -> e2e_r5.txt (wt/gatenight). Merge night8 if green.
-Live site: `npm run uat` on 127.0.0.1:5000 since 23:55 (old code). Morning (06:00-08:00): rebuild, stop the site's python by its
-PID (netstat :5000), `npm run seed`, start `deploy\START-SITE.cmd`, re-record the videos on the final code, rebuild narration.
+**Progress (03:15 Nov 4):** ALL 5 DELIVERABLES DONE + pushed (entry point `Documents/CAPSTONE_ONLY/Demo_Migui/README-FOR-MIGUI.md`).
+Owner: leave the domain/Cloudflare to him; keep looping. MERGED on v6.1 after gates: night1..8 (last full Python 965 with 2 fails:
+night8 determinism test (fixed, test-only) + Myrine's test_teaching_schedule (I-236, hers); e2e 771 + targeted fixes). Teammate
+Myrine pushes to v6.1 too: ALWAYS `git fetch` + merge origin before pushing.
+Live site re-seeded + restarted 03:10 on 91771e6 (night1-8 + Myrine), `npm run uat` on 127.0.0.1:5000 via START-SITE.cmd.
+IN FLIGHT: pkt/night9 (I-220 footer spec pin, I-207 student carry-over + rules summary; wt/night9), pkt/night10 (I-237 graduation
+candidates, I-238 missing count, I-239 dashboard deep link + tile labels; wt/night10), pkt/night11 (Fable P2s: held-defense
+re-request, staff/RC delete verified file, Dean approval -> Completed, latest endorsement, Enrollment pronoun, passages regex;
+wt/night11). Then round 6 gates (wt/gatebase Python, wt/gatenight e2e), merge, re-seed + restart the site, re-record videos
+(record_demo.py on a fresh DB :5092, build_narration.py), final STATE + README. Stop new work by ~08:30.
 Restore BayoCoop watchdog registration (`E:/DevCache/dev-kit-workers/build-session.*.bayocoop-backup`) when the run ends.
 Shared doc tools: `E:/Temp/claude/docs-venv` (python-docx, pymupdf, openpyxl, imageio-ffmpeg); LibreOffice `E:/LibreOffice`.
 
