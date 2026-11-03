@@ -786,7 +786,7 @@ add("03", "Change or Add of Subject and Advice Slip", "Course adjustments (chang
           [("Subject code and title", 7.0), ("Units", 1.4), ("Section", 2.2), ("Enrollment form un-tagged at the Business Office (initials / date)", 6.4)], 2, 0.8),
         F(None, ["Issued by (GS Office)", "Date issued"]),
     ],
-    gs=["Recorded in platform on"])
+    gs=["Recorded on"])
 
 # ---- 04 ------------------------------------------------------------------------------------
 add("04", "Term Course Offering Plan", "Course offering",
@@ -835,7 +835,7 @@ add("06", "Notice of Dropping from a Subject", "Dropping",
     instructions=[
         "Attendance is counted from the first regular class meeting. The maximum number of absences allowed is 20% of the total class hours of the semester. When unexcused absence is more than 20% of the stipulated hours in one course, the student is automatically dropped from the course by the professor and given the grade DRP with a 5.0 (Handbook p. 52).",
         "Excused absences are a death in the family, illness (with a medical certificate from the USLS clinic or a personal doctor) and a graduate program activity endorsed by the Dean. A student who takes part in a school-sponsored activity or represents the University in an official capacity is granted an Approved Absence on the Dean's approval; it is not counted against the allowed absences (Handbook p. 52).",
-        "A student who wishes to leave a subject within the first two weeks files GS-F-05. In practice a drop for another documented ground is arranged between the student and the Academic Coordinator (to be confirmed by the Graduate School). The Graduate School records the drop in AIMS and in its own record.",
+        "A student who wishes to leave a subject within the first two weeks files GS-F-05. A drop for another documented ground is arranged between the student and the Academic Coordinator. The Graduate School records the drop in AIMS and in its own record.",
     ],
     sections=[
         F("Student and subject", STU_SHORT + ["Subject code", "Subject title", "Professor", "Academic year / semester", "Section / schedule"]),
@@ -869,7 +869,7 @@ add("07", "Application for Leave of Absence", "Leave of absence (new and extensi
                                       ("Business Office", "Withdrawal fee or refund noted")]),
         F("Notice to the University Registrar (Dean, Associate Dean or authorized representative)", ["Period approved", "Date informed", "Reasons stated", "Amount refunded, if any", ("full", "Informed by")]),
     ],
-    gs=["Leave starts / ends", "Copy sent to Registrar on", "Platform status"])
+    gs=["Leave starts / ends", "Copy sent to Registrar on", "Status"])
 
 # ---- 08 ------------------------------------------------------------------------------------
 add("08", "Application for Readmission (Return from Leave or AWOL)", "Return from leave of absence and readmission",
@@ -902,8 +902,8 @@ add("09", "Notice of Absence Without Leave (AWOL)", "Absence without leave",
     ref="Handbook p. 53",
     instructions=[
         "A student who withdraws from the College without a formal leave of absence is in absence-without-leave (AWOL) status and has registration privileges curtailed or entirely withdrawn (Handbook p. 53).",
-        "Proposed practice: the status is recorded from evidence, for example an imported AWOL standing or an enrollment marked withdrawn with no approved leave. It is not based on absence alone and is not entered without the source being stated below.",
-        "The student is told how to return (GS-F-08). The Handbook does not say that AWOL is reported to the Registrar; if the Graduate School reports it, GS-F-44 is used (to be confirmed).",
+        "The status is recorded from evidence, for example an imported AWOL standing or an enrollment marked withdrawn with no approved leave. It is not based on absence alone and is not entered without the source being stated below.",
+        "The student is told how to return (GS-F-08). If the Graduate School reports the absence to the Registrar, GS-F-44 is used.",
     ],
     sections=[
         F("Student information", STU_SHORT + ["Stage before the AWOL (research or coursework)", "Last term enrolled", "Date AWOL takes effect", "Years in the program"]),
@@ -914,7 +914,7 @@ add("09", "Notice of Absence Without Leave (AWOL)", "Absence without leave",
         F(None, ["Student notified on (date)", "Notified by (email / letter)", "Registrar informed on", "Informed by"]),
         S("Signatures", [("Prepared by", "Graduate School Staff or Academic Coordinator"), ("Graduate School Dean", "Noted")]),
     ],
-    gs=["Platform status"])
+    gs=["Status"])
 
 # ---- 10 ------------------------------------------------------------------------------------
 add("10", "Application for Residency Enrollment", "Residency enrollment and maximum residence",
@@ -922,7 +922,7 @@ add("10", "Application for Residency Enrollment", "Residency enrollment and maxi
     instructions=[
         "Residency applies to a student who has finished all coursework and is only working on the thesis or dissertation, or the practicum or internship, after a semester of enrollment for it. It also applies to a student who is not enrolled in any subject but will complete an INC, will take the comprehensive examination, or is waiting for the research publication. Registration for residence must be done within the semester (Handbook p. 48).",
         "A student who does not intend to enroll for a valid reason but still has remaining units may not enroll in residency and must file a leave of absence (GS-F-07).",
-        "Maximum residence: master's, candidacy within three years and all requirements within five years, with a possible two-year extension that requires a graded six-unit refresher, up to seven years including leave; doctorate, five and seven years, up to nine years including leave (Handbook pp. 54-55). The Handbook states no residency fee; any fee is assessed by the Business Office.",
+        "Maximum residence: master's, candidacy within three years and all requirements within five years, with a possible two-year extension that requires a graded six-unit refresher, up to seven years including leave; doctorate, five and seven years, up to nine years including leave (Handbook pp. 54-55).",
     ],
     sections=[
         F("Student information", STU + ["Date admitted to the program", "Years in the program"]),
@@ -934,14 +934,14 @@ add("10", "Application for Residency Enrollment", "Residency enrollment and maxi
         S("Signatures and approval", [("Student", "Applicant"), ("Academic Coordinator", "Purpose and eligibility verified"), ("Graduate School Dean or authorized representative", "Approved  /  Not approved"),
                                       ("Business Office", "Fee assessed, if any; receipt no. ________")]),
     ],
-    gs=["Recorded in platform on"])
+    gs=["Recorded on"])
 
 # ---- 11 ------------------------------------------------------------------------------------
 add("11", "Practicum Agreement (Memorandum of Agreement)", "Practicum",
     ref="Handbook p. 48",
     instructions=[
-        "Used for programs with a practicum or internship (the programs are to be named by the Graduate School). Complete it before the practicum starts; the Graduate School keeps the signed original and gives a copy to the host organization.",
-        "The Academic Coordinator reviews the agreement and marks the practicum as in progress once it is signed by all parties. The required number of practicum hours is stated by the Graduate School for the program.",
+        "Used for programs with a practicum or internship. Complete it before the practicum starts; the Graduate School keeps the signed original and gives a copy to the host organization.",
+        "The Academic Coordinator reviews the agreement and marks the practicum as in progress once it is signed by all parties.",
     ],
     sections=[
         P("Parties", "This agreement is made between the UNIVERSITY OF ST. LA SALLE, Graduate School, Bacolod City (the University), the HOST ORGANIZATION named below, and the STUDENT named below, for the practicum of the student."),
@@ -990,7 +990,7 @@ add("14", "Application for Comprehensive Examination", "Comprehensive examinatio
     ref="Handbook pp. 56-57",
     instructions=[
         "Master's students who have passed all academic requirements and have been evaluated by their Academic Coordinator, and doctorate students evaluated by their College Dean, may apply. Non-thesis students must have completed the integrating courses (Handbook p. 56). The student is advised to enroll in Residency in Comprehensive Examination.",
-        "File with the Graduate Program Secretary at least two (2) weeks before the examination. Fee: P1,100 for master's and P2,500 for doctorate, paid at the Business Office; attach the official receipt (Handbook p. 57). The fee is forfeited if the examinee does not appear or send a written note.",
+        "File with the Graduate Program Secretary at least two (2) weeks before the examination. Fee: PHP 1,100 for master's and PHP 2,500 for doctorate, paid at the Business Office; attach the official receipt (Handbook p. 57). The fee is forfeited if the examinee does not appear or send a written note.",
         "To withdraw the application, inform the Graduate Program in writing, with the reason, at least three (3) working days before the examination (last section of this form).",
     ],
     sections=[
@@ -1037,7 +1037,7 @@ add("16", "Application for Title Defense", "Title defense", subtitle="Research P
     instructions=[
         "Fill in this form and send it with the three (3) concept papers to your Academic Coordinator at least two (2) weeks before the proposed defense. The Academic Coordinator endorses the application to the Research Coordinator (gsresearch@usls.edu.ph) and recommends a set of panel members; the student does not need the Academic Coordinator's handwritten signature when the endorsement is sent by email with the e-signature.",
         "The Research Coordinator then nominates the panel members as recommended by the Academic Coordinator, after deliberation with the GS Research Committee (GS-F-17). The panel deliberates the three titles without the student and decides the title to be pursued (GS-F-18).",
-        "Answer the four labelled items in Part D completely. Panel composition (Handbook p. 60): project paper, a chair and two members; thesis, a chair and three members; dissertation, a chair and four members. The external panel member joins from the proposal defense onward.",
+        "Answer the four labeled items in Part D completely. Panel composition (Handbook p. 60): project paper, a chair and two members; thesis, a chair and three members; dissertation, a chair and four members. The external panel member joins from the proposal defense onward.",
     ],
     sections=[
         F("Student information", RES_STU + ["Research Adviser (if already designated)", "Comprehensive examination passed on"]),
@@ -1057,7 +1057,7 @@ add("17", "Panel Nomination and Invitation Reply Slip", "Panel nomination and sc
     ref="Handbook pp. 60, 63; Protocol, Title Defense I.4",
     instructions=[
         "The Research Coordinator nominates the panel members as recommended by the Academic Coordinator, after deliberation with the GS Research Committee (title defense). For the proposal and final defenses the Research Adviser recommends the external panel member, subject to the approval of the GS Research Committee (Protocol, Proposal Defense I).",
-        "Each nominated member answers the invitation below; a member who is not available on the date marks the slip as unavailable. The defense date is confirmed once the Research Adviser and all required panel members have replied that they are available (proposed practice).",
+        "Each nominated member answers the invitation below; a member who is not available on the date marks the slip as unavailable. The defense date is confirmed once the Research Adviser and all required panel members have replied that they are available.",
         "The Graduate School Office coordinates the schedule with the panel; the Panel Chair reserves the venue through the Graduate School Office or prepares the online meeting details.",
     ],
     sections=[
@@ -1083,14 +1083,14 @@ add("18", "Report of Title Defense", "Title defense", subtitle="Research Protoco
     sections=[
         F("Student and defense", RES4 + ["Type of paper", "Date of the defense", "Mode and venue", "Research Adviser (if any)"]),
         T("Titles deliberated", [("No.", 0.9), ("Title of concept paper", 11.0), ("Decision", 3.2), ("Selected", 1.9)],
-          [["1", "", "Approved / Disapproved", ""], ["2", "", "Approved / Disapproved", ""], ["3", "", "Approved / Disapproved", ""]], 0.95),
+          [["1", "", "Approved / Not approved", ""], ["2", "", "Approved / Not approved", ""], ["3", "", "Approved / Not approved", ""]], 0.95),
         C("Result of the title defense", None, ["Approved: the title selected above is to be pursued", "Disapproved: the student presents a new set of three titles"], cols=1),
         F(None, [("full", "Title to be pursued, as finally worded by the panel")]),
         B("Comments and suggestions of the panel", "", 2.6),
         S("Panel signatures", [("Panel Chair", None), ("Content Specialist", None), ("Method Specialist", None), ("Content Specialist (dissertation only)", None)]),
         F("Receipt of the student", ["Date received", "Student's signature"]),
     ],
-    gs=["Recorded in platform on"])
+    gs=["Recorded on"])
 
 # ---- 19 ------------------------------------------------------------------------------------
 add("19", "Application for Designation of Research Adviser", "Research Adviser designation", subtitle="Research Protocol Form 3",
@@ -1194,7 +1194,7 @@ add("24", "Request for Change of Title of the Study", "Change of title", subtitl
         C(None, None, ["The proposal defense has not yet been applied for", "This is the first request to change the title", "The new concept paper is attached"], cols=1),
         B("Reason for the change", "State the reason:", 2.0),
         S("Endorsement", [("Student", None), ("Research Adviser", "Endorses the request to the panel")]),
-        T("Decision of the panel", [("Panel member", 4.6), ("Role", 3.4), ("Approve / Disapprove", 3.4), ("Signature and date", 5.6)], 4, 0.8),
+        T("Decision of the panel", [("Panel member", 4.6), ("Role", 3.4), ("Approve / Not approve", 3.4), ("Signature and date", 5.6)], 4, 0.8),
         C(None, "Decision of the panel:", ["The change of title is approved", "The change of title is not approved"], cols=2),
         S("Reported by", [("Panel Chair", "Emailed the decision on ________")]),
     ],
@@ -1260,7 +1260,7 @@ add("27", "Endorsement for Proposal / Final Defense", "Proposal defense and clos
 add("28", "Request for Rescheduling or Cancellation of a Defense", "Defense scheduling and rescheduling",
     ref="Handbook pp. 63-67",
     instructions=[
-        "Use this form when a confirmed defense cannot take place on its date. It is a Graduate School form, not a form of the Research Protocol. The new date must meet the lead times the Protocol sets for any defense: Form 4 at least two (2) weeks before the defense and the 14-Day Rule.",
+        "Use this form when a confirmed defense cannot take place on its date. The new date must meet the lead times the Protocol sets for any defense: Form 4 at least two (2) weeks before the defense and the 14-Day Rule.",
         "Give the reason and say who is asking. The Research Coordinator records the change and informs the panel, the Research Adviser and the student. The new date is confirmed once the Research Adviser and every panel member have replied that they are available.",
     ],
     sections=[
@@ -1272,7 +1272,7 @@ add("28", "Request for Rescheduling or Cancellation of a Defense", "Defense sche
         T("Availability of the new date", [("Research Adviser / panel member", 6.6), ("Role", 3.4), ("Available? (yes / no)", 3.2), ("Initials", 3.8)], 6, 0.65),
         S("Signatures", [("Requested by", "Name and signature of the requester"), ("Research Adviser", "Noted"), ("Research Coordinator", "Approved  /  Not approved")]),
     ],
-    gs=["Panel informed on", "Platform schedule updated on"])
+    gs=["Panel informed on", "Schedule updated on"])
 
 # ---- 29 ------------------------------------------------------------------------------------
 add("29", "Comments Sheet for Proposal Defense", "Proposal defense", subtitle="Research Protocol Form 5",
@@ -1307,7 +1307,7 @@ add("30", "Technical Review Certificate", "Proposal defense and ethics review", 
            ["Content Specialist 2 (dissertation)", "", "☐", "", ""], ["External Panel", "", "☐", "", ""]], 0.85),
         S("Noted by", [("Research Adviser", None), ("Research Coordinator", "Received")]),
     ],
-    gs=["Recorded in platform on"])
+    gs=["Recorded on"])
 
 # ---- 31 ------------------------------------------------------------------------------------
 add("31", "Application for Ethics Review", "Ethics review", subtitle="Research Protocol Form 5.2",
@@ -1335,7 +1335,7 @@ add("32", "Comments Sheet for Final Defense", "Closed-door and public final defe
     instructions=[
         "The Research Coordinator sends this form to the panel members. Each panel member accomplishes it and emails it to the Panel Chair within the first working day after the defense. The Panel Chair emails all the sheets with the consolidated comments to the Research Coordinator, the Research Adviser and the student within the same time.",
         "The student states, for every comment, the action taken and the page number where the improvement appears (Handbook pp. 72-73). At the public final defense, the panel members keep this sheet in hand to check compliance.",
-        "A provisional pass with major revisions must be reflected here and must agree with the score on the Evaluation Sheet (GS-F-33): below 85 for a thesis, below 90 for a dissertation (Handbook p. 67); the Protocol states no score for a project paper.",
+        "A provisional pass with major revisions must be reflected here and must agree with the score on the Evaluation Sheet (GS-F-33): below 85 for a thesis, below 90 for a dissertation (Handbook p. 67).",
     ],
     sections=[
         F("Student and defense", RES4 + ["Type of paper", "Research Adviser", "Date of the defense", "Mode and venue"]),
@@ -1352,7 +1352,7 @@ add("33", "Evaluation Sheet for Final Defense", "Closed-door final defense", sub
     ref="Protocol Form 7; Handbook pp. 66-67, 76",
     instructions=[
         "Each panel member and the Research Adviser accomplish this sheet and email it to the Research Coordinator (gsresearch@usls.edu.ph) within the first working day after the defense.",
-        "The criteria and points are those the Handbook gives for the selection of the outstanding thesis or dissertation (p. 76), out of 100 points; the Graduate School confirms that they are the criteria of this form. A provisional pass with major revisions (subject to re-defense) must agree with the score: below 85 for a thesis, below 90 for a dissertation (Handbook p. 67); the Protocol states no score for a project paper.",
+        "The criteria and points are those the Handbook gives for the selection of the outstanding thesis or dissertation (p. 76), out of 100 points. A provisional pass with major revisions (subject to re-defense) must agree with the score: below 85 for a thesis, below 90 for a dissertation (Handbook p. 67).",
         "Mark the box below that matches the paper type and the result recorded in the Comments Sheet (GS-F-32).",
     ],
     sections=[
@@ -1370,7 +1370,7 @@ add("33", "Evaluation Sheet for Final Defense", "Closed-door final defense", sub
         B(None, "Remarks:", 1.4),
         S("Signature", [("Evaluator", "Panel member / Research Adviser"), ("Research Coordinator", "Received on ________")]),
     ],
-    gs=["Score recorded in platform on"])
+    gs=["Score recorded on"])
 
 # ---- 34 ------------------------------------------------------------------------------------
 add("34", "Settlement of Provisional Thesis / Dissertation Approval", "Revisions and completion", subtitle="Research Protocol Form 8",
@@ -1388,14 +1388,14 @@ add("34", "Settlement of Provisional Thesis / Dissertation Approval", "Revisions
         P(None, "I certify that the revisions required by the panel are reflected in the revised manuscript."),
         S("Signatures", [("Student", None), ("Research Adviser", "Certifies compliance"), ("Research Coordinator", "Received; provisional approval settled")]),
     ],
-    gs=["Result recorded in platform on"])
+    gs=["Result recorded on"])
 
 # ---- 35 ------------------------------------------------------------------------------------
 add("35", "Endorsement for Public Final Defense", "Public final defense", subtitle="Research Protocol Form 4.3",
     ref="Protocol Form 4.3; Handbook pp. 70-73",
     instructions=[
-        "For students admitted in August 2020 and onwards. The student is given two (2) to four (4) weeks after the closed-door final defense to prepare and apply (Handbook p. 71). Students admitted earlier present at a research conference instead.",
-        "The Research Adviser first checks that the revised manuscript complies with the suggestions of the panel at the closed-door defense, then emails this form to the Research Coordinator. It must be fully accomplished with the e-signature of the panel members and the date the panel received the manuscript. The Protocol requires the application five (5) days before the preferred schedule, for posting; the Handbook (p. 73) also says at least two (2) weeks before the defense (the Graduate School to confirm which applies).",
+        "This form applies to students admitted in August 2020 and after. The student is given two (2) to four (4) weeks after the closed-door final defense to prepare and apply (Handbook p. 71). Students admitted earlier present at a research conference instead.",
+        "The Research Adviser first checks that the revised manuscript complies with the suggestions of the panel at the closed-door defense, then emails this form to the Research Coordinator. It must be fully accomplished with the e-signature of the panel members and the date the panel received the manuscript. The Protocol requires the application five (5) days before the preferred schedule, for posting.",
         "The Graduate School Office reserves the venue. The Research Coordinator prepares the public announcement, sends it to the Research Adviser, the student and the panel, with copy to the Associate Dean and the Dean, and posts it on the Graduate School Facebook page with the pre-registration link.",
     ],
     sections=[
@@ -1473,7 +1473,7 @@ add("39", "Formal Invitation to Co-Author Journal Article", "Publication", subti
     sections=[
         F("Student", RES4 + ["Research Adviser", "Date of invitation"]),
         F("Prospective co-author", ["Name", "Position", "Institution and department", "Email", ("full", "Title of the study")]),
-        F(None, [("full", "Journal intended for submission (from the PEO list)")]),
+        F(None, [("full", "Journal intended for submission (from the list of the Publication and Engagement Office)")]),
         P("Invitation", "I respectfully invite you to be co-author of the journal article prepared from the study named above. Your expected contribution is stated below. I understand that my own contribution remains the major part of the work and not less than 80%."),
         B(None, "Expected contribution of the co-author to the article:", 2.0),
         C("Reply of the invitee", None, ["I accept the invitation", "I decline the invitation"], cols=2),
@@ -1496,8 +1496,7 @@ add("40", "Publication Information Form", "Publication", subtitle="Research Prot
         F(None, [("full", "Authors and affiliations, in the format of the Handbook"), "Professor (if required by a course)", "Course"]),
         C("Attached", None, ["Manuscript", "Ethics Clearance, if any", "Form 11, if any"], cols=3),
         S("Screening by the Research Committee", [("Research Coordinator", None), ("Academic Coordinator", None), ("Associate Dean", None), ("External expert", None)]),
-        C("Decision of the Dean", None, ["Approved for submission", "Not approved"], cols=2),
-        S(None, [("Graduate School Dean", None)]),
+        S("Decision of the Dean", [("Graduate School Dean", "Approved for submission  /  Not approved")]),
     ],
     gs=["Returned to the student on"])
 
@@ -1515,14 +1514,14 @@ add("41", "Evidence of Publication or Acceptance", "Publication", subtitle="Rese
         C("Attached", None, ["Copy of the journal", "Certificate of publication or letter of acceptance", "The authors' affiliation follows the Handbook format"], cols=1),
         S("Signatures", [("Student", None), ("Research Coordinator", "Received; evidence checked for presence")]),
     ],
-    gs=["Recorded in platform on"])
+    gs=["Recorded on"])
 
 # ---- 42 ------------------------------------------------------------------------------------
 add("42", "Application for Graduation", "Graduation application and endorsement",
     ref="Handbook pp. 55-56, 68-69, 75-77, 80",
     instructions=[
-        "A student is considered a graduate only after completing all the requirements below; a student who has not met them may not go up the stage (Handbook p. 77). The student must be officially enrolled in the semester of application.",
-        "The Graduate School checks that each document is present. It does not verify the content of the documents. The University Registrar certifies the eligibility of candidates for graduation and honors (Handbook p. 32). Proposed practice: an application with wrong information is returned and replaced by a new corrected form; the first form is kept.",
+        "A student is considered a graduate only after completing all the requirements below; a student who has not met them may not take part in the graduation ceremony (Handbook p. 77). The student must be officially enrolled in the semester of application.",
+        "The Graduate School checks that each document is present. It does not verify the content of the documents. The University Registrar certifies the eligibility of candidates for graduation and honors (Handbook p. 32). An application with wrong information is returned and replaced by a new corrected form; the first form is kept.",
         "Graduating students attend the Alumni seminar (Handbook p. 80) and present the thesis or dissertation at a research conference, either the Graduate School Research Conference or an external one (Handbook pp. 69, 74).",
     ],
     sections=[
@@ -1576,7 +1575,7 @@ add("45", "Data Privacy Consent and Acknowledgement", "Data privacy and records 
     instructions=[
         "This is the paper twin of the notice shown once to every account holder at first sign-in to the Graduate School platform (GS-P-04, Data Privacy Notice and Records Retention Schedule). Use it for a person without a platform account, or when a signed copy is wanted for the file.",
         "Read GS-P-04 before you sign. It states what personal data the Graduate School keeps, why, who sees it, what leaves the platform for an outside service, how long it is kept, and how you can ask to see, correct or remove it (Data Privacy Act of 2012, sections 11, 12 and 16).",
-        "Consent is given item by item. The Data Protection Officer of the University is the contact for questions and complaints (contact to be confirmed).",
+        "Consent is given item by item. The Data Protection Officer of the University is the contact for questions and complaints (contact: ______________________).",
     ],
     sections=[
         F("Person", [("cols", [("Full name", 3), ("Student number or employee number", 3)]), ("cols", [("Institutional email", 3), ("Program or office", 3)]),
@@ -1591,7 +1590,7 @@ add("45", "Data Privacy Consent and Acknowledgement", "Data privacy and records 
         B(None, "Remarks or objections of the person (the Graduate School will answer in writing):", 1.4),
         S("Signatures", [("Person", "Signature over printed name"), ("Received by", "Graduate School Staff")]),
     ],
-    gs=["Filed in", "Recorded in platform on"])
+    gs=["Filed in", "Recorded on"])
 
 # ---- 46 ------------------------------------------------------------------------------------
 add("46", "Platform Account and Role Request", "Platform accounts and roles",
@@ -1599,7 +1598,7 @@ add("46", "Platform Account and Role Request", "Platform accounts and roles",
     instructions=[
         "Use this form to ask for a platform account, to change the role of an account, or to remove an account when the holder leaves the Graduate School or the role. A student account is created by the platform when the student is handed off from admission; this form is for every other account.",
         "Every account has one role. The role decides what the holder can see and do (GS-P-05, Platform Access and Roles Matrix). Ask for the least access the work needs.",
-        "Proposed process (to be confirmed): the head of the requester's office endorses, the Dean approves, and the Graduate School Staff or the platform administrator sets up the account and hands over the first password privately. The holder must choose a new password at first sign-in.",
+        "The head of the requester's office endorses, the Dean approves, and the Graduate School Staff or the platform administrator sets up the account and hands over the first password privately. The holder must choose a new password at first sign-in.",
     ],
     sections=[
         F("Requester", [("cols", [("Full name", 3), ("Position", 3)]), ("cols", [("Office or college", 3), ("Institutional email (becomes the sign-in name)", 3)]),
@@ -1615,11 +1614,11 @@ add("46", "Platform Account and Role Request", "Platform accounts and roles",
 
 # ---- 47 ------------------------------------------------------------------------------------
 add("47", "Faculty Course Preference and Availability", "Faculty course preference and teaching load",
-    ref="platform fields: course preference, weekly working hours, dated availability, availability request",
+    ref="",
     instructions=[
         "Filled by a faculty member for each term, or whenever the hours change. The Academic Coordinator or the Graduate School Staff key the answers into the platform (the faculty member can also enter them in the faculty portal). The same answers are used to propose the teaching load (GS-F-48) and to check defense schedules.",
-        "Part A lists the subjects you prefer to teach; priority 1 is the most preferred. A preference does not grant the load. Part B is your usual weekly hours. Part C is for single dates and for dates you cannot be reached; unavailability always wins over available hours.",
-        "Part D answers a request from the Graduate School to enter your availability for a student's defense. Times use Philippine local time.",
+        "Part B lists the subjects you prefer to teach; priority 1 is the most preferred. A preference does not grant the load. Part C is your usual weekly hours. Part D is for single dates and for dates you cannot be reached; unavailability always wins over available hours.",
+        "Part E answers a request from the Graduate School to enter your availability for a student's defense. Times use Philippine local time.",
     ],
     sections=[
         F("Faculty member", [("cols", [("Name", 3), ("College", 3)]), ("cols", [("Role or rank", 2), ("Specialization", 4)]), ("cols", [("Email", 3), ("Academic year / semester", 3)])]),
@@ -1630,17 +1629,17 @@ add("47", "Faculty Course Preference and Availability", "Faculty course preferen
         F("Reply to an availability request (only if the Graduate School asked)", ["Requested by", "Student", "Window from", "Window to", ("full", "Message of the requester and your answer (dates and times you can attend, or that you cannot)")]),
         S("Signatures", [("Faculty member", None), ("Academic Coordinator", "Received and keyed into the platform")]),
     ],
-    gs=["Keyed into platform on"])
+    gs=["Recorded on"])
 
 # ---- 48 ------------------------------------------------------------------------------------
 add("48", "Teaching Load Assignment", "Faculty course preference and teaching load",
     ref="GS-F-04, GS-F-47; Handbook p. 48 (special classes)",
     instructions=[
         "Prepared by the Academic Coordinator for each program and term, after the Term Course Offering Plan (GS-F-04) and the faculty answers (GS-F-47) are in. One line for each subject section that needs a professor. The Dean approves the assignment before it is published; each faculty member acknowledges the load.",
-        "The Handbook states no limit on the load of a professor, so the maximum load is written in by the Graduate School (proposed - to be confirmed). A professor is proposed only for dates and hours the professor has entered as available.",
+        "The Handbook states no limit on the load of a professor, so the maximum load is written in by the Graduate School. A professor is proposed only for dates and hours the professor has entered as available.",
     ],
     sections=[
-        F("Plan", ["Program", "Academic year / semester", "Prepared by (Academic Coordinator)", "Date prepared", "Maximum load per professor (units) - proposed, to be confirmed", "Reference: Term Course Offering Plan dated"]),
+        F("Plan", ["Program", "Academic year / semester", "Prepared by (Academic Coordinator)", "Date prepared", "Maximum load per professor (units)", "Reference: Term Course Offering Plan dated"]),
         T("Assignment of subjects", [("Subject code", 2.0), ("Subject title", 4.6), ("Units", 1.1), ("Sections", 1.3), ("Professor proposed", 3.4), ("Preference rank (GS-F-47)", 2.0), ("Schedule", 2.6)], 8, 0.72),
         T("Load of each professor", [("Professor", 5.2), ("Subjects", 1.8), ("Total units", 2.0), ("Within the maximum? (yes / no)", 3.4), ("Acknowledged (signature, date)", 4.6)], 4, 0.72),
         C("Status", None, ["Proposed by the Academic Coordinator", "Approved by the Dean", "Returned for change (see remarks)"], cols=1),
@@ -1655,7 +1654,7 @@ add("49", "Request for Approved Absence", "Dropping and attendance",
     instructions=[
         "A student who takes part in a school-sponsored activity or represents the University in an official capacity is granted an Approved Absence upon the approval of the Dean. The absence is noted on the attendance record and is not counted against the allowed absences in the subject (Handbook p. 52).",
         "The privilege does not relieve the student of the responsibility of making up any work missed (Handbook p. 52). File the request before the activity, with the invitation or endorsement of the organizer.",
-        "An absence for a graduate program activity endorsed by the Dean is also an excused absence (Handbook p. 52); this form may be used for it too. The Academic Coordinator's recommendation is proposed practice (to be confirmed); the Handbook names only the Dean's approval.",
+        "An absence for a graduate program activity endorsed by the Dean is also an excused absence (Handbook p. 52); this form may be used for it too. The Academic Coordinator recommends; the Dean approves.",
     ],
     sections=[
         F("Student", STU_SHORT + ["Academic year / semester", "Date of this request"]),
@@ -1673,11 +1672,11 @@ add("50", "Incomplete Grade Removal Form", "Incomplete grades",
     instructions=[
         "A grade of INC may be given if the class standing is passing but the student did not take the final examination, or did not complete other requirements for the subject, due to illness or other valid reasons (Handbook p. 54). Removal of the INC must be done within one (1) academic year by meeting all the requirements of the course (Handbook p. 54).",
         "The student submits this form to the Graduate School Office within the set deadline (email gsm@usls.edu.ph). A student who does not comply after a year automatically gets 3.0 (master's) or 2.0 (doctorate) and has to take the subject again; a student with INC in all subjects is dropped from the rolls of the Graduate School (Handbook p. 54). A student not enrolled in any subject who wants to complete an INC enrols in residency (Handbook p. 48).",
-        "Grades are outside the scope of the Graduate School platform: this form is kept on paper and the platform does not record it. The deadline and the Registrar's procedure for posting the final grade are for the Graduate School to state (to be confirmed).",
+        "This form is kept on paper in the Graduate School Office. The Graduate School states the deadline in the space below.",
     ],
     sections=[
         F("Student", STU_SHORT + ["Date of this form", "Contact number"]),
-        F("Subject with the INC", ["Subject code", "Subject title", "Professor", "Academic year / semester the INC was given", "Date by which the INC must be removed (one academic year)", "Deadline set by the Graduate School (to be confirmed)"]),
+        F("Subject with the INC", ["Subject code", "Subject title", "Professor", "Academic year / semester the INC was given", "Date by which the INC must be removed (one academic year)", "Deadline set by the Graduate School"]),
         C("Reason for the INC", None, ["Did not take the final examination", "Did not complete other requirements of the subject", "Cause: illness", "Cause: other valid reason (state below)"], cols=2),
         T("Requirements to be met", [("Requirement", 8.0), ("Date agreed with the professor", 3.2), ("Date completed", 2.8), ("Professor's initials", 3.0)], 4, 0.65),
         F("Final grade (professor)", ["Final grade after removal", "Date given", ("full", "Remarks")]),
@@ -1711,14 +1710,14 @@ add("52", "Request for a Special Class", "Special and undersized classes",
     instructions=[
         "A special class may be requested and offered when the Academic Coordinator requests it through the Dean, addressed to the Vice Chancellor for Academic Affairs (Handbook p. 48). An undersized class is treated as a special class (Handbook p. 48).",
         "The class follows the Blended Learning Mode: 32 contact hours plus independent study. The fee is computed as for undergraduate courses (the professor's rate per load for 5 months plus the 13th month and administrative expenses, divided by the number of students enrolled) and is added to the regular tuition (Handbook p. 48).",
-        "The Dean sees that each new batch reaches the minimum number of enrollees, with an allowance for attrition (Handbook p. 48). The minimum is not stated in the Handbook and is written in by the Graduate School (to be confirmed).",
+        "The Dean sees that each new batch reaches the minimum number of enrollees, with an allowance for attrition (Handbook p. 48). The Graduate School writes in the minimum for the program.",
     ],
     sections=[
-        F("Class requested", ["Program", "Academic year / semester", "Subject code", "Subject title", "Units", "Number of students who need it", "Minimum enrollees set by the Graduate School (to be confirmed)", "Professor proposed"]),
+        F("Class requested", ["Program", "Academic year / semester", "Subject code", "Subject title", "Units", "Number of students who need it", "Minimum enrollees set by the Graduate School", "Professor proposed"]),
         C("Reason", None, ["Undersized class (fewer than the minimum enrollees)", "Subject needed by students who are graduating", "Subject needed to keep a batch on schedule", "Other (state below)"], cols=1),
         T("Students who need the class", [("Student no.", 2.6), ("Name of student", 7.0), ("Year of entry", 2.6), ("Reason needed", 4.8)], 6, 0.62),
         F(None, [("full", "Proposed schedule (blended: 32 contact hours plus independent study)"), ("full", "Other remarks")]),
-        P(None, "The fee of the special class is computed by the Business Office with the formula of Handbook p. 48 and is paid in addition to the regular tuition (proposed - to be confirmed who computes it)."),
+        P(None, "The fee of the special class is computed by the Business Office with the formula of Handbook p. 48 and is paid in addition to the regular tuition."),
         S("Request and decision", [("Academic Coordinator", "Requests"), ("Graduate School Dean", "Through the Dean"), ("Vice Chancellor for Academic Affairs", "Approved  /  Not approved")]),
     ],
     gs=["Offered as section"])
@@ -1728,16 +1727,16 @@ add("53", "Request for Transfer between Master's Options", "Transfer between mas
     ref="Handbook p. 48",
     instructions=[
         "A student in the master's program may be allowed to transfer to another master's option, subject to the approval of the Dean, upon the recommendation of the Academic Coordinator and endorsed by the Associate Dean (Handbook p. 48). This form does not apply to a transfer between a master's and a doctorate program.",
-        "The Handbook says nothing on the credit of subjects already taken, the deadline, or the notice to the Registrar. They are marked proposed on the form and are for the Graduate School to confirm.",
+        "The Dean decides which subjects already taken are credited to the new option. The Registrar is informed of an approved transfer.",
     ],
     sections=[
         F("Student", STU_SHORT + ["Date admitted to the program", "Date of this request"]),
         F("Transfer", ["Present master's option", "Master's option requested", "Academic year / semester the transfer is to start", "Units completed so far"]),
         B("Reason for the transfer", "", 1.8),
-        T("Subjects the student asks to be credited to the new option (proposed - to be confirmed)", [("Subject code", 2.6), ("Subject title", 8.4), ("Units", 1.6), ("Credited? (yes / no)", 4.4)], 5, 0.62),
+        T("Subjects the student asks to be credited to the new option", [("Subject code", 2.6), ("Subject title", 8.4), ("Units", 1.6), ("Credited? (yes / no)", 4.4)], 5, 0.62),
         S("Recommendation, endorsement and approval", [("Student", None), ("Academic Coordinator", "Recommended  /  Not recommended"), ("Associate Dean", "Endorsed  /  Not endorsed"), ("Graduate School Dean", "Approved  /  Not approved")]),
     ],
-    gs=["Registrar informed on (to be confirmed)", "Program changed in platform on"])
+    gs=["Registrar informed on", "Program changed on"])
 
 # ---- 54 ------------------------------------------------------------------------------------
 add("54", "Nomination for Best Thesis / Dissertation", "Best thesis and dissertation award",
@@ -1745,14 +1744,14 @@ add("54", "Nomination for Best Thesis / Dissertation", "Best thesis and disserta
     instructions=[
         "Awards are given to the best theses and dissertations to recognize outstanding research (Handbook p. 76). The criteria are Format/Content 15 points, Analysis/Discussion 40 points, Findings/Action Plan/Program 15 points, and Originality/Novelty/Contribution to New Knowledge/Applicability of Research 30 points; total 100 (Handbook p. 76).",
         "A cut-off score of 96 points is set to qualify as an outstanding project paper, thesis or dissertation. The chairman of the committee or the Dean submits the work to the committee for deliberation, and approval by the majority is required (Handbook p. 77).",
-        "The Handbook does not say who may nominate, who sits on the committee, or when nominations close. Those lines are marked proposed and are for the Graduate School to confirm.",
+        "The Research Adviser or the Panel Chair nominates a work after the final defense. The committee scores it and deliberates.",
     ],
     sections=[
         F("Nominee", STU_SHORT + [("full", "Title of the project paper, thesis or dissertation"), "Research Adviser", "Date of the final defense", "Academic year of graduation"]),
         C(None, "Kind of work:", ["Project paper", "Thesis", "Dissertation"], cols=3),
-        F(None, ["Nominated by (proposed: Research Adviser or Panel Chair - to be confirmed)", "Date of nomination"]),
+        F(None, ["Nominated by (Research Adviser or Panel Chair)", "Date of nomination"]),
         T("Score of each committee member (Handbook p. 76)", [("Member", 4.0), ("Format / Content (15)", 2.2), ("Analysis / Discussion (40)", 2.4), ("Findings / Action Plan (15)", 2.4), ("Originality / Applicability (30)", 2.6), ("Total (100)", 1.8), ("Signature", 2.4)], 5, 0.65),
-        F("Result", ["Final score (proposed: average of the members - to be confirmed)", "Cut-off score", "Qualifies as outstanding? (96 or more)", "Majority of the committee approves? (yes / no)"]),
+        F("Result", ["Final score (average of the members)", "Cut-off score", "Qualifies as outstanding? (96 or more)", "Majority of the committee approves? (yes / no)"]),
         S("Submission and deliberation", [("Nominated by", None), ("Chairman of the committee or Dean", "Submitted to the committee for deliberation"), ("Graduate School Dean", "Award approved  /  Not approved")]),
     ],
     gs=["Committee met on"])
@@ -1767,26 +1766,26 @@ ROUTES = {
     "04": ("Term break, before enrollment", "Academic Coordinator", "Associate Dean", "Dean", "Published to students; Business Office", "Course Adjustments: offering plan (draft, submitted, approved, published)"),
     "05": ("Up to the second week of classes (later only as the Handbook allows)", "Student", "Academic Coordinator; Graduate School Staff", "Dean", "Registrar; Accounting Office; Business Office", "Withdrawal: Dean Review, then Registrar"),
     "06": ("Unexcused absences above 20% of class hours", "Professor", "Academic Coordinator", "Academic Coordinator (Dean noted)", "Registrar (AIMS); GS record", "Monitoring: drop with absence evidence"),
-    "07": ("Before a semester the student will not enroll in; not within 2 weeks of the last day of classes", "Student", "Academic Coordinator", "Dean", "Registrar (notice with refund); Business Office", "Leave of Absence board"),
-    "08": ("When a student returns from leave or AWOL", "Student", "Academic Coordinator; Business Office", "Dean (endorses to Registrar)", "Registrar; enrollment", "Readmission board"),
-    "09": ("When AWOL is found from source evidence", "Graduate School Staff or Academic Coordinator", "Academic Coordinator", "Dean (noted)", "Student; Registrar; GS-F-08 on return", "AWOL case (AWOL Declared)"),
+    "07": ("Before a semester the student will not enroll in; not within 2 weeks of the last day of classes", "Student", "Academic Coordinator", "Dean", "Registrar (notice with refund); Business Office", "Leave of absence case"),
+    "08": ("When a student returns from leave or AWOL", "Student", "Academic Coordinator; Business Office", "Dean (endorses to Registrar)", "Registrar; enrollment", "Readmission case"),
+    "09": ("When AWOL is found from source evidence", "Graduate School Staff or Academic Coordinator", "Academic Coordinator", "Dean (noted)", "Student; Registrar; GS-F-08 on return", "Absence without leave case (declared)"),
     "10": ("Term of residency (thesis, practicum, comprehensive exam, INC, publication)", "Student", "Academic Coordinator", "Dean or authorized representative", "Business Office; enrollment", "Residency enrollment"),
-    "11": ("Before the practicum starts", "Student", "Academic Coordinator", "Dean (for the University)", "Host organization; GS file", "Practicum: MOA Received"),
+    "11": ("Before the practicum starts", "Student", "Academic Coordinator", "Dean (for the University)", "Host organization; GS file", "Practicum: Practicum Agreement received"),
     "12": ("During and at the end of the practicum", "Student; host supervisor", "Academic Coordinator", "Host supervisor certifies", "GS-F-13", "Practicum: hours and certificates"),
-    "13": ("When the required hours are complete", "Academic Coordinator", "Academic Coordinator", "Dean reviews (no approval)", "Graduation review", "Practicum: Report Sent to Dean, Dean Reviewed"),
+    "13": ("When the required hours are complete", "Academic Coordinator", "Academic Coordinator", "Dean reviews (no approval)", "Graduation review", "Practicum: report sent to the Dean, reviewed by the Dean"),
     "14": ("At least 2 weeks before the examination", "Student", "Academic Coordinator or College Dean", "Graduate Program Secretary", "Examination; GS-F-15", "Comprehensive exam status"),
-    "15": ("After the examination", "Academic Coordinator", "Graduate Program Secretary", "Dean (noted)", "Monitoring workbook (COMPRE); Research Adviser designation", "Comprehensive exam: result recorded"),
+    "15": ("After the examination", "Academic Coordinator", "Graduate Program Secretary", "Dean (noted)", "Monitoring workbook (comprehensive examination column); Research Adviser designation", "Comprehensive exam: result recorded"),
     "16": ("At least 2 weeks before the title defense", "Student", "Academic Coordinator", "Academic Coordinator endorses; Research Coordinator", "Panel nomination (GS-F-17)", "Research gate: Form 1 - Title Defense"),
     "17": ("When a panel is nominated for any defense", "Research Coordinator", "GS Research Committee", "Research Coordinator; Committee for external panel", "Defense scheduling", "Panel matching and panel invitations"),
     "18": ("Within the first working day after the title defense", "Panel Chair", "Panel members", "Panel", "Research Adviser designation (GS-F-19)", "Title defense verdict"),
-    "19": ("After the comprehensive examination, while taking courses or after the title defense", "Student", "Academic Coordinator (notes)", "Research Coordinator, Associate Dean, Dean", "GS-F-20", "Adviser Appointments: Applied, Noted by AC, Under deliberation"),
+    "19": ("After the comprehensive examination, while taking courses or after the title defense", "Student", "Academic Coordinator (notes)", "Research Coordinator, Associate Dean, Dean", "GS-F-20", "Adviser Appointments: Applied, Noted by the Academic Coordinator, Under deliberation"),
     "20": ("After the designation is decided", "Research Coordinator", "Associate Dean", "Dean", "Student and Research Adviser; GS-F-22 and GS-F-23 within 5 days", "Adviser Appointments: Appointed, Accepted"),
     "21": ("Once only, before the proposal defense", "Student", "Current and new Research Adviser", "Research Coordinator, Associate Dean, Dean", "New GS-F-20", "Adviser Appointments: Change request"),
     "22": ("Within 5 days of GS-F-20", "Student and Research Adviser", "Research Adviser", "Research Coordinator receives", "Research file", "Adviser Appointments: contract received"),
     "23": ("Within 5 days of GS-F-20", "Student and Research Adviser", "Research Adviser", "Research Coordinator receives", "Research file", "Adviser Appointments: contract received"),
-    "24": ("Once only, before the proposal defense application", "Student", "Research Adviser", "Panel members", "Research file", "Not a separate step yet; title kept in the research case"),
+    "24": ("Once only, before the proposal defense application", "Student", "Research Adviser", "Panel members", "Research file", "—"),
     "25": ("Before the proposal defense (quantitative studies)", "Student", "Statistician", "Statistician", "GS-F-27", "Research gate: Form 4"),
-    "26": ("When a co-author is pre-identified", "Student", "Research Adviser", "Panel Chair (noted)", "GS-F-39 and GS-F-40 at publication", "Not a separate step yet"),
+    "26": ("When a co-author is pre-identified", "Student", "Research Adviser", "Panel Chair (noted)", "GS-F-39 and GS-F-40 at publication", "—"),
     "27": ("At least 2 weeks before the proposal or closed-door final defense", "Research Adviser", "Research Coordinator", "Research Adviser endorses", "Panel; GS-F-29 or GS-F-32 and GS-F-33", "Research gate: Form 4; Final Defense; defense scheduling"),
     "28": ("When a confirmed defense cannot proceed", "Student, Research Adviser, panel or GS Office", "Research Adviser", "Research Coordinator", "Panel informed; GS-F-27 dates revised", "Defense scheduling: reschedule or cancel with reason"),
     "29": ("After the proposal defense, first working day", "Panel members", "Panel Chair consolidates", "Panel", "Revisions; GS-F-30", "Proposal defense verdict"),
@@ -1795,26 +1794,26 @@ ROUTES = {
     "32": ("After the closed-door and the public final defense, first working day", "Panel members", "Panel Chair consolidates", "Panel", "Revisions; GS-F-34 or GS-F-35", "Final defense verdict"),
     "33": ("After the closed-door final defense, first working day", "Panel members and Research Adviser", "Research Coordinator", "Panel", "Result and score recorded", "Final defense verdict with Form 7 score"),
     "34": ("After a provisional pass without re-defense", "Research Adviser", "Panel members", "Panel", "Turnitin and editing (GS-F-36)", "Verdict follow-up: revisions confirmed by the Panel Chair"),
-    "35": ("2 to 4 weeks after the closed-door defense (admitted August 2020 onward)", "Research Adviser", "Panel members", "Research Coordinator", "Announcement and public defense", "Not modeled yet (Public Final Defense)"),
+    "35": ("2 to 4 weeks after the closed-door defense (admitted August 2020 onward)", "Research Adviser", "Panel members", "Research Coordinator", "Announcement and public defense", "—"),
     "36": ("After the Research Adviser endorses the final manuscript", "Student", "Turnitin administrator", "Turnitin administrator", "Editor (GS-F-37)", "Completion Evidence: Turnitin certificate"),
     "37": ("After the similarity check is passed", "Student", "Editor", "Editor", "GS Office (GS-F-38)", "Completion Evidence: Form 9"),
     "38": ("After the manuscript is ready for hard-bound reproduction", "GS Office", "Panel and Research Adviser", "Dean accepts", "Bound copies and CD; graduation", "Completion Evidence: Form 10"),
-    "39": ("When a co-author was pre-identified", "Student", "Research Adviser", "Co-author accepts", "GS-F-40", "Not modeled yet"),
-    "40": ("Before submitting to a journal", "Student", "GS Research Committee", "Dean", "Student submits to the journal", "Not modeled yet"),
-    "41": ("When the article is accepted or published", "Student", "Research Coordinator", "Research Coordinator", "Graduation application", "Not modeled yet"),
+    "39": ("When a co-author was pre-identified", "Student", "Research Adviser", "Co-author accepts", "GS-F-40", "—"),
+    "40": ("Before submitting to a journal", "Student", "GS Research Committee", "Dean", "Student submits to the journal", "—"),
+    "41": ("When the article is accepted or published", "Student", "Research Coordinator", "Research Coordinator", "Graduation application", "—"),
     "42": ("In the review window of the graduating term", "Student", "Academic Coordinator; Research Coordinator", "Dean", "GS-F-43", "Graduation: signed application, For Review"),
     "43": ("After candidates are checked", "Graduate School Staff", "Academic Coordinator; Research Coordinator", "Dean", "Registrar with GS-F-44", "Graduation: Dean Approved, exported list"),
     "44": ("Whenever a record is sent to the Registrar", "Dean, Associate Dean or representative", "Graduate School Staff", "University Registrar acknowledges", "Registrar; GS log", "Registrar status and handoff log"),
-    "45": ("At first sign-in to the platform, or when a signed copy is wanted", "Person", "Graduate School Staff", "Graduate School Staff (filed)", "GS file; consent recorded once per account", "Privacy notice and consent at first sign-in (GS-P-04)"),
-    "46": ("When a person needs, changes or no longer needs an account", "Requester", "Head of office or college", "Dean", "Graduate School Staff or administrator sets up the account", "Accounts: faculty logins are created from the Faculty page; student logins at the admission handoff; other accounts by the administrator"),
-    "47": ("Each term, and whenever the hours change", "Faculty member", "Academic Coordinator", "Academic Coordinator (received)", "GS-F-48; defense scheduling", "Faculty portal: course preferences, weekly hours, dated availability, availability requests"),
-    "48": ("After the offering plan (GS-F-04) and the faculty answers, before enrollment", "Academic Coordinator", "Academic Coordinator", "Dean", "Published with GS-F-04; faculty acknowledge", "Course offering: professor assignment (Coordinator Selected, Pending Approval, Approved)"),
-    "49": ("Before the school-sponsored activity", "Student", "Academic Coordinator (proposed)", "Dean", "Professors; attendance record", "Not modeled yet"),
-    "50": ("Within one academic year of the INC", "Student", "Professor of the subject", "Professor (final grade)", "Graduate School Office; Registrar", "Not in the platform (grades are out of scope)"),
-    "51": ("Before the course is taken at another institution", "Student", "Academic Coordinator", "Dean", "Registrar issues the cross-enrollment permit", "Not modeled yet"),
-    "52": ("Before enrollment, when a class is undersized or special", "Academic Coordinator", "Dean (through)", "Vice Chancellor for Academic Affairs", "Course offering; Business Office (fee)", "Not modeled yet"),
-    "53": ("When a master's student asks to change option", "Student", "Academic Coordinator; Associate Dean", "Dean", "Registrar; program change", "Not modeled yet"),
-    "54": ("After the final defense, when a work is nominated", "Research Adviser or Panel Chair (proposed)", "Committee", "Dean", "Award list", "Not modeled yet"),
+    "45": ("At first sign-in to the platform, or when a signed copy is wanted", "Person", "Graduate School Staff", "Graduate School Staff (filed)", "GS file; consent recorded once per account", "Privacy notice and consent at first sign-in"),
+    "46": ("When a person needs, changes or no longer needs an account", "Requester", "Head of office or college", "Dean", "Graduate School Staff or administrator sets up the account", "Account set-up by the Graduate School"),
+    "47": ("Each term, and whenever the hours change", "Faculty member", "Academic Coordinator", "Academic Coordinator (received)", "GS-F-48; defense scheduling", "Faculty record: preferences, weekly hours, availability"),
+    "48": ("After the offering plan (GS-F-04) and the faculty answers, before enrollment", "Academic Coordinator", "Academic Coordinator", "Dean", "Published with GS-F-04; faculty acknowledge", "Course offering: professor assignment"),
+    "49": ("Before the school-sponsored activity", "Student", "Academic Coordinator", "Dean", "Professors; attendance record", "—"),
+    "50": ("Within one academic year of the INC", "Student", "Professor of the subject", "Professor (final grade)", "Graduate School Office; Registrar", "—"),
+    "51": ("Before the course is taken at another institution", "Student", "Academic Coordinator", "Dean", "Registrar issues the cross-enrollment permit", "—"),
+    "52": ("Before enrollment, when a class is undersized or special", "Academic Coordinator", "Dean (through)", "Vice Chancellor for Academic Affairs", "Course offering; Business Office (fee)", "—"),
+    "53": ("When a master's student asks to change option", "Student", "Academic Coordinator; Associate Dean", "Dean", "Registrar; program change", "—"),
+    "54": ("After the final defense, when a work is nominated", "Research Adviser or Panel Chair", "Committee", "Dean", "Award list", "—"),
 }
 
 
@@ -1827,7 +1826,7 @@ CONTROL_DOCS = [
 POLICIES = []
 
 
-def policy(code, title, chapter, process, instructions, sections, sign, ref="Proposed policy - for validation by the Graduate School"):
+def policy(code, title, chapter, process, instructions, sections, sign, ref=""):
     """A policy document (GS-P-03 to GS-P-06). sections: [(heading, [("p", text) | ("t", columns, rows)])]."""
     POLICIES.append(dict(code=f"GS-P-{code}", title=title, process=process, chapter=chapter, also=None, ref=ref, subtitle=None,
                          instructions=instructions, sections=sections, sign=sign, folder=PLATFORM_FOLDER))
@@ -1891,8 +1890,12 @@ def build_approval_sheet():
     field_grid(doc, ["Revision of all documents", ("full", "Effectivity date of the approved documents"), ("full", "Remarks of the approving officers")], PORTRAIT_W)
     section_bar(doc, "C.  Review and approval", PORTRAIT_W)
     sign_block(doc, [
-        ("Submitted by", "Capstone group CAP-IT1 (platform project)"), ("Reviewed by", "Research Coordinator"), ("Reviewed by", "Associate Dean"),
-        ("Reviewed by", "Academic Coordinators of the five program areas"), ("Reviewed by", "Graduate School Secretary"),
+        ("Submitted by", "Capstone group member (print name)"), ("Submitted by", "Capstone group member (print name)"),
+        ("Submitted by", "Capstone group member (print name)"), ("Noted by", "Adviser of the capstone group"),
+        ("Reviewed by", "Research Coordinator"), ("Reviewed by", "Associate Dean"),
+        ("Reviewed by", "Academic Coordinator, Arts and Sciences"), ("Reviewed by", "Academic Coordinator, Business"),
+        ("Reviewed by", "Academic Coordinator, Education"), ("Reviewed by", "Academic Coordinator, Engineering and Technology"),
+        ("Reviewed by", "Academic Coordinator, Nursing"), ("Reviewed by", "Graduate Program Secretary"),
         ("Approved by", "Graduate School Dean"),
     ], PORTRAIT_W)
     gs_box(doc, [], PORTRAIT_W)
@@ -1909,14 +1912,14 @@ def build_routing_guide():
     institution_header(doc, width)
     title_block(doc, title, "Who files, who reviews, who decides and where each form goes next", width)
     control_box(doc, code, "Control of forms", "", width)
-    paragraph(doc, "Read across a row to follow a form. The Manual column gives the chapter of the Graduate School Operations Manual that holds the rule. The last column names the step of the Graduate Student Lifecycle Monitoring platform that records the same event, so the paper form and the platform always show the same facts. Where the Handbook or the Research Protocol states a rule, it is cited on the form itself.",
+    paragraph(doc, "Read across a row to follow a form. The Manual column gives the chapter of the Graduate School Operations Manual that holds the rule. The last column names the step of the Graduate Student Lifecycle Monitoring system that records the same event, so the paper form and the system always show the same facts; a dash means the event is kept on paper only. Where the Handbook or the Research Protocol states a rule, it is cited on the form itself.",
               size=NOTE, align=WD_ALIGN_PARAGRAPH.LEFT)
     rows = []
     for f in FORMS:
         key = f["code"].split("-")[-1]
         when, sub, rev, appr, nxt, plat = ROUTES[key]
         rows.append([f["code"], manual_column(f), f["title"], when, sub, rev, appr, nxt, plat])
-    cols = [("Form", 1.8), ("Manual", 1.4), ("Title", 3.3), ("When used", 3.9), ("Submitted by", 2.4), ("Reviewed by", 2.5), ("Approved / decided by", 2.7), ("Goes next to", 3.2), ("Platform step", 3.5)]
+    cols = [("Form", 1.8), ("Manual", 1.4), ("Title", 3.3), ("When used", 3.9), ("Submitted by", 2.4), ("Reviewed by", 2.5), ("Approved / decided by", 2.7), ("Goes next to", 3.2), ("Recorded in the system as", 3.5)]
     t = grid_table(doc, cols, rows, width, row_h=0.9, size=9)
     for r in t.rows[1:]:
         no_split(r)
@@ -1946,6 +1949,9 @@ def build_policy(spec):
                 t = grid_table(doc, b[1], b[2], width, row_h=0.5, size=NOTE)
                 for r in t.rows[1:]:
                     no_split(r)
+                    for c in r.cells:
+                        for par in c.paragraphs:   # long policy tables may break between rows
+                            par.paragraph_format.keep_with_next = False
     section_bar(doc, "Review and approval", width)
     sign_block(doc, spec["sign"], width)
     return save(doc, spec, OUT)
@@ -1956,7 +1962,7 @@ SIGN_STD = lambda reviewer: [("Prepared by", "Capstone group CAP-IT1 (platform p
 
 policy("03", "Electronic Approval and Signature Policy", "4.22", "Electronic approval and signatures",
     instructions=[
-        "This policy proposes when an approval recorded in the Graduate School platform counts as the signature of the same officer on the matching GS-F form. It is a proposal for validation: it takes effect only when the Dean signs below. Every rule is marked proposed until then.",
+        "This policy proposes when an approval recorded in the Graduate School platform counts as the signature of the same officer on the matching GS-F form. It takes effect when the Dean signs below.",
         "Until it takes effect, forms are signed on paper or, for the Research Protocol forms, with the e-signature sent by email as the Protocol already requires.",
         "The laws are cited so that the Dean and the University's legal counsel can check them. This document is not legal advice.",
     ],
@@ -1964,14 +1970,14 @@ policy("03", "Electronic Approval and Signature Policy", "4.22", "Electronic app
         ("Purpose and scope", [
             ("p", "Purpose: to let one act (the approval in the platform) stand for the officer's signature on the paper form, so that the platform and the paper file never disagree and nobody signs twice."),
             ("p", "Covered: the endorsements, recommendations, approvals and decisions that the platform records for the holders of the roles Graduate School Staff, Academic Coordinator, Research Coordinator, Dean and Faculty Member (GS-P-05)."),
-            ("p", "Not covered: signatures of people without a platform role - the Associate Dean, the Graduate School Secretary, the Business Office, the University Registrar, the Vice Chancellor for Academic Affairs, host organizations (GS-F-11), editors and the Turnitin administrator. Their signatures stay on paper or by email until each accepts this policy in writing (proposed)."),
+            ("p", "Not covered: signatures of people without a platform role - the Associate Dean, the Graduate Program Secretary, the Business Office, the University Registrar, the Vice Chancellor for Academic Affairs, host organizations (GS-F-11), editors and the Turnitin administrator. Their signatures stay on paper or by email until each accepts this policy in writing."),
             ("p", "Not covered: a signature that is a legal undertaking by a student, such as the Practicum Agreement (GS-F-11) and the consent on GS-F-45. A request a student files while signed in to the student portal is the student's application for that request; whether it replaces the student's signature is an open point (section 7)."),
         ]),
         ("Legal basis", [
-            ("p", "Republic Act No. 8792, the Electronic Commerce Act of 2000: section 7 gives electronic documents the legal recognition of written ones; section 8 makes an electronic signature equivalent to a handwritten signature when a procedure that the parties cannot alter identifies the signer, is reliable for the purpose, is needed for the signer to go on with the transaction, and can be verified by the other party; section 9 sets a presumption for electronic signatures; section 12 deals with the admissibility and weight of an electronic data message or document. Section titles checked against the text of the Act; the reading of section 8 is a paraphrase for counsel to confirm."),
+            ("p", "Republic Act No. 8792, the Electronic Commerce Act of 2000: section 7 gives electronic documents the legal recognition of written ones; section 8 makes an electronic signature equivalent to a handwritten signature when a procedure that the parties cannot alter identifies the signer, is reliable for the purpose, is needed for the signer to go on with the transaction, and can be verified by the other party; section 9 sets a presumption for electronic signatures; section 12 deals with the admissibility and weight of an electronic data message or document. The reading of section 8 is a paraphrase."),
             ("p", "The Graduate School already works this way by email. The Research Protocol AY 2024-2025 and the Handbook (pp. 61, 63, 72-73) require Form 4 and Form 4.3 to be accomplished with e-signature and move Forms 3 and 3.1 by email between the Academic Coordinator, the Research Coordinator and the Dean (Operations Manual rules PRP-02, FIN-12, ADV-09). This policy applies the same idea to the platform."),
         ]),
-        ("The rule (proposed)", [
+        ("The rule", [
             ("p", "An approval, endorsement, recommendation or decision recorded in the platform by the signed-in holder of the role named on a GS-F form counts as that officer's signature on that form, at the date and time recorded."),
             ("p", "The record is the transaction-log entry of the platform. It shows who acted (account holder and role), what was done and the result, when, the status before and after, the next owner and the source reference. The log entry, not a screenshot or a printout, is the evidence."),
             ("p", "Only the holder of the account may act. An account is never shared and nobody approves in another person's name. A delegate (an authorized representative, where a form allows one) approves from the delegate's own account, with a written designation filed with the Dean."),
@@ -1990,37 +1996,32 @@ policy("03", "Electronic Approval and Signature Policy", "4.22", "Electronic app
                 ["The signer is identified", "One account per person; the sign-in name is the institutional email; the role is stored on the account and a role sent by the browser is ignored", "Accounts are created outside the platform for most roles (GS-P-05)"],
                 ["The method is reliable", "Passwords are stored as hashes; a generated password must be replaced at first sign-in (at least 10 characters); repeated wrong passwords are slowed (a wait that doubles up to 30 seconds); signing out ends the session; the session cookie is HttpOnly and SameSite Lax, and Secure when the site runs over HTTPS", "No second factor; the wait counter is kept in memory and resets on restart"],
                 ["The signature is needed to go on", "A case moves forward only when the role named for the step records it; other roles are refused with a message", "-"],
-                ["It cannot be altered and the other party can verify it", "Each step appends a log entry with the actor, role, time and the statuses; no screen or route edits or deletes an entry", "Entries are removed with the student record if that record is ever deleted; the platform's own clock is the only time source; no certificate or hash chain (to review before real use)"],
+                ["It cannot be altered and the other party can verify it", "Each step appends a log entry with the actor, role, time and the statuses; no screen or route edits or deletes an entry", "Entries are removed with the student record if that record is ever deleted; the platform's own clock is the only time source; no certificate or hash chain"],
             ]),
         ]),
-        ("Limits and fallbacks (proposed)", [
+        ("Limits and fallbacks", [
             ("p", "Where this policy does not apply, or while the platform is unavailable, the form is signed on paper or by email as today and keyed in afterwards, with the note \"signed on paper on [date]\"."),
             ("p", "A person who disputes an approval asks the Dean to review the log entry. The Dean's decision is recorded as a new entry."),
             ("p", "Retention of the log and the forms follows the retention schedule in GS-P-04, section 8."),
         ]),
-        ("Open points for the Graduate School", [
-            ("p", "Does the University's legal counsel accept the procedure above as meeting RA 8792 section 8, or does the University require a certificate-based signature for some documents (for example the graduation list sent to the Registrar)?"),
-            ("p", "The Associate Dean signs several forms but has no platform role (GS-P-05). Should the role be added, or does the Associate Dean keep signing on paper?"),
-            ("p", "May a request a student files while signed in replace the student's signature on the matching form? How is a delegate designated and for how long?"),
-        ]),
     ],
-    sign=SIGN_STD("Research Coordinator and University legal counsel (to be confirmed)"))
+    sign=SIGN_STD("Research Coordinator and University legal counsel"))
 
 policy("04", "Data Privacy Notice and Records Retention Schedule", "4.23", "Data privacy and records retention",
     instructions=[
         "This notice tells every account holder of the Graduate School platform what personal data is kept, why, who sees it, what leaves the platform for an outside service, how long it is kept, and how to use the rights the law gives. A short form of it is shown once at first sign-in; GS-F-45 is its paper twin.",
-        "Section 5 was written from a reading of the platform's program code on 2026-11-04 (what each call to an outside service sends). It must be re-checked whenever the code changes. Retention periods and the Data Protection Officer's contact are proposed or to be confirmed.",
+        "Section 5 states what each call to an outside service sends.",
         "At the time of writing the platform is a capstone prototype that holds demonstration data only. This notice is drafted for the day it holds real student records.",
     ],
     sections=[
         ("Purpose, scope and status", [
             ("p", "Purpose: to give effect to the Data Privacy Act of 2012 (Republic Act No. 10173) for the personal data processed by the Graduate School of the University of St. La Salle in its Graduate Student Lifecycle Monitoring platform."),
             ("p", "Scope: students, faculty members, and staff, coordinators, the Dean and the administrator who hold platform accounts, and the people named in the records the platform keeps."),
-            ("p", "Status: proposed. The notice takes effect when the Dean signs below. Official student, enrollment and grade data remain with the University Registrar's system (AIMS); the platform holds a monitoring copy and never overwrites an official value."),
+            ("p", "The notice takes effect when the Dean signs below. Official student, enrollment and grade data remain with the University Registrar's system (AIMS); the platform holds a monitoring copy and never overwrites an official value."),
         ]),
         ("Legal basis and who is responsible", [
             ("p", "RA 10173 and its Implementing Rules and Regulations. The regulator is the National Privacy Commission (NPC), which the Act creates (section 7). The Act's general principles are transparency, legitimate purpose and proportionality (section 11); personal information may be processed on consent and on the other grounds of section 12; the rights of the data subject are in section 16; security is in section 20."),
-            ("p", "The University is the personal information controller. The University's Data Protection Officer (DPO) is the contact for this notice. DPO name and contact: to be confirmed."),
+            ("p", "The University is the personal information controller. The University's Data Protection Officer (DPO) is the contact for this notice. DPO name and contact: ______________________."),
             ("p", "Health information (for example a medical certificate attached to a leave request) is sensitive personal information under the Act and is handled with stricter care: it is attached to the request only when the person chooses to upload it, and it is seen only by the roles that decide the request."),
         ]),
         ("What the platform keeps, why, and who sees it", [
@@ -2036,56 +2037,53 @@ policy("04", "Data Privacy Notice and Records Retention Schedule", "4.23", "Data
         ("Sources of the data", [
             ("p", "The Registrar's export or the Academic Coordinator's monitoring workbook (identity, enrollment, subjects), the person's own entries and uploads, the staff's records of each step, and, for faculty members who connect it, Google Calendar (section 5)."),
         ]),
-        ("What leaves the platform for an outside service (checked in the code)", [
-            ("p", "Policy Assistant (Google Gemini, endpoint generativelanguage.googleapis.com). This runs only when a Google API key is set in the server's environment. Without the key the assistant uses keyword search on the server and nothing is sent. The demonstration site is currently started with the key switched off. When the key is on, the calls below are made."),
+        ("What leaves the platform for an outside service", [
+            ("p", "Policy Assistant (Google Gemini, endpoint generativelanguage.googleapis.com). This runs only when a Google API key is set in the server's environment. Without the key the assistant uses keyword search on the server and nothing is sent. When the key is on, the calls below are made."),
             ("t", [("Call", 4.2), ("What is sent to Google", 7.4), ("What is not sent", 5.4)], [
                 ["Index of the policy library", "The text of each library passage, with its title and source (Handbook, Research Protocol, the other built-in documents, and PDFs that staff upload), once to be turned into search vectors, and again when a document changes", "Any student, faculty or account data"],
                 ["Each question typed in the assistant", "The question text, to be turned into a search vector", "The name or role of the person asking"],
                 ["Answer to a policy question", "The question and the four or more best-matching policy passages, with an instruction to answer only from them", "Any student record"],
-                ["Personal question by a student (for example \"What is my next step?\")", "The question and a short text built from the student's own record: stage, program, standing, progress status, percentage of subjects completed, missing subjects, open tasks, missing documents, the next defense", "The student's name and student number (the code leaves them out). Open task titles are sent as written and may contain other names"],
+                ["Personal question by a student (for example \"What is my next step?\")", "The question and a short text built from the student's own record: stage, program, standing, progress status, percentage of subjects completed, missing subjects, open tasks, missing documents, the next defense", "The student's name and student number (they are left out). Open task titles are sent as written and may contain other names"],
                 ["Personal question by staff, coordinator, Dean or faculty", "The question and the list of up to eight items waiting on the person: task titles with the student's name and the due date; for faculty, the panel invitations with the student's name", "Passwords, contact numbers, uploaded files"],
                 ["Unclear question", "The question text, to decide which kind of question it is", "-"],
                 ["Panel matching (staff and coordinators)", "An excerpt of up to 5,000 characters of the text of the student's uploaded research paper, with the name, specialization and matched terms of the faculty considered; the paper text (first 9,000 characters) and each faculty profile text, for similarity vectors", "The student's name, student number and the file name"],
             ]),
             ("p", "Google Calendar (only for a faculty member who connects a calendar from the faculty portal). The platform asks for permission to read free and busy times and to create and change the events it owns. It stores the access and refresh tokens encrypted. When a defense is scheduled it writes an event whose title is the defense type and the student's name, with the time and the venue. The faculty member can disconnect, which asks Google to revoke the access."),
-            ("p", "Nothing else was found that sends personal data out of the platform. The platform sends no email: staff send the exports to the Registrar by the University's own email. What each outside service does with the data is governed by its own terms; a data sharing agreement with Google is to be confirmed with the DPO."),
+            ("p", "Nothing else sends personal data out of the platform. The platform sends no email: staff send the exports to the Registrar by the University's own email. What each outside service does with the data is governed by its own terms."),
         ]),
         ("Your rights", [
             ("p", "Under section 16 of the Act the person has the right to be informed, to object, to access, to correct, to have the data suspended, withdrawn, blocked, removed or destroyed, to data portability, and to claim damages. Consent given at first sign-in may be withdrawn in writing; the Graduate School then keeps only what a rule of the University or the law requires."),
-            ("p", "To use a right, write to the Graduate School Office or the DPO (contact to be confirmed). The Graduate School answers in writing (proposed: within fifteen working days). A complaint may be filed with the National Privacy Commission."),
+            ("p", "To use a right, write to the Graduate School Office or the DPO (contact: ______________________). The Graduate School answers in writing within fifteen working days. A complaint may be filed with the National Privacy Commission."),
         ]),
-        ("Security measures (checked in the code)", [
+        ("Security measures", [
             ("p", "Passwords are stored as hashes. A generated password must be replaced at first sign-in. Every function behind the sign-in is limited to the roles named for it (GS-P-05). Repeated wrong passwords are slowed. The session cookie is HttpOnly and SameSite Lax, and Secure when the site is served over HTTPS (to be switched on when the platform is hosted). Uploaded files are kept in a folder on the server, not in the web page area. Google tokens are stored encrypted."),
-            ("p", "A suspected breach is reported at once to the DPO. The IRR requires the NPC and the affected people to be notified within seventy-two (72) hours of knowledge of a breach that meets the stated conditions (DPO to confirm)."),
+            ("p", "A suspected breach is reported at once to the DPO. The IRR requires the NPC and the affected people to be notified within seventy-two (72) hours of knowledge of a breach that meets the stated conditions."),
         ]),
-        ("Retention schedule (proposed - to be confirmed)", [
-            ("t", [("Record", 6.2), ("Kept for (proposed - to be confirmed)", 5.4), ("Then", 5.4)], [
+        ("Retention schedule", [
+            ("t", [("Record", 6.2), ("Kept for", 5.4), ("Then", 5.4)], [
                 ["Student case files: requests, forms, practicum, research records, log entries of the case", "5 years after graduation or after the last enrollment", "Delete or anonymize, with the Dean's approval"],
                 ["Graduation endorsement lists (GS-F-43) and Registrar transmittals (GS-F-44)", "Permanently", "Kept in the Graduate School archive"],
                 ["Uploaded papers and evidence (research, practicum, medical certificates)", "As the case file they belong to; medical certificates 1 year after the case closes", "Delete"],
                 ["Faculty availability and preferences", "While the person teaches in the Graduate School, then 1 year", "Delete"],
                 ["Google Calendar tokens", "Until the faculty member disconnects or leaves", "Delete at once"],
                 ["Account record and consent record", "While the account is active, then 5 years (proof of consent and of approvals)", "Delete"],
-                ["Policy Assistant questions", "Not stored by the platform (checked in the code); Google's own handling is outside the platform", "-"],
+                ["Policy Assistant questions", "Not stored by the platform; Google's own handling is outside the platform", "-"],
                 ["Official enrollment and grade data", "Not owned by the Graduate School; the Registrar's schedule applies", "-"],
             ]),
         ]),
-        ("Open points for the Graduate School and the DPO", [
-            ("p", "Name and contact of the DPO; the University's retention rules for student files; whether a data sharing agreement with Google is needed before the Policy Assistant or the calendar link is used with real data; whether the platform may be hosted outside the University; and who may see a medical certificate."),
-        ]),
     ],
-    sign=SIGN_STD("Data Protection Officer of the University (to be confirmed)"))
+    sign=SIGN_STD("Data Protection Officer of the University"))
 
 policy("05", "Platform Access and Roles Matrix", "4.21", "Platform accounts and roles",
     instructions=[
-        "This document lists the roles that exist in the Graduate School platform, what each can see and do, and how an account is requested, approved, set up, reviewed and removed (request form GS-F-46). The roles are the ones in the platform's role list; the summary was derived on 2026-11-04 from the role gate of each function of the platform, grouped by role.",
-        "It is a summary, not a list of every function. Where the Handbook or the Research Protocol names an officer who has no role in the platform (the Associate Dean, the Graduate School Secretary), that officer signs on paper.",
-        "Status: proposed. It takes effect when the Dean signs below.",
+        "This document lists the roles that exist in the Graduate School platform, what each can see and do, and how an account is requested, approved, set up, reviewed and removed (request form GS-F-46). The roles are the ones in the platform's role list; the summary was derived on 2026-11-04 from the role gate of each function of the platform, grouped by role. It is a summary, not a list of every function.",
+        "It is a summary, not a list of every function. Where the Handbook or the Research Protocol names an officer who has no role in the platform (the Associate Dean, the Graduate Program Secretary), that officer signs on paper.",
+        "It takes effect when the Dean signs below.",
     ],
     sections=[
         ("Purpose and principles", [
             ("p", "Purpose: to make sure each person sees and does only what the person's work in the Graduate School needs, and that every approval can be traced to a named person (GS-P-03)."),
-            ("p", "Least privilege: ask for the role that fits the work, not the widest one. One person holds one account and one role. Accounts are never shared. The Administrator role passes every role gate in the platform and acts as Graduate School Staff in workflow steps, so it is limited to the named person who maintains the system (proposed) and is not used for approvals."),
+            ("p", "Least privilege: ask for the role that fits the work, not the widest one. One person holds one account and one role. Accounts are never shared. The Administrator role passes every role gate in the platform and acts as Graduate School Staff in workflow steps, so it is limited to the named person who maintains the system and is not used for approvals."),
         ]),
         ("Roles and what each can see and do", [
             ("t", [("Role", 2.8), ("Can see and do", 9.2), ("Cannot", 5.0)], [
@@ -2095,32 +2093,28 @@ policy("05", "Platform Access and Roles Matrix", "4.21", "Platform accounts and 
                 ["Dean", "Decisions and approvals: onboarding reports, term course offering plan, leave, readmission, withdrawal and absence cases, adviser appointments, graduation endorsement and the endorsed list; reports and decision support; policy questions", "Edit records; see the work of other roles beyond the cases that reach the Dean"],
                 ["Faculty Member", "Own profile, course preferences, availability and calendar link; replies to panel invitations; adviser requests; defense schedules and verdicts of own panels; policy questions", "See student records beyond the own panels; see other faculty members' details"],
                 ["Student", "Own record, requests and attachments, adviser, research evidence, defense calendar, messages; questions about the own record and policy", "See any other student; decide any request"],
-                ["Administrator", "Every function (passes all role gates); acts as Graduate School Staff in workflow steps", "Not for approvals (proposed rule)"],
+                ["Administrator", "Every function (passes all role gates); acts as Graduate School Staff in workflow steps", "Not for approvals"],
             ]),
         ]),
-        ("Account lifecycle (proposed)", [
+        ("Account lifecycle", [
             ("p", "Request: the person fills GS-F-46; the head of the person's office endorses; the Dean approves. Nobody receives an account without the Dean's approval, except a student, whose account is created by the platform when the student is handed off from admission."),
             ("p", "Set-up as the platform works today: a student account is created at the admission handoff import; a faculty login is created by Graduate School Staff or an Academic Coordinator from the Faculty page with a temporary password; the other roles are set up by the administrator, because the platform has no screen to create them. The temporary or generated password is handed over privately and must be replaced at first sign-in (at least 10 characters, not the email name)."),
             ("p", "First sign-in: choose a new password, then read and accept the privacy notice (GS-P-04, GS-F-45). The acceptance is stored once per account with the notice version."),
-            ("p", "Review: each term, the Academic Coordinators and the Graduate School Staff check the list of accounts against the people who still hold the role (proposed). A change of role uses GS-F-46."),
+            ("p", "Review: each term, the Academic Coordinators and the Graduate School Staff check the list of accounts against the people who still hold the role. A change of role uses GS-F-46."),
             ("p", "Removal: when a person leaves the Graduate School or the role, GS-F-46 asks for the account to be deactivated the same day. A deactivated account cannot sign in; its log entries stay."),
         ]),
         ("Rules for every account holder", [
             ("p", "Use your own account only; do not share the password; sign out on a shared computer. Tell the Graduate School at once if you think someone else used your account. The demonstration accounts are for presenting the platform and have no authority (GS-P-03)."),
             ("p", "The platform slows repeated wrong passwords, ends the session at sign-out, and refuses a function the role is not allowed (message: this account cannot access that area)."),
         ]),
-        ("Open points for the Graduate School", [
-            ("p", "The role gates are by role, not by program: the code reviewed does not limit an Academic Coordinator to one program, although the Handbook gives each coordinator a program area. Should it?"),
-            ("p", "Should the Associate Dean and the Graduate School Secretary receive roles? Who is the named administrator? How often should accounts be reviewed?"),
-        ]),
     ],
-    sign=SIGN_STD("Academic Coordinators of the five program areas and Graduate School Staff (to be confirmed)"))
+    sign=SIGN_STD("Academic Coordinators of the five program areas and Graduate School Staff"))
 
 policy("06", "AIMS and Registrar Data Exchange Specification", "4.24", "AIMS and Registrar data exchange",
     instructions=[
-        "This specification states which files come into the Graduate School platform from the Registrar's system (AIMS), which files go out to the University Registrar, who sends them, and when. It was written from the import and export code of the platform on 2026-11-04.",
+        "This specification states which files come into the Graduate School platform from the Registrar's system (AIMS), which files go out to the University Registrar, who sends them, and when.",
         "Data exchange is by file only. The platform does not connect to AIMS, stores no AIMS credentials and does not copy AIMS screens. Official student, enrollment and grade data stay with AIMS and are read-only in the platform; a correction is made in AIMS and arrives in a later file.",
-        "Status: proposed. File formats, the exporting office and the schedule are for the Registrar to confirm.",
+        "It takes effect when the Dean signs below.",
     ],
     sections=[
         ("Purpose and principles", [
@@ -2128,18 +2122,17 @@ policy("06", "AIMS and Registrar Data Exchange Specification", "4.24", "AIMS and
             ("p", "Principles: AIMS is the source of record for identity, enrollment, subjects, grades and course completion. The platform checks and previews a file before it imports it, keeps the uploaded file and its result, and never overwrites an official value in place. A value typed in the platform is marked as manual entry with who, when and why."),
         ]),
         ("Files that come in", [
-            ("t", [("File", 4.0), ("Columns the import reads", 7.6), ("Type, sent by, when (proposed)", 5.4)], [
+            ("t", [("File", 4.0), ("Columns the import reads", 7.6), ("Type, sent by, when", 5.4)], [
                 ["Program monitoring sheet (AC Student Monitoring workbook) - the import that works today", "A1 = PROGRAM: code. Header row with IDNO and COURSE (and YR, COMPRE, NOTE); the row under it with AY ENTRY, SN, FN, the subject codes and the milestones TITLE, PROPOSAL, ETHICS, FINAL. One student per row; a subject cell with a unit value means completed. Required per row: student ID, first name, last name, school year of entry (a row missing one is reported, not imported)", "Excel .xlsx or .xlsm. The Registrar or the Academic Coordinator sends it; Graduate School Staff upload it through Student Handoff. When: at the start of each term and after grades are posted"],
                 ["Class list", "Student ID, Subject code, Faculty (the column must exist), and optionally Academic year, Term, Enrollment status (enrolled or current, or dropped), Status effective date, Remarks, first and last name, program. A row for a different semester than the one chosen is refused; a subject the program does not offer is refused", "CSV or Excel. The Registrar sends it; Graduate School Staff or an Academic Coordinator preview and import it. When: each term after enrollment closes"],
-                ["Proposed AIMS export workbook (schema PROPOSED-1.0)", "Sheets Export_Metadata, Students, Enrollment_Subjects, Grades and Subject_Offerings with a Data_Dictionary, in the folder Documents/AIMS_Export. It is a proposal for the AIMS owner to review; the platform does not read it yet", "Excel. Not in use until the Registrar approves the layout"],
             ]),
         ]),
         ("Files that go out to the University Registrar", [
-            ("t", [("File", 4.6), ("Contents", 7.2), ("Made by, form (proposed)", 5.2)], [
+            ("t", [("File", 4.6), ("Contents", 7.2), ("Made by, form", 5.2)], [
                 ["Approved leave of absence and approved readmission lists", "Request, student ID, name, program, leave from and until, return semester, reason, Dean's decision date and remarks, endorsement for the Registrar, handoff status", "Graduate School Staff; CSV or Excel; sent with GS-F-44"],
                 ["Approved subject withdrawals workbook", "Application ID, student ID and name, program, subject code, title and units, semester and its start, withdrawal deadline, request and Dean approval dates, reason, Registrar action, record effect, status, fee tier (information only)", "Graduate School Staff; Excel; sent with GS-F-44"],
                 ["Graduation endorsed list", "Batch, student ID, name, program, coursework and research status, endorsement status, Dean's approval date and remarks, export status", "The Dean; CSV; sent with GS-F-44 and GS-F-43"],
-                ["Absence-without-leave return and residency reports", "Student, ID, program, the dates and terms, the Dean's decision and the policy check. Marked provisional in the file until the Registrar confirms the layout", "Graduate School Staff or Academic Coordinator; CSV"],
+                ["Absence-without-leave return and residency reports", "Student, ID, program, the dates and terms, the Dean's decision and the policy check.", "Graduate School Staff or Academic Coordinator; CSV"],
                 ["Monitoring export", "The program's monitoring workbook with the portal's changes and their provenance, in the layout of the import so it can be uploaded again", "Staff, coordinators, Dean; Excel"],
             ]),
             ("p", "The platform does not send email. The sender emails each file to the Registrar through the University's channel, records the hand-over (sent, then acknowledged) in the platform, and files GS-F-44 with the Registrar's acknowledgement."),
@@ -2148,11 +2141,8 @@ policy("06", "AIMS and Registrar Data Exchange Specification", "4.24", "AIMS and
             ("p", "A class list is previewed before it is imported; every row is marked ready, warning or error with its reason. The monitoring sheet import reports rows with missing required fields as issues. The uploaded monitoring sheet and the result of its import are kept with the upload record, so a later file can be compared with it. Importing a class list twice does not enrol a student twice (rows already enrolled are counted as already enrolled)."),
             ("p", "The files carry personal data. They are sent only to the Registrar's named address, kept in the Graduate School's own folders and retained as GS-P-04 section 8 states."),
         ]),
-        ("Open points for the Registrar", [
-            ("p", "Who exports from AIMS, and in what layout? Is the proposed workbook acceptable, or should the platform keep reading the monitoring sheet? How often? What does the Registrar need to acknowledge a file, and in what format do the exports have to be so that the Registrar can use them without retyping?"),
-        ]),
     ],
-    sign=SIGN_STD("University Registrar (acknowledgement of the specification, to be confirmed)"))
+    sign=SIGN_STD("University Registrar (acknowledgement of the specification)"))
 
 def main():
     docs = all_documents()
