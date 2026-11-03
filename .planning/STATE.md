@@ -149,17 +149,18 @@ Stakeholder meeting 2026-11-04. Owner asked for, in this order:
    tunnel token from a file the owner fills), `deploy/DOCKER.md` (helper C). Owner: domain NOT yet on Cloudflare;
    public sign-in page SHOWS the demo accounts (DEMO_SHOW_ACCOUNTS=1, owner choice, risk told).
 7. Then polish / improvement / optimization loop (IMPROVE.md) until 10:00 Manila.
-**Progress (03:15 Nov 4):** ALL 5 DELIVERABLES DONE + pushed (entry point `Documents/CAPSTONE_ONLY/Demo_Migui/README-FOR-MIGUI.md`).
-Owner: leave the domain/Cloudflare to him; keep looping. MERGED on v6.1 after gates: night1..8 (last full Python 965 with 2 fails:
-night8 determinism test (fixed, test-only) + Myrine's test_teaching_schedule (I-236, hers); e2e 771 + targeted fixes). Teammate
-Myrine pushes to v6.1 too: ALWAYS `git fetch` + merge origin before pushing.
-Live site re-seeded + restarted 03:10 on 91771e6 (night1-8 + Myrine), `npm run uat` on 127.0.0.1:5000 via START-SITE.cmd.
-IN FLIGHT: pkt/night9 (I-220 footer spec pin, I-207 student carry-over + rules summary; wt/night9), pkt/night10 (I-237 graduation
-candidates, I-238 missing count, I-239 dashboard deep link + tile labels; wt/night10), pkt/night11 (Fable P2s: held-defense
-re-request, staff/RC delete verified file, Dean approval -> Completed, latest endorsement, Enrollment pronoun, passages regex;
-wt/night11). Then round 6 gates (wt/gatebase Python, wt/gatenight e2e), merge, re-seed + restart the site, re-record videos
-(record_demo.py on a fresh DB :5092, build_narration.py), final STATE + README. Stop new work by ~08:30.
-Restore BayoCoop watchdog registration (`E:/DevCache/dev-kit-workers/build-session.*.bayocoop-backup`) when the run ends.
+**RUN ENDED 07:40 Nov 4 (owner: stop by 09:00, he checks things).** ALL 5 DELIVERABLES DONE + pushed; owner entry point
+`Documents/CAPSTONE_ONLY/Demo_Migui/README-FOR-MIGUI.md`. Videos (local only, gitignored) re-recorded on the final night code.
+v6.1-migui @ 61c40e6 (pushed): night1..13 merged after gates. Last full Python gate 983 tests: only failures = Myrine's
+test_teaching_schedule (I-236, hers: her 26c8892 removed the published-timetable guard and the Schedule tab; her p110/p84 specs
+pin the old UI) + the night8 determinism test (fixed after, now compares two clean seed processes; passes). Last full e2e 786
+passed, fails = I-236 (2) + flaky I-235 pictures.
+Live site: `deploy/START-SITE.cmd` (npm run uat, 127.0.0.1:5000), seeded 06:05, process restarted 07:35 on 61c40e6, Policy
+Assistant offline (GOOGLE_API_KEY=off, I-221). No tunnel yet (owner does Cloudflare). Watchdog loop stopped; auto-resume
+registration handed back to BayoCoop (`build-session.id` = local_02521ec6...). Another session was editing Demo_Migui docs,
+narration.json, build_narration.py, build_cheat_sheet.py, build_uat_instrument.py (uncommitted, theirs) at 07:30 — not touched.
+Open for later: I-236 (Myrine), I-240, I-241 wording, I-215 F-15, I-218 smarter assistant (owner reminder: the session AFTER the
+next branch).
 Shared doc tools: `E:/Temp/claude/docs-venv` (python-docx, pymupdf, openpyxl, imageio-ffmpeg); LibreOffice `E:/LibreOffice`.
 
 ## HANDED OFF (2026-11-03 morning) — read `.planning/HANDOFF-v6.1.md` first
