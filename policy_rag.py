@@ -581,8 +581,11 @@ _SYNONYMS: dict[str, list[str]] = {
     "defense": ["panel", "form"],
 }
 _PHRASE_SYNONYMS: list[tuple[re.Pattern, list[str]]] = [
-    (re.compile(r"how (?:many|long).*\b(?:years?|semesters?)\b.*\b(?:finish|complete|graduate|take)\b|\b(?:finish|complete)\b.*\b(?:program|degree)\b.*\b(?:years?|long)\b"),
+    # "how many semesters of leave can I take" asks about the leave rule (Handbook p. 52), not the time to finish.
+    (re.compile(r"^(?!.*\b(?:leave of absence|loa|on leave)\b)(?:.*how (?:many|long).*\b(?:years?|semesters?)\b.*\b(?:finish|complete|graduate|take)\b|.*\b(?:finish|complete)\b.*\b(?:program|degree)\b.*\b(?:years?|long)\b)"),
      ["maximum", "residence", "academic", "years"]),
+    (re.compile(r"\b(?:how (?:many|long|much)|limit|maximum|at most|in total|total)\b.*\b(?:leave of absence|loa)\b|\b(?:leave of absence|loa)\b.*\b(?:how (?:many|long)|limit|maximum|last|in total|total)\b"),
+     ["leave", "approved", "period", "renewed", "year"]),
     (re.compile(r"\b(?:another|other|different) (?:school|university|institution|college)\b"), ["cross", "enrollment", "institution", "permission"]),
     (re.compile(r"\bgood standing\b|\bremain(?:ing)? in\b.*\b(?:program|school)\b"), ["retention", "weighted", "average"]),
     (re.compile(r"\bpass(?:ing)? (?:score|mark)\b|\bto pass\b|\bscore\b.*\bpass\b"), ["minimum", "score", "7.00"]),
@@ -896,7 +899,17 @@ def _strip_heading_prefix(sentence: str, section: str) -> str:
     return sentence
 
 
+# The draft Operations Manual cites its rule register: "(RES-07, RES-09; register value residency.includes_loa)",
+# "(ENR-04)", "(ADM-01 to ADM-08)". Those codes mean nothing to the reader of an answer, so they are left out.
+_RULE_CODE = r"[A-Z]{2,4}-\d{2}"
+_INTERNAL_REF = re.compile(
+    rf"\s*\((?:{_RULE_CODE}(?:\s*(?:,|to|and)\s*{_RULE_CODE})*)?(?:;?\s*register value [\w.]+)?\)"
+    rf"|\s*\(register value [\w.]+\)"
+)
+
+
 def _tidy(sentence: str) -> str:
+    sentence = _INTERNAL_REF.sub(lambda m: "" if m.group(0).strip() != "()" else m.group(0), sentence)
     sentence = re.sub(r"\s+", " ", sentence).strip()
     sentence = re.sub(r"^[-*]\s+", "", sentence)
     return re.sub(r"\s+([,.;:])", r"\1", sentence)

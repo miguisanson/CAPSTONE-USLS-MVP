@@ -184,3 +184,38 @@ class FableNightReviewTests(Base):
 
     def test_the_system_instruction_names_the_exact_not_found_sentence(self):
         self.assertIn(appmod._prag.NOT_FOUND_ANSWER, appmod.RAG_SYSTEM_INSTRUCTION)
+
+
+class DeanPersonaQuestionsTests(Base):
+    """2026-11-04 Dean persona (offline assistant): a leave-of-absence limit question got the doctoral maximum
+    residence, and a suggested question showed internal register codes "(RES-07, RES-09; register value ...)"."""
+
+    def test_leave_of_absence_limit_questions_find_the_leave_rule(self):
+        for question in (
+            "How many semesters of leave of absence can a student take in total?",
+            "How long can a leave of absence last?",
+            "How many years of LOA can I take?",
+        ):
+            result = self.ask_offline(question)
+            self.assertEqual(result["mode"], "document-rag-local", question)
+            self.assertIn("renewed", result["answer"], question)
+            self.assertIn("p. 52", result["answer"], question)
+
+    def test_time_to_finish_questions_still_find_the_maximum_residence(self):
+        result = self.ask_offline("How many years do I have to finish my master's degree?")
+        self.assertEqual(result["mode"], "document-rag-local")
+        self.assertRegex(result["answer"].lower(), r"seven|five|\b7\b|\b5\b")
+
+    def test_answers_never_show_internal_rule_codes(self):
+        for question in ("Explain the LOA and residency rule.", "Does leave of absence count toward residency?"):
+            for kwargs in ({"policy_only": True, "role": "dean"}, {"role": "staff"}):
+                with app.app_context():
+                    answer = appmod.generate_answer(question, **kwargs)["answer"]
+                self.assertNotRegex(answer, r"register value|\b(?:RES|LOA|AWL|RDM|WD|DRP|ADM|ENR)-\d{2}\b", f"{question} {kwargs}")
+
+    def test_the_internal_reference_filter_keeps_ordinary_brackets(self):
+        tidy = policy_rag._tidy
+        self.assertEqual(tidy("Leave counts (RES-07, RES-09; register value residency.includes_loa) toward residence."),
+                         "Leave counts toward residence.")
+        self.assertEqual(tidy("See the list (ADM-01 to ADM-08)."), "See the list.")
+        self.assertEqual(tidy("Two (2) years (Handbook p. 55)."), "Two (2) years (Handbook p. 55).")
