@@ -8,6 +8,11 @@ Integration branch `pkt/forms-ops` (wt/forms). Helpers (Sonnet): `pkt/fdocs` (wt
 Documents/USLS_Forms), `pkt/fman` (wt/fman: opsmanual + manual outputs), `pkt/fapp` (wt/fapp: app.py,
 frontend, tests/test_privacy_consent.py). Owner authorised Claude to commit and merge into v6.1-migui when
 verified. Fable session "Session progress report" was told before start.
+**HOLD (peer request 2026-11-04):** do not merge the forms move (pkt/fdocs) into v6.1-migui until the
+"Session progress report" session sends its Fable findings on Documents/USLS_Forms (fix them on our branch).
+Keep codes GS-F-01..44 / GS-P-01..02 stable (meeting print pack + ZOOM-CHEAT-SHEET table). Also hold pkt/fapp
+until after the stakeholder meeting: new UserAccount columns break sign-in if the live site restarts without a
+reseed. After merging, send that session the final code list so it can rebuild ZOOM-CHEAT-SHEET.
 
 ## Merge recovery — 2026-11-04 (current)
 
