@@ -23,35 +23,37 @@ Published assigned classes appear below the availability editor.
 
 ## Academic Coordinator
 
-1. Complete offering approval/publication and faculty assignment through the
-   existing Course Adjustments and Offering setup workflow.
-2. Open **Course Adjustments → Schedule**, select the term and review faculty
-   submission statuses.
-3. Create a draft from the term's offering list. Valid initial choices are
-   selected using a search across the semester, not published automatically.
-4. Review up to three recommended choices and the other valid choices for
-   each subject. Expand unavailable options to inspect representative reasons.
-5. Changing a selection saves it and checks affected choices again.
-   **Keep this schedule** fixes the selection during later recommendations.
-   Clear it when the search may move that subject.
-6. Save any format changes, then explicitly **Approve schedule** and
-   **Publish schedule**. These are separate actions. Only the Academic
-   Coordinator can approve or publish, including when an admin is signed in.
+Open **Course Adjustments → Offering setup**. Assign faculty, then choose a
+schedule in the existing **Schedule** column. Use **Save all changes** once to save
+every edited faculty assignment, schedule and section in the current program and
+semester. Overlaps for the same faculty or confirmed enrolled students are rejected;
+conflicting batches save nothing and keep your edits so they can be corrected.
+Up to three valid slots receive visual emphasis; option text contains only days
+and meeting times. When faculty hours are recorded, only slots fully within those
+days and hours appear. Sunday is excluded. When hours are unknown, Mon–Sat slots
+remain available with a caution after selection. Known class/defense conflicts are disabled. Availability cautions appear
+below the dropdown only after selection; missing availability does not block choosing
+a time. Submitted semester teaching hours take precedence; otherwise the recurring
+hours already saved in the faculty profile are used directly, without a second
+confirmation step or an unconfirmed-hours warning. Both paired and single-day
+formats are included without a separate opt-in workflow.
 
-Existing faculty suggestions remain tentative assignment aids. They do not
-certify that a class fits the new semester teaching availability; the Schedule
-tab performs that check against the faculty member's submitted teaching hours.
+The owner removed Semester class schedule and Faculty submissions sections.
+There is no timetable draft, revision, approval or publication step in this UI.
+Older timetable endpoints/models remain for compatibility but the dropdown uses
+read-only options and the offering save-all endpoint.
 
 The approved paired days are Monday/Thursday, Tuesday/Friday and
 Wednesday/Saturday. Defaults are 90-minute sessions, 15-minute gaps and a
 07:30–21:00 permitted day. The backend `TEACHING_SCHEDULE_RULES` configuration
-can change the time grid. Single-day fallback is off until the coordinator
-explicitly enables it: two 90-minute sessions with a 15-minute internal break.
+can change the time grid. Single-day options contain two 90-minute sessions with a 15-minute internal break.
 
 Hard restrictions include submitted teaching availability, faculty overlaps,
 confirmed student subject overlaps, teaching load, and existing class/defense
 commitments. Curriculum forecasts produce warnings and influence ranking;
 they are not confirmed enrollment. Reasons and equivalent rankings are shown.
+Existing `StudyPlanDraft` records are curriculum-derived plans sent for review,
+not recorded student commitments; they do not become hard attendance constraints.
 If the bounded search reaches its limit, the screen says so; it does not claim
 that no feasible timetable exists.
 

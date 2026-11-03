@@ -17573,18 +17573,59 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
         return jsonify({"ok": True, "message": f"{course.code} is now offered for {term.label}."})
 
+    @app.route("/api/course-offerings/bulk", methods=["PATCH"])
+    @require_api_login("academic_coordinator", "admin")
+    def course_offerings_bulk_update():
+        from teaching_backend import offering_conflict_errors, parse_offering_schedule
+        data = request.get_json(silent=True) or {}
+        rows = data.get("offerings")
+        if not isinstance(rows, list) or not rows or len(rows) > 500:
+            return jsonify(error="Send the offering changes to save."), 400
+        program = db.session.get(Program, safe_int(data.get("program_id")))
+        term = db.session.get(AcademicTerm, safe_int(data.get("term_id")))
+        if not program or not term:
+            return jsonify(error="Choose a valid program and semester."), 400
+        year, semester = split_academic_term_label(term.label)
+        changed = set()
+        with db.session.no_autoflush:
+            for row in rows:
+                if not isinstance(row, dict):
+                    db.session.rollback()
+                    return jsonify(error="Each offering change must be a record."), 400
+                off = db.session.get(CurriculumOffering, safe_int(row.get("id")))
+                if not off or off.program_id != program.id or (off.academic_year, off.semester) != (year, semester) or off.id in changed:
+                    db.session.rollback()
+                    return jsonify(error="An offering changed or does not belong to the selected program and semester. Reload and try again."), 409
+                faculty_id = safe_int(row.get("faculty_id")) or None
+                faculty = db.session.get(Faculty, faculty_id) if faculty_id else None
+                if faculty_id and (not faculty or not faculty.active or faculty.college != program.college):
+                    db.session.rollback()
+                    return jsonify(error=f"{off.course.code}: choose an active faculty member from this college."), 409
+                schedule = row.get("schedule") or ""
+                section = row.get("section") or ""
+                if not isinstance(schedule, str) or not isinstance(section, str) or len(schedule) > 160 or len(section) > 50:
+                    db.session.rollback()
+                    return jsonify(error=f"{off.course.code}: invalid schedule or section."), 400
+                schedule = schedule.strip()
+                if schedule and schedule != (off.schedule or "") and not parse_offering_schedule(schedule):
+                    db.session.rollback()
+                    return jsonify(error=f"{off.course.code}: choose a schedule from the dropdown."), 400
+                off.assigned_faculty_id, off.schedule, off.section = faculty_id, schedule or None, section.strip() or None
+                off.updated_at = now_utc()
+                changed.add(off.id)
+            all_offerings = CurriculumOffering.query.filter_by(academic_year=year, semester=semester).all()
+            errors = offering_conflict_errors(globals(), db, all_offerings, changed)
+            if errors:
+                db.session.rollback()
+                return jsonify(error="Nothing was saved. " + " ".join(errors), errors=errors), 409
+        db.session.commit()
+        return jsonify(ok=True, message=f"Saved all changes to {len(changed)} offering(s).")
+
     @app.route("/api/course-offerings/<int:offering_id>", methods=["PATCH"])
     @require_api_login("academic_coordinator", "admin")
     def course_offerings_update(offering_id: int):
         data = request.get_json(silent=True) or {}
         off = CurriculumOffering.query.get_or_404(offering_id)
-        if "schedule" in data and (data.get("schedule") or "").strip() != (off.schedule or ""):
-            governed = ClassSection.query.join(TeachingSchedulePlan).filter(
-                ClassSection.offering_id == off.id,
-                TeachingSchedulePlan.status.in_(["Approved", "Published"]),
-            ).first()
-            if governed:
-                return jsonify({"error": "This timetable is approved or published. Create a revision in the Schedule tab."}), 409
         if "faculty_id" in data:
             faculty_id = safe_int(data.get("faculty_id")) or None
             if faculty_id:
@@ -17597,6 +17638,13 @@ def register_routes(app: Flask) -> None:
         if "section" in data:
             off.section = (data.get("section") or "").strip() or None
         off.updated_at = now_utc()
+        from teaching_backend import offering_conflict_errors
+        with db.session.no_autoflush:
+            errors = offering_conflict_errors(globals(), db,
+                CurriculumOffering.query.filter_by(academic_year=off.academic_year, semester=off.semester).all(), {off.id})
+        if errors:
+            db.session.rollback()
+            return jsonify(error="Nothing was saved. " + " ".join(errors), errors=errors), 409
         db.session.commit()
         term = next((item for item in AcademicTerm.query.all() if split_academic_term_label(item.label) == (off.academic_year, off.semester)), None)
         return jsonify({"ok": True, "message": "Offering updated.", "offering": _offering_dict(off, off.program, term)})
@@ -24415,6 +24463,7 @@ def _report_is_valid(report) -> bool:
 # Written independently of the decorators; the KPI compares this against what
 # the endpoints were actually registered with, so a drifted decorator lowers it.
 ACCESS_CONTROL_SPEC = [
+    ("Offering setup save all", "course_offerings_bulk_update", {"academic_coordinator", "admin"}),
     ("Teaching availability", "faculty_teaching_schedule", {"faculty"}),
     ("Teaching schedule", "teaching_schedules", {"academic_coordinator"}),
     ("Teaching schedule changes", "teaching_schedule_update", {"academic_coordinator"}),

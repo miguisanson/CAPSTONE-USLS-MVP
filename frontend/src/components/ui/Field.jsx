@@ -63,7 +63,7 @@ export const Select = forwardRef(function Select({ options = [], placeholder = "
     <select ref={ref} {...props} {...aria} className={join("field-input cursor-pointer", isInvalid && INVALID, className)}>
       {placeholder && <option value="">{placeholder}</option>}
       {opts.map((o) => (
-        <option key={o.value} value={o.value} disabled={Boolean(o.disabled)}>
+        <option key={o.value} value={o.value} disabled={Boolean(o.disabled)} className={o.className}>
           {o.label}
         </option>
       ))}

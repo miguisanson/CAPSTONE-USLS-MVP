@@ -43,6 +43,7 @@ function queryString(params = {}) {
 }
 
 export const api = {
+  saveCourseOfferings: (body) => request("/course-offerings/bulk", { method: "PATCH", body: JSON.stringify(body) }),
   teachingAvailability: (params = {}) => request(`/faculty-portal/teaching-schedule?${queryString(params)}`),
   saveTeachingAvailability: (termId, body) => request(`/faculty-portal/teaching-schedule?${queryString({ term_id: termId })}`, { method: "PUT", body: JSON.stringify(body) }),
   teachingSchedules: (params = {}) => request(`/teaching-schedules?${queryString(params)}`),

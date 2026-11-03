@@ -2,9 +2,19 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { BookOpenCheck, CalendarClock, Eye, Lightbulb, Plus, Save, Trash2 } from "lucide-react";
 import { api } from "../api";
+import TeachingSchedule from "./TeachingSchedule";
 import { Button, Card, DataTable, Field, InlineNotice, Input, Select, SectionCard, Spinner } from "../components/ui/index.js";
 import { useConfirm } from "../components/confirm";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
+
+function scheduleMeetings(value) {
+  const text = (value || "").split("(")[0];
+  const head = text.match(/^([A-Za-z/ ,]+)\s*(?=\d)/);
+  if (!head || /\b[ap]m\b/i.test(text)) return [];
+  const days = (head[1].match(/[A-Za-z]+/g) || []).map((day) => day.slice(0, 3).toLowerCase());
+  const ranges = [...text.matchAll(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/g)];
+  return days.flatMap((day) => ranges.map((r) => ({ day, start: Number(r[1]) * 60 + Number(r[2]), end: Number(r[3]) * 60 + Number(r[4]) })));
+}
 
 // Course Offering Setup (Sir Eddie, 2026-07-21): the Academic Coordinator declares which
 // subjects are offered for a program + semester, assigns faculty and schedule, and those
@@ -20,17 +30,18 @@ export default function CourseOfferings() {
   const [addCourseId, setAddCourseId] = useState("");
   const [edits, setEdits] = useState({});
   const [selectedFaculty, setSelectedFaculty] = useState(null);
+  const [scheduleRefresh, setScheduleRefresh] = useState(0);
 
   const programId = searchParams.get("program_id") || "";
   const termId = searchParams.get("term_id") || "";
 
-  async function load() {
+  async function load(preserveEdits = false) {
     setLoading(true);
     setError("");
     try {
       const res = await api.courseOfferings({ program_id: programId || undefined, term_id: termId || undefined });
       setData(res);
-      setEdits({});
+      setEdits((current) => preserveEdits ? Object.fromEntries(Object.entries(current).filter(([id]) => res.offerings.some((offering) => String(offering.id) === id))) : {});
       const canonical = { program_id: String(res.program.id), term_id: String(res.term?.id || "") };
       if (canonical.program_id !== programId || canonical.term_id !== termId) {
         const params = new URLSearchParams(searchParams);
@@ -53,7 +64,8 @@ export default function CourseOfferings() {
 
   const canManage = data?.permissions?.can_manage;
 
-  function updateFilters(next) {
+  async function updateFilters(next) {
+    if (Object.keys(edits).length && !(await confirm({ title: "Discard unsaved changes?", message: "Save all changes before switching programs or semesters, or discard these edits.", confirmLabel: "Discard changes", tone: "danger" }))) return;
     const params = new URLSearchParams(searchParams);
     const values = { program_id: next.program_id ?? programId, term_id: next.term_id ?? termId };
     Object.entries(values).forEach(([key, value]) => value ? params.set(key, value) : params.delete(key));
@@ -74,17 +86,23 @@ export default function CourseOfferings() {
       const res = await api.addCourseOffering({ program_id: data.program.id, term_id: data.term.id, course_id: Number(addCourseId) });
       setNotice(res.message);
       setAddCourseId("");
-      await load();
+      await load(true);
+      setScheduleRefresh((value) => value + 1);
     } catch (err) { setError(err.message); } finally { setBusy(""); }
   }
 
-  async function saveOffering(offering) {
-    const e = editOf(offering);
-    setBusy(`save-${offering.id}`); setNotice(""); setError("");
+  async function saveAll() {
+    if (!Object.keys(edits).length) return;
+    if (conflictMessages.length) { setError("Nothing was saved. Resolve the schedule conflicts below."); return; }
+    setBusy("save-all"); setNotice(""); setError("");
     try {
-      const res = await api.updateCourseOffering(offering.id, { faculty_id: e.faculty_id || null, schedule: e.schedule, section: e.section });
-      setNotice(res.message);
+      const res = await api.saveCourseOfferings({
+        program_id: data.program.id, term_id: data.term.id,
+        offerings: Object.entries(edits).map(([id, edit]) => ({ id: Number(id), ...edit, faculty_id: edit.faculty_id || null })),
+      });
       await load();
+      setNotice(res.message);
+      setScheduleRefresh((value) => value + 1);
     } catch (err) { setError(err.message); } finally { setBusy(""); }
   }
 
@@ -99,9 +117,24 @@ export default function CourseOfferings() {
     try {
       const res = await api.deleteCourseOffering(offering.id);
       setNotice(res.message);
-      await load();
+      await load(true);
+      setScheduleRefresh((value) => value + 1);
     } catch (err) { setError(err.message); } finally { setBusy(""); }
   }
+
+  const rowConflicts = {};
+  const pending = (data?.offerings || []).map((offering) => ({ ...offering, ...editOf(offering) }));
+  for (let i = 0; i < pending.length; i += 1) {
+    for (let j = i + 1; j < pending.length; j += 1) {
+      const left = pending[i], right = pending[j];
+      if (!left.faculty_id || String(left.faculty_id) !== String(right.faculty_id)) continue;
+      const overlaps = scheduleMeetings(left.schedule).some((a) => scheduleMeetings(right.schedule).some((b) => a.day === b.day && a.start < b.end + 15 && b.start < a.end + 15));
+      if (!overlaps) continue;
+      const message = `${left.code} and ${right.code} overlap for the same faculty member. Choose different times with at least a 15-minute gap.`;
+      rowConflicts[left.id] = message; rowConflicts[right.id] = message;
+    }
+  }
+  const conflictMessages = [...new Set(Object.values(rowConflicts))];
 
   if (loading && !data) return <Spinner label="Loading course offerings…" />;
 
@@ -125,6 +158,7 @@ export default function CourseOfferings() {
         return (
           <div className="min-w-64">
             <Select
+              disabled={Boolean(busy)}
               value={e.faculty_id}
               onChange={(ev) => setEdit(o.id, "faculty_id", ev.target.value)}
               aria-label={`Faculty for ${o.code}`}
@@ -152,14 +186,14 @@ export default function CourseOfferings() {
       key: "schedule",
       header: "Schedule",
       cell: (o) => canManage
-        ? <Input value={editOf(o).schedule} onChange={(ev) => setEdit(o.id, "schedule", ev.target.value)} placeholder="e.g. Sat 8:00-11:00" aria-label={`Schedule for ${o.code}`} className="max-w-48" />
+        ? <TeachingSchedule offering={o} facultyId={editOf(o).faculty_id} termId={data.term?.id} value={editOf(o).schedule} onChange={(value) => setEdit(o.id, "schedule", value)} disabled={Boolean(busy)} refreshKey={scheduleRefresh} conflict={rowConflicts[o.id]} />
         : (o.schedule || <span className="text-slate-500">—</span>),
     },
     {
       key: "section",
       header: "Section",
       cell: (o) => canManage
-        ? <Input value={editOf(o).section} onChange={(ev) => setEdit(o.id, "section", ev.target.value)} placeholder="A" aria-label={`Section for ${o.code}`} className="max-w-20" />
+        ? <Input disabled={Boolean(busy)} value={editOf(o).section} onChange={(ev) => setEdit(o.id, "section", ev.target.value)} placeholder="A" aria-label={`Section for ${o.code}`} className="max-w-20" />
         : (o.section || <span className="text-slate-500">—</span>),
     },
     { key: "enrolled", header: "Enrolled", align: "center", cell: (o) => <span className="font-semibold text-ink">{o.enrolled_count}</span> },
@@ -171,13 +205,12 @@ export default function CourseOfferings() {
       align: "right",
       cell: (o) => (
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" size="sm" icon={Save} onClick={() => saveOffering(o)} loading={busy === `save-${o.id}`}>Save</Button>
           <Button
             variant="icon"
             icon={Trash2}
             className="text-red-600"
             onClick={() => removeOffering(o)}
-            disabled={busy === `del-${o.id}`}
+            disabled={Boolean(busy)}
             aria-label={`Remove ${o.code} from the offerings`}
           />
         </div>
@@ -231,12 +264,17 @@ export default function CourseOfferings() {
                 />
               </Field>
             </div>
-            <Button icon={Plus} onClick={addOffering} disabled={!addCourseId} loading={busy === "add"}>Add offering</Button>
+            <Button icon={Plus} onClick={addOffering} disabled={!addCourseId || Boolean(busy)} loading={busy === "add"}>Add offering</Button>
           </div>
           {!(data?.available_subjects || []).length && <p className="meta mt-2">All curriculum subjects for this program are already offered this semester.</p>}
         </Card>
       )}
 
+      {canManage && <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-600">{Object.keys(edits).length ? `${Object.keys(edits).length} offering(s) with unsaved changes` : "All changes saved"}</p>
+        <Button icon={Save} onClick={saveAll} loading={busy === "save-all"} disabled={Boolean(busy) || !Object.keys(edits).length || conflictMessages.length > 0}>Save all changes</Button>
+      </div>}
+      {conflictMessages.length > 0 && <InlineNotice tone="danger" title="Schedule conflicts"><ul className="list-inside list-disc space-y-1">{conflictMessages.map((message) => <li key={message}>{message}</li>)}</ul></InlineNotice>}
       <DataTable
         caption="Subjects offered this semester, with faculty, schedule, section and number enrolled"
         columns={columns}

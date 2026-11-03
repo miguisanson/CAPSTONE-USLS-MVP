@@ -6,6 +6,8 @@ Defense availability, official enrollment records and room data are never edited
 """
 import hashlib
 import json
+import re
+from itertools import combinations
 from datetime import datetime, timedelta
 
 from flask import abort, jsonify, request
@@ -146,6 +148,59 @@ def class_schedule_conflicts(ns, db, student_id, faculty_ids, day, start, end):
                     problems.append(f"{prefix} {off.course.code if off else 'Class'} {section.section} is already booked for this time.")
                     break
     return list(dict.fromkeys(problems))
+
+
+def parse_offering_schedule(value):
+    """Read current dropdown labels and older day/time labels without guessing prose."""
+    text = (value or "").split("(", 1)[0].strip()
+    head = re.match(r"^([A-Za-z/ ,]+)\s*(?=\d)", text)
+    if not head or re.search(r"\b[ap]m\b", text, re.I):
+        return None
+    names = {name: day for day, name in enumerate(("mon", "tue", "wed", "thu", "fri", "sat", "sun"))}
+    days = [names.get(word[:3].lower()) for word in re.findall(r"[A-Za-z]+", head.group(1))]
+    spans = re.findall(r"(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})", text)
+    if not days or None in days or not spans or len(days) > 2 or len(spans) > 2:
+        return None
+    try:
+        for start, end in spans:
+            if _minute(start.zfill(5)) >= _minute(end.zfill(5)):
+                return None
+    except ValueError:
+        return None
+    if len(days) > 1 and len(spans) != 1:
+        return None
+    return [{"weekday": day, "start": start.zfill(5), "end": end.zfill(5)} for day in days for start, end in spans]
+
+
+def offering_conflict_errors(ns, db, offerings, changed_ids):
+    """Validate final pending state against other offerings, across programs."""
+    errors = []
+    parsed = {off.id: parse_offering_schedule(off.schedule) for off in offerings}
+    enrolled = {}
+    terms = {ns["split_academic_term_label"](term.label): term.id for term in ns["AcademicTerm"].query.all()}
+    for off in offerings:
+        if not parsed[off.id]:
+            continue
+        term_id = terms.get((off.academic_year, off.semester))
+        enrolled[off.id] = {e.student_id for e in ns["SubjectEnrollment"].query.filter(
+            ns["SubjectEnrollment"].course_id == off.course_id,
+            ns["SubjectEnrollment"].term_id == term_id,
+            ns["SubjectEnrollment"].status.in_(ns["ACTIVE_SUBJECT_ENROLLMENT_STATUSES"])).all()} if term_id else set()
+    for left, right in combinations(offerings, 2):
+        if not ({left.id, right.id} & changed_ids) or not parsed[left.id] or not parsed[right.id]:
+            continue
+        if (left.academic_year, left.semester) != (right.academic_year, right.semester):
+            continue
+        shared_faculty = left.assigned_faculty_id and left.assigned_faculty_id == right.assigned_faculty_id
+        shared_students = enrolled.get(left.id, set()) & enrolled.get(right.id, set())
+        if not shared_faculty and not shared_students:
+            continue
+        if any(a["weekday"] == b["weekday"] and _minute(a["start"]) < _minute(b["end"]) + 15
+               and _minute(b["start"]) < _minute(a["end"]) + 15 for a in parsed[left.id] for b in parsed[right.id]):
+            faculty = db.session.get(ns["Faculty"], left.assigned_faculty_id) if shared_faculty else None
+            reason = f"{faculty.name} cannot teach both at overlapping times" if faculty else "enrolled students would have overlapping classes"
+            errors.append(f"{left.course.code} and {right.course.code}: {reason}. Choose different times with at least a 15-minute gap.")
+    return errors
 
 
 def install_routes(app, db, ns):
@@ -358,7 +413,7 @@ def install_routes(app, db, ns):
         for stored in plan.sections:
             off = db.session.get(Offering, stored.offering_id)
             if off is None:
-                row = {"id": str(stored.id), "course_id": None, "code": "Removed offering", "title": "",
+                row = {"id": str(stored.id), "offering_id": stored.offering_id, "course_id": None, "code": "Removed offering", "title": "",
                        "section": stored.section, "faculty_id": stored.faculty_id, "faculty_name": None,
                        "confirmed_student_ids": [], "forecast_student_ids": [], "options": [],
                        "option_id": None, "meetings": [], "pinned": stored.pinned, "blocked_options": [], "warnings": [],
@@ -368,7 +423,7 @@ def install_routes(app, db, ns):
                 errors.extend(row["errors"])
                 continue
             faculty = db.session.get(Faculty, stored.faculty_id) if stored.faculty_id else None
-            row = {"id": str(stored.id), "course_id": off.course_id, "code": off.course.code,
+            row = {"id": str(stored.id), "offering_id": stored.offering_id, "course_id": off.course_id, "code": off.course.code,
                    "title": off.course.title, "section": stored.section, "faculty_id": stored.faculty_id,
                    "faculty_name": faculty.name if faculty else None,
                    "confirmed_student_ids": committed_students(term, off.course_id),
@@ -512,6 +567,75 @@ def install_routes(app, db, ns):
             availability.append({"faculty_id": faculty.id, "faculty_name": faculty.name, **availability_data(row)})
         return {**term_data(term), "availability": availability, "plan": plan_data(plan) if plan else None, "rules": rules()}
 
+    def offering_schedule_options(term):
+        off = db.session.get(Offering, request.args.get("offering_id", type=int))
+        if not off or off not in offerings_for(term):
+            abort(404, description="Offering not found for this semester.")
+        faculty_id = request.args.get("faculty_id", type=int) if "faculty_id" in request.args else off.assigned_faculty_id
+        faculty = db.session.get(Faculty, faculty_id) if faculty_id else None
+        if faculty and (not faculty.active or faculty.college != off.program.college):
+            abort(400, description="Choose an active faculty member from this college.")
+        availability = Availability.query.filter_by(faculty_id=faculty_id, term_id=term.id).first() if faculty else None
+        confirmed = bool(availability and availability.status == "Submitted")
+        source = "teaching" if confirmed else "missing"
+        windows = _load(availability.windows_json, []) if confirmed else []
+        if not confirmed and faculty:
+            # Saved Faculty profile hours are usable without a second confirmation step.
+            profile_hours = ns["faculty_working_hours"](faculty)
+            windows = [{"weekday": day["weekday"], "start": day["start"], "end": day["end"], "kind": "available"}
+                       for day in profile_hours if day["enabled"] and day["start"] and day["end"]]
+            if windows:
+                source = "profile"
+        has_hours = source != "missing"
+        valid = {o["id"]: o for o in generate_options(windows, True, rules())}
+        all_windows = [{"weekday": day, "start": rules()["start"], "end": rules()["end"], "kind": "available"} for day in range(6)]
+        slots = generate_options(all_windows, True, rules())
+        by_label = {o["label"]: o for o in slots}
+        # Keep old saved labels readable while new labels contain days and times only.
+        for slot in slots:
+            first, second = slot["meetings"]
+            if first["weekday"] == second["weekday"]:
+                slot["label"] = (f'{("Mon", "Tue", "Wed", "Thu", "Fri", "Sat")[first["weekday"]]} '
+                                 f'{first["start"]}–{first["end"]}, {second["start"]}–{second["end"]}')
+            by_label[slot["label"]] = slot
+        students = set(committed_students(term, off.course_id))
+        bookings = []
+        for other in offerings_for(term):
+            if other.id == off.id:
+                continue
+            shared = faculty_id and other.assigned_faculty_id == faculty_id
+            shared_students = students & set(committed_students(term, other.course_id))
+            if (shared or shared_students) and other.schedule in by_label:
+                bookings.append((other, by_label[other.schedule]))
+        context = {"faculty_id": faculty_id, "confirmed_student_ids": list(students)}
+        for slot in slots:
+            cautions = []
+            problems = external_problems(context, slot, term, None)
+            for other, booked in bookings:
+                if any(overlap(a, b) for a in slot["meetings"] for b in booked["meetings"]):
+                    problems.append(f"Conflicts with {other.course.code}")
+            if not faculty:
+                cautions.append("Assign a faculty member before confirming this schedule.")
+            elif not has_hours:
+                cautions.append("No faculty availability is recorded for this semester. Confirm this time with the faculty member.")
+            else:
+                if slot["id"] not in valid:
+                    cautions.append("This time falls outside the faculty member's recorded availability. Confirm it with them before saving.")
+            slot["reason"] = "; ".join(dict.fromkeys(problems))
+            slot["caution"] = " ".join(cautions + list(dict.fromkeys(problems)))
+            slot["selectable"] = not bool(problems)
+            slot["valid"] = bool(faculty and has_hours and slot["id"] in valid and not problems)
+            slot["preference_score"] = valid.get(slot["id"], {}).get("preference_score", 0)
+        # Recorded days AND complete meeting intervals must fit. Missing hours
+        # retain Mon–Sat choices with the requested selection-time caution.
+        slots = [o for o in slots if not has_hours or o["id"] in valid]
+        ranked = sorted((o for o in slots if o["valid"]), key=lambda o: (-o["preference_score"], o["id"]))
+        recommended = {o["id"]: i + 1 for i, o in enumerate(ranked[:3])}
+        for slot in slots:
+            slot["recommended"] = recommended.get(slot["id"])
+        slots.sort(key=lambda o: (o["recommended"] is None, o["recommended"] or 0, o["label"]))
+        return jsonify(options=slots)
+
     @app.route("/api/teaching-schedules", methods=["GET", "POST"])
     @login("academic_coordinator")
     def teaching_schedules():
@@ -520,6 +644,8 @@ def install_routes(app, db, ns):
         data = json_body() if request.method == "POST" else None
         term = term_of(data)
         if request.method == "GET":
+            if request.args.get("mode") == "options":
+                return offering_schedule_options(term)
             return jsonify(coordinator_payload(term))
         if data.get("action", "draft") not in ("draft", "revise"):
             return jsonify(error="Choose draft or revise."), 400

@@ -8,11 +8,127 @@
 - Incoming decision IDs IM34–37 retained; local teaching decisions now IM38–41.
   Incoming issues I219–225 retained; local I219–226 now I226–233.
   Incoming R021 retained; local R021–25 now R022–26.
-- Latest owner corrections safely exist in GitHub Desktop stash@{0}; recover after
-  merge resolution. Backup refs and original conflicts/patch at ignored
+- Latest owner corrections have been restored from GitHub Desktop stash@{0};
+  the stash remains intact as a safety copy. Backup refs and original conflicts/patch at ignored
   frontend/e2e-artifacts/merge-recovery/. Do not drop stash or push.
-- Next: stage/finish merge, apply saved latest owner changes, resolve any overlaps,
-  compile/build only (owner asked no further tests), then final local commit.
+- Merge commit: 8103c5c. Local follow-up also retains Save all, schedule availability
+  filtering, no Sunday choices, clean labels, and no extra confirmation warning.
+  Stash-only issue I227 is now I234; stash-only regression R026 is now R027.
+- Combined Python syntax checks and frontend production build PASS; no additional
+  tests per owner. All conflict markers removed. Final local follow-up commit
+  includes restored owner corrections and this record. No push. Incoming
+  improvements, forms, Docker/deployment and assistant fixes retained.
+- Next: owner may Push origin in GitHub Desktop. Do not reapply stash@{0}: it has
+  already been recovered and is retained only as a backup.
+
+## Faculty availability confirmation correction — 2026-11-04
+
+- Removed the misleading semester-confirmation warning for saved recurring Faculty
+  profile hours. Those hours are valid input for offering dropdowns; coordinator
+  does not need to submit or confirm them again. No data copied or re-stamped.
+- Missing-hours and actual conflict warnings remain. Separate submitted semester
+  teaching windows retain precedence when present; this change adds no workflow.
+- Backend-only change in teaching_backend.py. Syntax compilation passed; no tests
+  per owner. Restart app to load the fix; frontend bundle unchanged.
+
+## Offering save-all / conflicts — 2026-11-04
+
+- Implemented: owner requested one Save button and duplicate/overlap error handling.
+- Replaced row saves with Save all changes; sends dirty rows to one transaction at
+  PATCH /api/course-offerings/bulk. Retains edits on failure. Add/remove preserves
+  edits in other rows; switching filters asks before discarding edits.
+- UI checks pending same-faculty overlap and a 15-minute transition gap, names both
+  subjects inline and above the table, blocks Save until resolved.
+- Backend validates the complete final pending state against saved offerings across
+  programs, for same faculty or confirmed shared students. Bulk rejects atomically;
+  old single-row PATCH also uses this validator. Different faculty with no shared
+  enrolled students may teach at the same time.
+- Backend syntax compilation and frontend build passed; diff whitespace check passed.
+  No automated tests per owner. Next: restart app and review Offering setup.
+  Files: app.py, teaching_backend.py, frontend/src/api.js,
+  frontend/src/pages/CourseOfferings.jsx and TeachingSchedule.jsx. Work remains local
+  on v6.1-migui together with the preceding scope corrections; no push or merge.
+
+## Strict schedule choices — 2026-11-04
+
+- Owner clarified: option labels only meeting days/times, no recommendation wording
+  or break prose. Top three keep visual emphasis via option classes.
+- With recorded faculty hours, return only slots whose complete meetings fit those
+  days/times; single-day blocks must also cover the internal break. No Sunday slots.
+  Saturday appears only when explicitly available (or unknown availability).
+- Unknown availability retains Mon–Sat selection/caution per earlier owner request.
+- Old saved out-of-range choices no longer reinserted into dropdown; caution below
+  asks to replace them. Legacy labels remain recognized for conflict checking.
+- No automated tests per owner. Backend syntax compilation passed; frontend rebuilt.
+  Next: owner review after restarting the app and hard-refreshing.
+
+## Availability / dropdown correction — 2026-11-04
+
+- Profile showed FacultyWorkingHour rows while the dropdown only checked Submitted
+  TeachingAvailability for the selected term. This explains the conflicting labels;
+  Liwayway's live database was not inspected or changed.
+- Options prefer submitted semester teaching hours, otherwise read the same recurring
+  hours as the profile as a reference (never mark them semester-confirmed). Missing
+  availability does not disable selecting a slot. Known class/defense conflicts remain
+  disabled; only valid candidates receive up to three recommendation labels.
+- Removed availability/reason text from option labels. A warning below the dropdown
+  appears only after selecting a slot, explaining missing/profile/outside-hours cases.
+- No tests per owner. Next: frontend build, restart app for backend changes, owner review.
+
+## Owner scope correction — 2026-11-04
+
+- Owner wants only faculty teaching availability and offering-row schedule suggestions.
+- Removed Semester class schedule, Faculty submissions, draft/revision/approval/publication
+  controls and Keep workflow from Offering setup. Dropdown now loads read-only candidates
+  directly, saves through the existing row Save, and does not require a timetable plan.
+- Both paired 90-minute and same-day two 90-minute sessions / 15-minute break appear.
+  Up to three valid choices marked Recommended; every generated slot remains visible,
+  unavailable ones disabled with reasons. Submitted faculty hours and known conflicts
+  determine validity. No Google Calendar teaching integration added.
+- Existing backend timetable models/routes remain for compatibility, unused by this UI.
+  Legacy custom free-text schedules cannot be reliably checked as structured conflicts.
+- No further tests per owner. Frontend build passed.
+- Dropdown follow-up: an older running backend returns the prior timetable payload
+  without options, which the UI silently treated as an empty list. Added explicit
+  restart guidance for that response. App restart is required for the new options
+  handler; do not claim the live backend was restarted or verified.
+- Next: restart app and owner review of Offering setup dropdown.
+
+## Current Position — 2026-11-04: owner-requested teaching scheduling
+
+- **Branch:** `v6.1-migui`. Local commits `e7d7176` (Dean review context) and
+  `3131fcf` (semester teaching availability/timetables). No push or merge.
+- **Implemented:** faculty Schedule calendar by semester, separate from defense
+  availability; copy/confirmation; paired and explicit single-day options;
+  whole-semester recommendations, durable manual pins, coordinator-only approval
+  and publication, immutable revisions, personal published views and notifications.
+  Rooms remain unchanged. Usage and limitations: `TEACHING_SCHEDULE.md`.
+- **Verified:** current focused backend/engine/roster suite 34 PASS; two final
+  publication/error-message cases PASS; real faculty → coordinator → student
+  walkthrough PASS including Keep/release; seven role sweeps PASS (faculty rerun
+  after the discovered roster-list fix), sidebar/new UI checks PASS; build PASS;
+  strict UI all zero; negative control failed as intended with six injected issues.
+  All three screen widths opened and reviewed for the new pages.
+- **Demo:** standard seed rebuilt the local disposable DB and startup schema smoke
+  passed. Teaching submissions start unknown. Restart the existing app process to
+  load the new routes; it does not auto-reload. Seed fingerprint recorded below.
+- **Stopped on owner instruction:** full Python suite, exec session `99914`, output
+  `frontend/e2e-artifacts/teaching-full-python.log`. Started before small scoped
+  roster/no-joint-explanation/post-publication-warning review fixes; those have
+  separate current-source targeted proof. Do not mislabel it an exact final-source
+  gate. No reported failures at the last check (panel-matching tests).
+- **Owner update:** no further testing requested. Do not resume the full test run.
+- **2026-11-04 UI adjustment:** removed the separate Course Adjustments Schedule
+  tab; structured dropdowns now live in Offering setup’s Schedule column, with
+  timetable controls below the table. Offering saves refresh schedule constraints.
+  No tests run per owner; production frontend rebuilt. API rows include offering_id for exact
+  row matching across programs/sections. Google Calendar remains defense busy-time
+  integration; teaching availability remains a separate semester submission.
+- **Next action:** owner review of Offering setup; no further automated tests run. All helper agents are done;
+  the three temporary worktrees and helper branches have been removed.
+
+The older handoff below predates this owner-authorized work; detailed progress for
+this run is appended near the end of the file.
 
 ## MEETING PREP RUN (2026-11-03 night -> 2026-11-04 10:00 Manila) — read this first
 
@@ -414,3 +530,5 @@ uncommitted changes is half-done — read its diff, run its tests, then decide.
 - Three helper worktrees .worktrees/teaching-engine, .worktrees/teaching-api, .worktrees/teaching-ui have frozen copies; all helper agents done. Main reviewed, transplanted, tested and applied small review fixes inline. Codex helper/worktree workflow used; no Ollama/Claude-specific executors available. No commit/merge/push yet. Next: collect fullgate result, final diff/secretscheck, save local commits with tests, remove temporary helperworktrees, update final STATE/BOARD/issues.
 
 - Post-publication warning refinement (I-226): existing lifecycle test strengthened to assert no false legacy free-text warning for own structured publication; RED showed2falsewarnings. sections_context now recognizes per-offering active published ClassSection records, retaining true legacy warnings. Two relevant lifecycle/no-joint cases rerunning -> teaching-publication-recheck.log. No schema/permission/conflict changes. No further feature scope planned; collect gate and save work.
+
+- Saved local commits e7d7176 (Dean review) and3131fcf (teaching scheduling + tests/docs). No push/merge. Temporary helperworktrees and codex/teaching-* branches removed after verifying root production files tracked. Only remaining background job is fullPython99914; output teaching-full-python.log. Postpublication warning recheck2PASS; final live workflowPASS24.4s. Additional doc clarification: StudyPlanDraft exists but is generated/reviewed projection, not confirmed attendance. Next collect fullgate, record result/scope and make final documentation commit.
