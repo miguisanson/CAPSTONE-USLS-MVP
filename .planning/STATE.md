@@ -13,6 +13,7 @@ verified. Fable session "Session progress report" was told before start.
 Keep codes GS-F-01..44 / GS-P-01..02 stable (meeting print pack + ZOOM-CHEAT-SHEET table). Also hold pkt/fapp
 until after the stakeholder meeting: new UserAccount columns break sign-in if the live site restarts without a
 reseed. After merging, send that session the final code list so it can rebuild ZOOM-CHEAT-SHEET.
+**STOP AT 09:00 (owner, 2026-11-04):** helpers commit by 08:30; review + this note by 08:55; nothing runs after 09:00.
 
 ## Merge recovery — 2026-11-04 (current)
 
