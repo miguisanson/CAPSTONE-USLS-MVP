@@ -24968,6 +24968,8 @@ REPORT_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.
 REPORT_FORMATS = ("json", "xlsx", "pdf")
 GRADUATION_CANDIDATE_STAGES = ("Writing", "Final Defense")
 NO_VERDICT_YET = "Not yet recorded"
+# What a checklist line that could not be checked is waiting for (graduation_eligibility gives passed=None for these).
+GRADUATION_NO_RECORD_TEXT = {"coursework": "no curriculum on file", "practicum": "no practicum record on file"}  # the research stages and the completion documents wait for a research record
 NOT_IN_A_BATCH = "Not in a batch"
 DEFENSE_REPORT_WHEN = ("Upcoming", "Awaiting verdict", "Held", "Deferred")
 GRADUATION_ELIGIBILITY_ORDER = {"Eligible": 0, "Needs verification": 1, "Not eligible": 2}
@@ -25276,9 +25278,14 @@ def report_graduation(args) -> dict:
         "eligibility": eligibility_filter, "batch_status": batch_filter,
     }
     in_a_batch = db.session.query(GraduationEndorsement.student_id)
+    # A student in a batch is listed only from the Writing stage on: the earlier terms' decided history endorsements
+    # sit on students still in Coursework (I-237) and are history, not candidates.
     students = (
         _report_students(args)
-        .filter(or_(Student.current_stage.in_(GRADUATION_CANDIDATE_STAGES), Student.id.in_(in_a_batch)))
+        .filter(or_(
+            Student.current_stage.in_(GRADUATION_CANDIDATE_STAGES),
+            and_(Student.current_stage == "Completed", Student.id.in_(in_a_batch)),
+        ))
         .order_by(Student.last_name, Student.first_name)
         .all()
     )
@@ -25296,7 +25303,7 @@ def report_graduation(args) -> dict:
         if (eligibility_filter and eligibility["status"] != eligibility_filter) or (batch_filter and status != batch_filter):
             continue
         missing = [
-            item["label"] + (" (to verify)" if item["passed"] is None else "")
+            item["label"] + (f" ({GRADUATION_NO_RECORD_TEXT.get(item['key'], 'no research record on file')})" if item["passed"] is None else "")
             for item in eligibility["checklist"]
             if item["passed"] is not True
         ]
