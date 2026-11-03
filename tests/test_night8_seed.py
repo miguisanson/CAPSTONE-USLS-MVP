@@ -163,8 +163,10 @@ class Night8SeedTests(unittest.TestCase):
         _seed(Path(self.other_folder))
         with app.app_context():
             db.session.remove()
+            # In a full run `app` was imported by an earlier test module, so it may use that module's file, not _DB_FILE.
+            here = db.engine.url.database
         differing = differing_tables(
-            table_fingerprints(_DB_FILE.name), table_fingerprints(Path(self.other_folder) / "demo.sqlite3")
+            table_fingerprints(here), table_fingerprints(Path(self.other_folder) / "demo.sqlite3")
         )
         self.assertEqual([], differing, "two seeds produced different data in these tables")
 
