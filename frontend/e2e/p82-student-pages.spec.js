@@ -385,7 +385,8 @@ test.describe("P82 student pages (pinned)", () => {
     try {
       await open(page, "/student/research");
       const card = cardOf(page, "Adviser and panel");
-      await expect(card).toContainText("Assigned after Panel Matching; scheduling opens once a panel is in place");
+      // I-222: the "assigned after Panel Matching" subtitle shows only while the adviser or panel is missing.
+      await expect(card).not.toContainText("Assigned after Panel Matching");
       await expect(card).toContainText("Adviser: Dr. Spec Adviser");
       await expect(card).toContainText("Dr. Panel One");
       await expect(card).toContainText("Panel Chair");
