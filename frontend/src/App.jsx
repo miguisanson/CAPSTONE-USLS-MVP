@@ -21,6 +21,7 @@ import { StudentPortalProvider, StudentRoutes } from "./pages/student/StudentRou
 import { DeanProvider, DeanRoutes } from "./pages/dean/DeanRoutes";
 import Login from "./pages/Login";
 import ChangePassword from "./pages/ChangePassword";
+import PrivacyConsent from "./pages/PrivacyConsent";
 import Form1Endorsements from "./pages/Form1Endorsements";
 import { FacultyProvider, FacultyRoutes } from "./pages/faculty/FacultyRoutes";
 import TermSettings from "./pages/TermSettings";
@@ -43,6 +44,8 @@ export default function App() {
   if (loading) return <Spinner label="Checking account…" />;
   // An account created with a generated initial password must choose its own first.
   if (user?.must_change_password) return <ChangePassword />;
+  // Then, once per account and notice version, the Data Privacy Notice (GS-P-04).
+  if (user?.privacy_consent_required) return <PrivacyConsent />;
 
   return (
     <Routes>

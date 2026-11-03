@@ -410,7 +410,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
   if (state.loading && !data) {
     return (
       <div className="page-stack">
-        <PageHeader title={config.title} description={(role === "dean" && config.deanDescription) || config.description} icon={Icon} badge={headerBadge} />
+        <PageHeader title={config.title} description={(role === "dean" && config.deanDescription) || config.description} forms={slug} icon={Icon} badge={headerBadge} />
         <SkeletonBoard columns={4} label="Loading requests" />
       </div>
     );
@@ -430,6 +430,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
       <PageHeader
         title={config.title}
         description={(role === "dean" && config.deanDescription) || config.description}
+        forms={slug}
         icon={Icon}
         badge={headerBadge}
         actions={

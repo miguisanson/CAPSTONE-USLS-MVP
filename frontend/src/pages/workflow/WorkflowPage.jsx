@@ -216,6 +216,7 @@ function SingleWorkflowPage() {
       <PageHeader
         title={tx.title}
         description={[tx.short, PAGE_NOTE[slug]].filter(Boolean).join(" ")}
+        forms={slug === "research-gate" && subview === "adviser" ? "adviser-designation" : slug}
         icon={Icon}
         actions={(
           <>

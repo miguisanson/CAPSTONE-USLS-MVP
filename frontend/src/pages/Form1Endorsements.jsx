@@ -78,7 +78,7 @@ export function Form1EndorsementQueue({ embedded = false }) {
         </div>
       ) : (
         <>
-          <PageHeader title="Form 1 Endorsements" description={SUBTITLE} icon={FileSignature} />
+          <PageHeader title="Form 1 Endorsements" description={SUBTITLE} forms="title-defense" icon={FileSignature} />
           <p className="text-sm text-slate-600">{INTRO}</p>
         </>
       )}

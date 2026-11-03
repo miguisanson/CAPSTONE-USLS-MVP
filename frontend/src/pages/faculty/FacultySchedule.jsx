@@ -81,7 +81,7 @@ export default function FacultySchedule() {
   }
 
   return <div className="page-stack">
-    <PageHeader title="Schedule" icon={CalendarDays} description="Enter teaching availability for each semester. Your defense availability is managed separately in My Availability." />
+    <PageHeader title="Schedule" forms="teaching-schedule" icon={CalendarDays} description="Enter teaching availability for each semester. Your defense availability is managed separately in My Availability." />
     {error && <InlineNotice tone="danger" title="Could not save or load teaching availability">{error}</InlineNotice>}
     {notice && <InlineNotice tone="success">{notice}</InlineNotice>}
     {loading ? <Spinner label="Loading teaching availability…" /> : data && <>

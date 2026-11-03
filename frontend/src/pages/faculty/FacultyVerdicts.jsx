@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { BookOpen, CalendarClock, CheckCircle2, Eye, Gavel, Hourglass, History } from "lucide-react";
 import { api } from "../../api";
-import { Button, Card, EmptyState, Field, Input, InlineNotice, SectionTitle, Select, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Card, EApprovalNote, EmptyState, Field, Input, InlineNotice, SectionTitle, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatClock, formatDate, formatDateTime } from "../../lib/format";
 
 // The Verdicts page (I-090). Three groups, most urgent first:
@@ -160,6 +160,7 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
           )}
         </div>
         <Button icon={Gavel} className="mt-3" disabled={busy} onClick={() => submitVerdict(panel)}>{busy ? "Submitting…" : "Submit final verdict"}</Button>
+        <EApprovalNote className="mt-2" />
         <p className="mt-2 text-xs text-brand-800">Tied to defense schedule #{scheduleId}. GS staff have read-only access.</p>
       </div>
     );

@@ -283,6 +283,7 @@ export default function StudentAdviserPage() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.researchAdviser}
+        forms="adviser-designation"
         icon={UserCheck}
         description="You nominate an adviser on Form 3. The Academic Coordinator notes it, the Dean decides, and the adviser accepts. Then you email Forms 3.2 and 3.3 to the Research Coordinator within a few days."
       />

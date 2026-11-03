@@ -228,6 +228,7 @@ export function DeanPracticumBoard() {
       <PageHeader
         title={PAGE.practicumReports}
         description={DESCRIPTION}
+        forms="practicum"
         icon={Briefcase}
         badge={<StatusChip status={`${counts.pendingPracticum} waiting`} tone="muted" dot={false} />}
         actions={
