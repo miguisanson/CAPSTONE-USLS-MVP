@@ -52,3 +52,11 @@ calendar page shows a preview.
 You chose to show the demo accounts on the sign-in page. Anyone who finds https://miguisanson.dev can then sign in
 as any demo role, Administrator included. Only demo data is on it, and a reset rebuilds it, so the risk is small;
 to hide the list later, change `DEMO_SHOW_ACCOUNTS=1` to `0` in `deploy\START-SITE.cmd`.
+
+## Policy Assistant runs without Gemini today
+
+On the morning of 4 Nov Google's Gemini service answered with errors (HTTP 503 and timeouts), so every Policy Assistant
+answer waited 8-13 seconds before showing the offline answer. `deploy\START-SITE.cmd` now starts the site with
+`GOOGLE_API_KEY=off`: answers come in under a second, quoted and cited from the Handbook / Research Protocol, with the
+badge "Offline answer". Panel matching also uses its built-in (offline) scoring. To use Gemini again, delete the line
+`set GOOGLE_API_KEY=off` in `deploy\START-SITE.cmd` and restart the site.

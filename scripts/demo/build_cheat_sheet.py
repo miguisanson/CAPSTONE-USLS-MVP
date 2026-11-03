@@ -252,6 +252,7 @@ table([
     ["A demo student is already used up", "Sign-in page > Demo accounts > Student workflow demos > Reset next to that student."],
     ["Drag and drop does not move the card", "Use 'Move to…' on the card, or the button in View details. Same step."],
     ["Numbers differ from the rehearsal", "Expected: reports are live measurements. Read them off the screen."],
+    ["Policy Assistant says \"Offline answer\"", "Expected today: Gemini was failing (HTTP 503) on 4 Nov, so the site runs without it. The answer is still quoted and cited from the Handbook / Protocol."],
     ["Withdrawal window is closed", "The demo semester is dated from the day of the seed; re-seed in the morning (docker compose exec app python app.py --seed, or npm run seed locally)."],
     ["Someone asks for a feature we do not have", "Write it down, say it goes into the improvement list, and ask which office would use it and how often."],
 ], [5.0, 12.4])

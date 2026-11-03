@@ -7,6 +7,10 @@ set DEMO_MODE=1
 set DEMO_SHOW_ACCOUNTS=1
 set SESSION_COOKIE_SECURE=1
 set GOOGLE_CALENDAR_REDIRECT_URI=https://miguisanson.dev/api/integrations/google-calendar/callback
+rem Gemini answered HTTP 503 / timeouts on the morning of 4 Nov 2026 (I-221): each Policy Assistant answer then waited
+rem 8-13 s before the cited offline answer. "off" (not a real key) makes the offline answer come at once
+rem ("set X=" would only remove the variable and .env would fill it back in). Delete the next line to use Gemini again.
+set GOOGLE_API_KEY=off
 
 curl -s -m 3 http://127.0.0.1:5000/api/health >nul 2>&1
 if errorlevel 1 (
