@@ -253,7 +253,7 @@ export default function StudentDetail() {
               <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
                 <p className="eyebrow mb-2">Outstanding subjects</p>
                 <ul className="space-y-1.5">
-                  {[...course_audit.incomplete, ...course_audit.missing].slice(0, 8).map((row) => (
+                  {[...course_audit.incomplete, ...course_audit.missing].map((row) => (
                     <li key={row.code} className="flex items-center justify-between gap-2 text-sm">
                       <span className="min-w-0 text-slate-700">
                         <span className="font-semibold">{row.code}</span> · {row.title}
