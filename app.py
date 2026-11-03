@@ -3240,6 +3240,7 @@ def withdrawal_application_dict(application: WithdrawalApplication | None, inclu
 
 
 GRADUATION_EXPORTED_STATUS = "Exported - Ready to Send"
+GRADUATION_APPROVED_STATUSES = ("Dean Approved", "Sent to Registrar", "Registrar Received")  # the Dean has said yes
 
 
 def graduation_display_status(endorsement: GraduationEndorsement) -> str:
@@ -35260,6 +35261,14 @@ def close_satisfied_research_tasks(student: Student, progress: dict) -> int:
     return closed
 
 
+def graduation_endorsement_undecided(student: Student) -> bool:
+    """True while one of the student's graduation endorsements has not been approved by the Dean."""
+    return GraduationEndorsement.query.filter(
+        GraduationEndorsement.student_id == student.id,
+        GraduationEndorsement.endorsement_status.notin_(GRADUATION_APPROVED_STATUSES),
+    ).first() is not None
+
+
 def sync_research_progress(student: Student, submitted_title: str = "") -> tuple[ResearchCase, dict]:
     prerequisite = comprehensive_exam_eligibility(student)
     if not prerequisite["research_allowed"]:
@@ -35325,7 +35334,8 @@ def sync_research_progress(student: Student, submitted_title: str = "") -> tuple
         "Title Defense": "Proposal Development",
         "Proposal Defense": "Proposal Defense",
         "Final Defense": "Final Defense",
-        "Completion": "Completed" if progress["status"] == "Complete" else "Final Defense",
+        # Completed means graduated: research evidence alone leaves a graduation candidate in Final Defense until the Dean approves (F-25).
+        "Completion": "Completed" if progress["status"] == "Complete" and not graduation_endorsement_undecided(student) else "Final Defense",
     }[progress["stage"]]
     if student.standing == "Active" and student.current_stage != "Completed":
         student.current_stage = lifecycle_stage
@@ -37554,6 +37564,60 @@ def _create_panel_demo_student(spec: dict, program: Program, adviser: Faculty) -
     _seed_panel_demo_research(student, spec, adviser)
     sync_research_progress(student)
     return student
+
+
+def seed_roster_advisers() -> int:
+    """Give the roster students in a research stage a research adviser, except ROSTER_WITHOUT_ADVISER (F-25).
+
+    The adviser is recorded the way the persona advisers are: the name and an active assignment, then the Accepted
+    appointment that adviser_faculty_ids_for_student reads. Students go in student-number order; each takes the
+    faculty member of their own college with the fewest advisees (any college when theirs is full), never one who
+    sits on their panel and never past the advisee limit. Returns the number of students given an adviser.
+    """
+    from panel_demo_data import ROSTER_ADVISER_SPARE_SEAT, ROSTER_WITHOUT_ADVISER
+
+    limit = adviser_max_advisees()
+    faculty_rows = Faculty.query.filter_by(active=True).order_by(Faculty.id).all()
+    students = Student.query.order_by(Student.student_number).all()
+    load: Counter = Counter(faculty_id for student in students for faculty_id in adviser_faculty_ids_for_student(student))
+    made = 0
+    for student in students:
+        if student.current_stage not in SEED_RESEARCH_STAGES[:-1] or student.student_number in ROSTER_WITHOUT_ADVISER:
+            continue
+        if adviser_faculty_ids_for_student(student):
+            continue
+        on_panel = {row.faculty_id for row in PanelAssignment.query.filter_by(student_id=student.id).all()}
+        options = [
+            faculty for faculty in faculty_rows
+            if faculty.id not in on_panel and load[faculty.id] < limit - (faculty.name in ROSTER_ADVISER_SPARE_SEAT)
+        ]
+        if not options:
+            continue
+        # Fill every adviser to limit - 1 first, then to the limit; within that, own college first, then fewest advisees.
+        faculty = min(options, key=lambda item: (load[item.id] >= limit - 1, item.college != student.program.college, load[item.id], item.id))
+        student.adviser_name = faculty.name
+        db.session.add(AdviserAssignment(student_id=student.id, faculty_id=faculty.id, status="Active"))
+        migrate_student_adviser(student)
+        load[faculty.id] += 1
+        made += 1
+    db.session.flush()
+    return made
+
+
+def keep_endorsed_candidates_out_of_completed() -> int:
+    """A student whose graduation endorsement the Dean has not approved is not "Completed" yet (F-25).
+
+    sync_research_progress already refuses to promote such a student; this moves back the ones the seed's earlier
+    steps promoted before their endorsement existed (Hector Ong's is made by seed_dean_review_cases). Returns the
+    number of students moved back to Final Defense.
+    """
+    moved = 0
+    for student in Student.query.filter_by(current_stage="Completed").order_by(Student.id).all():
+        if graduation_endorsement_undecided(student):
+            student.current_stage = "Final Defense"
+            moved += 1
+    db.session.flush()
+    return moved
 
 
 def seed_roster_research_papers() -> int:
@@ -40876,12 +40940,14 @@ def build_demo_database() -> dict:
         sync_automatic_awol_statuses(commit=False)
         db.session.commit()
         sync_leave_cases(commit=True)  # dates move leave cases along
+        seed_roster_advisers()  # a research student has a research adviser, a few still need one (F-25)
         seed_roster_research_papers()  # every research-stage student has a paper of their own (I-145)
         ensure_onboarding_reviews()
         generate_reminders()  # the reminders that are due today (a page view no longer makes them)
         db.session.commit()
         spread_seed_history()  # history over the previous weeks
         seed_report_history()  # two earlier terms of decided cases for the Reports (I-181)
+        keep_endorsed_candidates_out_of_completed()  # not Completed while the Dean has not approved (F-25)
         seed_stage_events()  # last: the stage clock, and the risk levels that read it
         return sync_result
 
