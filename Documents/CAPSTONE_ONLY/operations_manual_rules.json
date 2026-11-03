@@ -4,9 +4,9 @@
   "date": "2026-10-01",
   "note": "Draft for validation. Practice and Proposed rules are not confirmed by the Graduate School.",
   "counts": {
-    "Official": 168,
+    "Official": 170,
     "Practice": 22,
-    "Proposed": 40
+    "Proposed": 86
   },
   "rules": [
     {
@@ -590,6 +590,21 @@
       ],
       "page": "",
       "status": "Proposed"
+    },
+    {
+      "id": "CRS-13",
+      "process": "Course offering and course adjustments (change and add of subject)",
+      "process_section": "4.3",
+      "rule": "A special class is requested by the Academic Coordinator through the Dean and addressed to the Vice Chancellor for Academic Affairs; the fees for it are computed as the Handbook describes and the class follows the Blended Learning Mode of 32 contact hours plus independent study (see also ENR-07, CRS-04).",
+      "source": "Handbook 2022-2023, p. 48",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "p. 48"
+        }
+      ],
+      "page": "p. 48",
+      "status": "Official"
     },
     {
       "id": "WD-01",
@@ -3538,6 +3553,21 @@
       "status": "Proposed"
     },
     {
+      "id": "GRD-17",
+      "process": "Graduation application and endorsement",
+      "process_section": "4.18",
+      "rule": "A project paper, thesis or dissertation is nominated for the best thesis or dissertation award by the chairman of the committee or by the Dean; it is scored out of 100 points (format and content 15, analysis and discussion 40, findings, action plan or program 15, originality, novelty and contribution to new knowledge or applicability 30) and needs a cut-off of 96 points and the approval of the majority of the committee (see also CMP-12).",
+      "source": "Handbook 2022-2023, pp. 76-77",
+      "sources": [
+        {
+          "document": "Handbook 2022-2023",
+          "location": "pp. 76-77"
+        }
+      ],
+      "page": "pp. 76-77",
+      "status": "Official"
+    },
+    {
       "id": "HND-01",
       "process": "Records handoff to the Registrar",
       "process_section": "4.19",
@@ -3686,6 +3716,764 @@
         {
           "document": "Group working notes",
           "location": "Scenario notes; Platform (current build)"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "FAC-01",
+      "process": "Faculty course preference and teaching load",
+      "process_section": "4.20",
+      "rule": "Each faculty member has one profile with name, college or department, specialization, email, eligible roles (Faculty Adviser, Panel Member, Panel Chair, Academic Coordinator, Research Coordinator) and an Active or Inactive status. GS staff and the Academic Coordinator create and edit profiles.",
+      "source": "Platform (current build), faculty profile",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "faculty profile"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "FAC-02",
+      "process": "Faculty course preference and teaching load",
+      "process_section": "4.20",
+      "rule": "A faculty member lists preferred subjects in order of preference on GS-F-47. A faculty member may change only the member's own list; GS staff and the Academic Coordinator may enter it on the member's behalf. Only subjects of the member's own college may be listed.",
+      "source": "Platform (current build), faculty preferred subjects",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "faculty preferred subjects"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "FAC-03",
+      "process": "Faculty course preference and teaching load",
+      "process_section": "4.20",
+      "rule": "A preferred subject is a wish, not a promise. The Academic Coordinator weighs preference with availability, eligible role, qualification and current load, and the Academic Coordinator's assignment stands (see CRS-07 and CRS-12).",
+      "source": "Consultation 21 July 2026, the Academic Coordinator decides which professor teaches; Platform (current build), offering setup",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": "the Academic Coordinator decides which professor teaches"
+        },
+        {
+          "document": "Platform (current build)",
+          "location": "offering setup"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "FAC-04",
+      "process": "Faculty course preference and teaching load",
+      "process_section": "4.20",
+      "rule": "Availability is recorded as weekly hours with dated exceptions on top. An exception \"available\" replaces the weekly hours for that day; an exception \"unavailable\" removes the day or the stated hours. A weekend needs a dated entry.",
+      "source": "Platform (current build), faculty availability and exceptions",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "faculty availability and exceptions"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "FAC-05",
+      "process": "Faculty course preference and teaching load",
+      "process_section": "4.20",
+      "rule": "Hours that the system filled in by itself are never counted as availability the professor entered. Until the professor or GS staff enter hours, the record reads \"not entered\" and the professor is not suggested for a subject.",
+      "source": "Platform (current build), faculty availability status",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "faculty availability status"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "FAC-06",
+      "process": "Faculty course preference and teaching load",
+      "process_section": "4.20",
+      "rule": "The Research Coordinator and GS staff may request availability from the panel members for a student's defense. A request has a date window, an optional message and a status of Open, Answered or Cancelled, and it is answered when the professor enters hours or confirms the hours on record.",
+      "source": "Platform (current build), availability requests; Group working notes, BPM accurate flow, scheduling",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "availability requests"
+        },
+        {
+          "document": "Group working notes",
+          "location": "BPM accurate flow, scheduling"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "FAC-07",
+      "process": "Faculty course preference and teaching load",
+      "process_section": "4.20",
+      "rule": "A professor may be assigned at most 24 teaching units in a semester. An assignment that would pass the limit is refused and the Academic Coordinator chooses another professor or changes the sections. The 24-unit value is a prototype value pending the Graduate School's answer (OQ-45).",
+      "source": "Platform (current build), faculty teaching load limit",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "faculty teaching load limit"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "FAC-08",
+      "process": "Faculty course preference and teaching load",
+      "process_section": "4.20",
+      "rule": "Only an Active professor of the same college as the subject's program may be assigned to the subject.",
+      "source": "Platform (current build), offering setup",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "offering setup"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "FAC-09",
+      "process": "Faculty course preference and teaching load",
+      "process_section": "4.20",
+      "rule": "The Dean approves the offering plan, including its assigned professors, before it is published (CRS-10). GS-F-48 is the paper record of the assignment; the professor acknowledges it before classes begin.",
+      "source": "Group working notes, BPM accurate flow, section 3; Platform (current build), offering plan decision",
+      "sources": [
+        {
+          "document": "Group working notes",
+          "location": "BPM accurate flow, section 3"
+        },
+        {
+          "document": "Platform (current build)",
+          "location": "offering plan decision"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ACC-01",
+      "process": "Platform accounts and roles",
+      "process_section": "4.21",
+      "rule": "The platform has seven roles: Graduate School Staff, Academic Coordinator, Research Coordinator, Dean, Student, Faculty Member and Administrator. One account has one role and belongs to one person.",
+      "source": "Platform (current build), role labels",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "role labels"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ACC-02",
+      "process": "Platform accounts and roles",
+      "process_section": "4.21",
+      "rule": "Each screen and each action is open only to the roles that GS-P-05 lists for it (least privilege). A Student sees only the student's own record; a Faculty Member sees only the faculty member's own portal, panel invitations and adviser requests.",
+      "source": "Platform (current build), role checks on every request",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "role checks on every request"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ACC-03",
+      "process": "Platform accounts and roles",
+      "process_section": "4.21",
+      "rule": "A student account is created when the student is handed off from admission (the monitoring workbook import). Each new student account gets its own initial password, shown once to the staff member who imported the file.",
+      "source": "Platform (current build), student handoff import",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "student handoff import"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ACC-04",
+      "process": "Platform accounts and roles",
+      "process_section": "4.21",
+      "rule": "A faculty account is created together with the faculty profile by GS staff or the Academic Coordinator. The email must not belong to another profile or account.",
+      "source": "Platform (current build), faculty creation",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "faculty creation"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ACC-05",
+      "process": "Platform accounts and roles",
+      "process_section": "4.21",
+      "rule": "An account for GS staff, a coordinator or the Dean is requested on GS-F-46, endorsed by the head of the person's office, approved by the Dean and set up by GS staff or the platform administrator within three working days of the approval (proposed).",
+      "source": "Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ACC-06",
+      "process": "Platform accounts and roles",
+      "process_section": "4.21",
+      "rule": "A password set for someone else is temporary: the holder must choose a personal password at first sign-in before anything else works. A personal password has at least ten characters, differs from the old one and is not the email address or a shared demo password.",
+      "source": "Platform (current build), change of password",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "change of password"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ACC-07",
+      "process": "Platform accounts and roles",
+      "process_section": "4.21",
+      "rule": "Repeated failed sign-ins slow the next attempt (after five failures within 15 minutes the wait is 2 seconds and doubles to at most 30 seconds); the account is not locked.",
+      "source": "Platform (current build), sign-in brake",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "sign-in brake"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ACC-08",
+      "process": "Platform accounts and roles",
+      "process_section": "4.21",
+      "rule": "An account is deactivated, not deleted, when the person leaves or changes office, within five working days of the request. A deactivated account cannot sign in. Setting a faculty profile to Inactive deactivates its login.",
+      "source": "Platform (current build), account status; Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "account status"
+        },
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ACC-09",
+      "process": "Platform accounts and roles",
+      "process_section": "4.21",
+      "rule": "The Dean reviews the list of active accounts and roles once a year (the interval is proposed, OQ-46).",
+      "source": "Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "ACC-10",
+      "process": "Platform accounts and roles",
+      "process_section": "4.21",
+      "rule": "The Administrator account is held by the person who maintains the platform and not by an office holder. Accounts are personal: a password is never shared, and a shared demonstration login exists only in demonstration mode.",
+      "source": "Platform (current build), administrator and demonstration accounts; Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "administrator and demonstration accounts"
+        },
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "EAP-01",
+      "process": "Electronic approval and signatures",
+      "process_section": "4.22",
+      "rule": "The e-signature already used on research forms by email (ADV-09, PRP-02, FIN-12) remains valid. GS-P-03 adds the approval recorded in the platform and does not replace the Protocol.",
+      "source": "Platform (current build), approval records; Research Protocol AY2024-2025, e-signatures by email, as in ADV-09, PRP-02 and FIN-12",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "approval records"
+        },
+        {
+          "document": "Research Protocol AY2024-2025",
+          "location": "e-signatures by email, as in ADV-09, PRP-02 and FIN-12"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "EAP-02",
+      "process": "Electronic approval and signatures",
+      "process_section": "4.22",
+      "rule": "An electronic document and an electronic signature have legal recognition under RA 8792 (section 7, electronic documents; section 8, electronic signatures). An electronic signature equals a written signature when a method identifies the person to be bound and shows that the person had access to the document to consent or approve it, the method is dependable for its purpose, the person applied the signature to proceed, and the other party can verify it. The University must confirm that the platform's sign-in meets this test (OQ-47).",
+      "source": "Republic Act No. 8792 (Electronic Commerce Act of 2000), s. 7 and s. 8",
+      "sources": [
+        {
+          "document": "Republic Act No. 8792 (Electronic Commerce Act of 2000)",
+          "location": "s. 7 and s. 8"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "EAP-03",
+      "process": "Electronic approval and signatures",
+      "process_section": "4.22",
+      "rule": "An approval recorded in the platform by the signed-in holder of the approving role is that officer's signature on the matching GS-F form, if the approval record shows the officer's name and role, the date and time, the decision and the remarks.",
+      "source": "Republic Act No. 8792 (Electronic Commerce Act of 2000), s. 8; Platform (current build), approval records",
+      "sources": [
+        {
+          "document": "Republic Act No. 8792 (Electronic Commerce Act of 2000)",
+          "location": "s. 8"
+        },
+        {
+          "document": "Platform (current build)",
+          "location": "approval records"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "EAP-04",
+      "process": "Electronic approval and signatures",
+      "process_section": "4.22",
+      "rule": "An officer approves only under the officer's own account and never lends a password. A representative of an officer (for example the Dean's authorised representative) signs in under the representative's own account, and the decision names the officer for whom the representative acts and the authority.",
+      "source": "Republic Act No. 8792 (Electronic Commerce Act of 2000), s. 8; Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Republic Act No. 8792 (Electronic Commerce Act of 2000)",
+          "location": "s. 8"
+        },
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "EAP-05",
+      "process": "Electronic approval and signatures",
+      "process_section": "4.22",
+      "rule": "Every approve, endorse, return or decline control in the platform shows a one-line note that the decision is an electronic approval under GS-P-03.",
+      "source": "Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "EAP-06",
+      "process": "Electronic approval and signatures",
+      "process_section": "4.22",
+      "rule": "The approval record is kept for as long as the case file it belongs to (PRV-08). It is not edited. A wrong approval is corrected by a new, later entry that states the reason, and both entries stay.",
+      "source": "Platform (current build), transaction log",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "transaction log"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "EAP-07",
+      "process": "Electronic approval and signatures",
+      "process_section": "4.22",
+      "rule": "Where the Protocol requires an e-signature on the form itself, the form keeps it. The platform approval does not take its place until the Graduate School confirms GS-P-03.",
+      "source": "Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "EAP-08",
+      "process": "Electronic approval and signatures",
+      "process_section": "4.22",
+      "rule": "Other offices, including the Registrar, receive a platform approval only as a printed or exported case record, or as the form carrying the line \"Approved electronically under GS-P-03 by [name, role] on [date, time]\".",
+      "source": "Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRV-01",
+      "process": "Data privacy and records retention",
+      "process_section": "4.23",
+      "rule": "The Graduate School keeps personal data of students, faculty and officers for the lifecycle processes in this manual. The University's Data Protection Officer oversees the Graduate School's handling of that data, and the Dean is accountable for the Graduate School's records.",
+      "source": "Republic Act No. 10173 (Data Privacy Act of 2012), s. 21; Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+          "location": "s. 21"
+        },
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRV-02",
+      "process": "Data privacy and records retention",
+      "process_section": "4.23",
+      "rule": "The Graduate School collects only the data a process in this manual needs and uses it only for that process (transparency, legitimate purpose and proportionality). Official identity, enrollment and grade data come from AIMS and are not retyped (3.3).",
+      "source": "Republic Act No. 10173 (Data Privacy Act of 2012), s. 11",
+      "sources": [
+        {
+          "document": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+          "location": "s. 11"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRV-03",
+      "process": "Data privacy and records retention",
+      "process_section": "4.23",
+      "rule": "At first sign-in the platform shows the Data Privacy Notice (GS-P-04) and records the account holder's acceptance with the date, time and notice version. A person without an account, or who prefers paper, signs GS-F-45. A new version of the notice is shown again at the next sign-in.",
+      "source": "Republic Act No. 10173 (Data Privacy Act of 2012), s. 12; Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+          "location": "s. 12"
+        },
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRV-04",
+      "process": "Data privacy and records retention",
+      "process_section": "4.23",
+      "rule": "A data subject may ask to be told what is held, to see and correct it, to object to its use, and to have it blocked or removed where the law and the retention schedule allow (rights of the data subject). The Graduate School answers within 15 working days (the period is proposed, OQ-48).",
+      "source": "Republic Act No. 10173 (Data Privacy Act of 2012), s. 16",
+      "sources": [
+        {
+          "document": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+          "location": "s. 16"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRV-05",
+      "process": "Data privacy and records retention",
+      "process_section": "4.23",
+      "rule": "Personal data are shown only to the roles that need them for their step (4.21). Staff do not keep copies on personal devices or send them through personal email or chat.",
+      "source": "Republic Act No. 10173 (Data Privacy Act of 2012), s. 20; Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+          "location": "s. 20"
+        },
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRV-06",
+      "process": "Data privacy and records retention",
+      "process_section": "4.23",
+      "rule": "The platform protects personal data with role checks on every request, hashed passwords, a sign-in brake, session cookies that scripts cannot read, an audit log of changes, and uploaded files that are only given to roles allowed to see the case.",
+      "source": "Republic Act No. 10173 (Data Privacy Act of 2012), s. 20; Platform (current build), security measures",
+      "sources": [
+        {
+          "document": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+          "location": "s. 20"
+        },
+        {
+          "document": "Platform (current build)",
+          "location": "security measures"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRV-07",
+      "process": "Data privacy and records retention",
+      "process_section": "4.23",
+      "rule": "Any suspected breach is reported the same day to the Data Protection Officer and the Dean. The officer decides whether the National Privacy Commission and the affected persons must be notified.",
+      "source": "Republic Act No. 10173 (Data Privacy Act of 2012), s. 20",
+      "sources": [
+        {
+          "document": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+          "location": "s. 20"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRV-08",
+      "process": "Data privacy and records retention",
+      "process_section": "4.23",
+      "rule": "Retention (proposed): a student's case file, the forms, the approval records and the transaction log are kept for 5 years after graduation or after the last enrollment, whichever applies. The graduation list and the transmittals to the Registrar are kept permanently. After the period the files are disposed of securely or kept only without names for reports (OQ-49).",
+      "source": "Republic Act No. 10173 (Data Privacy Act of 2012), s. 11; Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+          "location": "s. 11"
+        },
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "PRV-09",
+      "process": "Data privacy and records retention",
+      "process_section": "4.23",
+      "rule": "Data go to an outside service only if GS-P-04 names the service and what it receives. The platform can use an outside search service for the policy question box and for reading documents; when it is used, text from the question, the documents or the person's own record leaves the platform. Switching it off must leave the platform working with its own documents (OQ-48). A faculty member's own calendar is linked only when the member connects it.",
+      "source": "Republic Act No. 10173 (Data Privacy Act of 2012), s. 11 and s. 21; Platform (current build), outside services",
+      "sources": [
+        {
+          "document": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+          "location": "s. 11 and s. 21"
+        },
+        {
+          "document": "Platform (current build)",
+          "location": "outside services"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "DEX-01",
+      "process": "AIMS and Registrar data exchange",
+      "process_section": "4.24",
+      "rule": "AIMS stays an external system and the official record of identity, enrollment and grades. The platform has no live link, no AIMS login and no screen reading of AIMS; only files are exchanged.",
+      "source": "Consultation 21 July 2026, the group was told the platform cannot be integrated with AIMS; Platform (current build), AIMS boundary",
+      "sources": [
+        {
+          "document": "Consultation 21 July 2026",
+          "location": "the group was told the platform cannot be integrated with AIMS"
+        },
+        {
+          "document": "Platform (current build)",
+          "location": "AIMS boundary"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "DEX-02",
+      "process": "AIMS and Registrar data exchange",
+      "process_section": "4.24",
+      "rule": "Files come in by upload by GS staff or the Academic Coordinator: the student monitoring workbook (.xlsx or .xlsm) at handoff, and class lists (.csv or .xlsx with a faculty column) for enrollment tagging. The platform validates a file, refuses rows it cannot accept (for example a row for another semester, or for a student who is on leave, AWOL or withdrawn) and never changes grades.",
+      "source": "Platform (current build), student handoff and class list import",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "student handoff and class list import"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "DEX-03",
+      "process": "AIMS and Registrar data exchange",
+      "process_section": "4.24",
+      "rule": "The proposed AIMS export contract (version PROPOSED-1.0, Documents/AIMS_Export/) is a workbook with the sheets Export_Metadata, Students, Enrollment_Subjects, Grades and Subject_Offerings. STUDENT_NUMBER is the identity key; official values are kept as exported. The exact columns, the exporting office and the cadence are for the AIMS and Registrar owner to confirm (OQ-50). The current build does not yet read this workbook.",
+      "source": "Platform (current build), Documents/AIMS_Export",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "Documents/AIMS_Export"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "DEX-04",
+      "process": "AIMS and Registrar data exchange",
+      "process_section": "4.24",
+      "rule": "The files from AIMS or the Registrar are supplied at the start of each term, after enrollment closes, and again after grades are posted (proposed). Between those dates the platform sends changes out by the daily change report (DEX-06).",
+      "source": "Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "DEX-05",
+      "process": "AIMS and Registrar data exchange",
+      "process_section": "4.24",
+      "rule": "Identity, enrollment, grade and completion values imported from AIMS are read-only. If the Graduate School's record differs, the difference is flagged for follow-up and corrected in AIMS, and a replacement export is imported with its history kept.",
+      "source": "This manual, section 3.3; Platform (current build), read-only official data",
+      "sources": [
+        {
+          "document": "This manual",
+          "location": "section 3.3"
+        },
+        {
+          "document": "Platform (current build)",
+          "location": "read-only official data"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "DEX-06",
+      "process": "AIMS and Registrar data exchange",
+      "process_section": "4.24",
+      "rule": "Every change made in the platform that the Registrar must apply in AIMS (enrollment or subject change, withdrawal, course adjustment, leave, readmission, AWOL or residency, graduation) appears on a dated daily change report. The Academic Coordinator or GS staff apply it in AIMS and mark it reflected; the platform does not write to AIMS.",
+      "source": "Platform (current build), daily change report",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "daily change report"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "DEX-07",
+      "process": "AIMS and Registrar data exchange",
+      "process_section": "4.24",
+      "rule": "Only leave and readmission cases that the Dean has approved can be exported to the Registrar list. Each export is logged with the file name, the person and the time, and a case moves from Pending Handoff to Exported - Ready to Send, then to Sent to Registrar and Acknowledged when GS staff record them (see GRD-16, OQ-32).",
+      "source": "Platform (current build), leave and readmission Registrar export",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "leave and readmission Registrar export"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "DEX-08",
+      "process": "AIMS and Registrar data exchange",
+      "process_section": "4.24",
+      "rule": "The graduation list is exported only for endorsements the Dean has approved and for students who are still eligible when the file is made. It is a CSV with batch, student number, name, program, coursework status, research status, endorsement status, the Dean's approval date and remarks, and the Registrar export status, and the Dean emails it manually (GRD-16).",
+      "source": "Platform (current build), endorsed graduation list",
+      "sources": [
+        {
+          "document": "Platform (current build)",
+          "location": "endorsed graduation list"
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "DEX-09",
+      "process": "AIMS and Registrar data exchange",
+      "process_section": "4.24",
+      "rule": "An outbound file holds only the columns the Registrar needs and goes by official University email, never by personal email or chat (PRV-05).",
+      "source": "Republic Act No. 10173 (Data Privacy Act of 2012), s. 11; Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+          "location": "s. 11"
+        },
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
+        }
+      ],
+      "page": "",
+      "status": "Proposed"
+    },
+    {
+      "id": "DEX-10",
+      "process": "AIMS and Registrar data exchange",
+      "process_section": "4.24",
+      "rule": "Each outbound file is sent with a Records Transmittal (GS-F-44). The transmittal and the Registrar's acknowledgement, when one is given, are filed (OQ-32).",
+      "source": "Group proposal, forms pack revision of 2026-11-04",
+      "sources": [
+        {
+          "document": "Group proposal, forms pack revision of 2026-11-04",
+          "location": ""
         }
       ],
       "page": "",
