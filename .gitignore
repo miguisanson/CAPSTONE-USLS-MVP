@@ -79,3 +79,6 @@ frontend/test-results/
 
 # Per-install runtime files (the generated session secret key)
 instance/
+
+# Isolated agent development worktrees
+.worktrees/

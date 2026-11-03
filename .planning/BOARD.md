@@ -1,5 +1,15 @@
 # USLS GS Platform — board
 
+## Owner-requested teaching scheduling (2026-11-03)
+
+Implemented on `v6.1-migui`, final checks in progress: semester-specific faculty
+Schedule calendar, copy/confirmation, whole-semester recommendations, explicit
+Academic Coordinator approval/publication, immutable revisions, and personal
+published views. Defense availability remains separate; rooms unchanged.
+Real faculty/coordinator/student workflow PASS; backend contracts PASS; build
+and strict UI PASS. Full Python and all-role checks pending. See
+`TEACHING_SCHEDULE.md` and STATE.md. Demo schema needs `npm run seed`.
+
 ## v6.1 run (2026-11-02, branch `v6.1-migui`) — UAT Wednesday 2026-11-04
 
 **Agreed (IM28-IM33):** v6.1-migui is the one UAT line (from Natalie's v6.0); UAT served from this PC at

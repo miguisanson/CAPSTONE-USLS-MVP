@@ -1,4 +1,4 @@
-import { BookOpenCheck, ClipboardList, SlidersHorizontal } from "lucide-react";
+import { BookOpenCheck, CalendarDays, ClipboardList, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { PageHeader, Tabs } from "../components/ui/index.js";
 import { CourseworkReportPanel } from "../components/ProcessGates";
@@ -6,13 +6,15 @@ import { useAuth } from "../auth";
 import PolicyRules from "../components/PolicyRules";
 import CourseAdjustments from "./CourseAdjustments";
 import CourseOfferings from "./CourseOfferings";
+import TeachingSchedule from "./TeachingSchedule";
 import { PAGE } from "../lib/labels.js";
 
 export default function CoursePlanning({ initialView = "adjustments" }) {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("view") || initialView;
-  const view = requested === "offerings" ? "offerings" : "adjustments";
+  const canSchedule = user?.role === "academic_coordinator";
+  const view = requested === "schedule" && canSchedule ? "schedule" : requested === "offerings" ? "offerings" : "adjustments";
 
   function switchView(nextView) {
     const params = new URLSearchParams(searchParams);
@@ -33,6 +35,7 @@ export default function CoursePlanning({ initialView = "adjustments" }) {
         tabs={[
           { key: "adjustments", label: "Demand & adjustments", icon: SlidersHorizontal },
           { key: "offerings", label: "Offering setup", icon: BookOpenCheck },
+          ...(canSchedule ? [{ key: "schedule", label: "Schedule", icon: CalendarDays }] : []),
         ]}
         value={view}
         onChange={switchView}
@@ -41,7 +44,7 @@ export default function CoursePlanning({ initialView = "adjustments" }) {
       <PolicyRules process="course_adjustment" title="Adding or changing a subject: rules applied" />
 
       <div role="tabpanel">
-        {view === "adjustments" ? <CourseAdjustments /> : <CourseOfferings />}
+        {view === "adjustments" ? <CourseAdjustments /> : view === "offerings" ? <CourseOfferings /> : <TeachingSchedule />}
       </div>
 
       {/* BPMN 4 Coursework: the status report the Academic Coordinator sends to the Dean. */}

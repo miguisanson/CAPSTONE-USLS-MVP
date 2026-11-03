@@ -271,3 +271,102 @@ uncommitted changes is half-done — read its diff, run its tests, then decide.
   rendered here. Page numbers/TOC in the proposal update when opened in Word.
 - `.venv` was rebuilt on Python 3.14 on 2026-09-30.
 - Gate baseline before the run: 80 tests, 2 known failures.
+
+## Current Position — 2026-11-03 Course Adjustments report
+
+- Branch: v6.1-migui. Owner reported faculty selection followed by Decision rationale replacing the page with "Complete the required rationale for MAED-STAT".
+- Finding: frontend/dist/index.html was dated 2026-09-15; current frontend source has no Decision rationale input and neither current frontend nor backend contains that validation message. Stale served frontend is the first cause to eliminate.
+- Completed: npm run build:web PASS; regenerated ignored frontend/dist. No application code or test changes; no database changes.
+- Next action: owner hard-refreshes the local page and retries faculty selection. If it persists, establish the actual served URL/process and reproduce against the rebuilt assets before changing behavior. No regression test yet because the reported controls are absent from current source.
+
+## Current Position — Dean decision context (2026-11-03)
+- Branch v6.1-migui; owner authorized Faculty and Student impact columns. Tests added to tests/test_academic_fixes.py and frontend/e2e/p90-dean-consistency.spec.js; implementation not started. Existing faculty serializer provides names; plan serializer needs existing course_demand_rows delayed_count by course and target term.
+- Repairing test prerequisites: .venv launcher inaccessible, Python312 available under AppData/Local/Programs/Python; isolated environment frontend/e2e-artifacts/verify-python. Frontend test dependencies installed; browser and Python dependencies in progress. No delegated packet (inline fallback).
+- Next: run both new tests red, implement, rerun and gate; record results and review screenshots.
+
+- Backend red/green: new test first failed KeyError delayed_count (both 2 and 0), then passed after plan serializer enriches offerings using course_demand_rows once per plan. Verified with installed Python312 plus existing .venv site-packages. Browser red run now starting with installed Chrome via ignored e2e-artifacts/local.config.js; default browser download is slow.
+
+- Backend academic suite PASS (39 tests). Browser first run could not access localhost (socket permissions); stopped and requested elevated rerun. Before final gate: Python suite output will go to frontend/e2e-artifacts/dean-context-python-gate.log; no frontend implementation yet pending browser red evidence.
+
+- Browser RED confirmed: missing Dr. Review Faculty (7 role sign-ins pass). Implemented the two PLAN_COLUMNS in DeanPages.jsx. Next rebuild and rerun p90, screenshots all widths. Full Python gate is session 88172, output in dean-context-python-gate.log.
+
+- Implemented I-219 on v6.1-migui: DeanPages.jsx adds Faculty (name / Unassigned) and Student impact (potential delay count / next-term demand sentence). app.py plan serializer reuses target-term course_demand_rows. New tests in tests/test_academic_fixes.py and p90-dean-consistency.spec.js. No changed/removed existing assertions.
+- Verification: backend test RED KeyError then GREEN; academic suite 39 PASS; browser RED missing faculty then p90 suite 20 PASS (includes 7 role logins and approval/return behavior); build PASS; strict UI metrics all zero. Opened/reviewed decision-context screenshots at 1366/1920/390 in frontend/e2e-artifacts/p90; desktop fits, phone table scrolls inside card without page overflow.
+- Full Python gate remains running as exec session 88172; output frontend/e2e-artifacts/dean-context-python-gate.log. Next action: collect its final result and resolve any relevant failures before committing. Files touched: app.py, DeanPages.jsx, both tests, ISSUES.md, REGRESSION.md, STATE.md. No commit/merge yet; full all-role sweep and negative control still required before merge. New isolated Python environment is frontend/e2e-artifacts/verify-python; ignored local.config.js selects installed Chrome. No external worktrees or active installers remain.
+
+## Current Position — delay-only impact wording (2026-11-03)
+- Owner replaces duplicate demand sentence with em dash for zero delay. Updated p90 test first; next run red using last disposable browser database (resume-server.mjs, no reseed), then change DeanPages.jsx and rerun focused test/build/UI check. No workflow/backend changes.
+
+- RED confirmed: CS-702 lacks em-dash cell. Replaced fallback in DeanPages.jsx with em dash; retained positive warning and demand column. Next build, UI check, focused browser green and screenshot review.
+
+- Delay-only wording complete: focused browser test RED on absent dash then GREEN (1 test, 3 widths); production build PASS; strict UI check PASS (zero metrics). Opened all three refreshed screenshots; desktop shows delay warning/dash, phone retains contained table scroll. Only existing no-delay sentence assertion was replaced to match explicit owner revision; added assertion that sentence is absent. No new backend changes. Earlier full Python gate remains session 88172, output unchanged location; no commit/merge until gate result is collected.
+
+## Current Position — Dean delay parity (2026-11-03)
+- Owner requests header Delayed if withheld and reports Details has 8 delayed but Dean blank. Source inspection: Details and plan serializer already call course_demand_rows for selected/target term; frontend treated absent delayed_count as zero. Flask debug=False requires restart for earlier backend addition. Need verify actual endpoint parity and distinguish absent count from real zero. Header test added first; running red before rename.
+
+- Header renamed Delayed if withheld; missing/null delayed_count displays Unavailable rather than zero dash. Browser first failed missing header; updated focused browser PASS at 1366/1920/390; screenshots opened/reviewed (contained mobile table scroll). Build and strict UI PASS. Added real endpoint parity test test_dean_delay_counts_match_coordinator_details_for_submitted_term: draft/submit, GET coordinator and Dean, nonzero counts and all matching subjects; PASS. No new backend calculation. Existing rule flags unique students for current or next subject groups, not prerequisite/forecast analysis. Backend stale process is plausible cause of owner blank, not verified on owner's live URL; restart Flask required to load prior serializer addition. Existing full gate session 88172 still separate; new parity test not in that earlier discovery. No commit/merge.
+
+## Current Position — smart class scheduling planning decisions (2026-11-03)
+
+- Planning only: owner requested inspection/implementation plan, explicitly no code changes for scheduling yet. Existing uncommitted Dean review packet is separate.
+- Confirmed by owner: Academic Coordinator approves class schedules; approved paired days are Monday/Thursday, Tuesday/Friday, Wednesday/Saturday; teaching availability is distinct from defense availability; current collection method unknown, but portal collection is useful; rooms remain existing free-text input, do not add/change room management.
+- Plan consequence: coordinator creates/reviews draft, explicitly approves/finalizes (no Dean timetable approval, retain Dean offering approval). Separate semester teaching availability; never reuse defense hours as confirmed teaching hours. No room inventory, capacity, booking engine, room-conflict guarantees, or room schema work.
+- Still unconfirmed: exact teaching hours/grid, 90-minute duration/15-minute gap and single-day fallback permission (owner explicitly confirmed paired days, not each timing detail); hard versus soft forecast conflict policy. Recommend proposed times as configurable pending confirmation; confirmed enrollment hard, forecasts warning/soft penalty. No student availability collection.
+- Next action: turn revised plan into small test-first packets only when implementation is authorized; first packet term-specific teaching availability and explicit coordinator finalization contract. Determine current collection practice during stakeholder validation without blocking technical design.
+
+### Faculty scheduling interface clarification (owner, 2026-11-03)
+- Add a faculty Schedule tab/page with semester selection and a calendar view for entering teaching availability each semester. Teaching availability remains separate from defense availability/calendar.
+- Proposed interaction: weekly calendar, click/tap day to add/edit available windows; optional preferred and unavailable windows with text legend; copy previous semester and explicit No changes confirmation; separate submitted availability from read-only finalized assigned classes. Keep keyboard-accessible form alternative and 390px day/list view.
+- This refines the requested implementation plan; original scheduling request remains planning-first/no-code until implementation go-ahead. No schedule code changed.
+
+## Active implementation — smart teaching scheduling (2026-11-03)
+- Owner authorized full plan implementation. Config defaults 07:30–21:00, 90-minute teaching, 15-minute gaps; approved pairs; single-day fallback explicit opt-in; forecasts warnings. Academic Coordinator approves; rooms untouched. Skills: intelligence-layer and ui-ux-pro-max.
+- Engine tests written first and failed ModuleNotFoundError teaching_engine. Delegated packet branch codex/teaching-engine at .worktrees/teaching-engine; only new teaching_engine.py, immutable test copy. Main integrates and verifies; no app.py edits delegated to engine.
+- Next: write API and UI contracts red; implement semester teaching availability and schedule lifecycle using separate modules, avoid defense changes. Existing Dean changes remain separate/uncommitted.
+
+- Engine isolated tests 8/8 PASS. Copied teaching_engine.py into main for integrator review/test. API test RED 404 vs200 before implementation. API worktree .worktrees/teaching-api, branch codex/teaching-api; named new teaching_backend.py plus minimal app.py registration; immutable tests/test_teaching_schedule.py copied. Main will transplant only reviewed diff, preserving prior Dean changes.
+
+- Frontend p110 walkthrough written first and confirmed RED: missing faculty sidebar Schedule link and coordinator Schedule tab. UI packet worktree .worktrees/teaching-ui, branch codex/teaching-ui; no backend edits. Immutable p110 copied. Engine 8/8 tests review in progress; backend API implements explicit versions and approval/publication.
+
+- Integrator engine run PASS 8/8. Added immutable API lifecycle scenarios: no publication before approval; personal student/faculty views; frozen publication with separate revision; availability change invalidates approval; tampered candidates; faculty self ownership. Tests copied to API worktree for builder verification.
+
+- Review findings before integration: API/UI approval request payload mismatch (UI sending draft-only fallback flag on approval), recommendations could move earlier manually saved choices, defense booking only checked one direction. Builders correcting with explicit save/approve payloads, persisted per-section pins/unlock, reverse defense-to-class conflict hook. Main wrote corresponding immutable pin/defense tests before fixes; paths remain three isolated worktrees. Root engine tests8/8 pass.
+
+- Stopped superseded Python gate session88172 before integrating new scheduling models; it was started before scheduling scope and is not a final gate. Log remains frontend/e2e-artifacts/dean-context-python-gate.log. Fresh final gate must run after integration. New model startup requires seed rebuild of demo schema; no manual schema patch permitted.
+
+- Added real browser workflow harness: scripts/serve_teaching_test.py + frontend/playwright.teaching.config.js + frontend/e2e/teaching-workflow/workflow.spec.js. Uses existing disposable unittest fixture (2 offered subjects, same faculty/student), port5056; no demo DB changes. Command npm run e2e:teaching. Shell test expected links intentionally expanded for new faculty/student Schedule. UI worktree still implementing approval payload + pin/refresh corrections before transplant.
+
+- API builder frozen after immutable19test PASS; integrated teaching_backend.py + minimal app.py hooks preserving Dean edits. Models new availability, timetable plan and sections (structured meeting JSON, pins), no startup ALTER. Inverse class/defense conflicts, source-history guards and publication notifications included. Next integrator rerun19tests + engine then real UI walkthrough; demo schema rebuild still pending.
+
+- Integrator combined engine/API run PASS27tests. Additional role test caught admin superuser bypass: admin could approve despite coordinator-only owner decision (RED200vs403). Added explicit mutation role guards in new teaching module; targeted rerun in progress. Added4new routes to access-control registry checks. .venv launcher repaired by pointing local ignored pyvenv.cfg home to installed Python312; .venv/Scripts/python.exe now reports3.12.2.
+
+- UI builder frozen; integrated8frontend files including faculty Schedule, coordinator third tab, student class schedule. Approval requests omit draft-only fields; choice saves revalidate; persisted Keep this schedule pins; semester URL respected. Root admin bypass test now GREEN. Next build+strict UI then isolated real teaching workflow port5056; stage full gate after no further functional changes.
+
+- Final Python gate started session99914 -> frontend/e2e-artifacts/teaching-full-python.log with both AI keys blank, standard repaired .venv launcher. UI strictPASS0. Build in progress session24431; realworkflow will use separate testDB port5056. No production/demo data rebuild yet; models require npm run seed when delivered.
+
+- Real teaching workflow PASS(21s) against actual API: faculty copy/confirm -> coordinator draft/approve/publish -> student sees both classes. Opened/reviewed7screenshots; found raw confirmation timestamp and fullpage sticky-header capture offset, fixed display via shared formatter and screenshot scroll-top. Need refreshed9screenshots incl3student widths. No functional backend changes since fullgate started.
+
+- Final realworkflow PASS25.4s after date formatting/screenshot fixes; all9screens captured. Browser role/shell/p110 gate starting via g2:180 with temp seededDB5055. FullPython session99914 remains active -> teaching-full-python.log. Documentation TEACHING_SCHEDULE.md, BOARD and issues I-220..222/regressionR022..024 updated. New route role test20thAPI targetedpass, first27suite covered19API+8engine.
+
+- Broad role sweep caught pre-existing faculty Assigned Classes403 from all-subject dropdown (I-223). New test in tests/test_i216.py failed extra unauthorized courseIDs; scoped context subject choices to taught/advisee courses without changing roster permissions. Targeted RosterScope suite running. Root all-role sweep still on loaded older app; rerun faculty against new process after run ends. FullPython likewise began before this small context fix; must report full-run baseline plus focused current-source regression rather than claim exact final full source if not rerun.
+
+- Role/sidebar/p110 gate finished32PASS/1FAIL, sole failure pre-existing Assigned Classes403 (I-223). New roster scope test first RED, targeted5tests GREEN after narrowing subjectlist. Rerunning only faculty role against current source/resumed disposableDB; other6role sweeps and sidebar/newUI checks alreadyPASS. Final live9screens opened/reviewed atall3widths, no clipping/pageoverflow; date readable and screenshotheader fixed.
+
+- Faculty sweep recheck PASS(13pages x3widths); other6roles, newp110 andshell checksPASS. Negative control failed as intended with6injectedproblems detected. Broad browser verification complete. FullPython still running session99914 (calendar classes, no reported failures). About to run standard npm run seed on local disposable demo DB to add new models via rebuild (not patch); output frontend/e2e-artifacts/teaching-demo-seed.log. Both AI keys blank for this process.
+
+- Final no-feasible review caught I-224: same faculty/shared student, only one TueFri slot each, no joint solution, UI generic missing selection only. New test first RED then plan_data now returns joint constraint explanation and retains search-limit distinction on refresh, no new schema fields. Targeted rerun started. Final gate still baseline before this small error-reporting fix; affected API cases require current-source rerun.
+
+- I-224 targeted test GREEN; running current-source scheduling+engine+roster suite to frontend/e2e-artifacts/teaching-final-targeted.log. This includes all21API scenarios plus8engine+5roster tests. Local demo seed still running90190, fullPython99914. No active UI checks or background installers.
+
+- Current-source targeted34tests PASS(21API+8engine+5roster). Final hands-on Keep checkbox test exposed UI request missing option_id when pinning a preselected recommendation (RED409, checkbox remainedfalse). Added selected ID for pintrue; unpinfalse remains supported. Build/refreshed realworkflow pending; backend code unchanged. Local seed PASS148students/12faculty, fingerprint1ebaba1566faf9c87d8b70e3747bab70bb114108d09a41aa2cda3d682ca57976, startup schema smokePASS.
+
+- Keep regression next exposed async controlled-checkbox flicker even withAPI200; state was only updated after server response. Added optimistic pin display with rollback to server state on failure, disable while saving. Same browser test remains unchanged, new build/live rerun pending. This is I-225 follow-up, no backend/schema changes.
+
+## Current Position — 2026-11-04 final verification
+- Functional implementation complete. Latest real teaching workflow PASS24.4s including Keep/release; latest buildPASS and strictUI all0. Current API+engine+roster tests34PASS. All7role sweeps pass across initialrun plus corrected faculty rerun; p110 andshellpass; negativecontrolfailsasintended6injectedproblems.
+- Demo rebuilt successfully using npm run seed; new schema verified and no teaching submissions fabricated. Existing running app needs restart to load new Python routes. Fingerprint1ebaba1566faf9c87d8b70e3747bab70bb114108d09a41aa2cda3d682ca57976.
+- FullPython session99914 still running -> frontend/e2e-artifacts/teaching-full-python.log; no reportedfailures yet. It began before scoped rosterlist and no-joint-explanation reviewfixes, which passed targeted current-source tests. Do not claim an exact final-source full gate without noting this distinction.
+- New production files: teaching_engine.py, teaching_backend.py, frontend/src/pages/TeachingSchedule.jsx, frontend/src/pages/faculty/FacultySchedule.jsx, frontend/src/pages/student/StudentClassSchedule.jsx. Integration: app.py, frontend/src/api.js, components/portalNav.jsx, CoursePlanning.jsx, faculty/FacultyRoutes.jsx, student/StudentRoutes.jsx. Tests: tests/test_teaching_engine.py, tests/test_teaching_schedule.py, tests/test_i216.py, e2e/p110, e2e/teaching-workflow/workflow.spec.js, playwright.teaching.config.js, scripts/serve_teaching_test.py. Earlier Dean packet files remain included in worktree; no user edits overwritten.
+- Three helper worktrees .worktrees/teaching-engine, .worktrees/teaching-api, .worktrees/teaching-ui have frozen copies; all helper agents done. Main reviewed, transplanted, tested and applied small review fixes inline. Codex helper/worktree workflow used; no Ollama/Claude-specific executors available. No commit/merge/push yet. Next: collect fullgate result, final diff/secretscheck, save local commits with tests, remove temporary helperworktrees, update final STATE/BOARD/issues.
+
+- Post-publication warning refinement (I-226): existing lifecycle test strengthened to assert no false legacy free-text warning for own structured publication; RED showed2falsewarnings. sections_context now recognizes per-offering active published ClassSection records, retaining true legacy warnings. Two relevant lifecycle/no-joint cases rerunning -> teaching-publication-recheck.log. No schema/permission/conflict changes. No further feature scope planned; collect gate and save work.

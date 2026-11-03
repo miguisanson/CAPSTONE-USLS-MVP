@@ -433,6 +433,8 @@ def create_app() -> Flask:
 
     register_json_error_handling(app)
     register_routes(app)
+    from teaching_backend import install_routes as install_teaching_routes
+    install_teaching_routes(app, db, globals())
     return app
 
 
@@ -15837,6 +15839,14 @@ def register_routes(app: Flask) -> None:
             })
         advisees = []
         adviser_student_ids = advisee_student_ids(faculty)
+        roster_course_ids = {
+            row[0] for row in db.session.query(CurriculumOffering.course_id).filter_by(assigned_faculty_id=faculty.id)
+        } | {
+            row[0] for row in db.session.query(CourseOffering.course_id).filter_by(assigned_faculty_id=faculty.id)
+        }
+        if adviser_student_ids:
+            roster_course_ids.update(row[0] for row in db.session.query(CourseRecord.course_id).filter(
+                CourseRecord.student_id.in_(adviser_student_ids)))
         adviser_students = (
             Student.query.filter(Student.id.in_(adviser_student_ids)).order_by(Student.last_name, Student.first_name).all()
             if adviser_student_ids else []
@@ -15906,7 +15916,7 @@ def register_routes(app: Flask) -> None:
             "advisees": advisees,
             "panel_count": len(panels),
             "terms": [term_dict(term) for term in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
-            "subjects": course_audit_subject_items(),
+            "subjects": [item for item in course_audit_subject_items() if item["id"] in roster_course_ids],
             "working_hours": faculty_working_hours(faculty),
             "availability": [
                 {
@@ -17515,6 +17525,13 @@ def register_routes(app: Flask) -> None:
     def course_offerings_update(offering_id: int):
         data = request.get_json(silent=True) or {}
         off = CurriculumOffering.query.get_or_404(offering_id)
+        if "schedule" in data and (data.get("schedule") or "").strip() != (off.schedule or ""):
+            governed = ClassSection.query.join(TeachingSchedulePlan).filter(
+                ClassSection.offering_id == off.id,
+                TeachingSchedulePlan.status.in_(["Approved", "Published"]),
+            ).first()
+            if governed:
+                return jsonify({"error": "This timetable is approved or published. Create a revision in the Schedule tab."}), 409
         if "faculty_id" in data:
             faculty_id = safe_int(data.get("faculty_id")) or None
             if faculty_id:
@@ -17535,6 +17552,8 @@ def register_routes(app: Flask) -> None:
     @require_api_login("academic_coordinator", "admin")
     def course_offerings_delete(offering_id: int):
         off = CurriculumOffering.query.get_or_404(offering_id)
+        if ClassSection.query.filter_by(offering_id=off.id).first():
+            return jsonify({"error": "This offering has timetable history and cannot be removed. Keep it for the recorded schedules."}), 409
         term = next(
             (item for item in AcademicTerm.query.all()
              if split_academic_term_label(item.label) == (off.academic_year, off.semester)),
@@ -17786,6 +17805,8 @@ def register_routes(app: Flask) -> None:
             # Same guard as the manual offering delete: an offering that still has enrolled
             # students is never removed by publishing.
             still_enrolled = []
+            if any(ClassSection.query.filter_by(offering_id=item.id).first() for item in to_remove):
+                return jsonify({"error": "Cannot publish: an omitted offering has class schedule history. Keep the offering so recorded timetables remain intact."}), 409
             for existing_offering in to_remove:
                 enrolled_now = active_enrollment_count_for_offering(existing_offering, target_term)
                 if enrolled_now:
@@ -24341,6 +24362,10 @@ def _report_is_valid(report) -> bool:
 # Written independently of the decorators; the KPI compares this against what
 # the endpoints were actually registered with, so a drifted decorator lowers it.
 ACCESS_CONTROL_SPEC = [
+    ("Teaching availability", "faculty_teaching_schedule", {"faculty"}),
+    ("Teaching schedule", "teaching_schedules", {"academic_coordinator"}),
+    ("Teaching schedule changes", "teaching_schedule_update", {"academic_coordinator"}),
+    ("Student class schedule", "student_class_schedule", {"student"}),
     ("Monitoring sheet", "monitoring_grid", {"staff", "academic_coordinator", "research_coordinator", "dean"}),
     ("Monitoring sheet portal entry", "monitoring_student_create", {"staff", "academic_coordinator"}),
     ("Monitoring sheet subject rows", "monitoring_subject_add", {"staff", "academic_coordinator"}),
@@ -33754,6 +33779,8 @@ def defense_schedule_conflicts(
             conflicts.append(f"Panel conflict with {label}: {', '.join(names)} already scheduled.")
         if venue.strip() and schedule.venue.strip().casefold() == venue.strip().casefold():
             conflicts.append(f"Venue conflict with {label}: {schedule.venue} is already booked.")
+    from teaching_backend import class_schedule_conflicts
+    conflicts.extend(class_schedule_conflicts(globals(), db, student.id, participant_ids, day, selected_start, selected_end))
     return conflicts
 
 
@@ -40694,6 +40721,9 @@ def ensure_demo_accounts() -> None:
     normalize_withdrawal_workflow_states()
     normalize_immediate_standing_outcomes()
     # Faculty logins come from the imported faculty roster via link_faculty_accounts().
+
+from teaching_backend import install_models as install_teaching_models
+globals().update(install_teaching_models(db))
 
 app = create_app()
 

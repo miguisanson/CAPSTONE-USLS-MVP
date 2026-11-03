@@ -43,6 +43,12 @@ function queryString(params = {}) {
 }
 
 export const api = {
+  teachingAvailability: (params = {}) => request(`/faculty-portal/teaching-schedule?${queryString(params)}`),
+  saveTeachingAvailability: (termId, body) => request(`/faculty-portal/teaching-schedule?${queryString({ term_id: termId })}`, { method: "PUT", body: JSON.stringify(body) }),
+  teachingSchedules: (params = {}) => request(`/teaching-schedules?${queryString(params)}`),
+  createTeachingSchedule: (body) => request("/teaching-schedules", { method: "POST", body: JSON.stringify(body) }),
+  updateTeachingSchedule: (id, body) => request(`/teaching-schedules/${id}`, { method: "POST", body: JSON.stringify(body) }),
+  studentClassSchedule: (params = {}) => request(`/student-portal/class-schedule?${queryString(params)}`),
   me: () => request("/auth/me"),
   login: (payload) => request("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => request("/auth/logout", { method: "POST", body: JSON.stringify({}) }),

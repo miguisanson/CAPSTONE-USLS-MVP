@@ -6,6 +6,7 @@ import CalendarPage from "../../components/calendar/CalendarPage";
 import FacultyAvailabilityEditor from "./FacultyAvailabilityEditor";
 import { FacultyCalendarConnection } from "./FacultyCalendar";
 import FacultyInvitationsPage from "./FacultyInvitationsPage";
+import FacultySchedule from "./FacultySchedule";
 import {
   FacultyAdviseesPage,
   FacultyClassesPage,
@@ -46,6 +47,7 @@ export function FacultyRoutes() {
         <Route path="defenses" element={<FacultyDefensesPage />} />
         <Route path="verdicts" element={<FacultyVerdictsPage />} />
         <Route path="classes" element={<FacultyClassesPage />} />
+        <Route path="schedule" element={<FacultySchedule />} />
         <Route path="availability" element={<FacultyAvailabilityEditor />} />
         <Route path="invitations" element={<FacultyInvitationsPage />} />
         <Route

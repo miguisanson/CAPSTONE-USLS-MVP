@@ -4,6 +4,7 @@ import StudentOverview from "./StudentOverview";
 import StudentProgress from "./StudentProgress";
 import StudentAdviserPage from "./StudentAdviserPage";
 import StudentCalendarPage from "./StudentCalendarPage";
+import StudentClassSchedule from "./StudentClassSchedule";
 import { StudentDefensePage, StudentRequestCenter, StudentRequestPage, StudentResearchPage } from "./StudentRequestPages";
 import {
   StudentActivityPage,
@@ -24,6 +25,7 @@ export function StudentRoutes() {
         <Route index element={<StudentOverview />} />
         <Route path="progress" element={<StudentProgress />} />
         <Route path="enrollment" element={<StudentEnrollmentPage />} />
+        <Route path="class-schedule" element={<StudentClassSchedule />} />
         <Route path="research" element={<StudentResearchPage />} />
         <Route path="adviser" element={<StudentAdviserPage />} />
         <Route path="defense-schedule" element={<StudentDefensePage />} />
