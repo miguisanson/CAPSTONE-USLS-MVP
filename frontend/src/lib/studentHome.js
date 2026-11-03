@@ -38,6 +38,20 @@ const VIEW_BY_TASK_URL = Object.freeze({
   "/workflow/leave-of-absence": "loa",
 });
 
+// The Defense Schedule page's own rules, kept here so the page and the home agree (night 5, item 1).
+export const BOOKABLE_DEFENSES = ["Title Defense", "Proposal Defense", "Final Defense"];
+/** Statuses in which a booking is alive: a new request must not be filed on top of it. */
+const LIVE_SCHEDULE_STATUSES = ["Scheduled", "Confirmed", "Needs Re-confirmation"];
+export const isLiveSchedule = (schedule) => Boolean(schedule?.is_active) || LIVE_SCHEDULE_STATUSES.includes(schedule?.status);
+/** True while the Defense Schedule page is locked (no research case or no panel yet). */
+export const defenseScheduleLocked = (data) => !data.research_case || !data.panel?.length;
+/** The defense the Defense Schedule page would take a request for (its request form, not a booking), else "". */
+export function defenseToRequest(data) {
+  const stage = data.research_progress?.stage;
+  if (defenseScheduleLocked(data) || (data.schedules || []).some(isLiveSchedule)) return "";
+  return BOOKABLE_DEFENSES.includes(stage) ? stage : "";
+}
+
 export const WITHDRAWAL_WINDOW_DAYS = 14;
 const MAX_RECOMMENDATIONS = 3;
 const MESSAGES_PATH = "/student/messages";
@@ -142,6 +156,20 @@ export function studentActions(data, { now = new Date(), researchGates = new Set
       tone: task.overdue ? "danger" : "warning",
       target: taskTarget(task),
       status: task.overdue ? "Overdue" : task.status,
+    });
+  }
+
+  // 4b. the defense date to request: the Defense Schedule page shows its request form; once the office holds the
+  // review task the request is filed and it is listed under "waiting" instead
+  const defense = defenseToRequest(data);
+  if (defense && !(data.tasks || []).some((task) => task.title === `Review student ${defense} schedule request`)) {
+    items.push({
+      key: "defense-request",
+      kind: "defense-request",
+      title: `Request your ${defense} date`,
+      detail: "Your panel is in place. Choose the date you prefer on the Defense Schedule page.",
+      tone: "warning",
+      target: { view: "schedule" },
     });
   }
 

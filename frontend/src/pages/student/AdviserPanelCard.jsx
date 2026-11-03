@@ -10,15 +10,16 @@ import { Button, SectionCard, StatusChip } from "../../components/ui/index.js";
  */
 export default function AdviserPanelCard({ data, showSpecialization = true, showScheduleLink = true }) {
   const panel = data.panel || [];
+  const adviser = data.student.adviser_name || data.research_case?.adviser_name;
   return (
     <SectionCard
       pad="lg"
       title="Adviser and panel"
-      subtitle="Assigned after Panel Matching; scheduling opens once a panel is in place"
+      subtitle={adviser && panel.length ? undefined : "Assigned after Panel Matching; scheduling opens once a panel is in place"}
       icon={Users}
       action={showScheduleLink ? <Button as={Link} to="/student/defense-schedule" variant="secondary" size="sm">Defense schedule <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Button> : null}
     >
-      <p className="text-sm text-slate-600">Adviser: <span className="font-semibold text-ink">{data.student.adviser_name || data.research_case?.adviser_name || "Not assigned"}</span></p>
+      <p className="text-sm text-slate-600">Adviser: <span className="font-semibold text-ink">{adviser || "Not assigned"}</span></p>
       {panel.length ? (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {panel.map((member) => (

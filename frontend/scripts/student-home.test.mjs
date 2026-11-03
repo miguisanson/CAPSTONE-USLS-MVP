@@ -161,3 +161,34 @@ test("activity: activity-log entries and replies from staff, newest first, cappe
   assert.equal(studentActivity(data, 2).length, 2);
   assert.deepEqual(studentActivity(base(), 6), []);
 });
+
+// Night 5, item 1: the home lists the defense date request exactly when the Defense Schedule page would take one.
+const atDefense = (over = {}) => base({
+  research_case: { id: 1 },
+  research_progress: { stage: "Final Defense" },
+  panel: [{ id: 1 }],
+  schedules: [],
+  ...over,
+});
+
+test("defense request: a student at a bookable stage with a panel and no live booking is asked to request the date", () => {
+  const [item, ...rest] = studentActions(atDefense(), opts);
+  assert.equal(rest.length, 0);
+  assert.equal(item.kind, "defense-request");
+  assert.equal(item.title, "Request your Final Defense date");
+  assert.deepEqual(item.target, { view: "schedule" });
+});
+
+test("defense request: not listed while the page would not take a request", () => {
+  assert.deepEqual(studentActions(atDefense({ panel: [] }), opts), [], "no panel: the page is locked");
+  assert.deepEqual(studentActions(atDefense({ research_case: null }), opts), [], "no research case: the page is locked");
+  assert.deepEqual(studentActions(atDefense({ research_progress: { stage: "Completed" } }), opts), [], "no defense left");
+  assert.deepEqual(studentActions(atDefense({ schedules: [{ id: 1, status: "Scheduled", defense_type: "Final Defense" }] }), opts), [], "a booking is live");
+  assert.deepEqual(studentActions(atDefense({ schedules: [{ id: 1, status: "Held", defense_type: "Title Defense" }] }), opts).map((i) => i.kind), ["defense-request"], "an earlier defense that took place does not block the next");
+});
+
+test("defense request: once the request is filed (the office holds the review task) it moves to 'waiting'", () => {
+  const task = { id: 9, title: "Review student Final Defense schedule request", owner_role: "Research Coordinator", status: "Pending" };
+  assert.deepEqual(studentActions(atDefense({ tasks: [task] }), opts), []);
+  assert.equal(studentWaiting(atDefense({ tasks: [task] })).length, 1);
+});
