@@ -496,7 +496,7 @@ export default function Enrollment() {
                 ))}
                 {nothingAddable && notOffered.length > 0 && (
                   <InlineNotice tone="info">
-                    Nothing offered this semester can be added for this student. Her not-taken subjects ({notOffered.slice(0, 3).map((course) => course.code).join(", ")}
+                    Nothing offered this semester can be added for this student. The student's not-taken subjects ({notOffered.slice(0, 3).map((course) => course.code).join(", ")}
                     {notOffered.length > 3 ? ` and ${notOffered.length - 3} more` : ""}) are not on this semester's offering list. Add them under Offering list first.
                   </InlineNotice>
                 )}

@@ -187,6 +187,13 @@ test("defense request: not listed while the page would not take a request", () =
   assert.deepEqual(studentActions(atDefense({ schedules: [{ id: 1, status: "Held", defense_type: "Title Defense" }] }), opts).map((i) => i.kind), ["defense-request"], "an earlier defense that took place does not block the next");
 });
 
+test("defense request: not listed once the current defense took place (its schedule requirement is Complete), e.g. after a revise verdict", () => {
+  const held = { stage: "Final Defense", milestone: { requirements: [{ source_type: "system_final_schedule", status: "Complete" }, { source_type: "system_defense_result", status: "Pending" }] } };
+  assert.deepEqual(studentActions(atDefense({ research_progress: held, schedules: [{ id: 1, status: "Held", defense_type: "Final Defense" }] }), opts), []);
+  const resubmit = { stage: "Final Defense", milestone: { requirements: [{ source_type: "system_final_schedule", status: "Pending" }] } };
+  assert.deepEqual(studentActions(atDefense({ research_progress: resubmit, schedules: [{ id: 1, status: "Held", defense_type: "Final Defense" }] }), opts).map((i) => i.kind), ["defense-request"], "a verdict that sends the student back needs a new request");
+});
+
 test("defense request: once the request is filed (the office holds the review task) it moves to 'waiting'", () => {
   const task = { id: 9, title: "Review student Final Defense schedule request", owner_role: "Research Coordinator", status: "Pending" };
   assert.deepEqual(studentActions(atDefense({ tasks: [task] }), opts), []);

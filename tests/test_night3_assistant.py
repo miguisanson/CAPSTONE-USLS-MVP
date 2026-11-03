@@ -168,6 +168,15 @@ class FableNightReviewTests(Base):
             self.assertEqual([c["id"] for c in used], [2], line)
             self.assertNotIn("assages used", answer, line)
 
+    def test_a_body_line_that_starts_with_passages_used_is_kept(self):
+        chunks = [{"id": n} for n in (1, 2, 3)]
+        body = "Passages used in this section say seven years at most."
+        for tail in ("Passages used: 2", "**Passages used:** 2"):
+            answer, used = appmod._split_used_passages(f"{body}\n{tail}", chunks)
+            self.assertEqual([c["id"] for c in used], [2], tail)
+            self.assertIn(body, answer)
+            self.assertNotIn("Passages used:", answer)
+
     def test_years_are_not_read_as_course_codes(self):
         subject = appmod._prag.stem("subject")
         self.assertNotIn(subject, appmod._prag.QueryTerms("deadline for AY 2026 enrollment since 2020").base)

@@ -11411,7 +11411,8 @@ RAG_SYSTEM_INSTRUCTION = (
     f"answer, reply with exactly this sentence and nothing else: {_prag.NOT_FOUND_ANSWER}"
 )
 # The closing "Passages used: 1, 3" line, also as Gemini dresses it: "**Passages used:** 2", "- Passages used: 2".
-_PASSAGES_USED = re.compile(r"(?im)^\W*passages? used\W*(.*)$")
+# The line holds only the marker (and markdown punctuation) plus passage numbers, so a body line like "Passages used in ..." stays.
+_PASSAGES_USED = re.compile(r"(?im)^[^\w\n]*passages?[ \t]+used[^\w\n]*((?:(?:\d+|and|none)\b[^\w\n]*)*)$")
 
 
 def _rag_passages_block(chunks: list[dict]) -> str:
@@ -13798,27 +13799,9 @@ def register_routes(app: Flask) -> None:
             "compliance": compliance,
         })
 
-    @app.route("/api/student-portal/research-evidence/<int:evidence_id>", methods=["DELETE"])
-    @require_api_login("student")
-    def student_research_evidence_delete(evidence_id: int):
-        account = current_account()
-        student = Student.query.get_or_404(account.student_id)
-        evidence = ResearchEvidenceFile.query.filter_by(id=evidence_id, student_id=student.id).first_or_404()
+    def remove_research_evidence(student: Student, evidence: ResearchEvidenceFile, actor: str):
+        """Take one research file out of its requirement (shared by the student and the staff routes)."""
         doc = evidence.document_check
-        presentation = research_requirement_presentation(doc.gate, doc.item_name)
-        if not presentation or presentation["source_type"] != "student_upload":
-            return jsonify({"error": "Only student-uploaded research evidence can be removed from the student view."}), 400
-        if doc.gate == "Form 1 - Title Defense" and title_uploads_locked(student):
-            return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
-        if ScheduleRequest.query.filter(
-            ScheduleRequest.student_id == student.id,
-            ScheduleRequest.defense_type == RESEARCH_GATE_DEFENSE_TYPES.get(doc.gate),
-            ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
-        ).first():
-            return jsonify({"error": "This defense is booked. Cancel the schedule first."}), 409
-        if doc.status == "Complete":
-            return jsonify({"error": "Staff have already verified this file, so it cannot be removed. Ask the Research Coordinator if it must be replaced."}), 409
-
         original_name = evidence.original_name
         # Signed evidence is archived, never deleted: the adviser's signature points at the file.
         stored_path = retire_research_evidence(evidence)
@@ -13859,11 +13842,11 @@ def register_routes(app: Flask) -> None:
         add_log(
             "research-gate",
             student.id,
-            "Student",
+            actor,
             original_name,
             f"{doc.item_name} removed",
             "Student" if len(remaining) < required_count else "Academic Coordinator",
-            f"Student removed a {doc.gate} upload. {len(remaining)} of {required_count} remain for {doc.item_name}. "
+            f"{actor} removed a {doc.gate} upload. {len(remaining)} of {required_count} remain for {doc.item_name}. "
             + ("Academic Coordinator endorsement was revoked and " if endorsement_revoked else "")
             + "Panel Matching was cleared for this stage.",
         )
@@ -13877,6 +13860,44 @@ def register_routes(app: Flask) -> None:
             "panel_invalidated": panel_invalidated,
             "endorsement_revoked": endorsement_revoked,
         })
+
+    @app.route("/api/student-portal/research-evidence/<int:evidence_id>", methods=["DELETE"])
+    @require_api_login("student")
+    def student_research_evidence_delete(evidence_id: int):
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        evidence = ResearchEvidenceFile.query.filter_by(id=evidence_id, student_id=student.id).first_or_404()
+        doc = evidence.document_check
+        presentation = research_requirement_presentation(doc.gate, doc.item_name)
+        if not presentation or presentation["source_type"] != "student_upload":
+            return jsonify({"error": "Only student-uploaded research evidence can be removed from the student view."}), 400
+        if doc.gate == "Form 1 - Title Defense" and title_uploads_locked(student):
+            return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
+        if ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == student.id,
+            ScheduleRequest.defense_type == RESEARCH_GATE_DEFENSE_TYPES.get(doc.gate),
+            ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+        ).first():
+            return jsonify({"error": "This defense is booked. Cancel the schedule first."}), 409
+        if doc.status == "Complete":
+            return jsonify({"error": "Staff have already verified this file, so it cannot be removed. Ask the Research Coordinator if it must be replaced."}), 409
+
+        return remove_research_evidence(student, evidence, "Student")
+
+    @app.route("/api/research-evidence/<int:evidence_id>", methods=["DELETE"])
+    @require_api_login("staff", "research_coordinator")
+    def staff_research_evidence_delete(evidence_id: int):
+        # Unlike the student route, a verified file may go: staff must be able to undo a wrong verification.
+        evidence = ResearchEvidenceFile.query.get_or_404(evidence_id)
+        doc = evidence.document_check
+        if ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == evidence.student_id,
+            ScheduleRequest.defense_type == RESEARCH_GATE_DEFENSE_TYPES.get(doc.gate),
+            ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+        ).first():
+            return jsonify({"error": "This defense is booked. Cancel the schedule first."}), 409
+        student = db.session.get(Student, evidence.student_id)
+        return remove_research_evidence(student, evidence, workflow_actor_label(current_account()))
 
     @app.route("/api/student-portal/request-attachments/upload", methods=["POST"])
     @require_api_login("student")
@@ -14790,6 +14811,12 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": (
                 f"Your {defense_type} is already booked for {booked.preferred_date.isoformat()}. "
                 "Ask the Research Coordinator to move it if you need a different date."
+            )}), 409
+        held = active_schedule_for_gate(student, stage_progress["gate"])  # a Held one counts unless the verdict sends the student back
+        if held and held.status == HELD_DEFENSE_STATUS:
+            return jsonify({"error": (
+                f"Your {defense_type} already took place. Submit any required revisions; "
+                "the Graduate School will schedule another defense only if the panel's result requires it."
             )}), 409
         source = (data.get("venue") or "").strip()
         notes = [
@@ -18281,6 +18308,7 @@ def register_routes(app: Flask) -> None:
                 result = "Graduation endorsement approved by Dean; CSV is ready for export"
                 next_owner = "Dean"
                 add_task(endorsement.student_id, "Export endorsed list for manual Registrar email", "Dean", 3, 40)
+                sync_research_progress(endorsement.student)  # approved: the student is Completed now, not at the next page view
             elif decision == "return":
                 endorsement.endorsement_status = "Returned for Revision"
                 endorsement.dean_decision_at = now_utc()
@@ -21416,6 +21444,7 @@ def register_routes(app: Flask) -> None:
                     next_owner = "Dean"
                     result = "Graduation candidate approved in Dean batch"
                     add_task(student.id, "Export endorsed list for manual Registrar email", "Dean", 3, 40)
+                    sync_research_progress(student)  # approved: the student is Completed now, not at the next page view
                 elif action == "return":
                     if account.role == "dean" and (
                         not endorsement or endorsement.endorsement_status != "Ready for Dean Review"
@@ -35345,11 +35374,9 @@ def close_satisfied_research_tasks(student: Student, progress: dict) -> int:
 
 
 def graduation_endorsement_undecided(student: Student) -> bool:
-    """True while one of the student's graduation endorsements has not been approved by the Dean."""
-    return GraduationEndorsement.query.filter(
-        GraduationEndorsement.student_id == student.id,
-        GraduationEndorsement.endorsement_status.notin_(GRADUATION_APPROVED_STATUSES),
-    ).first() is not None
+    """True while the student's latest graduation endorsement has not been approved by the Dean (older rows are history)."""
+    latest = latest_graduation_endorsement(student.id)
+    return latest is not None and latest.endorsement_status not in GRADUATION_APPROVED_STATUSES
 
 
 def sync_research_progress(student: Student, submitted_title: str = "") -> tuple[ResearchCase, dict]:
