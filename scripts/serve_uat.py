@@ -55,10 +55,10 @@ def read_settings(environ=None) -> dict:
 
 
 def apply_proxy_fix(flask_app):
-    """Trust exactly one proxy hop (the tunnel) for X-Forwarded-For / -Proto / -Host."""
+    """Trust exactly one proxy hop (the tunnel) for X-Forwarded-For / -Proto; the host comes from the Host header."""
     from werkzeug.middleware.proxy_fix import ProxyFix
 
-    flask_app.wsgi_app = ProxyFix(flask_app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    flask_app.wsgi_app = ProxyFix(flask_app.wsgi_app, x_for=1, x_proto=1, x_host=0)  # Cloudflare sends no X-Forwarded-Host; trusting one lets a client set the host
     return flask_app
 
 

@@ -351,6 +351,11 @@ def resolve_database_url() -> str:
     return f"sqlite:///{sqlite_path}"
 
 
+# The shared password of every seeded demo account. The default is public (this repo is public), so a
+# shared site sets DEMO_PASSWORD (kept in .env, handed to testers privately) and the seed uses that.
+SIM_STUDENT_PASSWORD = os.getenv("DEMO_PASSWORD", "").strip() or "DemoPass123!"
+
+
 def demo_mode_enabled() -> bool:
     """The single switch for every presenter convenience (DEMO_MODE, default ON).
 
@@ -370,8 +375,8 @@ def demo_accounts_listing_enabled() -> bool:
 
 
 def demo_password_hint() -> str:
-    """The shared default password, but only while DEMO_MODE is on."""
-    return SIM_STUDENT_PASSWORD if demo_mode_enabled() else ""
+    """The shared demo password, but only while DEMO_MODE is on and DEMO_SHOW_ACCOUNTS is not 0."""
+    return SIM_STUDENT_PASSWORD if demo_accounts_listing_enabled() else ""
 
 
 def resolve_secret_key(environ=None) -> str:
@@ -2832,7 +2837,7 @@ def default_faculty_email(faculty: Faculty) -> str:
 
 def ensure_faculty_user_account(
     faculty: Faculty,
-    temporary_password: str = "DemoPass123!",
+    temporary_password: str = SIM_STUDENT_PASSWORD,
     *,
     reset_password: bool = False,
 ) -> UserAccount:
@@ -4924,7 +4929,16 @@ def account_dict(account: UserAccount) -> dict:
         "student_id": account.student_id,
         "faculty_id": account.faculty_id,
         "must_change_password": bool(account.must_change_password),
+        "demo_account": is_demo_account(account),
     }
+
+
+def is_demo_account(account: UserAccount) -> bool:
+    """A seeded, shared demo login (the presenter list and the workflow demo students), DEMO_MODE on."""
+    if not demo_mode_enabled():
+        return False
+    emails = {item[3] for item in DEMO_ACCOUNT_CATALOG} | {c["email"] for c in WORKFLOW_DEMO_STUDENTS.values()}
+    return (account.email or "").lower() in emails
 
 
 BACKOFFICE_ROLES = {
@@ -8108,7 +8122,7 @@ def leave_registrar_export(slug: str, cases: list[LeaveCase], file_format: str, 
     else:
         file_format = "csv"
         stream = io.StringIO()
-        writer = csv.writer(stream)
+        writer = safe_csv_writer(stream)
         writer.writerow(LEAVE_REGISTRAR_HEADERS)
         for case in cases:
             writer.writerow(leave_registrar_row(case))
@@ -12843,7 +12857,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         for stored_name in result.pop("stored_names"):
             (REQUEST_UPLOAD_ROOT / stored_name).unlink(missing_ok=True)
         for stored_name in result.pop("research_stored_names", []):
@@ -12915,6 +12929,8 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         if not account:
             return no_store(jsonify({"error": "Please sign in to continue."})), 401
+        if is_demo_account(account):
+            return no_store(jsonify({"error": "Demo accounts are shared by testers; their password cannot be changed."})), 403
         body = request.get_json(silent=True) or {}
         current_password = str(body.get("current_password") or "")
         new_password = str(body.get("new_password") or "")
@@ -13266,7 +13282,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({
             "ok": True,
             "student": student_brief(target),
@@ -13709,7 +13725,7 @@ def register_routes(app: Flask) -> None:
                 path.unlink(missing_ok=True)
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({
             "ok": True,
             "document": document_check_dict(evidence.document_check),
@@ -13833,7 +13849,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({
             "ok": True,
             "attachment": {
@@ -14379,7 +14395,7 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
 
         output = io.StringIO()
-        writer = csv.writer(output)
+        writer = safe_csv_writer(output)
         writer.writerow(["USLS Graduate School Subject Withdrawal Report"])
         writer.writerow(["Application ID", application.id])
         writer.writerow(["Student", application.student.name])
@@ -14490,7 +14506,7 @@ def register_routes(app: Flask) -> None:
         if not case:
             return jsonify({"error": "The Dean must approve this request before a Registrar report is generated."}), 400
         output = io.StringIO()
-        writer = csv.writer(output)
+        writer = safe_csv_writer(output)
         writer.writerow(leave_registrar_rows(case)[0])
         writer.writerow(leave_registrar_rows(case)[1])
         filename = f"{'loa' if slug == SLUG_LOA else 'readmission'}-registrar-{student.student_number}.csv"
@@ -14521,7 +14537,7 @@ def register_routes(app: Flask) -> None:
         )
         db.session.commit()
         output = io.StringIO()
-        writer = csv.writer(output)
+        writer = safe_csv_writer(output)
         writer.writerow(["USLS Graduate School AWOL Return Registrar Report"])
         writer.writerow(["Format status", "Provisional - Registrar format still requires stakeholder confirmation"])
         writer.writerow(["Student", item.student.name])
@@ -14559,7 +14575,7 @@ def register_routes(app: Flask) -> None:
         )
         db.session.commit()
         output = io.StringIO()
-        writer = csv.writer(output)
+        writer = safe_csv_writer(output)
         writer.writerow(["USLS Graduate School Residency Registrar Report"])
         writer.writerow(["Format status", "Provisional - Registrar format still requires stakeholder confirmation"])
         writer.writerow(["Student", item.student.name])
@@ -14751,7 +14767,7 @@ def register_routes(app: Flask) -> None:
             evidence = store_research_evidence(student, doc.gate, doc.item_name, uploaded, doc)
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         ensure_open_task(student.id, f"Review submitted {doc.item_name}", "Research Coordinator", 3, 35)
         add_log(
             "research-gate",
@@ -15392,7 +15408,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "No Dean-approved graduation endorsements are available to export."}), 400
 
         stream = io.StringIO()
-        writer = csv.writer(stream)
+        writer = safe_csv_writer(stream)
         writer.writerow(["Graduate School Endorsed List for Manual Registrar Email"])
         writer.writerow([
             "Batch", "Student ID", "Student Name", "Program", "Coursework Status", "Research Status",
@@ -16414,7 +16430,7 @@ def register_routes(app: Flask) -> None:
                 store_research_evidence(student, verdict.gate, revised_item, uploaded, revised_doc)
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         verdict.revision_status = REVISION_SUBMITTED
         verdict.revision_note = note or verdict.revision_note
         verdict.revisions_submitted_at = now_utc()
@@ -18218,6 +18234,18 @@ def register_routes(app: Flask) -> None:
             .order_by(Student.last_name.asc(), Student.first_name.asc())
             .all()
         )
+        account = current_account()
+        if account.role == "faculty":
+            # Faculty read the roster of a course they teach, or only the students they advise.
+            fid = account.faculty_id
+            teaches = bool(fid) and (
+                CurriculumOffering.query.filter_by(course_id=course_id, assigned_faculty_id=fid).first()
+                or CourseOffering.query.filter_by(course_id=course_id, assigned_faculty_id=fid).first()
+            )
+            if not teaches:
+                rows = [(rec, s) for rec, s in rows if fid and faculty_is_adviser_for_student(fid, s.id)]
+                if not rows:
+                    return jsonify({"error": "You can only view the roster of a course you teach or of students you advise."}), 403
         students = []
         active_term = get_active_term()
         active_term_label = active_term.label if active_term else ""
@@ -19489,7 +19517,7 @@ def register_routes(app: Flask) -> None:
             return _process_error_response(exc)
         except Exception as exc:  # noqa: BLE001 - a refused step must never be a server error
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         kind, record = process_load_record(slug, ref)
         return jsonify({
             "ok": True,
@@ -19749,7 +19777,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({
             "ok": True,
             "issue": monitoring_validation_issue_dict(issue),
@@ -19958,7 +19986,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "We could not find that student or record."}), 404
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         message = "Saved. The student record, queue, and monitoring indicators were updated."
         if slug in {"leave-of-absence", "readmission"}:
             message = "Forwarded to the Dean. The student's standing changes only after the Dean approves and the leave begins."
@@ -20023,7 +20051,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({"ok": True, "message": "Defense rescheduled. The previous booking is kept in the history."})
 
     @app.route("/api/defense-schedules/<int:schedule_id>/cancel", methods=["POST"])
@@ -21080,7 +21108,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({
             "ok": True,
             "message": "Clarification response saved." if message.action_type == "response" else "Message saved and the next owner was notified.",
@@ -21329,7 +21357,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         for stored_name in result.pop("stored_names"):
             (REQUEST_UPLOAD_ROOT / stored_name).unlink(missing_ok=True)
         for stored_name in result.pop("research_stored_names", []):
@@ -25188,6 +25216,30 @@ def _report_cell(value):
     return value
 
 
+def unexpected_error_response(exc: Exception, status: int = 400):
+    """The JSON error for a caught exception. A ValueError (incl. ProcessError, LeaveError) carries text the
+    code wrote for the user and is shown; anything else is logged and replaced by a generic message, so
+    file paths, SQL and library text never reach the browser."""
+    if isinstance(exc, ValueError):
+        return jsonify({"error": str(exc)}), status
+    app.logger.error("Unexpected error in %s", request.path, exc_info=exc)
+    return jsonify({"error": "Something went wrong and nothing was saved. Please try again; if it keeps happening, tell the Graduate School office."}), status
+
+
+class _SafeCsvWriter:
+    """csv.writer that keeps text starting like a formula (= + - @) as text, like the xlsx exports."""
+
+    def __init__(self, stream):
+        self._writer = csv.writer(stream)
+
+    def writerow(self, row):
+        return self._writer.writerow([_report_cell(cell) for cell in row])
+
+
+def safe_csv_writer(stream) -> _SafeCsvWriter:
+    return _SafeCsvWriter(stream)
+
+
 def report_workbook_bytes(result: dict) -> bytes:
     workbook = Workbook()
     sheet = workbook.active
@@ -25567,7 +25619,7 @@ def summary_tiles(args) -> tuple[dict, list[dict]]:
     median_before = round(_median(days_before), 1) if days_before else None
     tile_decide = {
         "key": "decide_days", "label": "Median days to decide", "value": median_now, "unit": "days", "count": len(days_now),
-        "comparison": _compare_previous(median_now, median_before, scope, " days", f"no decisions in {previous.label}" if previous else ""),
+        "comparison": _compare_previous(median_now, median_before, scope, " days", (f"no decisions in {term.label}" if median_now is None else f"no decisions in {previous.label}") if previous and term else ""),
         "rows": [
             {"student_id": c["student_id"], "student": scope["by_id"][c["student_id"]].name if c["student_id"] else c["title"],
              "student_number": scope["by_id"][c["student_id"]].student_number if c["student_id"] else "", "program": "",
@@ -25581,6 +25633,9 @@ def summary_tiles(args) -> tuple[dict, list[dict]]:
         params = {"program_id": scope["filters"]["program_id"] or "", "when": when, "term": in_term.label if in_term else ""}
         return [r for r in report_defenses(params)["rows"] if r["student_id"] in scope["ids"]]
 
+    def defense_list(group, label):
+        return [_student_row(scope["by_id"][r["student_id"]], f"{label}: {r['defense_type']} on {r['date']}") for r in group]
+
     held = defense_rows("Held", term) if term else []
     upcoming = [r for r in defense_rows("Upcoming") if r["date"] <= (today + timedelta(days=DEFENSE_LOOKAHEAD_DAYS)).isoformat()]
     awaiting = defense_rows("Awaiting verdict")
@@ -25589,10 +25644,12 @@ def summary_tiles(args) -> tuple[dict, list[dict]]:
         "key": "defenses", "label": "Defenses held", "value": len(held), "unit": "defenses",
         "detail": {"held": len(held), "next_30_days": len(upcoming), "awaiting_verdict": len(awaiting)},
         "comparison": _compare_previous(len(held), held_before, scope),
-        "rows": [
-            _student_row(scope["by_id"][r["student_id"]], f"{label}: {r['defense_type']} on {r['date']}")
-            for label, group in (("Held", held), ("Next 30 days", upcoming), ("Awaiting verdict", awaiting)) for r in group
-        ],
+        # The list behind the headline is the held defenses only; the other two counts have their own lists.
+        "rows": defense_list(held, "Held"),
+        "more": {
+            "defenses_upcoming": ("Defenses in the next 30 days", defense_list(upcoming, "Next 30 days")),
+            "defenses_awaiting": ("Defenses waiting for a verdict", defense_list(awaiting, "Awaiting verdict")),
+        },
     }
 
     # 6. Graduation: endorsements sent to the Dean in the term, and the candidates who are ready now.
@@ -25605,13 +25662,14 @@ def summary_tiles(args) -> tuple[dict, list[dict]]:
         if s.current_stage in GRADUATION_CANDIDATE_STAGES and s.id not in endorsed_ids and graduation_eligibility(s)["status"] == "Eligible"
     ]
     tile_graduation = {
-        "key": "graduation", "label": "Graduation-ready", "value": len(endorsed_now), "unit": "students",
+        "key": "graduation", "label": "Endorsements sent to the Dean", "value": len(endorsed_now), "unit": "students",
         "detail": {"endorsed_this_term": len(endorsed_now), "eligible_now": len(ready_now)},
         "comparison": _compare_previous(len(endorsed_now), endorsed_before, scope),
         "rows": [
             _student_row(scope["by_id"][e.student_id], f"Endorsement {e.endorsement_status}, sent {e.submitted_at.date().isoformat()}")
             for e in endorsed_now
-        ] + [_student_row(s, "Eligible, not yet endorsed") for s in ready_now],
+        ],
+        "more": {"graduation_ready": ("Ready to graduate, not yet sent to the Dean", [_student_row(s, "Eligible, not yet endorsed") for s in ready_now])},
     }
     return scope, [tile_active, tile_behind, tile_waiting, tile_decide, tile_defenses, tile_graduation]
 
@@ -25620,7 +25678,7 @@ def report_summary(args) -> dict:
     scope, tiles = summary_tiles(args)
     public = []
     for tile in tiles:
-        tile = {k: v for k, v in tile.items() if k != "rows"}
+        tile = {k: v for k, v in tile.items() if k not in {"rows", "more"}}
         tile["drill"] = {"url": f"/api/reports/summary/{tile['key']}", "params": {k: v for k, v in scope["filters"].items() if v}}
         public.append(tile)
     cohorts = sorted({_cohort_entry_label(s) for s in Student.query.all()} - {"Not recorded"})
@@ -25633,6 +25691,11 @@ def report_summary(args) -> dict:
 def report_summary_list(key: str, args) -> dict | None:
     scope, tiles = summary_tiles(args)
     tile = next((t for t in tiles if t["key"] == key), None)
+    if tile is None:  # the secondary lists of a tile (defenses next 30 days / awaiting, graduation ready)
+        for t in tiles:
+            if key in t.get("more", {}):
+                title, rows = t["more"][key]
+                tile = {"label": title, "rows": rows}
     if tile is None:
         return None
     return {
@@ -39488,7 +39551,6 @@ def ensure_faculty_demo_profiles() -> int:
 
 
 SIM_PROGRAM_CODE = "MAEDS"
-SIM_STUDENT_PASSWORD = "DemoPass123!"
 STUDENT_EMAIL_DOMAIN = os.getenv("STUDENT_EMAIL_DOMAIN", "student.usls.edu.ph")
 
 WORKFLOW_DEMO_STUDENTS = {
@@ -40550,7 +40612,7 @@ def link_faculty_accounts() -> None:
         if not faculty.eligible_roles:
             faculty.eligible_roles = default_roles
         # Only a NEW account gets the initial password; never overwrite one a person has chosen.
-        primary = ensure_faculty_user_account(faculty, "DemoPass123!")
+        primary = ensure_faculty_user_account(faculty, SIM_STUDENT_PASSWORD)
         # A brand-new account has no id until it is flushed; without this the duplicate filter below
         # compiles to "id IS NOT NULL" and deactivates the very login we just created.
         db.session.flush()
@@ -40585,7 +40647,7 @@ def ensure_demo_accounts() -> None:
                 UserAccount(
                     email=email,
                     full_name=full_name,
-                    password_hash=generate_password_hash("DemoPass123!"),
+                    password_hash=generate_password_hash(SIM_STUDENT_PASSWORD),
                     role=role,
                     active=True,
                 )
@@ -40603,7 +40665,7 @@ def ensure_demo_accounts() -> None:
             UserAccount(
                 email="dean@usls.edu.ph",
                 full_name="Dr. Manuel Villaruz",
-                password_hash=generate_password_hash("DemoPass123!"),
+                password_hash=generate_password_hash(SIM_STUDENT_PASSWORD),
                 role="dean",
                 active=True,
             )
@@ -40618,7 +40680,7 @@ def ensure_demo_accounts() -> None:
             student_account = UserAccount(
                 email="student@usls.edu.ph",
                 full_name=linked_student.name,
-                password_hash=generate_password_hash("DemoPass123!"),
+                password_hash=generate_password_hash(SIM_STUDENT_PASSWORD),
                 role="student",
                 active=True,
             )

@@ -58,7 +58,7 @@ class ServeUatTests(unittest.TestCase):
                 wrapped,
                 {
                     "X-Forwarded-Proto": "https",
-                    "X-Forwarded-Host": "miguisanson.dev",
+                    "Host": "miguisanson.dev",  # the tunnel passes the public host name as the Host header
                     "X-Forwarded-For": "203.0.113.7",
                 },
             )
@@ -69,11 +69,27 @@ class ServeUatTests(unittest.TestCase):
         self.assertEqual(host, "miguisanson.dev")
         self.assertEqual(remote, "203.0.113.7", "login throttling needs the visitor's address, not the tunnel's")
 
+    def test_a_client_sent_forwarded_host_is_ignored(self):
+        # I-216 / F-22: Cloudflare sends no X-Forwarded-Host, so a client-supplied one is an attack
+        # on every absolute link the app builds (calendar feed, OAuth redirect).
+        serve_uat = load_serve_uat()
+        original = app_module.app.wsgi_app
+        try:
+            wrapped = serve_uat.apply_proxy_fix(app_module.app)
+            url_root, _scheme, host, _remote = self.seen_url_root(
+                wrapped,
+                {"X-Forwarded-Proto": "https", "Host": "miguisanson.dev", "X-Forwarded-Host": "evil.example"},
+            )
+        finally:
+            app_module.app.wsgi_app = original
+        self.assertEqual(url_root, "https://miguisanson.dev/")
+        self.assertEqual(host, "miguisanson.dev")
+
     def test_without_the_wrapper_the_app_sees_plain_http(self):
         # Proves the check above can fail: the headers alone change nothing.
         url_root, scheme, _host, _remote = self.seen_url_root(
             app_module.app,
-            {"X-Forwarded-Proto": "https", "X-Forwarded-Host": "miguisanson.dev"},
+            {"X-Forwarded-Proto": "https", "Host": "miguisanson.dev"},
         )
         self.assertNotEqual(url_root, "https://miguisanson.dev/")
         self.assertEqual(scheme, "http")
