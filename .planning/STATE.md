@@ -6,6 +6,7 @@
 - Everything is merged on `v6.1-migui` and pushed; no helper worktrees or `pkt/*` branches left from this run.
 - Last gates: Mac Python 875/0 (before the final pkt/fable1 merge; fable1's own run 425 targeted tests OK); Mac e2e
   see `E:/Temp/claude/gate61/mac_e2e_final.txt`; build + `check:ui --strict` zeros after the last merge.
+- **Owner reminder (2026-11-03): build the smarter Policy Assistant (I-218: route questions, role-scoped data answers from the report endpoints, clarifying questions with buttons, "not covered" instead of weak passages; Gemini/local model optional) in the session AFTER the next branch. Remind the owner then.**
 - Open work: HANDOFF-v6.1.md "Open work" (I-207, I-208, I-213 F-10, I-214/I-215 AI leftovers, I-216 .ics + forced
   password change, walkthrough case 20 re-capture, Graduate School questions I-167/I-170/I-174).
 - Before UAT the owner must: Cloudflare login + Access, Google client ID/secret, testers as Google test users,

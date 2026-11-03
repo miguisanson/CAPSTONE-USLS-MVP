@@ -71,6 +71,8 @@ rules.
 4. Before UAT the owner must: Cloudflare login + Access, Google client ID/secret in `.env`, testers as Google test
    users, `DEMO_PASSWORD` in `.env`, then `npm run build:web`, `npm run seed`, `npm run uat`.
 
+- **Owner reminder (2026-11-03): build the smarter Policy Assistant (I-218: route questions, role-scoped data answers from the report endpoints, clarifying questions with buttons, "not covered" instead of weak passages; Gemini/local model optional) in the session AFTER the next branch. Remind the owner then.**
+
 ## Things that bite
 - `app.py` is ~39k lines: Grep, never read whole; only one change set touching it at a time (merge conflicts).
 - Seed dates are relative to the seed day; tests must read data at test time, not hard-code dates/counts
