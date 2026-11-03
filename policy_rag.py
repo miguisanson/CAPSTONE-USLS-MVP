@@ -478,7 +478,7 @@ _STOP = set(
     "will would there their them they have has had been being also any some such than then into from about if not no "
     "student students case handbook manual please tell give explain describe list state answer need needs want wants "
     "many much very just more most other own same per each every up out over under again "
-    "happen happens happened get gets got take takes took long last early soon".split()
+    "happen happens happened get gets got take takes took long last early soon too".split()
 )
 _LEMMAS = {
     "failure": "fail", "failed": "fail", "failing": "fail", "fails": "fail", "failures": "fail",
@@ -603,7 +603,9 @@ _NUMBER_WORDS = {
 
 # Students say "drop a subject"; the Handbook calls that withdrawal (3.1 Registration, p. 49), while its "dropped"
 # is the automatic 20%-absence rule. Asking for the withdrawal wording keeps the absence rule from taking the answer.
-_DROP_A_SUBJECT = re.compile(r"\bdrop(?:ping)?\s+(?:a|an|my|the|this|that|one)?\s*(subjects?|courses?)\b")
+_DROP_A_SUBJECT = re.compile(r"\bdrop(?:ping)?\s+(?:a|an|my|the|this|that|one)?\s*(subjects?|courses?|class(?:es)?)\b")
+# A course code ("MATH 501", "EDUC-601") names a subject; no policy document contains the code itself.
+_COURSE_CODE = re.compile(r"\b(?!(?:19|20)\d\d\b)[a-z]{2,5}[ -]?\d{3,4}[a-z]?\b")
 
 
 class QueryTerms:
@@ -611,8 +613,9 @@ class QueryTerms:
 
     def __init__(self, question: str):
         self.question = question or ""
-        lowered = self.question.lower()
-        sequence = terms(_DROP_A_SUBJECT.sub(r"withdraw \1", lowered))
+        lowered = _COURSE_CODE.sub("subject", self.question.lower())
+        # a "class" is what the Handbook calls a subject
+        sequence = terms(_DROP_A_SUBJECT.sub(lambda m: "withdraw " + ("subject" if m.group(1).startswith("class") else m.group(1)), lowered))
         seen: set[str] = set()
         self.base = [t for t in sequence if not (t in seen or seen.add(t))]
         self.expanded: dict[str, float] = {}
@@ -621,8 +624,10 @@ class QueryTerms:
                 extra = stem(extra)
                 if extra not in self.base:
                     self.expanded[extra] = 0.5
+        self.phrase_hit = False  # a recognised domain phrase ("stop coming to class") explains the words around it
         for pattern, extras in _PHRASE_SYNONYMS:
             if pattern.search(lowered):
+                self.phrase_hit = True
                 for extra in extras:
                     extra = stem(extra)
                     if extra not in self.base:
@@ -839,20 +844,41 @@ def search(
         elif chunk.get("kind") == "managed":
             score *= 1.05  # a staff upload is the newer, approved word
         window = " ".join(sentences[max(0, best_i - 1): best_i + 2])
-        scored.append((score, position, _coverage(window, query, index, chunk.get("section") or "")))
+        section = chunk.get("section") or ""
+        coverage = _coverage(window, query, index, section)
+        scored.append((score, position, coverage, coverage >= MIN_COVERAGE and _anchored(query, index, window, section, coverage)))
     scored.sort(key=lambda item: -item[0])
     return [
         {
             **chunks[position], "_score": round(score, 4), "_coverage": round(coverage, 3),
-            "_relevant": coverage >= MIN_COVERAGE, "_retrieval": "bm25-hybrid" if extra_rank else "bm25",
+            "_relevant": relevant, "_retrieval": "bm25-hybrid" if extra_rank else "bm25",
         }
-        for score, position, coverage in scored[:limit]
+        for score, position, coverage, relevant in scored[:limit]
     ]
 
 
 # Filler words in a chatty question ("my job is getting heavy this semester") lower the share of its words a
 # passage can cover; 0.45 keeps those answerable while off-topic questions (gym hours 0.41, restaurant 0.29) stay below it.
 MIN_COVERAGE = 0.45
+# A question word that no document uses ("admin" in "password of the admin account") is a warning: the passage that
+# matches the rest is probably about something else. Such a question is answered only when the passage covers at
+# least ANCHOR_COVERAGE of its words, or contains a two-word phrase of the question ("leave of absence"), which is
+# what lets "my job is getting heavy ... leave of absence" through while "admin password" is turned away.
+ANCHOR_COVERAGE = 0.75
+
+
+def _anchored(query: QueryTerms, index: PolicyIndex, window: str, section: str, coverage: float) -> bool:
+    unknown = [
+        t for t in query.base
+        if not any(ch.isdigit() for ch in t) and not index.df.get(t) and t not in _SYNONYMS
+    ]
+    if not unknown or query.phrase_hit or coverage >= ANCHOR_COVERAGE:
+        return True
+    text_pairs = set()
+    for text in (window, section):
+        sequence = terms(text)
+        text_pairs.update(zip(sequence, sequence[1:]))
+    return bool(query.bigrams & text_pairs)
 
 
 # --------------------------------------------------------------------------- answering

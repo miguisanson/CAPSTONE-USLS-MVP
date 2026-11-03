@@ -353,7 +353,7 @@ class GeminiHybridPathTests(EvalBase):
     def run_with_key(self, question, generated):
         seen = {}
 
-        def fake_generate(prompt):
+        def fake_generate(prompt, system=None):
             seen["prompt"] = prompt
             return generated
 
