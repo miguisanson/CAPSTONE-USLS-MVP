@@ -269,7 +269,7 @@ test.describe("Staff active students (I-193)", () => {
 
   test("the dashboard says which 'active' it counts, and Reports says its own", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText(/\d+ with Active standing/)).toBeVisible();
+    await expect(page.getByText(/\d+ active students/)).toBeVisible();
     await page.goto("/reports");
     await expect(page.getByRole("group", { name: "Summary numbers" }).getByRole("button", { name: /Active students/ })).toContainText("Standing Active, not completed or withdrawn");
   });
