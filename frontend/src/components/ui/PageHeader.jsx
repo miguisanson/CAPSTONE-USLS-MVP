@@ -5,10 +5,12 @@
 // components/ui.jsx PageHeader ({ title, description, icon, actions, badge }).
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { formRefLine } from "../../lib/formRefs.js";
 
 /**
  * @param title        the page title
  * @param description  one short line under the title
+ * @param forms        a key of lib/formRefs.js; adds the muted line "Forms GS-F-07 · Operations Manual 4.6" under the description
  * @param icon         a lucide icon component; shown in a 44px tile from sm up
  * @param actions      buttons for the right-hand side (under the title on phones)
  * @param badge        a StatusChip or similar, shown beside the title
@@ -17,7 +19,7 @@ import { ArrowLeft } from "lucide-react";
  * @param titleProps   extra props for the heading element (e.g. an id)
  * @param className    extra classes on the wrapper
  */
-export function PageHeader({ title, description, icon: Icon, actions = null, badge = null, back = null, level = 1, titleProps = {}, className = "", ...rest }) {
+export function PageHeader({ title, description, icon: Icon, actions = null, badge = null, back = null, forms = null, level = 1, titleProps = {}, className = "", ...rest }) {
   const Heading = level === 2 ? "h2" : level === 3 ? "h3" : "h1";
   return (
     <header className={`flex flex-wrap items-start justify-between gap-3 ${className}`.trim()} {...rest}>
@@ -48,6 +50,11 @@ export function PageHeader({ title, description, icon: Icon, actions = null, bad
             {description && (
               <p data-slot="description" className="mt-1 max-w-3xl text-sm text-slate-500">
                 {description}
+              </p>
+            )}
+            {forms && formRefLine(forms) && (
+              <p data-slot="forms" className="meta mt-1">
+                {formRefLine(forms)}
               </p>
             )}
           </div>

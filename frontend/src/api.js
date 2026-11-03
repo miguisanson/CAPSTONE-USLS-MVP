@@ -54,6 +54,7 @@ export const api = {
   login: (payload) => request("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => request("/auth/logout", { method: "POST", body: JSON.stringify({}) }),
   changePassword: (payload) => request("/auth/change-password", { method: "POST", body: JSON.stringify(payload) }),
+  acceptPrivacyNotice: () => request("/auth/privacy-consent", { method: "POST", body: JSON.stringify({ accept: true }) }),
   authConfig: () => request("/auth/config"),
   demoAccounts: () => request("/auth/demo-accounts"),
   demoStudents: () => request("/auth/demo-students"),

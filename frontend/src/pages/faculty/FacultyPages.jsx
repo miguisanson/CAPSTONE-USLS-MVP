@@ -119,6 +119,7 @@ export function FacultyAdviseesPage() {
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title="My Advisees"
+        forms="adviser-designation"
         description="Students you advise, their stage, and the research documents that need your signature."
         icon={Users}
         actions={<Button as={Link} variant="secondary" icon={FileSignature} to="/faculty-portal/signatures">Signatures</Button>}
@@ -234,6 +235,7 @@ export function FacultyDefensesPage() {
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title="Defense Schedule"
+        forms="defense-scheduling"
         description="Defenses scheduled for the panels you sit on. Keep your availability current so staff can confirm dates."
         icon={CalendarClock}
         actions={

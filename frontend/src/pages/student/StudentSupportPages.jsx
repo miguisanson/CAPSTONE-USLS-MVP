@@ -16,6 +16,7 @@ export function StudentEnrollmentPage() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.enrollment}
+        forms="enrollment"
         description="Choose the published subjects you are taking this semester. Subjects already on your record stay locked."
         icon={BookPlus}
         actions={<Button as={Link} to="/student/progress" variant="secondary">View my progress</Button>}

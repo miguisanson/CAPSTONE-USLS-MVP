@@ -563,6 +563,9 @@ class Student(db.Model):
         return f"{self.first_name} {self.last_name}"
 
 
+PRIVACY_NOTICE_VERSION = "GS-P-04 rev 00"
+
+
 class UserAccount(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(160), unique=True, nullable=False)
@@ -575,6 +578,9 @@ class UserAccount(db.Model):
     # True for an account whose initial password was generated for it: the holder must
     # choose their own password at first sign-in before anything else works.
     must_change_password = db.Column(db.Boolean, nullable=False, default=False)
+    # GS-P-04: when, and which version of, the Data Privacy Notice the holder accepted at first sign-in.
+    privacy_consent_at = db.Column(db.DateTime)
+    privacy_notice_version = db.Column(db.String(40))
     created_at = db.Column(db.DateTime, default=now_utc)
 
     student = db.relationship("Student")
@@ -4946,6 +4952,8 @@ def account_dict(account: UserAccount) -> dict:
         "student_id": account.student_id,
         "faculty_id": account.faculty_id,
         "must_change_password": bool(account.must_change_password),
+        "privacy_consent_required": account.privacy_notice_version != PRIVACY_NOTICE_VERSION,
+        "privacy_notice_version": PRIVACY_NOTICE_VERSION,
         "demo_account": is_demo_account(account),
     }
 
@@ -13015,6 +13023,24 @@ def register_routes(app: Flask) -> None:
         account.must_change_password = False
         db.session.commit()
         LOGIN_THROTTLE.record_success(account.email, client_ip)
+        return no_store(jsonify({"ok": True, "user": account_dict(account)}))
+
+    @app.route("/api/auth/privacy-consent", methods=["POST"])
+    def auth_privacy_consent():
+        """Record that the signed-in account accepted the current Data Privacy Notice (GS-P-04)."""
+        account = current_account()
+        if not account:
+            return no_store(jsonify({"error": "Please sign in to continue."})), 401
+        if (request.get_json(silent=True) or {}).get("accept") is not True:
+            return no_store(jsonify({"error": "Accept the Data Privacy Notice to continue."})), 400
+        account.privacy_consent_at = now_utc()
+        account.privacy_notice_version = PRIVACY_NOTICE_VERSION
+        db.session.add(TransactionLog(
+            transaction_slug="privacy-consent", actor_user_id=account.id, actor_role=ROLE_LABELS.get(account.role, account.role),
+            action_type="consent", visibility="internal", source_reference=f"{PRIVACY_NOTICE_VERSION} (Operations Manual 4.23)",
+            result="Accepted the Data Privacy Notice",
+        ))
+        db.session.commit()
         return no_store(jsonify({"ok": True, "user": account_dict(account)}))
 
     # Shared reference data used to render filters, dropdowns, and workflow cards.
@@ -41062,7 +41088,17 @@ def build_demo_database() -> dict:
         seed_report_history()  # two earlier terms of decided cases for the Reports (I-181)
         keep_endorsed_candidates_out_of_completed()  # not Completed while the Dean has not approved (F-25)
         seed_stage_events()  # last: the stage clock, and the risk levels that read it
+        accept_privacy_notice_for_seeded_accounts()
         return sync_result
+
+
+def accept_privacy_notice_for_seeded_accounts() -> None:
+    """Seeded accounts start with the current notice accepted (seed day, midnight), so demos and walkthroughs are not stopped by it."""
+    accepted_at = datetime.combine(ph_today(), datetime.min.time())
+    for account in UserAccount.query.all():
+        account.privacy_consent_at = accepted_at
+        account.privacy_notice_version = PRIVACY_NOTICE_VERSION
+    db.session.commit()
 
 
 def database_has_demo_data() -> bool:

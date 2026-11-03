@@ -21,6 +21,7 @@ import { Button } from "./Button.jsx";
 import { Card } from "./Card.jsx";
 import { Field, Textarea } from "./Field.jsx";
 import { InlineNotice } from "./Feedback.jsx";
+import { EApprovalNote } from "./EApprovalNote.jsx";
 import { useConfirm } from "../confirm.jsx";
 
 const TONES = ["approve", "return", "reject"];
@@ -75,6 +76,7 @@ const joinOr = (words) => (words.length > 1 ? `${words.slice(0, -1).join(", ")} 
  * @param onCancel, cancelLabel   adds a Cancel button (for a panel inside a dialog)
  * @param extra              a node at the end of the button row (a "Message" button, a read-only sentence)
  * @param children           extra controls between the comment box and the buttons (a checkbox, a select, a signature pad)
+ * @param eApprovalNote      false hides the muted line "Your decision is recorded as your electronic approval (GS-P-03)." (default: shown)
  * @param variant            "card" (default, bordered) | "plain" (no chrome, for use inside a Modal or an existing card)
  * @param compact            on a phone the buttons share ONE row (their words wrap) instead of one full-width button per line, and
  *                           the box scrolls into view when it takes the focus (a pinned footer, F-18); the button icons drop out on a
@@ -105,6 +107,7 @@ export function DecisionPanel({
   extra,
   children,
   variant = "card",
+  eApprovalNote = true,
   compact = false,
   className = "",
   ...rest
@@ -252,6 +255,8 @@ export function DecisionPanel({
         )}
         {extra}
       </div>
+
+      {eApprovalNote && <EApprovalNote />}
 
       {hinted.map((action) => (
         <p key={action.key} id={`${base}-hint-${action.key}`} className={action.disabled ? "meta" : "sr-only"}>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CalendarClock, CalendarDays, MailCheck, UserX, Users } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, EmptyState, Field, InlineNotice, PageHeader, SectionTitle, Spinner, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Card, EApprovalNote, EmptyState, Field, InlineNotice, PageHeader, SectionTitle, Spinner, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatDateTime } from "../../lib/format";
 import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
 
@@ -138,6 +138,7 @@ function InvitationCard({ invitation, onChanged }) {
       ) : (
         <>
           <ErrorLine message={error} />
+          <EApprovalNote />
           <div className="flex flex-wrap items-center gap-2">
             {invitation.status !== "Accepted" && (
               <Button onClick={accept} disabled={busy}>
@@ -187,6 +188,7 @@ export default function FacultyInvitationsPage() {
   const header = (
     <PageHeader
       title="Panel Invitations"
+      forms="panel-matching"
       description="Research defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense."
       icon={CalendarDays}
     />

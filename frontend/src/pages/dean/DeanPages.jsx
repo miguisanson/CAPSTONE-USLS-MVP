@@ -342,6 +342,7 @@ function DeanPlansBody() {
       <PageHeader
         title={DEAN_PROCESSES["course-adjustments"].label}
         description={COURSE_ADJUSTMENTS_COPY}
+        forms="course-adjustments"
         icon={Gavel}
         badge={<StatusChip status={`${counts[PROCESS_COUNT_KEY["course-adjustments"]]} waiting`} tone="muted" dot={false} />}
         actions={<Button as={Link} to="/dean/approvals" variant="secondary" icon={ArrowLeft}>All approvals</Button>}
@@ -382,6 +383,7 @@ function DeanCaseBody() {
       <PageHeader
         title={item.title}
         description={`${item.student?.name || ""} · ${item.student?.student_number || ""} · ${processLabel(item.type)}`}
+        forms={processOfType(item.type)}
         icon={Gavel}
         badge={<StatusChip status={item.status} dot={false} />}
         actions={<Button as={Link} to={backTo} variant="secondary" icon={ArrowLeft}>Back to list</Button>}
