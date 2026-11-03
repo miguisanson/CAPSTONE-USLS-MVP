@@ -217,6 +217,27 @@ def fmt(par, before=0, after=0, align=None, keep_next=False, line=1.0):
         pf.keep_with_next = True
 
 
+NO_BREAK_CODES = [False]   # the routing guide turns this on: GS-F-17 must not wrap after "GS-"
+
+
+def add_code_runs(par, text, size, bold, italic, color):
+    for part in re.split(r"(GS-[FP]-\d\d)", text):
+        if not part:
+            continue
+        if re.fullmatch(r"GS-[FP]-\d\d", part):
+            pieces = part.split("-")
+            for i, piece in enumerate(pieces):
+                if i:
+                    r = par.add_run()
+                    style_run(r, size=size, bold=bold, italic=italic, color=color)
+                    r._r.append(OxmlElement("w:noBreakHyphen"))
+                r = par.add_run(piece)
+                style_run(r, size=size, bold=bold, italic=italic, color=color)
+        else:
+            r = par.add_run(part)
+            style_run(r, size=size, bold=bold, italic=italic, color=color)
+
+
 def add_text(par, text, size=BODY, bold=False, italic=False, color=None):
     """Add text; every ballot box is set in the symbol font so it renders everywhere."""
     parts = re.split(f"({BOX})", text)
@@ -226,6 +247,8 @@ def add_text(par, text, size=BODY, bold=False, italic=False, color=None):
         if part == BOX:
             r = par.add_run(part)
             style_run(r, size=size + 1, font=CHECK_FONT)
+        elif NO_BREAK_CODES[0]:
+            add_code_runs(par, part, size, bold, italic, color)
         else:
             r = par.add_run(part)
             style_run(r, size=size, bold=bold, italic=italic, color=color)
@@ -619,7 +642,7 @@ def build_form(spec, outdir: Path) -> Path:
         nxt = secs[idx + 1] if idx + 1 < len(secs) else None
         # chained to the next section when that one has no heading of its own;
         # the last section is chained to the Graduate School box
-        chain = (nxt is None) or (nxt[0] != "note" and nxt[1] is None)
+        chain = (nxt is None) or (nxt[0] not in ("note", "para") and nxt[1] is None)
         if kind == "note":
             paragraph(doc, sec[1], size=NOTE, italic=True, align=WD_ALIGN_PARAGRAPH.LEFT)
             continue
@@ -799,11 +822,11 @@ add("04", "Term Course Offering Plan", "Course offering",
     ],
     sections=[
         F("Plan information", ["Program", "Academic year / semester", "Prepared by (Academic Coordinator)", "Date prepared", "Reference term for demand", "Number of students enrolled in program"]),
-        T("Subjects", [("Subject code", 2.0), ("Subject title", 4.6), ("Units", 1.1), ("Students needing it", 1.9), ("Secs.", 1.3), ("Professor assigned", 3.2), ("Schedule", 2.7)], 6, 0.8),
+        T("Subjects", [("Subject code", 2.0), ("Subject title", 4.6), ("Units", 1.1), ("Students needing it", 1.9), ("Secs.", 1.3), ("Professor assigned", 3.2), ("Schedule", 2.7)], 4, 0.8),
         C("Decision on each subject", "Mark here any subject that will not be offered and name the students who would be delayed:",
           ["All subjects listed above are offered", "Some subjects are not offered (state below)"], cols=1),
-        B(None, "Subjects not offered, the reason, and students who would be delayed:", 1.4),
-        B(None, "Special / undersized classes requested (subject, number of enrollees, reason):", 1.2),
+        B(None, "Subjects not offered, the reason, and students who would be delayed:", 1.1),
+        B(None, "Special / undersized classes requested (subject, number of enrollees, reason):", 1.0),
         S("Approval", [("Prepared by", "Academic Coordinator"), ("Approved by", "Graduate School Dean")]),
     ],
     gs=["Published on"])
@@ -843,7 +866,7 @@ add("06", "Notice of Dropping from a Subject", "Dropping",
         F("Attendance computation", ["Total scheduled class hours", "Hours absent", "Hours excused or approved", "Unexcused absence (hours)", "Unexcused absence (% of total hours)", "Attendance record attached"]),
         C("Basis of the drop", None, ["Unexcused absence is more than 20% of the total class hours (Handbook p. 52)",
                                        "Other documented ground agreed with the Academic Coordinator (state below)"], cols=1),
-        B(None, "Other ground, with supporting documents:", 1.3),
+        B(None, "Other ground, with supporting documents:", 0.9),
         P(None, "The student was informed of this drop on the date shown below."),
         S("Signatures", [("Professor of the subject", "Reports the absences"), ("Academic Coordinator", "Verified; recorded as dropped"),
                          ("Student", "Informed of the drop"), ("Graduate School Dean", "Noted")]),
@@ -1003,7 +1026,8 @@ add("14", "Application for Comprehensive Examination", "Comprehensive examinatio
         C("Evaluation of eligibility", None, ["All academic requirements passed, evaluated by the Academic Coordinator (master's)", "All academic requirements passed, evaluated by the College Dean (doctorate)",
                                               "Integrating course completed (non-thesis)"], cols=1),
         S("Signatures", [("Student", "Applicant"), ("Academic Coordinator or College Dean", "Evaluated"), ("Graduate Program Secretary", "Received with official receipt")]),
-        B("Withdrawal of application (only if the student withdraws)", "Reason and date (at least three working days before the examination); signature of the student:", 1.4),
+        B("Withdrawal of application (only if the student withdraws)", "Reason for withdrawing (at least three working days before the examination):", 1.0),
+        S(None, [("Student", "Withdraws the application")]),
     ],
     gs=["Examination schedule"])
 
@@ -1141,8 +1165,7 @@ add("21", "Request for Change of Research Adviser", "Change of Research Adviser"
         C("Stage of the study", None, ["The proposal defense has not yet been held", "This is the first request to change the Research Adviser"], cols=1),
         B("Justifiable reason for the change", "State the reason clearly:", 2.6),
         S("Agreement", [("Student", "Requests the change"), ("Current Research Adviser", "Agrees to release the advisee"), ("Proposed New Research Adviser", "Agrees to advise")]),
-        C("Deliberation (Research Coordinator, Associate Dean, Dean)", None, ["Approved; a new Form 3.1 is prepared", "Not approved"], cols=2),
-        S("Decision", [("Research Coordinator", None), ("Associate Dean", None), ("Graduate School Dean", None)]),
+        S("Deliberation and decision", [("Research Coordinator", "Approved; a new Form 3.1 is prepared  /  Not approved"), ("Associate Dean", "Approved  /  Not approved"), ("Graduate School Dean", "Approved  /  Not approved")]),
     ],
     gs=["New Form 3.1 issued on"])
 
@@ -1212,7 +1235,7 @@ add("25", "Statistical Consultation Form", "Proposal defense", subtitle="Researc
         F(None, [("tall", "Title of the study", 2)]),
         C("Type of study", None, ["Quantitative", "Qualitative (this form is not required)"], cols=2),
         F("Design reviewed", [("full", "Research design"), ("full", "Population, sampling and sample size"), ("full", "Instrument and its validity and reliability"), ("full", "Statistical tools to be used")]),
-        B("Findings and recommendations of the Statistician", "", 2.6),
+        B("Findings and recommendations of the Statistician", "", 1.8),
         C(None, "Status:", ["The statistical plan is appropriate for the study", "The statistical plan is appropriate after the changes recommended above"], cols=1),
         S("Signatures", [("Statistician", "Position / college: ________"), ("Student", "Received the recommendations"), ("Research Adviser", "Noted")]),
     ],
@@ -1565,7 +1588,7 @@ add("44", "Records Transmittal to the University Registrar", "Records handoff to
     sections=[
         F("Transmittal", ["Date sent", "Sent by (name and office)", "Mode (email / hand-carried)", "Reference no."]),
         C("Type of handoff", None, ["Notice of approved leave of absence (GS-F-07)", "Withdrawal Form copies (GS-F-05)", "Endorsement of returning student (GS-F-08)", "Graduation endorsement list (GS-F-43)", "Cross-enrollment or other request", "Other: ____________________"], cols=1),
-        T("Records transmitted", [("Student no.", 2.4), ("Name of student", 5.0), ("Document", 4.4), ("Term", 2.4), ("Remarks (reason, refund)", 2.8)], 7, 0.68),
+        T("Records transmitted", [("Student no.", 2.4), ("Name of student", 5.0), ("Document", 4.4), ("Term", 2.4), ("Remarks (reason, refund)", 2.8)], 5, 0.68),
         S("Signatures", [("Sent by", "Dean, Associate Dean or authorized representative"), ("Received by", "University Registrar (name, date, reference no.)")]),
     ],
     gs=["Confirmation of Registrar on"])
@@ -1924,7 +1947,11 @@ def build_routing_guide():
         when, sub, rev, appr, nxt, plat = ROUTES[key]
         rows.append([f["code"], manual_column(f), f["title"], when, sub, rev, appr, nxt, plat])
     cols = [("Form", 1.8), ("Manual", 1.4), ("Title", 3.3), ("When used", 3.9), ("Submitted by", 2.4), ("Reviewed by", 2.5), ("Approved / decided by", 2.7), ("Goes next to", 3.2), ("Recorded in the system as", 3.5)]
-    t = grid_table(doc, cols, rows, width, row_h=0.9, size=9)
+    NO_BREAK_CODES[0] = True
+    try:
+        t = grid_table(doc, cols, rows, width, row_h=0.9, size=9)
+    finally:
+        NO_BREAK_CODES[0] = False
     for r in t.rows[1:]:
         no_split(r)
     return save(doc, CONTROL_DOCS[1], OUT)
