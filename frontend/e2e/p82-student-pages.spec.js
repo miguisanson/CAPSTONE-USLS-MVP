@@ -626,7 +626,8 @@ test.describe("P82 changes: the Defense Schedule page", () => {
       await expect(main(page).locator('a[href="/student/defense-schedule"]'), "no self-link on the Defense Schedule page").toHaveCount(0);
       await expect(h2s(page).filter({ hasText: "Adviser and panel" })).toHaveCount(1);
       await open(page, "/student/research");
-      await expect(main(page).locator('a[href="/student/defense-schedule"]')).toHaveCount(1);
+      // the card's link, plus (I-222) "Request your defense date on Defense Schedule" when that is the next step
+      await expect(main(page).locator('a[href="/student/defense-schedule"]').first()).toBeVisible();
     } finally {
       await finish();
     }
