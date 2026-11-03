@@ -5,6 +5,7 @@ import { useApi } from "../hooks";
 import { Button, DataTable, Field, InlineNotice, Input, Modal, PageHeader, Spinner, StatusChip } from "../components/ui/index.js";
 import { useConfirm } from "../components/confirm";
 import { PAGE } from "../lib/labels.js";
+import { formatDate } from "../lib/format";
 
 const EMPTY_FORM = { label: "", start_date: "", end_date: "", planning_window_open: "", planning_window_close: "" };
 const DATE_FIELDS = ["start_date", "end_date", "planning_window_open", "planning_window_close"];
@@ -163,9 +164,9 @@ export default function TermSettings() {
       header: "Semester dates",
       cell: (term) => (
         <>
-          <span className="text-slate-600">{term.start_date} — {term.end_date}</span>
+          <span className="text-slate-600">{formatDate(term.start_date)} — {formatDate(term.end_date)}</span>
           {(term.planning_window_open || term.planning_window_close) && (
-            <span className="meta mt-0.5 block">Planning: {term.planning_window_open || "?"} — {term.planning_window_close || "?"}</span>
+            <span className="meta mt-0.5 block">Planning: {term.planning_window_open ? formatDate(term.planning_window_open) : "?"} — {term.planning_window_close ? formatDate(term.planning_window_close) : "?"}</span>
           )}
         </>
       ),

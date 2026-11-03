@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { BookOpen, CalendarClock, CheckCircle2, Eye, Gavel, Hourglass, History } from "lucide-react";
 import { api } from "../../api";
 import { Button, Card, EmptyState, Field, Input, InlineNotice, SectionTitle, Select, StatusChip, Textarea } from "../../components/ui/index.js";
-import { formatDate, formatDateTime } from "../../lib/format";
+import { formatClock, formatDate, formatDateTime } from "../../lib/format";
 
 // The Verdicts page (I-090). Three groups, most urgent first:
 //   1. "Needs your verdict"   - defenses where this member can record the verdict (with the papers and the form)
@@ -33,7 +33,7 @@ function PanelHeader({ panel }) {
       <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-brand-800">
         <CalendarClock className="h-4 w-4" aria-hidden="true" />
         <span className="font-semibold">
-          {panel.defense.defense_type} · <time dateTime={whenOf(panel)}>{formatDate(panel.defense.preferred_date)} {panel.defense.start_time || ""}</time>
+          {panel.defense.defense_type} · <time dateTime={whenOf(panel)}>{formatDate(panel.defense.preferred_date)} {formatClock(panel.defense.start_time)}</time>
         </span>
         <StatusChip status={panel.defense.display_status || panel.defense.status} dot={false} />
       </p>

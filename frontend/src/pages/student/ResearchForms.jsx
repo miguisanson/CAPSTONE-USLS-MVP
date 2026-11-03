@@ -8,6 +8,7 @@ import {
 import { api } from "../../api";
 import { Button, Field, InlineNotice, Input, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
+import { formatDate } from "../../lib/format";
 import { ErrorSummary, useFormErrors, useSubmitRequest, SubmitState, isLiveSchedule } from "./shared";
 
 export function ResearchRequestForm({ data, onSaved }) {
@@ -383,7 +384,7 @@ export function ScheduleRequestForm({ data, onSaved }) {
       return;
     }
     clear();
-    submit({ student_id: studentId, ...form }, { lines: [`${form.defense_type} schedule request`, `Preferred date: ${form.preferred_date}`, `Mode: ${form.mode}`] });
+    submit({ student_id: studentId, ...form }, { lines: [`${form.defense_type} schedule request`, `Preferred date: ${formatDate(form.preferred_date)}`, `Mode: ${form.mode}`] });
   }
 
   return (

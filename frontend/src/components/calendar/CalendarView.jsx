@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, Flag, MapPin } from "lucide-react";
 import { Button, Card, EmptyState, StatusChip } from "../ui/index.js";
+import { formatClock, formatDate, formatDay, formatTimeRange } from "../../lib/format";
 
 // A light month / week / agenda calendar (no calendar library). It only draws what it is given:
 // defense events (date + time range), deadline markers (date only), an optional availability
@@ -78,10 +79,10 @@ function toolbarTitle(anchor, view) {
     const first = startOfWeek(anchor);
     const last = addDays(first, 6);
     const fmt = { month: "short", day: "numeric" };
-    return `${first.toLocaleDateString(undefined, fmt)} – ${last.toLocaleDateString(undefined, { ...fmt, year: "numeric" })}`;
+    return `${formatDate(first, fmt)} – ${formatDate(last, { ...fmt, year: "numeric" })}`;
   }
-  if (view === "agenda") return `From ${anchor.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
-  return anchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  if (view === "agenda") return `From ${formatDate(anchor)}`;
+  return formatDate(anchor, { month: "long", year: "numeric" });
 }
 
 function timeOf(iso) {
@@ -103,7 +104,7 @@ function shortStage(type) {
 }
 
 function eventLabel(event) {
-  return `${timeOf(event.start)} ${shortStage(event.defense_type)} · ${event.student_name || ""}`.trim();
+  return `${formatClock(event.start)} ${shortStage(event.defense_type)} · ${event.student_name || ""}`.trim();
 }
 
 function statusMark(event) {
@@ -144,7 +145,7 @@ function EventChip({ event, onSelect, selected }) {
     <button
       type="button"
       onClick={() => onSelect?.(event)}
-      title={`${event.title} · ${timeOf(event.start)}–${timeOf(event.end)}${event.venue ? ` · ${event.venue}` : ""} · ${event.status}`}
+      title={`${event.title} · ${formatTimeRange(event.start, event.end)}${event.venue ? ` · ${event.venue}` : ""} · ${event.status}`}
       className={`flex w-full min-w-0 cursor-pointer items-center gap-1 rounded-md border px-1.5 py-0.5 text-left text-2xs font-semibold leading-tight transition-shadow hover:shadow-card ${style.chip} ${statusMark(event)} ${alertRing(event)} ${selected ? "outline outline-2 outline-brand-600" : ""}`}
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`} aria-hidden="true" />
@@ -276,7 +277,7 @@ function WeekView({ anchor, events, deadlines, availability, busy, onSelectEvent
             const key = isoDay(day);
             return (
               <div key={key} className="border-l border-slate-100 px-1.5 py-2 text-center">
-                <p className="text-2xs font-semibold uppercase tracking-wide text-slate-500">{day.toLocaleDateString(undefined, { weekday: "short" })}</p>
+                <p className="text-2xs font-semibold uppercase tracking-wide text-slate-500">{formatDate(day, { weekday: "short" })}</p>
                 <p className={`mx-auto mt-0.5 grid h-7 min-w-[1.75rem] place-items-center rounded-full px-1 text-sm font-semibold ${key === today ? "bg-brand-600 text-white" : "text-slate-700"}`}>{day.getDate()}</p>
               </div>
             );
@@ -320,7 +321,7 @@ function WeekView({ anchor, events, deadlines, availability, busy, onSelectEvent
                     key={`w${index}`}
                     className="absolute inset-x-0 bg-brand-50/80"
                     style={{ top: Math.max(0, topOf(hhmm(window.start))), height: Math.max(0, topOf(hhmm(window.end)) - Math.max(0, topOf(hhmm(window.start)))) }}
-                    title={`Available ${window.start}–${window.end}`}
+                    title={`Available ${formatTimeRange(window.start, window.end)}`}
                   />
                 ))}
                 {layer?.blocked?.map((block, index) => (
@@ -358,9 +359,9 @@ function WeekView({ anchor, events, deadlines, availability, busy, onSelectEvent
                       onClick={() => onSelectEvent?.(event)}
                       className={`absolute cursor-pointer overflow-hidden rounded-md border px-1.5 py-1 text-left text-2xs font-semibold leading-tight hover:shadow-card ${style.bar} ${statusMark(event)} ${alertRing(event)} ${selectedId === event.id ? "outline outline-2 outline-brand-600" : ""}`}
                       style={{ top, height, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${100 / cols}% - 4px)` }}
-                      title={`${event.title} · ${timeOf(event.start)}–${timeOf(event.end)} · ${event.status}`}
+                      title={`${event.title} · ${formatTimeRange(event.start, event.end)} · ${event.status}`}
                     >
-                      <span className="block truncate">{timeOf(event.start)}–{timeOf(event.end)}</span>
+                      <span className="block truncate">{formatTimeRange(event.start, event.end)}</span>
                       <span className="block truncate">{shortStage(event.defense_type)} · {event.student_name}</span>
                       {height > 52 && event.venue && <span className="block truncate font-normal opacity-80">{event.venue}</span>}
                     </button>
@@ -402,7 +403,7 @@ function AgendaView({ anchor, events, deadlines, onSelectEvent, onSelectDeadline
       {rows.map((group) => (
         <li key={group.day} className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]">
           <p className="text-sm font-semibold text-ink">
-            {parseDay(group.day).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+            {formatDay(group.day)}
             {group.day === isoDay(new Date()) && <span className="ml-2 rounded-full bg-brand-600 px-2 py-0.5 text-2xs font-semibold uppercase text-white">Today</span>}
           </p>
           <ul className="space-y-2">
@@ -417,7 +418,7 @@ function AgendaView({ anchor, events, deadlines, onSelectEvent, onSelectDeadline
                     className={`flex w-full cursor-pointer flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left hover:shadow-card ${(DEFENSE_STYLES[item.defense_type] || FALLBACK_STYLE).chip} ${alertRing(item)} ${selectedId === item.id ? "outline outline-2 outline-brand-600" : ""}`}
                   >
                     <span className={`min-w-0 ${statusMark(item)}`}>
-                      <span className="block text-sm font-semibold">{timeOf(item.start)}–{timeOf(item.end)} · {item.defense_type} · {item.student_name}</span>
+                      <span className="block text-sm font-semibold">{formatTimeRange(item.start, item.end)} · {item.defense_type} · {item.student_name}</span>
                       <span className="flex flex-wrap items-center gap-x-3 text-xs opacity-80">
                         {item.venue && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" aria-hidden="true" />{item.venue}</span>}
                         {item.my_role && <span>Your role: {item.my_role}</span>}

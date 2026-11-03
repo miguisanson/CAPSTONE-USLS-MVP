@@ -4,29 +4,17 @@ import { api } from "../../api";
 import { useApi } from "../../hooks";
 import { Card, EmptyState, Spinner } from "../../components/ui/index.js";
 import { PortalNavProvider } from "../../components/portalNav";
-import { parseDay } from "../../components/calendar/CalendarView";
+import { formatDay as formatDayShared, formatTimeRange as formatTimeRangeShared } from "../../lib/format";
 
 const FacultyContext = createContext(null);
 
-// Small display helpers shared by the faculty pages. Dates are "YYYY-MM-DD"
-// and times "HH:MM" in Philippine time; nothing is converted.
-export function formatDay(value, opts = { weekday: "short", month: "short", day: "numeric", year: "numeric" }) {
-  if (!value) return "Not set";
-  const day = parseDay(value);
-  return Number.isNaN(day.getTime()) ? String(value) : day.toLocaleDateString(undefined, opts);
-}
-
-export function formatClock(value) {
-  if (!value) return "";
-  const [h, m] = String(value).slice(0, 5).split(":").map(Number);
-  if (Number.isNaN(h) || Number.isNaN(m)) return String(value);
-  const hour = h % 12 || 12;
-  return `${hour}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+// Dates and times use the one app-wide style from lib/format (I-207); only the "not set" wording is local.
+export function formatDay(value) {
+  return value ? formatDayShared(value) : "Not set";
 }
 
 export function formatTimeRange(start, end) {
-  if (!start) return "Time not set";
-  return end ? `${formatClock(start)} – ${formatClock(end)}` : formatClock(start);
+  return start ? formatTimeRangeShared(start, end) : "Time not set";
 }
 
 // One fetch of the faculty member's portal context, shared by every page so

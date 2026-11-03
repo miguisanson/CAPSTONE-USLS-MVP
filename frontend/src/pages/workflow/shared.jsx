@@ -4,7 +4,7 @@ import { api } from "../../api";
 import { Button, Card, EmptyState, Field, HistoryList, HistoryPanel, InlineNotice, Input, Modal, SearchInput, Select, StatCard, StatusChip, Textarea } from "../../components/ui/index.js";
 import StepDialog from "../../components/StepDialog";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
-import { formatDateTime } from "../../lib/format";
+import { formatClock, formatDateTime, formatDay, formatTimeRange } from "../../lib/format";
 import { useAuth } from "../../auth";
 
 export const WORKFLOW_ROLE_LABELS = {
@@ -432,31 +432,12 @@ export function panelSeatIds(roles, panel) {
 }
 
 export function shortDate(value) {
-  if (!value) return "";
-  return new Intl.DateTimeFormat("en-PH", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T00:00:00Z`));
+  return value ? formatDay(value) : "";
 }
 
+export const formatTime = formatClock;
 
-export function formatTime(value) {
-  if (!value) return "";
-  const [hour, minute] = value.split(":").map(Number);
-  return new Intl.DateTimeFormat("en-PH", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(2026, 0, 1, hour, minute)));
-}
-
-export function timeRange(start, end) {
-  return `${formatTime(start)}-${formatTime(end)}`;
-}
+export const timeRange = formatTimeRange;
 
 // A small figure tile. New code uses StatCard size="sm" directly; the Practicum and Graduation rosters still call this
 // (their packet replaces it). The tone name is the old one (brand / blue / amber / red); the icon makes the tone visible.

@@ -687,7 +687,7 @@ test.describe("Calendar page", () => {
       await expect(details).toContainText("Spec Student · SP-777");
       await expect(details.getByText("Needs Re-confirmation", { exact: true })).toBeVisible();
       await expect(details).toContainText("Spec: a panelist has not confirmed.");
-      for (const [label, value] of [["Time", "09:00–10:30"], ["Venue", "Spec Room 1"], ["Mode", "On-site"], ["Program", "MAED"], ["Adviser", "Dr. Spec Adviser"], ["Last change", "Spec: moved by an hour."]]) {
+      for (const [label, value] of [["Time", "9:00 – 10:30 AM"], ["Venue", "Spec Room 1"], ["Mode", "On-site"], ["Program", "MAED"], ["Adviser", "Dr. Spec Adviser"], ["Last change", "Spec: moved by an hour."]]) {
         await expect(details.getByText(label, { exact: true }), label).toBeVisible();
         await expect(details, label).toContainText(value);
       }
@@ -728,7 +728,7 @@ test.describe("Calendar page", () => {
       await main(page).getByRole("checkbox", { name: "Deadlines" }).check();
 
       // open the defense from the month grid
-      await main(page).getByRole("button", { name: /09:00–10:30.*Proposal · Spec Student/ }).first().click();
+      await main(page).getByRole("button", { name: /9:00 – 10:30 AM.*Proposal · Spec Student/ }).first().click();
       const details = main(page).locator(".card", { hasText: "Add to my calendar (.ics)" });
       await expect(details).toContainText("Your role");
       await expect(details).toContainText("Panel Member");

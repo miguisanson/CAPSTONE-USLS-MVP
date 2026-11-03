@@ -309,7 +309,7 @@ test.describe("P4.1 shared student parts", () => {
       await expect(sched).toContainText("Title Defense");
       await expect(sched).toContainText(/Fri, Dec 4, 2026/);
       await expect(sched.getByText("Scheduled", { exact: true })).toBeVisible();
-      await expect(sched).toContainText("09:00-10:30 (Philippine time) - In person - Conference Room B");
+      await expect(sched).toContainText("9:00 – 10:30 AM (Philippine time) - In person - Conference Room B");
       await expect(sched).toContainText("Dr. Ana Reyes - Panel Chair");
       await expect(sched).toContainText("Dr. Ben Cruz - Content Specialist");
       await expect(sched).toContainText("Bring two printed copies.");
@@ -350,7 +350,7 @@ test.describe("P4.1 shared student parts", () => {
       for (const stage of ["Admission", "Coursework", "Final Defense", "AWOL"]) expect(status).toContain(stage);
       // the AWOL row of Workflow Status
       const workflow = panel(page, "Workflow Status");
-      await expect(workflow).toContainText("AWOL / Return");
+      await expect(workflow).toContainText("Return from AWOL");
       await expect(workflow.getByText("AWOL Declared", { exact: true })).toBeVisible();
       await expect(workflow).toContainText("Awaiting return intent");
     });
