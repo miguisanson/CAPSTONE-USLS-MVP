@@ -1,5 +1,14 @@
 # State
 
+## Forms x Operations Manual — 2026-11-04 (in progress, forms session)
+
+Owner asked: forms grouped by Operations Manual chapter, 5 platform-basis documents, 6 supplementary forms,
+app wiring (privacy consent, form-code labels, e-approval note). Contract: `.planning/forms-ops/CONTRACT.md`.
+Integration branch `pkt/forms-ops` (wt/forms). Helpers (Sonnet): `pkt/fdocs` (wt/fdocs: build_forms.py,
+Documents/USLS_Forms), `pkt/fman` (wt/fman: opsmanual + manual outputs), `pkt/fapp` (wt/fapp: app.py,
+frontend, tests/test_privacy_consent.py). Owner authorised Claude to commit and merge into v6.1-migui when
+verified. Fable session "Session progress report" was told before start.
+
 ## Merge recovery — 2026-11-04 (current)
 
 - Merging origin v6.1-migui a22916c into local 3131fcf. Five conflicts resolved
