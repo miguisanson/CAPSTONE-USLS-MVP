@@ -236,7 +236,16 @@ bullets([
     "Forms pack: review, sign and set effectivity dates; tell us any form the office already uses that we should match instead.",
 ])
 
-doc.add_heading("9. If something goes wrong", 1)
+doc.add_heading("9. Documents to hand over and get signed", 1)
+bullets([
+    "Forms pack (Documents/USLS_Forms/USLS-GS-Forms-Pack.pdf, print it): 44 Graduate School forms GS-F-01 to GS-F-44 in lifecycle order, plus GS-P-01 Forms Approval Sheet (first page) and GS-P-02 Forms Routing Guide.",
+    "How to present it: \"The panel asked for the school's forms. Apart from the Handbook and the Research Protocol, most were never written down, so we drafted them from those two documents, keeping the Protocol's form numbers. Each form cites its rule. Please review, mark changes on the Approval Sheet, and sign it; once signed with an effectivity date they are the official forms, and the portal already asks for the same information.\"",
+    "Open questions for the forms are listed at the end of Documents/USLS_Forms/00-INVENTORY.md (e.g. whether the office already has templates for Forms 1-13, defense fees, ethics committee forms). Ask them while they sign.",
+    "UAT form (Documents/CAPSTONE_ONLY/UAT/[CAP-IT2] UAT Instrument - Revised.pdf): one per evaluator, after the demo. Sections A, I, J for everyone plus the sections of their own role. Allow about 20-25 minutes.",
+    "Operations Manual (Documents/CAPSTONE_ONLY/USLS GS Operations Manual - DRAFT for Validation): the process descriptions the forms follow; ask for validation the same way.",
+])
+
+doc.add_heading("10. If something goes wrong", 1)
 table([
     ["Problem", "Do this"],
     ["Site does not load", "Check the PC is on and Docker Desktop is running (docker compose ps). Fall back to the local copy: npm run dev → http://127.0.0.1:5000, or play the recorded video."],
