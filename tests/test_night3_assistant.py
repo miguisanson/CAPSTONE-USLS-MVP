@@ -155,3 +155,23 @@ class GeminiPromptTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FableNightReviewTests(Base):
+    """Fable review of the night packets (I-215 follow-up): markdown "Passages used" lines, years read as course codes,
+    and the exact not-found sentence in the system instruction."""
+
+    def test_markdown_and_bullet_passages_used_lines_are_parsed_and_removed(self):
+        chunks = [{"id": n} for n in (1, 2, 3)]
+        for line in ("**Passages used:** 2", "- Passages used: 2", "(Passages used: 2)", "*Passages used*: 2"):
+            answer, used = appmod._split_used_passages(f"Seven years at most.\n{line}", chunks)
+            self.assertEqual([c["id"] for c in used], [2], line)
+            self.assertNotIn("assages used", answer, line)
+
+    def test_years_are_not_read_as_course_codes(self):
+        subject = appmod._prag.stem("subject")
+        self.assertNotIn(subject, appmod._prag.QueryTerms("deadline for AY 2026 enrollment since 2020").base)
+        self.assertIn(subject, appmod._prag.QueryTerms("drop MATH 501").base)
+
+    def test_the_system_instruction_names_the_exact_not_found_sentence(self):
+        self.assertIn(appmod._prag.NOT_FOUND_ANSWER, appmod.RAG_SYSTEM_INSTRUCTION)

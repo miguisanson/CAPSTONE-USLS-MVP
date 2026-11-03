@@ -605,7 +605,7 @@ _NUMBER_WORDS = {
 # is the automatic 20%-absence rule. Asking for the withdrawal wording keeps the absence rule from taking the answer.
 _DROP_A_SUBJECT = re.compile(r"\bdrop(?:ping)?\s+(?:a|an|my|the|this|that|one)?\s*(subjects?|courses?|class(?:es)?)\b")
 # A course code ("MATH 501", "EDUC-601") names a subject; no policy document contains the code itself.
-_COURSE_CODE = re.compile(r"\b(?!(?:19|20)\d\d\b)[a-z]{2,5}[ -]?\d{3,4}[a-z]?\b")
+_COURSE_CODE = re.compile(r"\b[a-z]{2,5}[ -]?(?!(?:19|20)\d\d\b)\d{3,4}[a-z]?\b")  # "MATH 501", never "AY 2026"
 
 
 class QueryTerms:
