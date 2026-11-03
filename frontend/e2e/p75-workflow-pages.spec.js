@@ -250,7 +250,6 @@ test.describe("Research Gate (research coordinator)", () => {
 
   test("with no student chosen it asks for one", async ({ page }) => {
     await openFromSidebar(page, /5 · Research Gate/);
-    await page.evaluate(() => window.localStorage.removeItem("workflowStudentId"));
     await page.goto("/workflow/research-gate");
     await expect(main(page).getByRole("heading", { level: 2, name: "Choose a student" })).toBeVisible();
     await expect(main(page).getByText("Select a student to begin")).toBeVisible();

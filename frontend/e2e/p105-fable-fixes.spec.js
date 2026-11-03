@@ -220,17 +220,23 @@ for (const view of VIEWS) {
 test.describe("Dean decision footer on a phone (F-18)", () => {
   test.use({ storageState: authFile("dean"), viewport: { width: 390, height: 844 } });
 
+  // I-220: pinned to the seeded case of Lorenzo Reyes, a Leave of Absence waiting for the Dean that no other spec files,
+  // moves or decides (the old "first leave case" was Martin's or Clarissa's in a full run: p72 / p79 add theirs).
   test("the pinned footer is one compact row and the focused box is in view", async ({ page }) => {
-    const item = await leaveCaseOf(page);
+    const res = await page.request.get("/api/approvals");
+    const item = (await res.json()).workflow_pending.find((x) => x.type === "leave-of-absence" && x.student?.name === "Lorenzo Reyes");
+    expect(item, "the seeded Leave of Absence case of Lorenzo Reyes waits for the Dean").toBeTruthy();
     await page.goto(`/dean/case/${item.type}/${item.id}`);
     const footer = page.getByTestId("decision-footer");
     await expect(footer).toBeVisible();
+    // the page fades in: read every button's place at the same instant, once the entrance animations are over
+    await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getTiming().iterations !== Infinity).map((a) => a.finished)));
+    const rects = await footer.getByRole("button").evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ y: Math.round(r.y), height: Math.round(r.height) })));
     const box = await footer.boundingBox();
     expect(box.height, "the footer takes at most a quarter of the phone screen (it was over a third)").toBeLessThanOrEqual(844 / 4);
-    const buttons = footer.getByRole("button");
-    const tops = [];
-    for (let i = 0; i < (await buttons.count()); i += 1) tops.push(Math.round((await buttons.nth(i).boundingBox()).y));
-    expect(new Set(tops).size, "Approve, Return and Deny sit on one row").toBe(1);
+    expect(rects.length, "Approve, Return and Deny").toBe(3);
+    expect(new Set(rects.map((r) => r.y)).size, "Approve, Return and Deny sit on one row").toBe(1);
+    expect(Math.max(...rects.map((r) => r.height)), "no button word wraps to a third line").toBeLessThanOrEqual(56);
     const area = footer.getByRole("textbox").first();
     await area.focus();
     await expect(area).toBeInViewport();

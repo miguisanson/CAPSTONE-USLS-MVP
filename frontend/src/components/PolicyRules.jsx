@@ -42,6 +42,7 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
   if (!items.length) return null;
   const canOpenPage = user && user.role !== "student" && user.role !== "faculty";
   // "Prototype rule / needs review" is the Graduate School's own to-do (F-11): the Dean, the student and faculty see a plain source.
+  // Staff always see the count (even "none need review"), so every board's panel reads the same (I-207).
   const gsStaff = canOpenPage && user.role !== "dean";
   const needsReview = gsStaff ? items.filter((rule) => rule.status === "needs_review").length : 0;
   const sourceOf = (rule) => (!gsStaff && /^Prototype rule/i.test(rule.citation || "") ? "Graduate School policy" : rule.citation);
@@ -58,8 +59,8 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-100 text-brand-700"><Scale className="h-4 w-4" aria-hidden="true" /></span>
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-ink">{title}</span>
-            <span className="meta block truncate">
-              {items.length} rule{items.length === 1 ? "" : "s"} from the Graduate School policies{needsReview ? ` · ${needsReview} need${needsReview === 1 ? "s" : ""} review` : ""}
+            <span className="meta block break-words">
+              {items.length} rule{items.length === 1 ? "" : "s"} from the Graduate School policies{gsStaff ? ` · ${needsReview || "none"} need${needsReview === 1 ? "s" : ""} review` : ""}
             </span>
           </span>
         </span>

@@ -77,7 +77,8 @@ const joinOr = (words) => (words.length > 1 ? `${words.slice(0, -1).join(", ")} 
  * @param children           extra controls between the comment box and the buttons (a checkbox, a select, a signature pad)
  * @param variant            "card" (default, bordered) | "plain" (no chrome, for use inside a Modal or an existing card)
  * @param compact            on a phone the buttons share ONE row (their words wrap) instead of one full-width button per line, and
- *                           the box scrolls into view when it takes the focus (a pinned footer, F-18)
+ *                           the box scrolls into view when it takes the focus (a pinned footer, F-18); the button icons drop out on a
+ *                           phone so no label needs a third line (I-220)
  */
 export function DecisionPanel({
   title,
@@ -237,7 +238,7 @@ export function DecisionPanel({
               loading={pending === action.key}
               disabled={working || action.disabled}
               aria-describedby={hintId}
-              className={compact ? "max-sm:min-w-0 max-sm:flex-1 max-sm:px-2 max-sm:text-xs max-sm:leading-tight" : "max-sm:w-full"}
+              className={compact ? "max-sm:min-w-0 max-sm:flex-1 max-sm:px-2 max-sm:text-xs max-sm:leading-tight max-sm:[&>svg]:hidden" : "max-sm:w-full"}
               onClick={(event) => decide(action, event.currentTarget)}
             >
               {action.label}

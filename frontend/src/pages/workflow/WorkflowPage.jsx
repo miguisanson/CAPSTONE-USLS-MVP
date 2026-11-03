@@ -102,7 +102,7 @@ function SingleWorkflowPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: meta } = useApi(() => api.meta(), []);
   const [studentId, setStudentId] = useState(() => {
-    const value = searchParams.get("student_id") || window.localStorage.getItem("workflowStudentId");
+    const value = searchParams.get("student_id"); // only an explicit link carries a student over (I-207, AD12)
     return value ? Number(value) : null;
   });
   const [studentLabel, setStudentLabel] = useState("");
@@ -113,8 +113,8 @@ function SingleWorkflowPage() {
   const [submitError, setSubmitError] = useState("");
   const [supportModal, setSupportModal] = useState("");
 
-  // Keep the same student while staff move through research gate, panel
-  // matching, and scheduling. The query string also makes the view shareable.
+  // The query string keeps the chosen student for this page and makes the view shareable. Nothing is remembered
+  // across pages: the links that should carry a student (Research Gate list, "Open matching", calendar) say so in the URL.
   useEffect(() => {
     setSpecialization("");
     setResult(null);
@@ -123,7 +123,6 @@ function SingleWorkflowPage() {
 
   useEffect(() => {
     if (studentId) {
-      window.localStorage.setItem("workflowStudentId", String(studentId));
       if (searchParams.get("student_id") !== String(studentId)) {
         const next = new URLSearchParams(searchParams);
         next.set("student_id", String(studentId));
@@ -261,7 +260,6 @@ function SingleWorkflowPage() {
                 setStudentLabel(label || "");
                 setResult(null);
                 if (!id) {
-                  window.localStorage.removeItem("workflowStudentId");
                   const next = new URLSearchParams(searchParams);
                   next.delete("student_id");
                   setSearchParams(next, { replace: true });
