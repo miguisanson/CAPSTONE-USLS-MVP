@@ -9,7 +9,7 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { useApi } from "../hooks";
 import { Button, Card, DataTable, Field, InlineNotice, Input, Modal, PageHeader, SearchInput, Select, Spinner, StatusChip, Textarea } from "../components/ui/index.js";
-import { initials } from "../lib/format";
+import { formatDate, formatTimeRange, initials } from "../lib/format";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 import { useConfirm } from "../components/confirm";
 import { PAGE } from "../lib/labels.js";
@@ -655,9 +655,9 @@ function CalendarBlock({ event, index = 0 }) {
   const isWorking = event.status === "working";
   const color = isWorking ? "border-brand-300 bg-brand-50/70 text-brand-800" : "border-blue-600 bg-blue-500 text-white";
   return (
-    <div className={`absolute overflow-hidden rounded-md border px-1.5 py-1 text-2xs ${isWorking ? "z-0" : "z-10"} ${color}`} style={{ top, height, left: isWorking ? 4 : 7 + (index % 2) * 4, right: isWorking ? 4 : 7 }} title={`${event.title}: ${event.start}–${event.end}`}>
+    <div className={`absolute overflow-hidden rounded-md border px-1.5 py-1 text-2xs ${isWorking ? "z-0" : "z-10"} ${color}`} style={{ top, height, left: isWorking ? 4 : 7 + (index % 2) * 4, right: isWorking ? 4 : 7 }} title={`${event.title}: ${formatTimeRange(event.start, event.end)}`}>
       <p className="truncate font-semibold">{event.title}</p>
-      {height >= 36 && <p className={`truncate ${isWorking ? "text-brand-700" : "text-white/85"}`}>{event.start}–{event.end}</p>}
+      {height >= 36 && <p className={`truncate ${isWorking ? "text-brand-700" : "text-white/85"}`}>{formatTimeRange(event.start, event.end)}</p>}
     </div>
   );
 }
@@ -722,7 +722,7 @@ function AvailabilityBadge({ faculty }) {
 function formatUpdated(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return formatDate(date);
 }
 
 function ProfileSection({ icon: Icon, title, children }) {

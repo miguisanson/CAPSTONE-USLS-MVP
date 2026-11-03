@@ -1,0 +1,103 @@
+1
+00:00:00,900 --> 00:00:15,100
+The last one is the improper way out: a student who stopped enrolling without an approved leave. Nobody types 'AWOL' by hand. The system flags the student from the official records.
+
+2
+00:00:16,199 --> 00:00:23,199
+I sign in as staff.
+
+3
+00:00:24,899 --> 00:00:38,199
+This is the AWOL and Residency board. It flags cases from the source records, and the line above counts the cases in each column.
+
+4
+00:00:38,399 --> 00:00:53,399
+I search for Maya Torres. Her card is in the AWOL column, AWOL since July fifth, and it says 'Waiting for: Student'. Staff cannot move it: only the student can start a return.
+
+5
+00:00:54,500 --> 00:01:17,299
+The rules here are the residence limits: five years normal and seven absolute for a master's student, seven and nine for a doctorate, and time on leave counts toward residence. Each rule shows its Handbook page.
+
+6
+00:01:19,299 --> 00:01:32,099
+Opening the card shows the AWOL date, where the flag came from, and the last enrolled semester. There is no button for staff yet.
+
+7
+00:01:32,299 --> 00:01:40,000
+Now I sign in as Maya.
+
+8
+00:01:41,700 --> 00:01:52,299
+Her Return from AWOL page shows the flag, and a note that registration stays restricted until her return is reviewed.
+
+9
+00:02:00,900 --> 00:02:09,900
+She chooses her intended return semester and her last enrolled semester, and writes her intention and her reason for returning.
+
+10
+00:02:10,099 --> 00:02:16,300
+She checks the summary and sends it.
+
+11
+00:02:16,500 --> 00:02:27,500
+Submitted. The system classifies her as within the maximum residence, and she cannot cancel it herself; she has to contact the Graduate School office.
+
+12
+00:02:28,599 --> 00:02:40,800
+I sign in as staff.
+
+13
+00:02:41,000 --> 00:02:49,600
+Back on the staff board, the card has moved by itself to Return review.
+
+14
+00:02:49,800 --> 00:02:58,600
+The request shows her written intention, the residence limits, and the policy check: eligible for Dean review.
+
+15
+00:03:07,199 --> 00:03:15,300
+I drag it to With the Dean and add a note.
+
+16
+00:03:15,500 --> 00:03:19,300
+Forwarded, and locked for staff.
+
+17
+00:03:19,500 --> 00:03:25,900
+The Dean decides.
+
+18
+00:03:31,000 --> 00:03:43,900
+The Dean finds Maya's card in With the Dean.
+
+19
+00:03:44,099 --> 00:03:55,200
+The Dean drags it to Back in the program. The window explains that approval restores her standing.
+
+20
+00:03:55,400 --> 00:04:01,300
+The card lands in Back in the program: she is active again.
+
+21
+00:04:02,500 --> 00:04:14,600
+I sign in as staff.
+
+22
+00:04:14,800 --> 00:04:24,699
+On the staff side, the next owner is the Academic Coordinator, because enrollment is a separate step.
+
+23
+00:04:24,899 --> 00:04:30,400
+All four steps of the tracker are complete.
+
+24
+00:04:30,600 --> 00:04:41,300
+The Registrar list here is a list of reports, one per approved return. Staff download it and send it through the official channel.
+
+25
+00:04:42,699 --> 00:04:53,500
+Now I sign in as Maya.
+
+26
+00:04:53,699 --> 00:05:04,600
+And Maya sees her return approved. So leave, return and AWOL all ran on the same board, the same request window and the same Registrar list.

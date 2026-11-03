@@ -1,0 +1,111 @@
+1
+00:00:00,900 --> 00:00:16,400
+Now Leave of Absence, Readmission and AWOL. These three run on the same kind of board, so once you have seen one, you know all of them. First, a student asks for a leave.
+
+2
+00:00:17,500 --> 00:00:32,299
+I sign in as Daniel Fernandez, a Master of Arts in Education student who has accepted a work assignment in another city.
+
+3
+00:00:34,000 --> 00:00:48,599
+Under Requests, he opens Leave of Absence. The form tells him the limits straight away: up to two semesters at a time, renewable once, and never more than four semesters in total.
+
+4
+00:00:49,600 --> 00:01:10,500
+He can open 'Rules applied on this screen'. These are the same rules the staff will apply, each with its Handbook page. The ones marked Needs review are prototype values the Graduate School still has to confirm.
+
+5
+00:01:18,700 --> 00:01:28,799
+He chooses when the leave starts and ends, the system tells him that is two semesters, and he gives the reason and a short explanation.
+
+6
+00:01:30,099 --> 00:01:39,799
+Before anything is sent, he sees a summary to check: from, to, and the reason.
+
+7
+00:01:40,000 --> 00:01:52,899
+It is submitted. He can see the tracker: staff review, Dean decision, the leave begins, and his return. He always knows who has his request right now.
+
+8
+00:01:53,099 --> 00:02:00,599
+Now the Graduate School staff side.
+
+9
+00:02:04,500 --> 00:02:18,700
+This is the Leave of Absence board. Each column is a stage, and each card is a request. I search for Daniel: his card is in Submitted, flagged 'awaiting your review'.
+
+10
+00:02:21,800 --> 00:02:37,700
+I drag the card to In staff review. Dragging does exactly the same as the buttons, and the server still checks every move, so a card cannot be dragged somewhere the rules do not allow.
+
+11
+00:02:39,400 --> 00:02:47,000
+The same requests can be read as a table, if staff prefer a list.
+
+12
+00:02:49,599 --> 00:02:57,800
+I open the request. It shows the leave period, the reason, and what the student wrote.
+
+13
+00:02:58,000 --> 00:03:13,500
+Below that is the policy check, advice for staff. Each rule shows Pass or Needs review. Minimum residency says Needs review because it is a prototype rule. The check never decides: the Dean does.
+
+14
+00:03:23,699 --> 00:03:32,700
+I forward it to the Dean with a note explaining what I checked.
+
+15
+00:03:32,900 --> 00:03:44,500
+The card moves to With the Dean and is locked for staff. The board says 'Waiting for: Dean' instead of hiding the card.
+
+16
+00:03:44,699 --> 00:03:52,600
+Now I sign in as the Dean.
+
+17
+00:03:57,800 --> 00:04:12,500
+The Dean sees the same board, with the requests waiting for a decision.
+
+18
+00:04:12,699 --> 00:04:26,500
+The Dean drags the card to Leave scheduled. The approval window opens, and the Dean can add a note the student will read.
+
+19
+00:04:26,699 --> 00:04:40,000
+Approved. The card is in Leave scheduled and is flagged for the Registrar. The Dean could also have returned it for revision or denied it, both with a comment.
+
+20
+00:04:41,100 --> 00:04:53,900
+Now the Graduate School staff side.
+
+21
+00:04:54,100 --> 00:05:03,100
+Back as staff, the card waits in Leave scheduled. Normally the leave starts by itself on its first day.
+
+22
+00:05:06,399 --> 00:05:16,300
+For the demonstration, I start the leave now by dragging the card to On leave.
+
+23
+00:05:16,500 --> 00:05:23,699
+Daniel is now on leave, and enrollment is closed for him while he is away.
+
+24
+00:05:24,500 --> 00:05:37,400
+Further down is the Registrar list. The portal sends no e-mail: staff download the list, send it through the official channel, then mark it sent and later acknowledged.
+
+25
+00:05:39,399 --> 00:05:47,000
+I download the list. The system reminds me that no e-mail was sent by the portal.
+
+26
+00:05:50,600 --> 00:06:02,199
+I tick Daniel and mark the list as sent to the Registrar, so the office always knows what was handed over and what was not.
+
+27
+00:06:03,300 --> 00:06:21,100
+I sign in as Daniel Fernandez, a Master of Arts in Education student who has accepted a work assignment in another city.
+
+28
+00:06:21,300 --> 00:06:30,699
+And on the student's side, Daniel sees that he is on leave, with every message he received along the way.

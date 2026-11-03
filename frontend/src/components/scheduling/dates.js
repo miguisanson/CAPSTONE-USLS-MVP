@@ -1,17 +1,7 @@
-import { parseDay } from "../calendar/CalendarView";
+import { formatDate } from "../../lib/format";
 
-// Dates arrive as YYYY-MM-DD (naive Philippine time). Always parsed as local dates.
-export function longDate(value) {
-  if (!value) return "";
-  return new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric" }).format(parseDay(value));
-}
-
-export function shortTime(value) {
-  if (!value) return "";
-  const [hour, minute] = String(value).slice(0, 5).split(":").map(Number);
-  const suffix = hour >= 12 ? "PM" : "AM";
-  return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${suffix}`;
-}
+// Dates arrive as YYYY-MM-DD (naive Philippine time); the style is the app-wide one in lib/format (I-207).
+export const longDate = (value) => (value ? formatDate(value) : "");
 
 // "Entered - updated Oct 1, 2026", "Google Calendar", or "Availability not entered".
 export function availabilityLabel(participant) {

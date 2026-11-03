@@ -385,7 +385,8 @@ test.describe("P82 student pages (pinned)", () => {
     try {
       await open(page, "/student/research");
       const card = cardOf(page, "Adviser and panel");
-      await expect(card).toContainText("Assigned after Panel Matching; scheduling opens once a panel is in place");
+      // I-222: the "assigned after Panel Matching" subtitle shows only while the adviser or panel is missing.
+      await expect(card).not.toContainText("Assigned after Panel Matching");
       await expect(card).toContainText("Adviser: Dr. Spec Adviser");
       await expect(card).toContainText("Dr. Panel One");
       await expect(card).toContainText("Panel Chair");
@@ -482,7 +483,7 @@ test.describe("P82 student pages (pinned)", () => {
       await expect(next).toContainText("Final Defense");
       await expect(next).toContainText("Scheduled");
       await expect(next).toContainText("In 12 days");
-      await expect(next).toContainText("09:00-10:30");
+      await expect(next).toContainText("9:00 – 10:30 AM");
       await expect(next).toContainText("Spec Room 1 (On-site)");
       await expect(next).toContainText("Dr. Spec Adviser");
       await expect(next).toContainText("Dr. Panel One");
@@ -625,7 +626,8 @@ test.describe("P82 changes: the Defense Schedule page", () => {
       await expect(main(page).locator('a[href="/student/defense-schedule"]'), "no self-link on the Defense Schedule page").toHaveCount(0);
       await expect(h2s(page).filter({ hasText: "Adviser and panel" })).toHaveCount(1);
       await open(page, "/student/research");
-      await expect(main(page).locator('a[href="/student/defense-schedule"]')).toHaveCount(1);
+      // the card's link, plus (I-222) "Request your defense date on Defense Schedule" when that is the next step
+      await expect(main(page).locator('a[href="/student/defense-schedule"]').first()).toBeVisible();
     } finally {
       await finish();
     }

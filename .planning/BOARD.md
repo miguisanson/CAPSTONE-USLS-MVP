@@ -14,8 +14,8 @@ and strict UI PASS. Full Python and all-role checks pending. See
 
 **Agreed (IM28-IM33):** v6.1-migui is the one UAT line (from Natalie's v6.0); UAT served from this PC at
 https://miguisanson.dev via Cloudflare Tunnel; demo seed data only; no e-mail sending (bell only); Ponytail + Caveman in
-the dev kit; max 3 helpers, Mac for long test runs; stop at 80% weekly (auto-resume after 5-hour limits and after the
-weekly reset); Fable full review at the end; don't redo teammates' work drastically.
+the dev kit; max 3 helpers, Mac for long test runs; auto-resume after 5-hour limits;
+Fable full review at the end; don't redo teammates' work drastically.
 
 **Done:** Natalie's calendar work reviewed (bugs found); 3 paused v5.3 packets merged (Reports rebuild, consistency,
 test isolation); UAT server `npm run uat` + `UAT.md` + `.env.example`; `/continue_capstone`.

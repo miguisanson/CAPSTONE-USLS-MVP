@@ -19,6 +19,7 @@ import {
   Stepper,
 } from "../components/ui/index.js";
 import { useConfirm } from "../components/confirm";
+import { formatDate as formatSharedDate } from "../lib/format";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 import {
   NeedsMeaning,
@@ -573,10 +574,7 @@ function planStatusNote(plan) {
 }
 
 function formatDate(value) {
-  if (!value) return "not recorded";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString();
+  return value ? formatSharedDate(value) : "not recorded";
 }
 
 function formatTermLabel(label) {

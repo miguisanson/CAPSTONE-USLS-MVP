@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   FileUp,
   Eye,
@@ -8,6 +9,9 @@ import {
 import { api } from "../../api";
 import { Button, Field, InlineNotice, Input, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
+import { formatDate } from "../../lib/format";
+import { PAGE } from "../../lib/labels.js";
+import { BOOKABLE_DEFENSES, defenseToRequest } from "../../lib/studentHome.js";
 import { ErrorSummary, useFormErrors, useSubmitRequest, SubmitState, isLiveSchedule } from "./shared";
 
 export function ResearchRequestForm({ data, onSaved }) {
@@ -25,6 +29,9 @@ export function ResearchRequestForm({ data, onSaved }) {
   const [prefillNote, setPrefillNote] = useState("");
   const uploadRequirements = (milestone.requirements || []).filter((item) => item.student_upload);
   const managedRequirements = (milestone.requirements || []).filter((item) => !item.student_upload);
+  // Nothing left to send once staff verified every file of the milestone; the next step may be the defense date.
+  const allVerified = uploadRequirements.length > 0 && uploadRequirements.every((item) => item.status === "Complete");
+  const requestDefenseDate = Boolean(defenseToRequest(data));
 
   useEffect(() => {
     setForm((current) => ({
@@ -103,7 +110,11 @@ export function ResearchRequestForm({ data, onSaved }) {
               <div key={requirement.item_name} className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-3.5 py-3 last:border-b-0">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-ink">{requirement.label}</p>
-                  <p className="meta mt-0.5">{requirement.description}</p>
+                  <p className="meta mt-0.5">
+                    {requestDefenseDate && requirement.source_type?.endsWith("_schedule") && requirement.status !== "Complete"
+                      ? <>Request your defense date on <Link to="/student/defense-schedule" className="font-semibold text-brand-700 underline">{PAGE.defenseSchedule}</Link>. It is added here once staff confirm it.</>
+                      : requirement.description}
+                  </p>
                 </div>
                 <StatusChip status={requirement.status_label} dot={false} />
               </div>
@@ -118,9 +129,9 @@ export function ResearchRequestForm({ data, onSaved }) {
         busy={busy}
         error={error}
         message={message}
-        disabled={!milestone?.student_uploads_ready}
+        disabled={!milestone?.student_uploads_ready || allVerified}
         label={`Submit ${milestone?.short_label || "milestone"} for review`}
-        disabledHint={!milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : ""}
+        disabledHint={allVerified ? "Every file for this milestone is already verified. Nothing is left to submit." : !milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : ""}
       />
     </form>
   );
@@ -219,7 +230,7 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
                   <Button as="a" variant="secondary" size="sm" href={file.url} target="_blank" rel="noreferrer">
                     {file.name}<Eye className="h-3.5 w-3.5" aria-hidden="true" />
                   </Button>
-                  {requirement.student_upload && (
+                  {requirement.student_upload && requirement.status !== "Complete" && (
                     <Button
                       variant="secondary"
                       size="sm"
@@ -294,7 +305,7 @@ export function ConceptPaperCompliance({ compliance }) {
   );
 }
 
-export const BOOKABLE_DEFENSES = ["Title Defense", "Proposal Defense", "Final Defense"];
+export { BOOKABLE_DEFENSES };
 
 // After a verdict that asks for revisions: send the revised manuscript (and a note) for confirmation.
 function RevisionSubmitForm({ followUp, onSaved }) {
@@ -383,7 +394,7 @@ export function ScheduleRequestForm({ data, onSaved }) {
       return;
     }
     clear();
-    submit({ student_id: studentId, ...form }, { lines: [`${form.defense_type} schedule request`, `Preferred date: ${form.preferred_date}`, `Mode: ${form.mode}`] });
+    submit({ student_id: studentId, ...form }, { lines: [`${form.defense_type} schedule request`, `Preferred date: ${formatDate(form.preferred_date)}`, `Mode: ${form.mode}`] });
   }
 
   return (

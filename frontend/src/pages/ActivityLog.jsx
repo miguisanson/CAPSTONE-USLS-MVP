@@ -5,7 +5,7 @@ import { api } from "../api";
 import { useApi } from "../hooks";
 import { Card, EmptyState, PageHeader, SearchInput, Select, Spinner } from "../components/ui/index.js";
 import { PAGE } from "../lib/labels.js";
-import { formatDate } from "../lib/format";
+import { formatDateTime } from "../lib/format";
 
 const SLUG_LABEL = {
   "student-handoff": PAGE.studentHandoff,
@@ -107,7 +107,7 @@ export default function ActivityLog() {
                   <span className="rounded-md bg-slate-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-slate-600">
                     {workflowLabel(log.transaction_slug)}
                   </span>
-                  <span className="meta">{formatDate(log.created_at, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="meta">{formatDateTime(log.created_at)}</span>
                 </div>
                 <p className="mt-1 text-sm font-semibold text-ink">{log.result}</p>
                 <p className="meta">

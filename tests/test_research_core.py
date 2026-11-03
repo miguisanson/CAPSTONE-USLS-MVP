@@ -342,6 +342,27 @@ class VerdictOutcomeTests(ResearchCoreBase):
                 event.remove(db.engine, "connect", fk_on)
                 db.engine.dispose()
 
+    def test_student_cannot_delete_a_file_staff_already_verified(self):
+        """Night-5 item 2: a Verified (Complete) requirement is read-only for the student; a Submitted one is not."""
+        with app.app_context():
+            self.pass_gate(self.student_id, TITLE, "Title Defense")
+            self.fill_uploads(self.student_id, PROPOSAL, status="Complete")
+            verified_id = (
+                ResearchEvidenceFile.query.join(DocumentCheck)
+                .filter(DocumentCheck.gate == PROPOSAL, DocumentCheck.item_name == "Proposal manuscript")
+                .one().id
+            )
+            db.session.commit()
+        response = self.student().delete(f"/api/student-portal/research-evidence/{verified_id}")
+        self.assertEqual(response.status_code, 409, response.get_json())
+        self.assertIn("already verified", response.get_json()["error"])
+        with app.app_context():
+            self.assertIsNotNone(db.session.get(ResearchEvidenceFile, verified_id))
+            self.assertEqual(
+                DocumentCheck.query.filter_by(student_id=self.student_id, gate=PROPOSAL, item_name="Proposal manuscript").one().status,
+                "Complete",
+            )
+
     def test_student_deleting_an_adviser_signed_file_archives_it_instead_of_crashing(self):
         """R31 (second path): deleting a signed file must keep the signature row and the file."""
         with app.app_context():
@@ -1035,6 +1056,9 @@ class SchedulingRuleTests(ResearchCoreBase):
         cancelled = self.research().post(f"/api/defense-schedules/{schedule_id}/cancel",
                                          json={"reason": "Venue unavailable", "requested_by": "GS Office"})
         self.assertEqual(cancelled.status_code, 200, cancelled.get_json())
+        with app.app_context():  # night 5: a Verified file is read-only for the student, so the file is not yet verified here
+            DocumentCheck.query.filter_by(student_id=self.student_id, gate=PROPOSAL, item_name="Proposal manuscript").one().status = "Submitted"
+            db.session.commit()
         again = self.student().delete(f"/api/student-portal/research-evidence/{evidence_id}")
         self.assertEqual(again.status_code, 200, again.get_json())
 

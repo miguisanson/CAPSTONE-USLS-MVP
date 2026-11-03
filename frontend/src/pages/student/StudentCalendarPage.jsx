@@ -8,8 +8,8 @@ import CalendarView, { CalendarLegend } from "../../components/calendar/Calendar
 import CalendarFeedCard from "../../components/calendar/CalendarFeedCard";
 import { LoadError, daysPhrase, fmtDay } from "./shared";
 import { PAGE } from "../../lib/labels.js";
+import { formatTimeRange } from "../../lib/format";
 
-const timeOf = (value) => (value ? String(value).slice(11, 16) : "");
 
 const URGENCY = {
   overdue: { text: "Overdue", tone: "text-red-700" },
@@ -64,7 +64,7 @@ function NextDefenseCard({ event }) {
           <p className="eyebrow text-brand-700">{event.defense_type}</p>
           <p className="page-title mt-1">{fmtDay(event.date, true)}</p>
           <p className="mt-1 text-lg font-semibold text-slate-700">
-            {timeOf(event.start)}-{timeOf(event.end)} <span className="meta font-semibold">Philippine time</span>
+            {formatTimeRange(event.start, event.end)} <span className="meta font-semibold">Philippine time</span>
           </p>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -163,7 +163,7 @@ function SelectedCard({ selected, onClose }) {
       </div>
       {isDefense ? (
         <div className="mt-2 space-y-1 text-sm text-slate-600">
-          <p>{fmtDay(selected.date)}, {timeOf(selected.start)}-{timeOf(selected.end)} (Philippine time)</p>
+          <p>{fmtDay(selected.date)}, {formatTimeRange(selected.start, selected.end)} (Philippine time)</p>
           <p>{selected.venue || "Venue or link not set yet"}{selected.mode ? ` (${selected.mode})` : ""}</p>
           <p className="flex flex-wrap items-center gap-2">Status: <StatusChip status={selected.status} dot={false} /></p>
           {(selected.panel || []).length > 0 && (

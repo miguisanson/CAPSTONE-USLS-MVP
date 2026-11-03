@@ -213,7 +213,7 @@ parallel, each in its own worktree, branched from `v5.2-migui_again`.
 
 - **At most 3 implementer subagents at once** (owner, IM10), and only if their
   file sets do not overlap. While `app.py` is still one file, only **one**
-  packet at a time may edit it. Read-only research/audit agents are not capped.
+  packet at a time may edit it. Read-only research/audit/review agents count toward the 3.
   **WIP cap 4.** **One integrator** (the main session) merges one packet at a
   time and **re-runs the gate after every merge**. Drop to 1 implementer after
   a regression, a red gate after a merge, or a merge that needed manual

@@ -1,0 +1,254 @@
+[
+ {
+  "t": 0.9,
+  "kind": "card",
+  "label": "Part 2h-2 \u00b7 Readmission",
+  "role": ""
+ },
+ {
+  "t": 8.4,
+  "kind": "step",
+  "label": "reset Therese",
+  "role": ""
+ },
+ {
+  "t": 9.2,
+  "kind": "card",
+  "label": "Signing in as Student",
+  "role": "Student"
+ },
+ {
+  "t": 20.6,
+  "kind": "signin",
+  "label": "signed in as Student (readmission.therese@usls.edu.ph)",
+  "role": "Student"
+ },
+ {
+  "t": 20.6,
+  "kind": "step",
+  "label": "student opens Readmission",
+  "role": "Student"
+ },
+ {
+  "t": 22.0,
+  "kind": "hold",
+  "label": "readmission-01",
+  "role": "Student"
+ },
+ {
+  "t": 35.1,
+  "kind": "step",
+  "label": "student reads the rules panel",
+  "role": "Student"
+ },
+ {
+  "t": 36.0,
+  "kind": "hold",
+  "label": "readmission-02",
+  "role": "Student"
+ },
+ {
+  "t": 44.9,
+  "kind": "step",
+  "label": "student fills the request and ticks the four items",
+  "role": "Student"
+ },
+ {
+  "t": 53.8,
+  "kind": "hold",
+  "label": "readmission-03",
+  "role": "Student"
+ },
+ {
+  "t": 62.0,
+  "kind": "step",
+  "label": "student sends the request",
+  "role": "Student"
+ },
+ {
+  "t": 63.0,
+  "kind": "hold",
+  "label": "readmission-04",
+  "role": "Student"
+ },
+ {
+  "t": 69.4,
+  "kind": "hold",
+  "label": "readmission-05",
+  "role": "Student"
+ },
+ {
+  "t": 78.7,
+  "kind": "card",
+  "label": "Signing in as Graduate School Staff",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 85.3,
+  "kind": "signin",
+  "label": "signed in as Graduate School Staff (staff@usls.edu.ph)",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 85.3,
+  "kind": "step",
+  "label": "staff opens the Readmission board and finds Therese",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 89.1,
+  "kind": "hold",
+  "label": "readmission-06",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 96.5,
+  "kind": "step",
+  "label": "staff drags the card to In staff review",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 99.4,
+  "kind": "hold",
+  "label": "readmission-07",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 103.4,
+  "kind": "step",
+  "label": "staff opens the request, reads the checklist and the policy check",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 105.1,
+  "kind": "hold",
+  "label": "readmission-08",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 112.7,
+  "kind": "hold",
+  "label": "readmission-09",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 126.7,
+  "kind": "hold",
+  "label": "readmission-10",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 139.3,
+  "kind": "step",
+  "label": "staff verifies the checklist and forwards to the Dean",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 147.0,
+  "kind": "hold",
+  "label": "readmission-11",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 159.7,
+  "kind": "hold",
+  "label": "readmission-12",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 164.6,
+  "kind": "card",
+  "label": "Signing in as Dean",
+  "role": "Dean"
+ },
+ {
+  "t": 171.1,
+  "kind": "signin",
+  "label": "signed in as Dean (dean@usls.edu.ph)",
+  "role": "Dean"
+ },
+ {
+  "t": 171.1,
+  "kind": "step",
+  "label": "Dean drags the card to Approved and approves",
+  "role": "Dean"
+ },
+ {
+  "t": 176.2,
+  "kind": "hold",
+  "label": "readmission-13",
+  "role": "Dean"
+ },
+ {
+  "t": 188.9,
+  "kind": "hold",
+  "label": "readmission-14",
+  "role": "Dean"
+ },
+ {
+  "t": 198.5,
+  "kind": "hold",
+  "label": "readmission-15",
+  "role": "Dean"
+ },
+ {
+  "t": 209.8,
+  "kind": "step",
+  "label": "staff sees the approved request and the Registrar list",
+  "role": "Dean"
+ },
+ {
+  "t": 210.8,
+  "kind": "card",
+  "label": "Signing in as Graduate School Staff",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 217.4,
+  "kind": "signin",
+  "label": "signed in as Graduate School Staff (staff@usls.edu.ph)",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 222.6,
+  "kind": "hold",
+  "label": "readmission-16",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 233.7,
+  "kind": "hold",
+  "label": "readmission-17",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 241.1,
+  "kind": "step",
+  "label": "student sees the result",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 242.0,
+  "kind": "card",
+  "label": "Signing in as Student",
+  "role": "Student"
+ },
+ {
+  "t": 253.5,
+  "kind": "signin",
+  "label": "signed in as Student (readmission.therese@usls.edu.ph)",
+  "role": "Student"
+ },
+ {
+  "t": 256.5,
+  "kind": "hold",
+  "label": "readmission-18",
+  "role": "Student"
+ },
+ {
+  "t": 264.6,
+  "kind": "end",
+  "label": "end of part",
+  "role": "Student"
+ }
+]

@@ -5,6 +5,7 @@ import { useApi } from "../hooks";
 import { Button, DataTable, Field, InlineNotice, Input, Modal, PageHeader, Spinner, StatusChip } from "../components/ui/index.js";
 import { useConfirm } from "../components/confirm";
 import { PAGE } from "../lib/labels.js";
+import { formatDate } from "../lib/format";
 
 const EMPTY_FORM = { label: "", start_date: "", end_date: "", planning_window_open: "", planning_window_close: "" };
 const DATE_FIELDS = ["start_date", "end_date", "planning_window_open", "planning_window_close"];
@@ -32,6 +33,8 @@ export default function TermSettings() {
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [editError, setEditError] = useState("");
+  // The Academic Coordinator reads the semesters; only staff and admin change them (the server decides).
+  const canManage = data?.permissions?.can_manage === true;
 
   const say = (text, tone = "success") => setNotice({ text, tone });
 
@@ -163,9 +166,9 @@ export default function TermSettings() {
       header: "Semester dates",
       cell: (term) => (
         <>
-          <span className="text-slate-600">{term.start_date} — {term.end_date}</span>
+          <span className="text-slate-600">{formatDate(term.start_date)} — {formatDate(term.end_date)}</span>
           {(term.planning_window_open || term.planning_window_close) && (
-            <span className="meta mt-0.5 block">Planning: {term.planning_window_open || "?"} — {term.planning_window_close || "?"}</span>
+            <span className="meta mt-0.5 block">Planning: {term.planning_window_open ? formatDate(term.planning_window_open) : "?"} — {term.planning_window_close ? formatDate(term.planning_window_close) : "?"}</span>
           )}
         </>
       ),
@@ -205,15 +208,16 @@ export default function TermSettings() {
         icon={CalendarClock}
         title={PAGE.academicSemesters}
         description="Maintain the list of academic semesters and mark the current planning term. Enrollment, course adjustments, and reporting use these semesters."
-        actions={
+        actions={canManage ? (
           <>
             <Button variant="secondary" icon={Plus} onClick={openForm}>Add semester</Button>
             <Button icon={Plus} loading={adding} onClick={addNext}>Add next semester</Button>
           </>
-        }
+        ) : null}
       />
 
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+      {data && !canManage && <InlineNotice tone="neutral">You can read the semesters and their dates here. Graduate School staff change them.</InlineNotice>}
       {notice.text && <InlineNotice tone={notice.tone} onDismiss={() => say("")}>{notice.text}</InlineNotice>}
 
       {loading ? (
@@ -221,11 +225,11 @@ export default function TermSettings() {
       ) : (
         <DataTable
           caption="Academic semesters, newest first, with their dates and actions"
-          columns={columns}
+          columns={canManage ? columns : columns.filter((column) => column.key !== "actions")}
           rows={data?.items || []}
           minWidth="md"
           pageSize={0}
-          empty={{ icon: CalendarClock, title: "No academic semesters are set up yet", hint: "Add the first semester above." }}
+          empty={{ icon: CalendarClock, title: "No academic semesters are set up yet", hint: canManage ? "Add the first semester above." : "Graduate School staff add the semesters." }}
         />
       )}
 

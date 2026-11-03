@@ -1,0 +1,41 @@
+# USLS Graduate School demo: `docker compose up -d --build` (see deploy/DOCKER.md).
+# `app` is the website; `tunnel` publishes it at https://miguisanson.dev through Cloudflare
+# and only starts when you ask for it with `--profile tunnel` (it needs deploy/tunnel.env).
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:5000"   # this PC only; the public door is the tunnel
+    env_file:
+      - path: .env              # optional: Gemini key, Google Calendar secrets, DEMO_PASSWORD, SECRET_KEY
+        required: false
+    environment:
+      DEMO_MODE: "1"
+      DEMO_SHOW_ACCOUNTS: "1"   # owner decision IM36: the sign-in page lists the demo accounts
+      SESSION_COOKIE_SECURE: "1"
+      GOOGLE_CALENDAR_REDIRECT_URI: https://miguisanson.dev/api/integrations/google-calendar/callback
+    volumes:
+      - usls_data:/data         # database, uploads, session secret
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=4)"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+      start_period: 120s
+
+  tunnel:
+    image: cloudflare/cloudflared:2026.10.7
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    # Shares the app container's network, so the Cloudflare route "http://localhost:5000" is the same
+    # whether the site runs in Docker or natively (deploy/START-SITE.cmd).
+    network_mode: "service:app"
+    env_file:
+      - deploy/tunnel.env       # TUNNEL_TOKEN=...
+    depends_on:
+      - app
+
+volumes:
+  usls_data:

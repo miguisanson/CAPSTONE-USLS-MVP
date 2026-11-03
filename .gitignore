@@ -44,7 +44,7 @@ npm-debug.log*
 
 # Private local notes and deployment files
 PRIVATE_UBUNTU_HOSTING_NOTES.txt
-deploy/
+deploy/tunnel.env
 
 # Ignore accidental nested copies of this repository
 CAPSTONE-USLS-MVP/
@@ -79,6 +79,9 @@ frontend/test-results/
 
 # Per-install runtime files (the generated session secret key)
 instance/
+
+# Recorded demo videos (large; kept on this PC, rebuilt with scripts/demo/record_demo.py)
+Documents/CAPSTONE_ONLY/Demo_Migui/videos/*.mp4
 
 # Isolated agent development worktrees
 .worktrees/

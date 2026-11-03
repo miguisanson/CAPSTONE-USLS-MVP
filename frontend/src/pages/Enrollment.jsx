@@ -121,6 +121,11 @@ export default function Enrollment() {
     [data?.integrity, data?.selected_student, data?.offered_subjects]
   );
 
+  // Why the list can look empty-handed: only offered subjects can be added, so a student whose offered subjects are all
+  // completed or enrolled has nothing to pick even though her Monitoring Sheet shows subjects not taken (night 5, item 4).
+  const notOffered = (data?.curriculum_subjects || []).filter((course) => !course.is_offered && course.enrollment_state === "available");
+  const nothingAddable = !(data?.offered_subjects || []).some((subject) => subject.enrollment_state === "available");
+
   function updateFilters(next) {
     const params = {
       program_id: next.program_id ?? programId,
@@ -489,6 +494,12 @@ export default function Enrollment() {
                 {notes.general.map((note) => (
                   <InlineNotice key={note} tone="warning">{note}</InlineNotice>
                 ))}
+                {nothingAddable && notOffered.length > 0 && (
+                  <InlineNotice tone="info">
+                    Nothing offered this semester can be added for this student. Her not-taken subjects ({notOffered.slice(0, 3).map((course) => course.code).join(", ")}
+                    {notOffered.length > 3 ? ` and ${notOffered.length - 3} more` : ""}) are not on this semester's offering list. Add them under Offering list first.
+                  </InlineNotice>
+                )}
                 <DataTable
                   caption="Official offered subjects for this semester"
                   columns={offeredColumns}

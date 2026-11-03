@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, CalendarDays, CalendarPlus, ExternalLink, Flag, Printer } from "lucide-react";
 import { api } from "../../api";
 import { Button, Card, Field, InlineNotice, Input, PageHeader, SectionTitle, Select, StatusChip, Textarea } from "../ui/index.js";
-import CalendarView, { CalendarLegend, isoDay, parseDay, visibleRange } from "./CalendarView";
+import CalendarView, { CalendarLegend, isoDay, visibleRange } from "./CalendarView";
 import CalendarFeedCard from "./CalendarFeedCard";
+import { formatDate, formatDay, formatTimeRange } from "../../lib/format";
 
 // One calendar page for every role that reads the shared /api/calendar feed:
 //   scope "staff"   -> Graduate School staff, Research / Academic Coordinator (filters, deadline overlay)
@@ -113,7 +114,7 @@ function DetailPanel({ selected, scope, onClose, onChanged }) {
         </div>
         <p className="text-sm font-semibold text-ink">{selected.label}</p>
         <dl className="grid grid-cols-2 gap-3">
-          <Fact label="Due">{parseDay(selected.date).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</Fact>
+          <Fact label="Due">{formatDay(selected.date)}</Fact>
           <Fact label="State">{selected.done ? "Done" : selected.urgency === "overdue" ? "Overdue" : selected.urgency === "soon" ? "Due soon" : "Upcoming"}</Fact>
           {selected.student_name && <Fact label="Student">{selected.student_name}</Fact>}
           {selected.defense_type && <Fact label="Defense">{selected.defense_type}</Fact>}
@@ -144,8 +145,8 @@ function DetailPanel({ selected, scope, onClose, onChanged }) {
         </ul>
       )}
       <dl className="grid grid-cols-2 gap-3">
-        <Fact label="Date">{parseDay(selected.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</Fact>
-        <Fact label="Time">{selected.start.slice(11, 16)}–{selected.end.slice(11, 16)}</Fact>
+        <Fact label="Date">{formatDay(selected.date)}</Fact>
+        <Fact label="Time">{formatTimeRange(selected.start, selected.end)}</Fact>
         <Fact label="Venue">{selected.venue || "Not set"}</Fact>
         <Fact label="Mode">{selected.mode || "—"}</Fact>
         <Fact label="Program">{selected.program_code || "—"}</Fact>
@@ -273,7 +274,7 @@ export default function CalendarPage({ scope = "staff", title, description, embe
                     <button type="button" onClick={() => setSelected(event)} className="w-full cursor-pointer rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left hover:bg-amber-100">
                       <span className="block text-sm font-semibold text-amber-950">{event.defense_type} · {event.student_name}</span>
                       <span className="block text-xs text-amber-900">
-                        {event.date}{event.verdict_overdue ? " · verdict overdue" : ""}{(event.attention || [])[0] ? ` · ${event.attention[0]}` : ""}
+                        {formatDate(event.date)}{event.verdict_overdue ? " · verdict overdue" : ""}{(event.attention || [])[0] ? ` · ${event.attention[0]}` : ""}
                       </span>
                     </button>
                   </li>

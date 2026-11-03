@@ -1,3 +1,5 @@
+> Running it in Docker (app + Cloudflare Tunnel in two containers)? Follow `deploy/DOCKER.md` instead of steps 1-3 below.
+
 # Running User Acceptance Testing (UAT) at https://miguisanson.dev
 
 The app runs on this Windows 11 PC. A free **Cloudflare Tunnel** (`cloudflared`) connects
