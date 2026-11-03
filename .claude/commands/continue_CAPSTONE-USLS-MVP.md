@@ -16,9 +16,7 @@ condition in that file is hit, the owner types `stop`, or
 while the owner is present. **Usage limits are not a stop:** before the
 window runs out, commit, push the working branch (see below), and write the
 exact next step into `.planning/STATE.md` so the next session (or the
-scheduled resume task) picks it up. **Stop at 80% of the weekly limit**
-(IM33): finish the current step, save, push, report.
-
+scheduled resume task) picks it up.
 ## Current run: v6.1 — UAT from Wednesday 2026-11-04 (IM28–IM33)
 
 - **Branch `v6.1-migui`** (from Natalie's `v6.0-natalie`). It is the one line
@@ -30,8 +28,9 @@ scheduled resume task) picks it up. **Stop at 80% of the weekly limit**
   database improvements. Do not redo teammates' work drastically: fix and
   extend it in their style.
 - **Max 3 agents at once** (IM33), still one `app.py` editor at a time.
-  Read-only reviewers count toward the 3. One Fable full review at the end of
-  the run (`model: "fable"`, read-only, findings filed as I-rows).
+  Read-only reviewers and research agents count toward the 3. Fable reviews are
+  allowed when worth it (milestones, hard bugs; `model: "fable"`, read-only, findings
+  filed as I-rows); reviews of a diff are Sonnet by default.
 - **Machines:** long test runs go to the Mac when it is online
   (`bash E:/Github_Projects/dev-kit/workers/pc/run-job.sh CAPSTONE-USLS-MVP <dir>`
   picks a free machine and falls back to this PC). Check Tailscale first; never

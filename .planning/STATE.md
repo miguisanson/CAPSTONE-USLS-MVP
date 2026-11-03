@@ -1,5 +1,26 @@
 # State
 
+## MEETING PREP RUN (2026-11-03 night -> 2026-11-04 10:00 Manila) — read this first
+
+Session `local_0845825f-fe9e-4422-b52b-d6b8bc762cfd` (registered in `E:/DevCache/dev-kit-workers/build-session.id`;
+the BayoCoop registration it replaced is in `build-session.id.bayocoop-backup` / `.resume.bayocoop-backup` — restore it
+when this run ends). Branch `v6.1-migui`; commit + push as each piece lands (owner 2026-11-03).
+Stakeholder meeting 2026-11-04. Owner asked for, in this order:
+1. **Demo recording + narration script** of Migui's parts (2d Monitoring Sheet, 2h LOA/AWOL, 2l Reports, 2m Best
+   Features), slow, no audio. Output `Documents/CAPSTONE_ONLY/Demo_Migui/` (video + `NARRATION-SCRIPT.docx`).
+   Recorder `scripts/demo/record_migui_demo.mjs` (Playwright video, own DB copy via DATABASE_URL, own port).
+2. **Meeting cheat sheet** `Documents/CAPSTONE_ONLY/Demo_Migui/MEETING-CHEAT-SHEET.docx`.
+3. **UAT instrument review + revised docx** (owner's draft `C:/Users/Windows10/Downloads/[CAP-IT2] UAT Instrument Draft.docx`)
+   -> `Documents/CAPSTONE_ONLY/UAT/` (helper A).
+4. **USLS forms pack** — inventory what the Graduate School needs, draft every form/process document cleanly (no draft
+   mark, owner choice) for the Dean to sign in the meeting -> `Documents/USLS_Forms/` (helper B).
+5. Google Calendar `.env` question — answered in chat (send Natalie a personal Gmail so she adds it as a Google test user).
+6. **Docker + Cloudflare Tunnel** for https://miguisanson.dev: `Dockerfile`, `docker-compose.yml` (app + cloudflared,
+   tunnel token from a file the owner fills), `deploy/DOCKER.md` (helper C). Owner: domain NOT yet on Cloudflare;
+   public sign-in page SHOWS the demo accounts (DEMO_SHOW_ACCOUNTS=1, owner choice, risk told).
+7. Then polish / improvement / optimization loop (IMPROVE.md) until 10:00 Manila.
+Shared doc tools: `E:/Temp/claude/docs-venv` (python-docx, pymupdf, openpyxl, imageio-ffmpeg); LibreOffice `E:/LibreOffice`.
+
 ## HANDED OFF (2026-11-03 morning) — read `.planning/HANDOFF-v6.1.md` first
 
 - Owner: "finish up … I plan to let someone else develop". The v6.1 run is closed; auto-resume is OFF.
@@ -51,16 +72,16 @@
   Coordinator, student_standing_summary, assistant next step, /api/research-gate/overview, research_lock_status, invitation reminders.
   Tests: tests/test_sweep2.py, e2e/p105-sweep2.spec.js, scripts/stages.test.mjs. Skipped: sidebar numbering gap (p21/p95 pin it).
 - **Next:** merge be6 + staffux, gates; persona sweep 2 (student-leave, faculty-rare, coordinator-research) from wt/gate
-  (not while e2e runs there); walkthrough case 20 re-capture; **Fable full review at ~70% weekly** (63% at 22:45),
-  then fix its P1s; stop at 80% (`WEEKLY BUDGET`); no auto-resume after the weekly reset (owner).
-- **Auto-resume:** scheduled task `oathbound-keep-going` (every 30 min, while `E:/DevCache/dev-kit-workers/autopilot.on` exists) resumes session `local_51b87609-0806-4cf8-87f2-0c79290158d8` after a turn ending `PAUSED for 5-hour limit`; stop at 80% weekly with `WEEKLY BUDGET` and do NOT resume after the weekly reset — owner 2026-11-02: after the weekly stop, build only when the owner says. Extra usage is OFF on the account (no charges).
+  (not while e2e runs there); walkthrough case 20 re-capture; **Fable full review** when worth it (milestones, hard bugs; allowed any time, owner 2026-11-03;
+  no usage-% trigger), then fix its P1s.
+- **Auto-resume:** OFF for CAPSTONE right now (the keep-going task points at another session; re-register via E:\DevCache\dev-kit-workers\build-session.id to turn it on). Extra usage is OFF on the account (no charges).
 - **Mac e2e:** `bash E:/Github_Projects/dev-kit/workers/pc/run-job.sh --worker mac CAPSTONE-USLS-MVP-e2e E:/Github_Projects/CAPSTONE-USLS-MVP` runs the full Playwright suite on the Mac in ~10 min (first run 708/730, I-208). Use it instead of the PC from Wednesday (the PC hosts UAT).
 - **Machines:** Mac online with Python 3.13 (brew); full Python gate on the Mac = 16 min: `bash E:/Github_Projects/dev-kit/workers/pc/run-job.sh --worker mac CAPSTONE-USLS-MVP <dir>` (conf `dev-kit/workers/projects/CAPSTONE-USLS-MVP.conf`, parser unittest). First Mac run on b629b82: 717 passed, 1 failed; PC gate same code: 718 ran, the same 1 error (test_reports_im20 shared-DB teardown, fixed in a later commit). Lenovo: no Python, not used. Dev-kit edits (Ponytail/Caveman, workers) are uncommitted in dev-kit (owner commits).
 - **MERGED `pkt/uat`** (I-138): `npm run uat` = waitress + ProxyFix (`scripts/serve_uat.py`, test `tests/test_uat_serving.py` 7/7), `.env.example`, setup-env `--uat`, `UAT.md`, `deploy/cloudflared/config.yml.example`. Its public-exposure audit -> next app.py packet `pkt/harden` (after pkt/cal): empty env values = unset, `DEMO_SHOW_ACCOUNTS` switch (demo-accounts endpoints publish the shared password + admin e-mail), demo reset staff/admin only, assistant per-account rate limit, `MAX_CONTENT_LENGTH`, security headers, SQLite WAL + busy_timeout.
 - **pkt/a11y2** (I-120) still has only a stash in `wt/a11y2`; redo it later from the brief.
 - **Next after the three land:** review + merge pkt/cal then pkt/uat; app.py packet for the public-exposure audit
   findings; e2e on merged code; then IMPROVE.md loop (ISSUES P1/P2, consistency sweep, UI/database improvements);
-  Fable full review at the end; stop at 80% weekly.
+  Fable full review at the end.
 
 ## ACTIVE RUN UPDATE (2026-10-27) - faculty calendar UI refinement complete
 
@@ -103,7 +124,7 @@
 - **Red contract landed in packet worktree:** five targeted backend checks fail for the intended reasons (invented 08:00-18:00 availability, hidden entered hours, broad `calendar.readonly`, selected real Google identity not stored/encrypted/audited, and missing sync/disconnect routes). `frontend/e2e/p96-google-calendar.spec.js` also reaches the faculty screen and fails because v5.3 has no last-checked status or sync/disconnect controls. Playwright Chromium was installed; its first attempted run was infrastructure-red before installation, then the feature-red run reached the assertion.
 - **Exact next action:** commit the red tests and hand the fixed contract to the Sonnet implementer in this worktree; then main reviews, reruns the targeted tests, checks screenshots at 1366/1920/390, and runs the required gates.
 
-## PAUSED BY THE OWNER (2026-10-22 night) — read this first
+## (old, 2026-10-22) PAUSED BY THE OWNER (2026-10-22 night) — read this first
 
 Owner: "put a pause on things and wrap up". All helpers were stopped. `v5.3-migui_test` is pushed; last full Python
 gate 680 OK (after pkt/be4), every later merge checked with targeted e2e + strict design check (all zeros).

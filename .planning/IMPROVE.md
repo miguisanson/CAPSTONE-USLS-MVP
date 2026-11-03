@@ -33,7 +33,7 @@ Not inputs: "could be better" with no evidence, new features that are not cheap 
   file sets do not overlap. While `app.py` is still one file, only **one** packet at a time
   may edit it; frontend and test packets can run beside it.
 - **Mechanical text: the local model** (Ollama), or a Haiku subagent if Ollama is down.
-- **Read-only research or audit agents** are not capped.
+- **Read-only research, audit or review agents** count toward the same 3.
 - **WIP cap: 4** open packets (specified, in flight, or waiting for review).
 - **Drop to 1 implementer** after a regression, a red gate after a merge, or a merge that
   needed manual conflict resolution. Back to 3 after one clean wave.
@@ -48,8 +48,8 @@ Not inputs: "could be better" with no evidence, new features that are not cheap 
 One fix or feature per pass.
 
 0. **Preflight.** Read `STATE.md`, `BOARD.md`, `ISSUES.md`. Confirm the gate is green on
-   `v5.2-migui_again`, no `.planning/IMPROVE_STOP` file exists, and usage is below 80% of the
-   window and week. If not, stop and report in 5 lines.
+   `v5.2-migui_again`, no `.planning/IMPROVE_STOP` file exists, and usage is below 90% of the
+   5-hour window. If not, stop and report in 5 lines.
 1. **Pick** the top input. A question only the owner can answer becomes a `QUESTION` row in
    `ISSUES.md` and a line under "Waiting on you" in `BOARD.md`; pick the next input.
 2. **Test first.** Write the failing check (AGENTS.md Rule 1): a unittest for backend
@@ -120,7 +120,7 @@ Stop dispatching, report in 5 lines, and wait for the owner when any of these is
 3. The same bug class shows up a second time: fix the class, add a guard, then ask.
 4. Any "done" is later found not done. Re-review the last 10 done rows before new work.
 5. The queue is empty apart from items that need the owner.
-6. Usage above 80% of the window or week. Do not start a wave you cannot finish and verify.
+6. Usage at 90% of the 5-hour window. Do not start a wave you cannot finish and verify.
 7. An agent wants to change a rule or process. Only the owner changes process.
 8. `.planning/IMPROVE_STOP` exists, or the owner types stop.
 
