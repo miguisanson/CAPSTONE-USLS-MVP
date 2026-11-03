@@ -44,7 +44,7 @@ npm-debug.log*
 
 # Private local notes and deployment files
 PRIVATE_UBUNTU_HOSTING_NOTES.txt
-deploy/
+deploy/tunnel.env
 
 # Ignore accidental nested copies of this repository
 CAPSTONE-USLS-MVP/
