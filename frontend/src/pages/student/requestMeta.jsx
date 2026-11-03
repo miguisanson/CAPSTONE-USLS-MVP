@@ -9,6 +9,7 @@ import {
   UserX,
 } from "lucide-react";
 import { PAGE } from "../../lib/labels.js";
+import { defenseScheduleLocked } from "../../lib/studentHome.js";
 
 export const REQUEST_GROUPS = [
   {
@@ -20,7 +21,7 @@ export const REQUEST_GROUPS = [
         id: "schedule",
         label: PAGE.defenseSchedule,
         icon: CalendarCheck,
-        lockedWhen: (data) => !data.research_case || !data.panel?.length,
+        lockedWhen: defenseScheduleLocked,
         lockedReason: "Available after research staff opens your research case and completes panel matching.",
       },
     ],

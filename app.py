@@ -13050,12 +13050,16 @@ def register_routes(app: Flask) -> None:
         return jsonify({"term": term_dict(term) if term else None})
 
     @app.route("/api/admin/terms")
-    @require_api_login("staff")
+    @require_api_login("staff", "academic_coordinator")
     def admin_terms_list():
         # The management page shows every semester (the trimmed prior+active+next
-        # window only applies to the pickers elsewhere).
+        # window only applies to the pickers elsewhere). The Academic Coordinator may read it; only
+        # staff and admin edit (every other /api/admin/terms route stays staff-only).
         terms = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()
-        return jsonify({"items": [term_dict(term) for term in terms]})
+        return jsonify({
+            "items": [term_dict(term) for term in terms],
+            "permissions": {"can_manage": current_account().role in {"staff", "admin"}},
+        })
 
     @app.route("/api/admin/terms/add-next", methods=["POST"])
     @require_api_login("staff")
@@ -13805,6 +13809,8 @@ def register_routes(app: Flask) -> None:
             ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
         ).first():
             return jsonify({"error": "This defense is booked. Cancel the schedule first."}), 409
+        if doc.status == "Complete":
+            return jsonify({"error": "Staff have already verified this file, so it cannot be removed. Ask the Research Coordinator if it must be replaced."}), 409
 
         original_name = evidence.original_name
         # Signed evidence is archived, never deleted: the adviser's signature points at the file.

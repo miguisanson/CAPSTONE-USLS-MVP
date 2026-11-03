@@ -1,3 +1,4 @@
+import { isLiveSchedule } from "../../lib/studentHome.js";
 import { Component, createContext, useContext, useEffect, useId, useState } from "react";
 import {
   CalendarClock,
@@ -414,11 +415,8 @@ export function timeRange(start, end) {
   return start ? formatTimeRange(start, end) : "Time not set";
 }
 
-// Statuses in which a booking is alive: a new request must not be filed on top of it.
-export const LIVE_SCHEDULE_STATUSES = ["Scheduled", "Confirmed", "Needs Re-confirmation"];
-export function isLiveSchedule(schedule) {
-  return Boolean(schedule?.is_active) || LIVE_SCHEDULE_STATUSES.includes(schedule?.status);
-}
+// Live-booking rule: lib/studentHome.js, shared with the home's "Needs your action".
+export { isLiveSchedule };
 
 const SCHEDULE_STATUS_NOTE = {
   Held: "This defense took place.",
