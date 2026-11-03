@@ -24968,6 +24968,8 @@ REPORT_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.
 REPORT_FORMATS = ("json", "xlsx", "pdf")
 GRADUATION_CANDIDATE_STAGES = ("Writing", "Final Defense")
 NO_VERDICT_YET = "Not yet recorded"
+# What a checklist line that could not be checked is waiting for (graduation_eligibility gives passed=None for these).
+GRADUATION_NO_RECORD_TEXT = {"coursework": "no curriculum on file", "practicum": "no practicum record on file"}  # the research stages and the completion documents wait for a research record
 NOT_IN_A_BATCH = "Not in a batch"
 DEFENSE_REPORT_WHEN = ("Upcoming", "Awaiting verdict", "Held", "Deferred")
 GRADUATION_ELIGIBILITY_ORDER = {"Eligible": 0, "Needs verification": 1, "Not eligible": 2}
@@ -25296,7 +25298,7 @@ def report_graduation(args) -> dict:
         if (eligibility_filter and eligibility["status"] != eligibility_filter) or (batch_filter and status != batch_filter):
             continue
         missing = [
-            item["label"] + (" (to verify)" if item["passed"] is None else "")
+            item["label"] + (f" ({GRADUATION_NO_RECORD_TEXT.get(item['key'], 'no research record on file')})" if item["passed"] is None else "")
             for item in eligibility["checklist"]
             if item["passed"] is not True
         ]
@@ -39402,13 +39404,18 @@ def seed_report_history(today: date | None = None) -> int:
         if s.id not in busy and s.standing == "Active" and s.enrollment_tag == "Enrolled"
         and s.current_stage in ("Coursework", "Admission")
     ]
+    # A Dean-approved graduation endorsement belongs to a student who has completed (I-237): never a coursework student.
+    completed_pool = [
+        s for s in Student.query.filter_by(current_stage="Completed").order_by(Student.id).all()
+        if s.id not in {sid for (sid,) in db.session.query(GraduationEndorsement.student_id).all()}
+    ]
     practicum_pool = [s for s in pool if program_allows_practicum(s.program)]
     pool = [s for s in pool if s not in practicum_pool]  # kept for the practicum reports
     faculty_ids = [f.id for f in Faculty.query.filter_by(active=True).order_by(Faculty.id).all()]
     taken: set[int] = set()
 
-    def next_student(practicum: bool = False):
-        for student in (practicum_pool if practicum else pool):
+    def next_student(practicum: bool = False, graduated: bool = False):
+        for student in (completed_pool if graduated else practicum_pool if practicum else pool):
             if student.id not in taken:
                 taken.add(student.id)
                 return student
@@ -39447,7 +39454,9 @@ def seed_report_history(today: date | None = None) -> int:
         for process, outcomes in plan:
             for outcome in outcomes:
                 index += 1
-                student = next_student(practicum=process == "practicum")
+                if process == "graduation" and outcome != "A":
+                    continue  # a returned endorsement has no completed student to belong to
+                student = next_student(practicum=process == "practicum", graduated=process == "graduation")
                 if student is None:
                     continue
                 decided, forwarded = spread(kind, term, index, turnarounds[index % len(turnarounds)])
