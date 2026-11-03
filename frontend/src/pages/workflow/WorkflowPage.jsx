@@ -106,6 +106,7 @@ function SingleWorkflowPage() {
     return value ? Number(value) : null;
   });
   const [studentLabel, setStudentLabel] = useState("");
+  const [onboardingKey, setOnboardingKey] = useState(0); // I-011: remounting reloads the onboarding report panel after an import
   const [specialization, setSpecialization] = useState("");
   const [result, setResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -296,7 +297,7 @@ function SingleWorkflowPage() {
           <GraduationRoster {...formProps} />
         ) : (
           <Card pad="lg">
-            {slug === "student-handoff" && <HandoffPanel {...formProps} />}
+            {slug === "student-handoff" && <HandoffPanel {...formProps} onImported={() => setOnboardingKey((k) => k + 1)} />}
             {slug === "course-audit" && <CourseAuditPanel meta={meta} />}
             {slug === "panel-matching" && <PanelMatchingForm {...formProps} />}
           </Card>
@@ -305,7 +306,7 @@ function SingleWorkflowPage() {
         {/* BPMN 1 Admission: the onboarding report and the Dean's approval
             gate that turns an import batch into a recorded admission completion. */}
         {!subview && slug === "student-handoff" ? (
-          <div><OnboardingGatePanel role={user?.role} /></div>
+          <div><OnboardingGatePanel key={onboardingKey} role={user?.role} /></div>
         ) : null}
       </div>
       {supportModal && (
