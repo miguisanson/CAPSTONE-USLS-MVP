@@ -242,7 +242,7 @@ export function officeStats({ role, own, waiting, kpis }) {
     };
     // the Academic Coordinator watches risk; the Research Coordinator watches the defenses it schedules
     const focus = canOpen("/students", role)
-      ? { key: "risk", label: "At risk or delayed", value: kpis.at_risk, sub: `${kpis.high_risk} delayed (active students)`, tone: "warning", to: "/students?risk=At Risk of Delay/Delayed" }
+      ? { key: "risk", label: "At risk or delayed", value: kpis.at_risk, sub: `${kpis.high_risk} delayed, all students`, tone: "warning", to: "/students?risk=At Risk of Delay/Delayed" }
       : { key: "defenses", label: "Confirmed defenses", value: kpis.confirmed_schedules, sub: `${kpis.needs_availability} awaiting availability`, tone: "info", to: "/workflow/defense-scheduling" };
     return [tasks, students, focus, soon];
   }
@@ -250,7 +250,7 @@ export function officeStats({ role, own, waiting, kpis }) {
     return [
       tasks,
       { key: "students", label: "Students monitored", value: kpis.total_students, sub: `${kpis.active_students} active students`, tone: "success", to: "/students" },
-      { key: "risk", label: "At risk or delayed", value: kpis.at_risk, sub: `${kpis.high_risk} delayed (active students)`, tone: "warning", to: "/students?risk=At Risk of Delay/Delayed" },
+      { key: "risk", label: "At risk or delayed", value: kpis.at_risk, sub: `${kpis.high_risk} delayed, all students`, tone: "warning", to: "/students?risk=At Risk of Delay/Delayed" },
       { key: "defenses", label: "Confirmed defenses", value: kpis.confirmed_schedules, sub: `${kpis.needs_availability} awaiting availability`, tone: "info", to: "/workflow/defense-scheduling" },
     ];
   }

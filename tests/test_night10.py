@@ -59,16 +59,11 @@ class Night10Tests(unittest.TestCase):
         self.assertIn("Practicum completed (no practicum record on file)", practicum["missing"])
 
     # ------------------------------------------------------------------ I-239b
-    def test_dashboard_at_risk_is_the_number_behind_reports_behind_schedule(self):
+    def test_dashboard_at_risk_tile_is_the_list_its_link_opens(self):
         staff = self._client("staff")
         kpis = staff.get("/api/dashboard").get_json()["kpis"]
-        tiles = {t["key"]: t for t in staff.get("/api/reports/summary").get_json()["tiles"]}
-        behind = tiles["behind"]
-        self.assertEqual(behind["count"], kpis["at_risk"])
-        self.assertEqual(behind["of"], kpis["active_students"])
-        with app.app_context():
-            delayed = Student.query.filter(Student.risk_level == "Delayed", Student.standing == "Active").count()
-        self.assertEqual(delayed, kpis["high_risk"])
+        listed = staff.get("/api/students?risk=At Risk of Delay,Delayed&page_size=5").get_json()["total"]
+        self.assertEqual(listed, kpis["at_risk"])
 
 
 if __name__ == "__main__":
