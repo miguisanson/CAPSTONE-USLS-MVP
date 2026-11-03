@@ -39,12 +39,17 @@ class PanelSeedTests(unittest.TestCase):
         app.config.update(TESTING=True)
         with app.app_context():
             build_demo_database()
-            # The two practicum demo students hand in a project portfolio, not a thesis paper.
+            # The two practicum demo students hand in a project portfolio, not a thesis paper. A graduation candidate
+            # whose research is verified complete (Hector Ong and Isabel Flores wait in Final Defense for the Dean's
+            # endorsement, F-25) has no defense left, so there is nothing to match a panel to.
+            finished = {
+                student_id for (student_id,) in db.session.query(ResearchCase.student_id).filter_by(status="Verified Complete")
+            }
             cls.students = [
                 (student.id, student.student_number)
                 for student in Student.query.filter(Student.current_stage.in_(RESEARCH_STAGES))
                 .order_by(Student.id).all()
-                if not student.student_number.startswith("GS-2026-PRAC-")
+                if not student.student_number.startswith("GS-2026-PRAC-") and student.id not in finished
             ]
             cls.profiles = {}
             cls.results = {}

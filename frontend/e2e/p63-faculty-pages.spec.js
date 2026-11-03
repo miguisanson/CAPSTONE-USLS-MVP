@@ -505,7 +505,7 @@ test.describe("Adviser appointments", () => {
     test("Appoint adviser: optional note and Associate Dean name, no exception box under the limit", async ({ page }) => {
       await page.goto("/dean/approvals");
       const daniel = card(page, "Daniel Bernardo");
-      await expect(daniel).toContainText(/2 of 5 advisees/);
+      await expect(daniel, "the nominee is under the limit (F-25 seed: the count follows the seeded advisers)").toContainText(/[0-4] of 5 advisees/);
       await daniel.getByRole("button", { name: "Appoint adviser" }).first().click();
       await expect(daniel.getByLabel("Dean's note (optional)")).toBeVisible();
       await expect(daniel.getByLabel("Associate Dean name (optional)")).toBeVisible();

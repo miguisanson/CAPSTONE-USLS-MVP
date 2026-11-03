@@ -105,18 +105,19 @@ test.describe("P7.9 Dean pages", () => {
   // the home and Reports & Analytics count the same waiting decisions. The server's counting of outcomes (a scheduled
   // leave is approved, a denial is a denial) is pinned by tests/test_reports_decisions.py.
   test("I-074: the home and Reports & Analytics count the same decisions waiting", async ({ page }) => {
-    await page.goto("/dean");
-    await expect(page.getByRole("heading", { level: 1, name: /^Welcome, / })).toBeVisible();
-    const homeValue = statValue(page, "Decisions waiting");
-    await expect(homeValue).toBeVisible();
-    const home = Number((await homeValue.innerText()).trim());
-    expect(Number.isFinite(home), "the home shows a number").toBe(true);
-
-    await page.goto("/dean/analytics");
-    await expect(page.getByRole("heading", { level: 1, name: "Reports & Analytics" })).toBeVisible();
-    const analyticsValue = statValue(page, "Decisions waiting");
-    await expect(analyticsValue, "Reports & Analytics has the same figure").toBeVisible();
-    expect(Number((await analyticsValue.innerText()).trim()), "the same decisions are counted on both pages").toBe(home);
+    // Other workers can add a Dean decision between the two page loads (I-235), so read both until a quiet moment.
+    const read = async (path, heading) => {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+      const value = statValue(page, "Decisions waiting");
+      await expect(value).toBeVisible();
+      return Number((await value.innerText()).trim());
+    };
+    await expect.poll(async () => {
+      const home = await read("/dean", /^Welcome, /);
+      const analytics = await read("/dean/analytics", "Reports & Analytics");
+      return Number.isFinite(home) && home === analytics ? "same" : `home ${home} vs analytics ${analytics}`;
+    }, { message: "the same decisions are counted on both pages", timeout: 45000, intervals: [500, 1000, 2000] }).toBe("same");
   });
 
   test("I-084: the Approvals Queue lists what waits and one line for what does not", async ({ page, playwright }) => {

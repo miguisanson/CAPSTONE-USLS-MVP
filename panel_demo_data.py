@@ -403,6 +403,28 @@ DEMO_STUDENT_ADVISERS = {
 }
 
 
+# Roster students in a research stage who keep NO research adviser (F-25), so the Reports "Records to fix" tab shows a
+# short list instead of every research student. The first five are the students the adviser walkthrough works with
+# (frontend/e2e/p63-faculty-pages.spec.js applies for an adviser as Gian, Daniel, Rafael and Marielle, and uploads
+# Form 1 as Elena); the rest are students still at the title stage (Proposal Development).
+ROSTER_WITHOUT_ADVISER = frozenset({
+    "2360053",  # Gian Reyes
+    "2460055",  # Daniel Bernardo
+    "2260063",  # Rafael Pang
+    "2360061",  # Marielle Navarro
+    "2260011",  # Elena Mendoza
+    "2560025",  # Noel Abad
+    "2360041",  # Ben Bautista
+    "2560093",  # Nicole Dizon
+    "2360115",  # Grace Tan
+    "2360090",  # Fatima Santos
+})
+
+# The adviser the walkthrough appoints (p63: the Dean appoints Dr. Angela Cruz for Daniel Bernardo with no "over the limit"
+# warning) keeps one seat free, so the seed never fills her to the advisee limit.
+ROSTER_ADVISER_SPARE_SEAT = frozenset({"Dr. Angela Cruz"})
+
+
 # Research topics for the roster students who reach the research stages without a paper of their own (I-145).
 # One list per program; a student takes the topic at their position in the program, and the next two as the other
 # two concept papers of the package. Demonstration text, not real student work; stored as the student's uploaded
