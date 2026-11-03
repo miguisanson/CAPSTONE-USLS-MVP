@@ -35365,11 +35365,9 @@ def close_satisfied_research_tasks(student: Student, progress: dict) -> int:
 
 
 def graduation_endorsement_undecided(student: Student) -> bool:
-    """True while one of the student's graduation endorsements has not been approved by the Dean."""
-    return GraduationEndorsement.query.filter(
-        GraduationEndorsement.student_id == student.id,
-        GraduationEndorsement.endorsement_status.notin_(GRADUATION_APPROVED_STATUSES),
-    ).first() is not None
+    """True while the student's latest graduation endorsement has not been approved by the Dean (older rows are history)."""
+    latest = latest_graduation_endorsement(student.id)
+    return latest is not None and latest.endorsement_status not in GRADUATION_APPROVED_STATUSES
 
 
 def sync_research_progress(student: Student, submitted_title: str = "") -> tuple[ResearchCase, dict]:

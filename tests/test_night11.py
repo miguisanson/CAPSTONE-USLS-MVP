@@ -5,11 +5,12 @@ Reuses the research-core fixtures (one seeded temporary database per test).
 """
 import os
 import unittest
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from tests.test_research_core import (  # noqa: F401
-    PROPOSAL, TITLE, DocumentCheck, ResearchCoreBase, ResearchEvidenceFile, ScheduleRequest, TransactionLog, app, db,
+    PROPOSAL, TITLE, DocumentCheck, ResearchCoreBase, ResearchEvidenceFile, ScheduleRequest, Student, TransactionLog, app, db,
 )
+from app import GraduationEndorsement, graduation_endorsement_undecided  # noqa: E402
 
 
 class HeldDefenseRequestTests(ResearchCoreBase):
@@ -84,6 +85,26 @@ class VerifiedEvidenceRemovalTests(ResearchCoreBase):
         evidence_id = self.verified_file()
         self.assertEqual(self.student().delete(f"/api/research-evidence/{evidence_id}").status_code, 403)
         self.assertEqual(self.faculty_client("Chair Person").delete(f"/api/research-evidence/{evidence_id}").status_code, 403)
+
+
+class LatestEndorsementTests(ResearchCoreBase):
+    def endorsements(self, *rows):
+        """rows: (status, days ago) oldest first."""
+        with app.app_context():
+            for status, days in rows:
+                stamp = datetime.now() - timedelta(days=days)
+                db.session.add(GraduationEndorsement(
+                    student_id=self.student_id, endorsement_status=status, review_window="AY test", updated_at=stamp,
+                ))
+            db.session.commit()
+            return graduation_endorsement_undecided(db.session.get(Student, self.student_id))
+
+    def test_only_the_latest_endorsement_decides_whether_it_is_undecided(self):
+        # seed_report_history leaves old "Returned for Revision" rows behind a later approval
+        self.assertFalse(self.endorsements(("Returned for Revision", 60), ("Dean Approved", 5)))
+
+    def test_a_new_open_endorsement_after_an_approval_is_undecided(self):
+        self.assertTrue(self.endorsements(("Dean Approved", 60), ("Ready for Dean Review", 5)))
 
 
 if __name__ == "__main__":
