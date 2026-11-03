@@ -8122,7 +8122,7 @@ def leave_registrar_export(slug: str, cases: list[LeaveCase], file_format: str, 
     else:
         file_format = "csv"
         stream = io.StringIO()
-        writer = csv.writer(stream)
+        writer = safe_csv_writer(stream)
         writer.writerow(LEAVE_REGISTRAR_HEADERS)
         for case in cases:
             writer.writerow(leave_registrar_row(case))
@@ -14395,7 +14395,7 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
 
         output = io.StringIO()
-        writer = csv.writer(output)
+        writer = safe_csv_writer(output)
         writer.writerow(["USLS Graduate School Subject Withdrawal Report"])
         writer.writerow(["Application ID", application.id])
         writer.writerow(["Student", application.student.name])
@@ -14506,7 +14506,7 @@ def register_routes(app: Flask) -> None:
         if not case:
             return jsonify({"error": "The Dean must approve this request before a Registrar report is generated."}), 400
         output = io.StringIO()
-        writer = csv.writer(output)
+        writer = safe_csv_writer(output)
         writer.writerow(leave_registrar_rows(case)[0])
         writer.writerow(leave_registrar_rows(case)[1])
         filename = f"{'loa' if slug == SLUG_LOA else 'readmission'}-registrar-{student.student_number}.csv"
@@ -14537,7 +14537,7 @@ def register_routes(app: Flask) -> None:
         )
         db.session.commit()
         output = io.StringIO()
-        writer = csv.writer(output)
+        writer = safe_csv_writer(output)
         writer.writerow(["USLS Graduate School AWOL Return Registrar Report"])
         writer.writerow(["Format status", "Provisional - Registrar format still requires stakeholder confirmation"])
         writer.writerow(["Student", item.student.name])
@@ -14575,7 +14575,7 @@ def register_routes(app: Flask) -> None:
         )
         db.session.commit()
         output = io.StringIO()
-        writer = csv.writer(output)
+        writer = safe_csv_writer(output)
         writer.writerow(["USLS Graduate School Residency Registrar Report"])
         writer.writerow(["Format status", "Provisional - Registrar format still requires stakeholder confirmation"])
         writer.writerow(["Student", item.student.name])
@@ -15408,7 +15408,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "No Dean-approved graduation endorsements are available to export."}), 400
 
         stream = io.StringIO()
-        writer = csv.writer(stream)
+        writer = safe_csv_writer(stream)
         writer.writerow(["Graduate School Endorsed List for Manual Registrar Email"])
         writer.writerow([
             "Batch", "Student ID", "Student Name", "Program", "Coursework Status", "Research Status",
@@ -18234,6 +18234,18 @@ def register_routes(app: Flask) -> None:
             .order_by(Student.last_name.asc(), Student.first_name.asc())
             .all()
         )
+        account = current_account()
+        if account.role == "faculty":
+            # Faculty read the roster of a course they teach, or only the students they advise.
+            fid = account.faculty_id
+            teaches = bool(fid) and (
+                CurriculumOffering.query.filter_by(course_id=course_id, assigned_faculty_id=fid).first()
+                or CourseOffering.query.filter_by(course_id=course_id, assigned_faculty_id=fid).first()
+            )
+            if not teaches:
+                rows = [(rec, s) for rec, s in rows if fid and faculty_is_adviser_for_student(fid, s.id)]
+                if not rows:
+                    return jsonify({"error": "You can only view the roster of a course you teach or of students you advise."}), 403
         students = []
         active_term = get_active_term()
         active_term_label = active_term.label if active_term else ""
@@ -25202,6 +25214,20 @@ def _report_cell(value):
     if isinstance(value, str) and value[:1] in ("=", "+", "-", "@"):
         return "'" + value
     return value
+
+
+class _SafeCsvWriter:
+    """csv.writer that keeps text starting like a formula (= + - @) as text, like the xlsx exports."""
+
+    def __init__(self, stream):
+        self._writer = csv.writer(stream)
+
+    def writerow(self, row):
+        return self._writer.writerow([_report_cell(cell) for cell in row])
+
+
+def safe_csv_writer(stream) -> _SafeCsvWriter:
+    return _SafeCsvWriter(stream)
 
 
 def report_workbook_bytes(result: dict) -> bytes:
