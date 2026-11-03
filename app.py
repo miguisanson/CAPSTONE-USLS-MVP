@@ -39371,9 +39371,9 @@ HISTORY_DEFENSES = {
 # (process, outcomes) per term; A = approved, D = denied, R = returned.
 HISTORY_PLAN = {
     "older": [("leave", "AADA"), ("readmission", "AA"), ("awol", "A"), ("withdrawal", "AADAA"), ("practicum", "AA"),
-              ("graduation", "AA"), ("adviser", "AADA")],
+              ("graduation", "A"), ("adviser", "AADA")],
     "recent": [("leave", "AAADA"), ("readmission", "AAD"), ("awol", "AA"), ("withdrawal", "AAAADA"), ("practicum", "AAA"),
-               ("graduation", "AAR"), ("adviser", "AAADA")],
+               ("graduation", "A"), ("adviser", "AAADA")],  # one approved graduation per earlier term: the seed has two Completed students (I-237)
     "current": [("leave", "A"), ("withdrawal", "AD"), ("practicum", "A"), ("adviser", "AA")],
 }
 
