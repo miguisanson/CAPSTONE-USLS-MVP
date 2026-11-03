@@ -59,7 +59,7 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-100 text-brand-700"><Scale className="h-4 w-4" aria-hidden="true" /></span>
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-ink">{title}</span>
-            <span className="meta block truncate">
+            <span className="meta block break-words">
               {items.length} rule{items.length === 1 ? "" : "s"} from the Graduate School policies{gsStaff ? ` · ${needsReview || "none"} need${needsReview === 1 ? "s" : ""} review` : ""}
             </span>
           </span>
