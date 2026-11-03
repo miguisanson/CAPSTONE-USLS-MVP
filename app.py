@@ -11411,7 +11411,8 @@ RAG_SYSTEM_INSTRUCTION = (
     f"answer, reply with exactly this sentence and nothing else: {_prag.NOT_FOUND_ANSWER}"
 )
 # The closing "Passages used: 1, 3" line, also as Gemini dresses it: "**Passages used:** 2", "- Passages used: 2".
-_PASSAGES_USED = re.compile(r"(?im)^\W*passages? used\W*(.*)$")
+# The line holds only the marker (and markdown punctuation) plus passage numbers, so a body line like "Passages used in ..." stays.
+_PASSAGES_USED = re.compile(r"(?im)^[^\w\n]*passages?[ \t]+used[^\w\n]*((?:(?:\d+|and|none)\b[^\w\n]*)*)$")
 
 
 def _rag_passages_block(chunks: list[dict]) -> str:
