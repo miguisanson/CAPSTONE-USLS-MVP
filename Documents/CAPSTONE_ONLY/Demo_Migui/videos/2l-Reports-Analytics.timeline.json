@@ -48,7 +48,7 @@
   "role": "Graduate School Staff"
  },
  {
-  "t": 78.1,
+  "t": 78.2,
   "kind": "step",
   "label": "Needs attention: the causes, the students behind a bar, the list",
   "role": "Graduate School Staff"
@@ -90,7 +90,7 @@
   "role": "Graduate School Staff"
  },
  {
-  "t": 151.2,
+  "t": 151.3,
   "kind": "step",
   "label": "Office speed",
   "role": "Graduate School Staff"
@@ -102,13 +102,13 @@
   "role": "Graduate School Staff"
  },
  {
-  "t": 166.6,
+  "t": 166.7,
   "kind": "step",
   "label": "Records to fix",
   "role": "Graduate School Staff"
  },
  {
-  "t": 168.5,
+  "t": 168.6,
   "kind": "hold",
   "label": "reports-tour-09",
   "role": "Graduate School Staff"
@@ -132,61 +132,61 @@
   "role": "Graduate School Staff"
  },
  {
-  "t": 194.9,
+  "t": 195.0,
   "kind": "hold",
   "label": "reports-tour-11",
   "role": "Graduate School Staff"
  },
  {
-  "t": 204.1,
+  "t": 204.2,
   "kind": "step",
   "label": "report: Overdue and pending",
   "role": "Graduate School Staff"
  },
  {
-  "t": 205.9,
+  "t": 206.1,
   "kind": "hold",
   "label": "reports-tour-12",
   "role": "Graduate School Staff"
  },
  {
-  "t": 215.1,
+  "t": 215.2,
   "kind": "step",
   "label": "report: Defenses",
   "role": "Graduate School Staff"
  },
  {
-  "t": 217.0,
+  "t": 217.1,
   "kind": "hold",
   "label": "reports-tour-13",
   "role": "Graduate School Staff"
  },
  {
-  "t": 223.5,
+  "t": 223.7,
   "kind": "step",
   "label": "Registrar changes",
   "role": "Graduate School Staff"
  },
  {
-  "t": 225.4,
+  "t": 225.6,
   "kind": "hold",
   "label": "reports-tour-14",
   "role": "Graduate School Staff"
  },
  {
-  "t": 236.8,
+  "t": 236.9,
   "kind": "step",
   "label": "filter by program: every number follows",
   "role": "Graduate School Staff"
  },
  {
-  "t": 241.0,
+  "t": 241.2,
   "kind": "hold",
   "label": "reports-tour-15",
   "role": "Graduate School Staff"
  },
  {
-  "t": 261.0,
+  "t": 261.1,
   "kind": "end",
   "label": "end of part",
   "role": "Graduate School Staff"

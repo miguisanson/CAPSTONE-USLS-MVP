@@ -67,7 +67,7 @@
  "2h-3:intro": "The last one is the improper way out: a student who stopped enrolling without an approved leave. Nobody types 'AWOL' by hand. The system flags the student from the official records.",
  "2h-3:signin:Graduate School Staff": "I sign in as staff.",
  "awol-01": "This is the AWOL and Residency board. It flags cases from the source records, and the line above counts the cases in each column.",
- "awol-02": "I search for Maya Torres. Her card is in the AWOL column, AWOL since July fifth, and it says 'Waiting for: Student'. Staff cannot move it: only the student can start a return.",
+ "awol-02": "I search for Maya Torres. Her card is in the AWOL column, with the date the flag started, and it says 'Waiting for: Student'. Staff cannot move it: only the student can start a return.",
  "awol-03": "The rules here are the residence limits: five years normal and seven absolute for a master's student, seven and nine for a doctorate, and time on leave counts toward residence. Each rule shows its Handbook page.",
  "awol-04": "Opening the card shows the AWOL date, where the flag came from, and the last enrolled semester. There is no button for staff yet.",
  "2h-3:signin:Student": "Now I sign in as Maya.",

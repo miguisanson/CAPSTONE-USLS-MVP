@@ -15,7 +15,7 @@ Reports and Analytics is under Overview. At the top are three filters: program, 
 For example, Behind schedule: the share of active students who are behind, compared with a target, so you can see at once whether the Graduate School is on track.
 
 5
-00:01:04,200 --> 00:01:17,899
+00:01:04,200 --> 00:01:18,000
 Median days to decide shows how quickly requests are decided, compared with the twelve months before. Every number comes from recorded events, so it changes as the work is done.
 
 6
@@ -35,15 +35,15 @@ Show all causes brings back the full list: most delayed first, with the stage, t
 Where students get stuck shows, for each lifecycle stage, how many students are on time, slow, or stuck, with the limits written underneath.
 
 10
-00:02:16,000 --> 00:02:31,000
+00:02:16,000 --> 00:02:31,100
 Every count on these screens is a button. Selecting one opens the real students behind it, with a link to each record, so nobody has to take a figure on trust.
 
 11
-00:02:33,099 --> 00:02:46,400
+00:02:33,099 --> 00:02:46,500
 Office speed shows which offices take longest to close requests, grouped by how many days they have been waiting. The longest red bar is the office to ask first.
 
 12
-00:02:48,500 --> 00:03:00,100
+00:02:48,599 --> 00:03:00,100
 Records to fix lists research students with missing records, for example no adviser on file. Once the record is fixed, the student leaves the list.
 
 13
@@ -51,21 +51,21 @@ Records to fix lists research students with missing records, for example no advi
 The detailed lists are still here. Cohorts by stage shows how many students of each program and entry year are at each stage.
 
 14
-00:03:14,900 --> 00:03:23,900
+00:03:15,000 --> 00:03:24,000
 Graduation candidates shows who can graduate, what is still missing, and where each student stands in a graduation batch.
 
 15
-00:03:25,900 --> 00:03:34,900
+00:03:26,099 --> 00:03:35,000
 Overdue and pending lists every task and request still waiting, longest wait first, with the office that must act.
 
 16
-00:03:37,000 --> 00:03:43,300
+00:03:37,099 --> 00:03:43,500
 Defenses lists the defenses held and upcoming, with the panel and the verdict.
 
 17
-00:03:45,400 --> 00:03:56,600
+00:03:45,599 --> 00:03:56,700
 Registrar changes is the daily list of changes made here that the Registrar must apply in AIMS, each one marked when it is sent.
 
 18
-00:04:01,000 --> 00:04:20,800
+00:04:01,199 --> 00:04:20,900
 And every filter applies to everything on the page. Here I choose one program, and all six numbers and the charts follow. This is how the Graduate School can monitor many students at once, instead of checking records one by one.
