@@ -18308,6 +18308,7 @@ def register_routes(app: Flask) -> None:
                 result = "Graduation endorsement approved by Dean; CSV is ready for export"
                 next_owner = "Dean"
                 add_task(endorsement.student_id, "Export endorsed list for manual Registrar email", "Dean", 3, 40)
+                sync_research_progress(endorsement.student)  # approved: the student is Completed now, not at the next page view
             elif decision == "return":
                 endorsement.endorsement_status = "Returned for Revision"
                 endorsement.dean_decision_at = now_utc()
@@ -21443,6 +21444,7 @@ def register_routes(app: Flask) -> None:
                     next_owner = "Dean"
                     result = "Graduation candidate approved in Dean batch"
                     add_task(student.id, "Export endorsed list for manual Registrar email", "Dean", 3, 40)
+                    sync_research_progress(student)  # approved: the student is Completed now, not at the next page view
                 elif action == "return":
                     if account.role == "dean" and (
                         not endorsement or endorsement.endorsement_status != "Ready for Dean Review"
