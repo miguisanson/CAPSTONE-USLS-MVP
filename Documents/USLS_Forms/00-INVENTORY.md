@@ -17,14 +17,14 @@ The **Graduate School Operations Manual** is the backbone of the pack.
   GS-F-27 (Form 4) serves two chapters and says "Operations Manual 4.13 and 4.14"; its home folder is 4.13.
 - The manual's Appendix A lists every form with its code; GS-P-01 (approval sheet) and GS-P-02 (routing guide) carry a Manual column.
 - Each folder holds the Word file and its PDF side by side. `USLS-GS-Forms-Pack.pdf` is the print pack in this order: GS-P-01, GS-P-02,
-  the chapter folders 4.01 to 4.19, Platform Basis, Supplementary Forms (112 pages).
+  the chapter folders 4.01 to 4.19, Platform Basis, Supplementary Forms (108 pages).
 
 All 60 documents (54 forms and 6 policy and control documents) are built by one script,
 `scripts/docs/forms/build_forms.py`, so a correction is a one-line change followed by a re-run (layout, fonts and control fields stay
 identical); `scripts/docs/forms/build_pack.py` makes the PDFs and the print pack. Each document is clean (no watermark, no draft
 footer) and carries blank control fields: code, revision no. (00) and effectivity date. Approval is collected once, on **GS-P-01**.
-Layout: A4, Arial, 2 cm margins, page X of Y in the footer; instruction boxes 9.5 pt, field captions 9 pt; 14 forms fit one
-page and 40 two pages (none longer); GS-P-01 is 4 pages, GS-P-02 (landscape, 9 pt table) 5, GS-P-03 2,
+Layout: A4, Arial, 2 cm margins, page X of Y in the footer; instruction boxes 9.5 pt, field captions 9 pt; 18 forms fit one
+page and 36 two pages (none longer); GS-P-01 is 4 pages, GS-P-02 (landscape, 9 pt table) 5, GS-P-03 2,
 GS-P-04 3, GS-P-05 2, GS-P-06 2.
 
 
@@ -65,7 +65,7 @@ Folder `4.03 Course Offering and Course Adjustments`
 | Code | Document | Fills it / signs it | Source | Status | Pages |
 |---|---|---|---|---|---|
 | GS-F-03 | Change or Add of Subject and Advice Slip | Student; Academic Coordinator recommends; Associate Dean approves; GS Office issues slip | Handbook pp. 48-49 | drafted here (Advice Slip official by name, Handbook p. 49) | 2 |
-| GS-F-04 | Term Course Offering Plan | Academic Coordinator; Dean approves | Handbook pp. 48, 51 | drafted here | 2 |
+| GS-F-04 | Term Course Offering Plan | Academic Coordinator; Dean approves | Handbook pp. 48, 51 | drafted here | 1 |
 
 ### Operations Manual 4.4  -  Withdrawal of Subject
 
@@ -81,7 +81,7 @@ Folder `4.05 Dropping`
 
 | Code | Document | Fills it / signs it | Source | Status | Pages |
 |---|---|---|---|---|---|
-| GS-F-06 | Notice of Dropping from a Subject | Professor; Academic Coordinator; student acknowledges; Dean notes | Handbook p. 52 | drafted here | 2 |
+| GS-F-06 | Notice of Dropping from a Subject | Professor; Academic Coordinator; student acknowledges; Dean notes | Handbook p. 52 | drafted here | 1 |
 
 ### Operations Manual 4.6  -  Leave of Absence
 
@@ -153,7 +153,7 @@ Folder `4.13 Proposal Defense and Ethics Review`
 
 | Code | Document | Fills it / signs it | Source | Status | Pages |
 |---|---|---|---|---|---|
-| GS-F-25 | Statistical Consultation Form (Form 4.1) | Statistician; student; adviser | Protocol Form 4.1; Handbook p. 63 | official exists by name, template not held; drafted here | 2 |
+| GS-F-25 | Statistical Consultation Form (Form 4.1) | Statistician; student; adviser | Protocol Form 4.1; Handbook p. 63 | official exists by name, template not held; drafted here | 1 |
 | GS-F-26 | Co-authorship Information for Publication (Form 4.2) | Student; co-authors; adviser; Panel Chair | Protocol Form 4.2; Handbook p. 64 | official exists by name, template not held; drafted here | 1 |
 | GS-F-27 | Endorsement for Proposal / Final Defense (Form 4) | Adviser endorses; panel agrees to schedule; Research Coordinator | Protocol Form 4; Handbook pp. 63, 65-66 | official exists by name, template not held; drafted here | 2 |
 | GS-F-29 | Comments Sheet for Proposal Defense (Form 5) | Panel members; Panel Chair consolidates | Protocol Form 5; Handbook pp. 63-65 | official exists by name, template not held; drafted here | 2 |
@@ -217,7 +217,7 @@ Folder `4.19 Records Handoff to the Registrar`
 
 | Code | Document | Fills it / signs it | Source | Status | Pages |
 |---|---|---|---|---|---|
-| GS-F-44 | Records Transmittal to the University Registrar | Dean, Associate Dean or representative; Registrar acknowledges | Handbook pp. 32, 49-50, 53 | drafted here (proposed) | 2 |
+| GS-F-44 | Records Transmittal to the University Registrar | Dean, Associate Dean or representative; Registrar acknowledges | Handbook pp. 32, 49-50, 53 | drafted here (proposed) | 1 |
 
 ### Platform Basis (Operations Manual 4.20 to 4.24)
 
@@ -489,7 +489,7 @@ exist in the sources; the CHED memorandum and the Facebook and e-mail addresses 
   characters). GS-P-06: the monitoring-sheet import reads IDNO, COURSE, YR, COMPRE, NOTE, AY ENTRY, SN, FN, subject codes and the
   milestones TITLE, PROPOSAL, ETHICS, FINAL; the class-list import reads student ID, subject code, faculty and optional columns;
   the platform does not read the proposed AIMS export workbook yet.
-- **Page counts.** All forms are one or two pages; the print pack is 112 pages.
+- **Page counts.** All forms are one or two pages; the print pack is 108 pages.
 
 ## Not verified
 
