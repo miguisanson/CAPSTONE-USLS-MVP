@@ -16500,7 +16500,10 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/faculty/<int:faculty_id>/calendar.ics")
     @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean", "faculty")
     def faculty_calendar_feed(faculty_id: int):
-        # Was public and guessable by id; now needs a staff/faculty sign-in.
+        # Was public and guessable by id; now needs a staff/faculty sign-in, and faculty see only their own.
+        account = current_account()
+        if account.role == "faculty" and account.faculty_id != faculty_id:
+            return jsonify({"error": "Faculty may download only their own calendar."}), 403
         faculty = Faculty.query.get_or_404(faculty_id)
         return Response(
             faculty_calendar_ics(faculty),
