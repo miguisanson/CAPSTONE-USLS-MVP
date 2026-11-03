@@ -91,6 +91,21 @@ class RosterScopeTests(unittest.TestCase):
         for course in (self.c1, self.c2):
             self.assertEqual(self.roster("other@acct.test", course).status_code, 403)
 
+    def test_assigned_classes_choices_only_include_accessible_rosters(self):
+        for email, expected in (("teach@acct.test", {self.c1}),
+                                ("advise@acct.test", {self.c1, self.c2}),
+                                ("other@acct.test", set())):
+            with self.subTest(email=email):
+                client = app.test_client()
+                with app.app_context():
+                    account_id = UserAccount.query.filter_by(email=email).one().id
+                with client.session_transaction() as session:
+                    session["account_id"] = account_id
+                    session["role"] = "faculty"
+                response = client.get("/api/faculty-portal/context")
+                self.assertEqual(response.status_code, 200, response.get_json())
+                self.assertEqual({row["id"] for row in response.get_json()["subjects"]}, expected)
+
 
 class CsvFormulaTests(unittest.TestCase):
     def test_csv_writer_keeps_formula_text_as_text(self):

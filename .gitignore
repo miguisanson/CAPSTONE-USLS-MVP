@@ -82,3 +82,6 @@ instance/
 
 # Recorded demo videos (large; kept on this PC, rebuilt with scripts/demo/record_demo.py)
 Documents/CAPSTONE_ONLY/Demo_Migui/videos/*.mp4
+
+# Isolated agent development worktrees
+.worktrees/

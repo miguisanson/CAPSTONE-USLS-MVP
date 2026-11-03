@@ -19,7 +19,8 @@
     "test:format": "node --test scripts/format.test.mjs",
     "e2e": "npm run check:ui:strict && node scripts/e2e.mjs --build",
     "e2e:negative": "vite build && node scripts/e2e.mjs --negative",
-    "e2e:install": "node scripts/e2e.mjs install chromium"
+    "e2e:install": "node scripts/e2e.mjs install chromium",
+    "e2e:teaching": "node scripts/e2e.mjs --build test --config playwright.teaching.config.js"
   },
   "dependencies": {
     "lucide-react": "^0.453.0",

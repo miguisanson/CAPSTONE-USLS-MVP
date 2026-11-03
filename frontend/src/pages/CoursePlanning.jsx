@@ -12,7 +12,7 @@ export default function CoursePlanning({ initialView = "adjustments" }) {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("view") || initialView;
-  const view = requested === "offerings" ? "offerings" : "adjustments";
+  const view = ["offerings", "schedule"].includes(requested) ? "offerings" : "adjustments";
 
   function switchView(nextView) {
     const params = new URLSearchParams(searchParams);

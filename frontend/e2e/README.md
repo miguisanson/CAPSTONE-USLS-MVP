@@ -1,5 +1,14 @@
 # Playwright harness (owner decisions IM7 and IM15)
 
+Teaching timetable workflow: `npm run e2e:teaching` from the repository root.
+This runs a separate small disposable database on port 5056, logs in through
+the UI as faculty, Academic Coordinator and student, and exercises semester
+availability, draft recommendations, explicit approval/publication and the
+student's published classes. It never changes the developer's demo database.
+Screenshots are saved under `frontend/e2e-artifacts/teaching-live/` at 1366,
+1920 and 390 pixels. `USLS_PYTHON` selects a working interpreter;
+`PLAYWRIGHT_CHANNEL=chrome` optionally uses installed Chrome.
+
 Proves every role's pages load cleanly on the seeded demo data, and takes the
 screenshots used in the design review.
 

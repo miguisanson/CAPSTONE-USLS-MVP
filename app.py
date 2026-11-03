@@ -433,6 +433,8 @@ def create_app() -> Flask:
 
     register_json_error_handling(app)
     register_routes(app)
+    from teaching_backend import install_routes as install_teaching_routes
+    install_teaching_routes(app, db, globals())
     return app
 
 
@@ -4859,6 +4861,8 @@ def default_academic_year_options() -> list[str]:
 def course_offering_plan_dict(plan: CourseOfferingPlan | None) -> dict | None:
     if not plan:
         return None
+    impact = {row["course"]["id"]: row["delayed_count"]
+              for row in course_demand_rows(plan.program, plan.target_term)} if plan.program else {}
     return {
         "id": plan.id,
         "program_id": plan.program_id,
@@ -4876,7 +4880,8 @@ def course_offering_plan_dict(plan: CourseOfferingPlan | None) -> dict | None:
         "reference_term_id": plan.reference_term_id,
         "target_term": term_dict(plan.target_term) if plan.target_term else None,
         "reference_term": term_dict(plan.reference_term) if plan.reference_term else None,
-        "offerings": [course_offering_dict(o) for o in sorted(plan.offerings, key=lambda item: item.demand_count, reverse=True)],
+        "offerings": [{**course_offering_dict(o), "delayed_count": impact.get(o.course_id, 0)}
+                      for o in sorted(plan.offerings, key=lambda item: item.demand_count, reverse=True)],
     }
 
 
@@ -17573,6 +17578,54 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
         return jsonify({"ok": True, "message": f"{course.code} is now offered for {term.label}."})
 
+    @app.route("/api/course-offerings/bulk", methods=["PATCH"])
+    @require_api_login("academic_coordinator", "admin")
+    def course_offerings_bulk_update():
+        from teaching_backend import offering_conflict_errors, parse_offering_schedule
+        data = request.get_json(silent=True) or {}
+        rows = data.get("offerings")
+        if not isinstance(rows, list) or not rows or len(rows) > 500:
+            return jsonify(error="Send the offering changes to save."), 400
+        program = db.session.get(Program, safe_int(data.get("program_id")))
+        term = db.session.get(AcademicTerm, safe_int(data.get("term_id")))
+        if not program or not term:
+            return jsonify(error="Choose a valid program and semester."), 400
+        year, semester = split_academic_term_label(term.label)
+        changed = set()
+        with db.session.no_autoflush:
+            for row in rows:
+                if not isinstance(row, dict):
+                    db.session.rollback()
+                    return jsonify(error="Each offering change must be a record."), 400
+                off = db.session.get(CurriculumOffering, safe_int(row.get("id")))
+                if not off or off.program_id != program.id or (off.academic_year, off.semester) != (year, semester) or off.id in changed:
+                    db.session.rollback()
+                    return jsonify(error="An offering changed or does not belong to the selected program and semester. Reload and try again."), 409
+                faculty_id = safe_int(row.get("faculty_id")) or None
+                faculty = db.session.get(Faculty, faculty_id) if faculty_id else None
+                if faculty_id and (not faculty or not faculty.active or faculty.college != program.college):
+                    db.session.rollback()
+                    return jsonify(error=f"{off.course.code}: choose an active faculty member from this college."), 409
+                schedule = row.get("schedule") or ""
+                section = row.get("section") or ""
+                if not isinstance(schedule, str) or not isinstance(section, str) or len(schedule) > 160 or len(section) > 50:
+                    db.session.rollback()
+                    return jsonify(error=f"{off.course.code}: invalid schedule or section."), 400
+                schedule = schedule.strip()
+                if schedule and schedule != (off.schedule or "") and not parse_offering_schedule(schedule):
+                    db.session.rollback()
+                    return jsonify(error=f"{off.course.code}: choose a schedule from the dropdown."), 400
+                off.assigned_faculty_id, off.schedule, off.section = faculty_id, schedule or None, section.strip() or None
+                off.updated_at = now_utc()
+                changed.add(off.id)
+            all_offerings = CurriculumOffering.query.filter_by(academic_year=year, semester=semester).all()
+            errors = offering_conflict_errors(globals(), db, all_offerings, changed)
+            if errors:
+                db.session.rollback()
+                return jsonify(error="Nothing was saved. " + " ".join(errors), errors=errors), 409
+        db.session.commit()
+        return jsonify(ok=True, message=f"Saved all changes to {len(changed)} offering(s).")
+
     @app.route("/api/course-offerings/<int:offering_id>", methods=["PATCH"])
     @require_api_login("academic_coordinator", "admin")
     def course_offerings_update(offering_id: int):
@@ -17590,6 +17643,13 @@ def register_routes(app: Flask) -> None:
         if "section" in data:
             off.section = (data.get("section") or "").strip() or None
         off.updated_at = now_utc()
+        from teaching_backend import offering_conflict_errors
+        with db.session.no_autoflush:
+            errors = offering_conflict_errors(globals(), db,
+                CurriculumOffering.query.filter_by(academic_year=off.academic_year, semester=off.semester).all(), {off.id})
+        if errors:
+            db.session.rollback()
+            return jsonify(error="Nothing was saved. " + " ".join(errors), errors=errors), 409
         db.session.commit()
         term = next((item for item in AcademicTerm.query.all() if split_academic_term_label(item.label) == (off.academic_year, off.semester)), None)
         return jsonify({"ok": True, "message": "Offering updated.", "offering": _offering_dict(off, off.program, term)})
@@ -17598,6 +17658,8 @@ def register_routes(app: Flask) -> None:
     @require_api_login("academic_coordinator", "admin")
     def course_offerings_delete(offering_id: int):
         off = CurriculumOffering.query.get_or_404(offering_id)
+        if ClassSection.query.filter_by(offering_id=off.id).first():
+            return jsonify({"error": "This offering has timetable history and cannot be removed. Keep it for the recorded schedules."}), 409
         term = next(
             (item for item in AcademicTerm.query.all()
              if split_academic_term_label(item.label) == (off.academic_year, off.semester)),
@@ -17849,6 +17911,8 @@ def register_routes(app: Flask) -> None:
             # Same guard as the manual offering delete: an offering that still has enrolled
             # students is never removed by publishing.
             still_enrolled = []
+            if any(ClassSection.query.filter_by(offering_id=item.id).first() for item in to_remove):
+                return jsonify({"error": "Cannot publish: an omitted offering has class schedule history. Keep the offering so recorded timetables remain intact."}), 409
             for existing_offering in to_remove:
                 enrolled_now = active_enrollment_count_for_offering(existing_offering, target_term)
                 if enrolled_now:
@@ -24404,6 +24468,11 @@ def _report_is_valid(report) -> bool:
 # Written independently of the decorators; the KPI compares this against what
 # the endpoints were actually registered with, so a drifted decorator lowers it.
 ACCESS_CONTROL_SPEC = [
+    ("Offering setup save all", "course_offerings_bulk_update", {"academic_coordinator", "admin"}),
+    ("Teaching availability", "faculty_teaching_schedule", {"faculty"}),
+    ("Teaching schedule", "teaching_schedules", {"academic_coordinator"}),
+    ("Teaching schedule changes", "teaching_schedule_update", {"academic_coordinator"}),
+    ("Student class schedule", "student_class_schedule", {"student"}),
     ("Monitoring sheet", "monitoring_grid", {"staff", "academic_coordinator", "research_coordinator", "dean"}),
     ("Monitoring sheet portal entry", "monitoring_student_create", {"staff", "academic_coordinator"}),
     ("Monitoring sheet subject rows", "monitoring_subject_add", {"staff", "academic_coordinator"}),
@@ -33818,6 +33887,8 @@ def defense_schedule_conflicts(
             conflicts.append(f"Panel conflict with {label}: {', '.join(names)} already scheduled.")
         if venue.strip() and schedule.venue.strip().casefold() == venue.strip().casefold():
             conflicts.append(f"Venue conflict with {label}: {schedule.venue} is already booked.")
+    from teaching_backend import class_schedule_conflicts
+    conflicts.extend(class_schedule_conflicts(globals(), db, student.id, participant_ids, day, selected_start, selected_end))
     return conflicts
 
 
@@ -40758,6 +40829,9 @@ def ensure_demo_accounts() -> None:
     normalize_withdrawal_workflow_states()
     normalize_immediate_standing_outcomes()
     # Faculty logins come from the imported faculty roster via link_faculty_accounts().
+
+from teaching_backend import install_models as install_teaching_models
+globals().update(install_teaching_models(db))
 
 app = create_app()
 

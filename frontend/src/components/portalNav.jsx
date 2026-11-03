@@ -54,6 +54,7 @@ export const STUDENT_NAV_GROUPS = [
     label: "Academics",
     items: [
       { to: "/student/enrollment", label: PAGE.enrollment, icon: BookPlus },
+      { to: "/student/class-schedule", label: "Schedule", icon: CalendarDays },
       { to: "/student/practicum", label: PAGE.practicum, icon: Briefcase, hideWhen: "noPracticum" },
       { to: "/student/graduation", label: PAGE.graduationEndorsement, icon: GraduationCap },
     ],
@@ -143,6 +144,7 @@ export const FACULTY_NAV_GROUPS = [
     label: "Teaching",
     items: [
       { to: "/faculty-portal/classes", label: PAGE.assignedClasses, icon: BookOpenCheck },
+      { to: "/faculty-portal/schedule", label: "Schedule", icon: CalendarDays },
     ],
   },
   {
