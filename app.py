@@ -351,6 +351,11 @@ def resolve_database_url() -> str:
     return f"sqlite:///{sqlite_path}"
 
 
+# The shared password of every seeded demo account. The default is public (this repo is public), so a
+# shared site sets DEMO_PASSWORD (kept in .env, handed to testers privately) and the seed uses that.
+SIM_STUDENT_PASSWORD = os.getenv("DEMO_PASSWORD", "").strip() or "DemoPass123!"
+
+
 def demo_mode_enabled() -> bool:
     """The single switch for every presenter convenience (DEMO_MODE, default ON).
 
@@ -370,8 +375,8 @@ def demo_accounts_listing_enabled() -> bool:
 
 
 def demo_password_hint() -> str:
-    """The shared default password, but only while DEMO_MODE is on."""
-    return SIM_STUDENT_PASSWORD if demo_mode_enabled() else ""
+    """The shared demo password, but only while DEMO_MODE is on and DEMO_SHOW_ACCOUNTS is not 0."""
+    return SIM_STUDENT_PASSWORD if demo_accounts_listing_enabled() else ""
 
 
 def resolve_secret_key(environ=None) -> str:
@@ -2832,7 +2837,7 @@ def default_faculty_email(faculty: Faculty) -> str:
 
 def ensure_faculty_user_account(
     faculty: Faculty,
-    temporary_password: str = "DemoPass123!",
+    temporary_password: str = SIM_STUDENT_PASSWORD,
     *,
     reset_password: bool = False,
 ) -> UserAccount:
@@ -4924,7 +4929,16 @@ def account_dict(account: UserAccount) -> dict:
         "student_id": account.student_id,
         "faculty_id": account.faculty_id,
         "must_change_password": bool(account.must_change_password),
+        "demo_account": is_demo_account(account),
     }
+
+
+def is_demo_account(account: UserAccount) -> bool:
+    """A seeded, shared demo login (the presenter list and the workflow demo students), DEMO_MODE on."""
+    if not demo_mode_enabled():
+        return False
+    emails = {item[3] for item in DEMO_ACCOUNT_CATALOG} | {c["email"] for c in WORKFLOW_DEMO_STUDENTS.values()}
+    return (account.email or "").lower() in emails
 
 
 BACKOFFICE_ROLES = {
@@ -12915,6 +12929,8 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         if not account:
             return no_store(jsonify({"error": "Please sign in to continue."})), 401
+        if is_demo_account(account):
+            return no_store(jsonify({"error": "Demo accounts are shared by testers; their password cannot be changed."})), 403
         body = request.get_json(silent=True) or {}
         current_password = str(body.get("current_password") or "")
         new_password = str(body.get("new_password") or "")
@@ -25567,7 +25583,7 @@ def summary_tiles(args) -> tuple[dict, list[dict]]:
     median_before = round(_median(days_before), 1) if days_before else None
     tile_decide = {
         "key": "decide_days", "label": "Median days to decide", "value": median_now, "unit": "days", "count": len(days_now),
-        "comparison": _compare_previous(median_now, median_before, scope, " days", f"no decisions in {previous.label}" if previous else ""),
+        "comparison": _compare_previous(median_now, median_before, scope, " days", (f"no decisions in {term.label}" if median_now is None else f"no decisions in {previous.label}") if previous and term else ""),
         "rows": [
             {"student_id": c["student_id"], "student": scope["by_id"][c["student_id"]].name if c["student_id"] else c["title"],
              "student_number": scope["by_id"][c["student_id"]].student_number if c["student_id"] else "", "program": "",
@@ -25581,6 +25597,9 @@ def summary_tiles(args) -> tuple[dict, list[dict]]:
         params = {"program_id": scope["filters"]["program_id"] or "", "when": when, "term": in_term.label if in_term else ""}
         return [r for r in report_defenses(params)["rows"] if r["student_id"] in scope["ids"]]
 
+    def defense_list(group, label):
+        return [_student_row(scope["by_id"][r["student_id"]], f"{label}: {r['defense_type']} on {r['date']}") for r in group]
+
     held = defense_rows("Held", term) if term else []
     upcoming = [r for r in defense_rows("Upcoming") if r["date"] <= (today + timedelta(days=DEFENSE_LOOKAHEAD_DAYS)).isoformat()]
     awaiting = defense_rows("Awaiting verdict")
@@ -25589,10 +25608,12 @@ def summary_tiles(args) -> tuple[dict, list[dict]]:
         "key": "defenses", "label": "Defenses held", "value": len(held), "unit": "defenses",
         "detail": {"held": len(held), "next_30_days": len(upcoming), "awaiting_verdict": len(awaiting)},
         "comparison": _compare_previous(len(held), held_before, scope),
-        "rows": [
-            _student_row(scope["by_id"][r["student_id"]], f"{label}: {r['defense_type']} on {r['date']}")
-            for label, group in (("Held", held), ("Next 30 days", upcoming), ("Awaiting verdict", awaiting)) for r in group
-        ],
+        # The list behind the headline is the held defenses only; the other two counts have their own lists.
+        "rows": defense_list(held, "Held"),
+        "more": {
+            "defenses_upcoming": ("Defenses in the next 30 days", defense_list(upcoming, "Next 30 days")),
+            "defenses_awaiting": ("Defenses waiting for a verdict", defense_list(awaiting, "Awaiting verdict")),
+        },
     }
 
     # 6. Graduation: endorsements sent to the Dean in the term, and the candidates who are ready now.
@@ -25605,13 +25626,14 @@ def summary_tiles(args) -> tuple[dict, list[dict]]:
         if s.current_stage in GRADUATION_CANDIDATE_STAGES and s.id not in endorsed_ids and graduation_eligibility(s)["status"] == "Eligible"
     ]
     tile_graduation = {
-        "key": "graduation", "label": "Graduation-ready", "value": len(endorsed_now), "unit": "students",
+        "key": "graduation", "label": "Endorsements sent to the Dean", "value": len(endorsed_now), "unit": "students",
         "detail": {"endorsed_this_term": len(endorsed_now), "eligible_now": len(ready_now)},
         "comparison": _compare_previous(len(endorsed_now), endorsed_before, scope),
         "rows": [
             _student_row(scope["by_id"][e.student_id], f"Endorsement {e.endorsement_status}, sent {e.submitted_at.date().isoformat()}")
             for e in endorsed_now
-        ] + [_student_row(s, "Eligible, not yet endorsed") for s in ready_now],
+        ],
+        "more": {"graduation_ready": ("Ready to graduate, not yet sent to the Dean", [_student_row(s, "Eligible, not yet endorsed") for s in ready_now])},
     }
     return scope, [tile_active, tile_behind, tile_waiting, tile_decide, tile_defenses, tile_graduation]
 
@@ -25620,7 +25642,7 @@ def report_summary(args) -> dict:
     scope, tiles = summary_tiles(args)
     public = []
     for tile in tiles:
-        tile = {k: v for k, v in tile.items() if k != "rows"}
+        tile = {k: v for k, v in tile.items() if k not in {"rows", "more"}}
         tile["drill"] = {"url": f"/api/reports/summary/{tile['key']}", "params": {k: v for k, v in scope["filters"].items() if v}}
         public.append(tile)
     cohorts = sorted({_cohort_entry_label(s) for s in Student.query.all()} - {"Not recorded"})
@@ -25633,6 +25655,11 @@ def report_summary(args) -> dict:
 def report_summary_list(key: str, args) -> dict | None:
     scope, tiles = summary_tiles(args)
     tile = next((t for t in tiles if t["key"] == key), None)
+    if tile is None:  # the secondary lists of a tile (defenses next 30 days / awaiting, graduation ready)
+        for t in tiles:
+            if key in t.get("more", {}):
+                title, rows = t["more"][key]
+                tile = {"label": title, "rows": rows}
     if tile is None:
         return None
     return {
@@ -39488,7 +39515,6 @@ def ensure_faculty_demo_profiles() -> int:
 
 
 SIM_PROGRAM_CODE = "MAEDS"
-SIM_STUDENT_PASSWORD = "DemoPass123!"
 STUDENT_EMAIL_DOMAIN = os.getenv("STUDENT_EMAIL_DOMAIN", "student.usls.edu.ph")
 
 WORKFLOW_DEMO_STUDENTS = {
@@ -40550,7 +40576,7 @@ def link_faculty_accounts() -> None:
         if not faculty.eligible_roles:
             faculty.eligible_roles = default_roles
         # Only a NEW account gets the initial password; never overwrite one a person has chosen.
-        primary = ensure_faculty_user_account(faculty, "DemoPass123!")
+        primary = ensure_faculty_user_account(faculty, SIM_STUDENT_PASSWORD)
         # A brand-new account has no id until it is flushed; without this the duplicate filter below
         # compiles to "id IS NOT NULL" and deactivates the very login we just created.
         db.session.flush()
@@ -40585,7 +40611,7 @@ def ensure_demo_accounts() -> None:
                 UserAccount(
                     email=email,
                     full_name=full_name,
-                    password_hash=generate_password_hash("DemoPass123!"),
+                    password_hash=generate_password_hash(SIM_STUDENT_PASSWORD),
                     role=role,
                     active=True,
                 )
@@ -40603,7 +40629,7 @@ def ensure_demo_accounts() -> None:
             UserAccount(
                 email="dean@usls.edu.ph",
                 full_name="Dr. Manuel Villaruz",
-                password_hash=generate_password_hash("DemoPass123!"),
+                password_hash=generate_password_hash(SIM_STUDENT_PASSWORD),
                 role="dean",
                 active=True,
             )
@@ -40618,7 +40644,7 @@ def ensure_demo_accounts() -> None:
             student_account = UserAccount(
                 email="student@usls.edu.ph",
                 full_name=linked_student.name,
-                password_hash=generate_password_hash("DemoPass123!"),
+                password_hash=generate_password_hash(SIM_STUDENT_PASSWORD),
                 role="student",
                 active=True,
             )

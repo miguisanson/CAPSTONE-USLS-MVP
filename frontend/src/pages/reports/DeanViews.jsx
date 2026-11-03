@@ -202,8 +202,8 @@ export function PipelineView({ scope, scopeKey, summary }) {
   const tile = summary.tiles.find((t) => t.key === "graduation");
   const graduationCases = (state) => data.cases.filter((c) => c.process === "graduation" && c.state === state).map(caseRow);
   const steps = [
-    { key: "ready", label: "Ready to graduate, not yet sent to the Dean", count: tile.detail.eligible_now, open: () => setOpen({ title: "Ready, not yet sent", endpoint: "summary/graduation", keep: (r) => r.detail.startsWith("Eligible") }) },
-    { key: "sent", label: "Sent to the Dean in this period", count: tile.detail.endorsed_this_term, open: () => setOpen({ title: "Sent to the Dean", endpoint: "summary/graduation", keep: (r) => r.detail.startsWith("Endorsement") }) },
+    { key: "ready", label: "Ready to graduate, not yet sent to the Dean", count: tile.detail.eligible_now, open: () => setOpen({ title: "Ready, not yet sent", endpoint: "summary/graduation_ready" }) },
+    { key: "sent", label: "Sent to the Dean in this period", count: tile.detail.endorsed_this_term, open: () => setOpen({ title: "Sent to the Dean", endpoint: "summary/graduation" }) },
     { key: "waiting", label: "Waiting for the Dean's decision now", count: graduationCases("waiting").length, open: () => setOpen({ title: "Waiting for the Dean", rows: graduationCases("waiting") }) },
     { key: "decided", label: "Decided in this period", count: graduationCases("decided").length, open: () => setOpen({ title: "Decided", rows: graduationCases("decided") }) },
   ];

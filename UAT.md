@@ -46,6 +46,7 @@ Calendar redirect address. Then open `.env` in Notepad and set:
 | Line | What to put |
 |---|---|
 | `SECRET_KEY=` | a long random text (run `python -c "import secrets; print(secrets.token_hex(32))"`), so testers stay signed in after a restart |
+| `DEMO_PASSWORD=` | **Set a private password BEFORE the first `npm run seed`** (every seeded login, Administrator included, then uses it instead of the public default, which anyone can read in this public repo). Share it with testers privately. Never print or commit it; changing it later needs a re-seed |
 | `DEMO_SHOW_ACCOUNTS=0` | **Add this line.** It stops the public sign-in page from listing the demo logins and the shared password (see step 4). Staff can still use the "Reset demo case" button |
 | `GOOGLE_API_KEY=` | your Gemini key (free at aistudio.google.com/apikey), or leave empty: the Policy Assistant then uses local search only |
 | `GOOGLE_CALENDAR_*` | see step 5; leave empty to skip Google Calendar (the page shows a preview only) |
@@ -69,8 +70,9 @@ schtasks /Create /TN "USLS UAT" /SC ONLOGON /TR "cmd /c cd /d <PROJECT FOLDER> &
 
 ## 4. Demo logins
 
-The password is the shared demo password. It is not written in the README: it is the value
-`SIM_STUDENT_PASSWORD` in `app.py`. With `DEMO_SHOW_ACCOUNTS=0` (step 2) the public sign-in page shows
+The password is the shared demo password: your private `DEMO_PASSWORD` (step 2). If you left it unset
+the public default is used, which is only acceptable on your own PC. Demo logins cannot change their
+password (they are shared by testers). With `DEMO_SHOW_ACCOUNTS=0` (step 2) the public sign-in page shows
 no **Demo accounts** panel and the two lists behind it answer "not found", so strangers cannot read
 the password. **Hand each tester their login privately** (the table below plus the password, by
 message or e-mail). On your own PC, leave `DEMO_SHOW_ACCOUNTS` unset and the panel works as before.
