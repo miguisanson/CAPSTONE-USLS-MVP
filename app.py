@@ -13798,27 +13798,9 @@ def register_routes(app: Flask) -> None:
             "compliance": compliance,
         })
 
-    @app.route("/api/student-portal/research-evidence/<int:evidence_id>", methods=["DELETE"])
-    @require_api_login("student")
-    def student_research_evidence_delete(evidence_id: int):
-        account = current_account()
-        student = Student.query.get_or_404(account.student_id)
-        evidence = ResearchEvidenceFile.query.filter_by(id=evidence_id, student_id=student.id).first_or_404()
+    def remove_research_evidence(student: Student, evidence: ResearchEvidenceFile, actor: str):
+        """Take one research file out of its requirement (shared by the student and the staff routes)."""
         doc = evidence.document_check
-        presentation = research_requirement_presentation(doc.gate, doc.item_name)
-        if not presentation or presentation["source_type"] != "student_upload":
-            return jsonify({"error": "Only student-uploaded research evidence can be removed from the student view."}), 400
-        if doc.gate == "Form 1 - Title Defense" and title_uploads_locked(student):
-            return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
-        if ScheduleRequest.query.filter(
-            ScheduleRequest.student_id == student.id,
-            ScheduleRequest.defense_type == RESEARCH_GATE_DEFENSE_TYPES.get(doc.gate),
-            ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
-        ).first():
-            return jsonify({"error": "This defense is booked. Cancel the schedule first."}), 409
-        if doc.status == "Complete":
-            return jsonify({"error": "Staff have already verified this file, so it cannot be removed. Ask the Research Coordinator if it must be replaced."}), 409
-
         original_name = evidence.original_name
         # Signed evidence is archived, never deleted: the adviser's signature points at the file.
         stored_path = retire_research_evidence(evidence)
@@ -13859,11 +13841,11 @@ def register_routes(app: Flask) -> None:
         add_log(
             "research-gate",
             student.id,
-            "Student",
+            actor,
             original_name,
             f"{doc.item_name} removed",
             "Student" if len(remaining) < required_count else "Academic Coordinator",
-            f"Student removed a {doc.gate} upload. {len(remaining)} of {required_count} remain for {doc.item_name}. "
+            f"{actor} removed a {doc.gate} upload. {len(remaining)} of {required_count} remain for {doc.item_name}. "
             + ("Academic Coordinator endorsement was revoked and " if endorsement_revoked else "")
             + "Panel Matching was cleared for this stage.",
         )
@@ -13877,6 +13859,44 @@ def register_routes(app: Flask) -> None:
             "panel_invalidated": panel_invalidated,
             "endorsement_revoked": endorsement_revoked,
         })
+
+    @app.route("/api/student-portal/research-evidence/<int:evidence_id>", methods=["DELETE"])
+    @require_api_login("student")
+    def student_research_evidence_delete(evidence_id: int):
+        account = current_account()
+        student = Student.query.get_or_404(account.student_id)
+        evidence = ResearchEvidenceFile.query.filter_by(id=evidence_id, student_id=student.id).first_or_404()
+        doc = evidence.document_check
+        presentation = research_requirement_presentation(doc.gate, doc.item_name)
+        if not presentation or presentation["source_type"] != "student_upload":
+            return jsonify({"error": "Only student-uploaded research evidence can be removed from the student view."}), 400
+        if doc.gate == "Form 1 - Title Defense" and title_uploads_locked(student):
+            return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
+        if ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == student.id,
+            ScheduleRequest.defense_type == RESEARCH_GATE_DEFENSE_TYPES.get(doc.gate),
+            ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+        ).first():
+            return jsonify({"error": "This defense is booked. Cancel the schedule first."}), 409
+        if doc.status == "Complete":
+            return jsonify({"error": "Staff have already verified this file, so it cannot be removed. Ask the Research Coordinator if it must be replaced."}), 409
+
+        return remove_research_evidence(student, evidence, "Student")
+
+    @app.route("/api/research-evidence/<int:evidence_id>", methods=["DELETE"])
+    @require_api_login("staff", "research_coordinator")
+    def staff_research_evidence_delete(evidence_id: int):
+        # Unlike the student route, a verified file may go: staff must be able to undo a wrong verification.
+        evidence = ResearchEvidenceFile.query.get_or_404(evidence_id)
+        doc = evidence.document_check
+        if ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == evidence.student_id,
+            ScheduleRequest.defense_type == RESEARCH_GATE_DEFENSE_TYPES.get(doc.gate),
+            ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
+        ).first():
+            return jsonify({"error": "This defense is booked. Cancel the schedule first."}), 409
+        student = db.session.get(Student, evidence.student_id)
+        return remove_research_evidence(student, evidence, workflow_actor_label(current_account()))
 
     @app.route("/api/student-portal/request-attachments/upload", methods=["POST"])
     @require_api_login("student")
