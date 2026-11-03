@@ -14791,6 +14791,12 @@ def register_routes(app: Flask) -> None:
                 f"Your {defense_type} is already booked for {booked.preferred_date.isoformat()}. "
                 "Ask the Research Coordinator to move it if you need a different date."
             )}), 409
+        held = active_schedule_for_gate(student, stage_progress["gate"])  # a Held one counts unless the verdict sends the student back
+        if held and held.status == HELD_DEFENSE_STATUS:
+            return jsonify({"error": (
+                f"Your {defense_type} already took place. Submit any required revisions; "
+                "the Graduate School will schedule another defense only if the panel's result requires it."
+            )}), 409
         source = (data.get("venue") or "").strip()
         notes = [
             f"Student requested scheduling support for {defense_type}.",

@@ -45,10 +45,13 @@ const LIVE_SCHEDULE_STATUSES = ["Scheduled", "Confirmed", "Needs Re-confirmation
 export const isLiveSchedule = (schedule) => Boolean(schedule?.is_active) || LIVE_SCHEDULE_STATUSES.includes(schedule?.status);
 /** True while the Defense Schedule page is locked (no research case or no panel yet). */
 export const defenseScheduleLocked = (data) => !data.research_case || !data.panel?.length;
+/** True once the current stage's defense is booked or took place (the server counts it as done unless the verdict sends the student back). */
+export const defenseScheduleDone = (data) =>
+  (data.research_progress?.milestone?.requirements || []).some((item) => item.status === "Complete" && /_schedule$/.test(item.source_type || ""));
 /** The defense the Defense Schedule page would take a request for (its request form, not a booking), else "". */
 export function defenseToRequest(data) {
   const stage = data.research_progress?.stage;
-  if (defenseScheduleLocked(data) || (data.schedules || []).some(isLiveSchedule)) return "";
+  if (defenseScheduleLocked(data) || defenseScheduleDone(data) || (data.schedules || []).some(isLiveSchedule)) return "";
   return BOOKABLE_DEFENSES.includes(stage) ? stage : "";
 }
 

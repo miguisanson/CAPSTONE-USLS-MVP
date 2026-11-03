@@ -11,7 +11,7 @@ import { Button, Field, InlineNotice, Input, Select, StatusChip, Textarea } from
 import { useConfirm } from "../../components/confirm";
 import { formatDate } from "../../lib/format";
 import { PAGE } from "../../lib/labels.js";
-import { BOOKABLE_DEFENSES, defenseToRequest } from "../../lib/studentHome.js";
+import { BOOKABLE_DEFENSES, defenseScheduleDone, defenseToRequest } from "../../lib/studentHome.js";
 import { ErrorSummary, useFormErrors, useSubmitRequest, SubmitState, isLiveSchedule } from "./shared";
 
 export function ResearchRequestForm({ data, onSaved }) {
@@ -374,6 +374,9 @@ export function ScheduleRequestForm({ data, onSaved }) {
   const stage = data.research_progress?.stage;
   const schedules = data.schedules || [];
   const liveSchedule = schedules.find(isLiveSchedule) || null;
+  // The stage's defense already took place (e.g. revisions are due): the office schedules another only if the result requires it.
+  const tookPlace = !liveSchedule && defenseScheduleDone(data);
+  const closed = Boolean(liveSchedule) || tookPlace;
   const followUp = data.defense_follow_up;
   const [form, setForm] = useState({
     preferred_date: "",
@@ -388,7 +391,7 @@ export function ScheduleRequestForm({ data, onSaved }) {
 
   function onSubmit(e) {
     e.preventDefault();
-    if (liveSchedule) return;
+    if (closed) return;
     if (!form.preferred_date) {
       fail([{ id: "schedule-date", message: "Choose the date you want for your defense." }]);
       return;
@@ -405,9 +408,14 @@ export function ScheduleRequestForm({ data, onSaved }) {
           <p className="text-xs">Your {liveSchedule.defense_type || "defense"} is {liveSchedule.status === "Needs Re-confirmation" ? "waiting for the Research Coordinator to confirm it again" : "scheduled"}. To change it, ask the Research Coordinator.</p>
         </InlineNotice>
       )}
+      {tookPlace && (
+        <InlineNotice tone="info" title="Your defense already took place, so you cannot send another request.">
+          <p className="text-xs">Submit any revisions the panel asked for. If the result requires another defense, the Graduate School will tell you.</p>
+        </InlineNotice>
+      )}
       <form noValidate onSubmit={onSubmit} className="space-y-4">
         <ErrorSummary errors={errors} />
-        <fieldset disabled={Boolean(liveSchedule)} className="space-y-4 disabled:opacity-60">
+        <fieldset disabled={closed} className="space-y-4 disabled:opacity-60">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Preferred date" required error={messageFor("schedule-date")}>
               <Input id="schedule-date" type="date" value={form.preferred_date} onChange={set("preferred_date")} />
@@ -431,8 +439,8 @@ export function ScheduleRequestForm({ data, onSaved }) {
           error={error}
           message={message}
           label="Submit schedule request"
-          disabled={Boolean(liveSchedule)}
-          disabledHint={liveSchedule ? "New requests are closed while a defense is booked." : ""}
+          disabled={closed}
+          disabledHint={liveSchedule ? "New requests are closed while a defense is booked." : tookPlace ? "New requests are closed: this defense already took place." : ""}
         />
       </form>
     </div>
