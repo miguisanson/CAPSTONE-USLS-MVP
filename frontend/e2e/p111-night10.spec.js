@@ -1,7 +1,9 @@
 // e2e-writes: none
 // pkt/night10 (stakeholder demo findings), through the real UI, read-only:
 //   - I-238: a student record's "Outstanding subjects" lists every subject its "Missing" and "Incomplete" cards count
-//     (it used to stop at eight).
+//     (it used to stop at eight);
+//   - I-239: a dashboard task about one request opens that request's window, not the whole board; the "Your open
+//     tasks" tile says what its second number counts.
 import { test, expect } from "@playwright/test";
 import { join } from "node:path";
 import { AUTH_DIR } from "./support/paths.mjs";
@@ -39,5 +41,22 @@ test.describe("night10", () => {
       await expect(box.locator("li"), `${student.name}: every outstanding subject is listed`).toHaveCount(outstanding);
     }
     expect(longest, "one of them has more than eight outstanding subjects").toBeGreaterThan(8);
+  });
+
+  test("I-239: a dashboard task about one request opens that request, and the tile names what it counts", async ({ page, context }) => {
+    const tasks = (await (await context.request.get("/api/tasks?owner=Graduate%20School%20Staff&page_size=200")).json()).items;
+    const task = tasks.find((t) => t.student_id && /^\/workflow\/(leave-of-absence|readmission|awol|withdrawal)$/.test(t.action_url || ""));
+    expect(task, "the demo data gives staff a task about one standalone request").toBeTruthy();
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    const tile = main(page).locator('[data-slot="label"]', { hasText: /^Your open tasks$/i }).locator("xpath=..");
+    await expect(tile.locator('[data-slot="sub"]')).toHaveText(/\d+ past their due date/);
+    const row = main(page).locator("li", { hasText: task.title }).filter({ hasText: task.student_name }).first();
+    await row.getByRole("link").first().click();
+    await expect(page).toHaveURL(new RegExp(`${task.action_url}`));
+    const dialog = page.getByRole("dialog");
+    await expect(dialog, "the request's window opens on its own").toBeVisible();
+    await expect(dialog).toContainText(task.student_name);
+    await expect(page, "the one-shot address is cleaned up").not.toHaveURL(/student_id=/);
   });
 });

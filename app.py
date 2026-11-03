@@ -21649,8 +21649,9 @@ def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
     active_students = students_scope().filter(active_student_clause()).count()  # the same students Reports counts (I-193)
     on_leave = students_scope().filter(on_leave_clause()).count()
     completed = students_scope().filter(Student.current_stage == "Completed").count()
-    at_risk = students_scope().filter(at_risk_clause()).count()
-    high_risk = students_scope().filter(Student.risk_level == "Delayed").count()
+    # Reports' "Behind schedule" counts the active students only, so the home does too (I-239).
+    at_risk = students_scope().filter(active_student_clause(), at_risk_clause()).count()
+    high_risk = students_scope().filter(active_student_clause(), Student.risk_level == "Delayed").count()
     withdrawn = students_scope().filter(Student.standing == "Withdrawn").count()
     pending_tasks = task_query.count()
     overdue_tasks = task_query.filter(Task.due_at < ph_today(), Task.status != "Done").count()

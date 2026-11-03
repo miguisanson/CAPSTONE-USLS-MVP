@@ -773,7 +773,10 @@ class SeededConsistencyTests(unittest.TestCase):
         with app.app_context():
             refreshed = Student.query.all()
             expected = sum(1 for s in refreshed if app_module.student_priority(s)["level"] in app_module.AT_RISK_LEVELS)
-            self.assertEqual(self.get("/api/dashboard")["kpis"]["at_risk"], expected)
+            # I-239: the dashboard tile counts the active students, as Reports' "Behind schedule" tile does; the Reports
+            # list and the students list show every student at risk (also one on leave or AWOL).
+            active = sum(1 for s in refreshed if app_module.student_is_active(s) and app_module.student_priority(s)["level"] in app_module.AT_RISK_LEVELS)
+            self.assertEqual(self.get("/api/dashboard")["kpis"]["at_risk"], active)
             self.assertEqual(self.get("/api/reports")["at_risk"]["count"], expected)
             self.assertEqual(self.get("/api/students", risk="At Risk of Delay,Delayed", page_size=5)["total"], expected)
 
