@@ -314,6 +314,32 @@ const PLAN = {
 };
 const withPlan = (json) => ({ ...json, pending: [PLAN] });
 
+test.describe("Dean offering decision context", () => {
+  test.use({ storageState: authFile("dean") });
+  test("faculty and student impact explain each proposed subject", async ({ page }) => {
+    await openAs(page, "/dean/approvals/course-adjustments", (json) => ({ ...json, pending: [{
+      ...PLAN, offerings: [
+        { ...PLAN.offerings[0], assigned_faculty_name: "Dr. Review Faculty", delayed_count: 2 },
+        { ...PLAN.offerings[1], assigned_faculty_name: null, delayed_count: 0 },
+        { ...PLAN.offerings[1], id: 3, code: "CS-703", assigned_faculty_name: "Dr. Missing Count" },
+      ],
+    }] }));
+    for (const width of [1366, 1920, 390]) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1080 });
+      await expect(page.getByRole("columnheader", { name: "Delayed if withheld", exact: true })).toBeVisible();
+      await expect(page.getByText("Dr. Review Faculty", { exact: true })).toBeVisible();
+      await expect(page.getByText("Unassigned", { exact: true })).toBeVisible();
+      await expect(page.getByText("2 potentially delayed if withheld", { exact: true })).toBeVisible();
+      await expect(page.getByRole("row").filter({ hasText: "CS-703" }).getByRole("cell", { name: "Unavailable", exact: true })).toBeVisible();
+      const noDelayRow = page.getByRole("row").filter({ hasText: "CS-702" });
+      await expect(noDelayRow.getByRole("cell", { name: "—", exact: true })).toBeVisible();
+      await expect(page.getByText("9 students need this subject next term", { exact: true })).toHaveCount(0);
+      expect(await noOverflow(page)).toBe(true);
+      await shot(page, `decision-context-${width}.png`);
+    }
+  });
+});
+
 test.describe("conA Dean Course Adjustments decides like every other Dean decision (finding 7 / I-127)", () => {
   test.use({ storageState: authFile("dean"), viewport: { width: 1366, height: 768 } });
 

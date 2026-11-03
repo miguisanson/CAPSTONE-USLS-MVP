@@ -211,6 +211,15 @@ const PLAN_COLUMNS = [
   },
   { key: "demand", header: "Demand", sortValue: (o) => o.demand_count, cell: (o) => o.demand_count },
   { key: "sections", header: "Sections", sortValue: (o) => o.section_count, cell: (o) => o.section_count },
+  { key: "faculty", header: "Faculty", sortValue: (o) => o.assigned_faculty_name || "Unassigned", cell: (o) => o.assigned_faculty_name || "Unassigned" },
+  {
+    key: "impact",
+    header: "Delayed if withheld",
+    sortValue: (o) => o.delayed_count || 0,
+    cell: (o) => o.delayed_count == null ? "Unavailable" : o.delayed_count > 0
+      ? `${o.delayed_count} potentially delayed if withheld`
+      : "—",
+  },
   { key: "decision", header: "Decision", sortValue: (o) => o.status, cell: (o) => <StatusChip status={o.status} dot={false} /> },
 ];
 

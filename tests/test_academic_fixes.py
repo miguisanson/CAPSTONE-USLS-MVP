@@ -52,6 +52,25 @@ def academic_year_label(today: date) -> str:
 
 
 class AcademicFixTests(unittest.TestCase):
+    def test_dean_plan_exposes_existing_student_delay_calculation(self):
+        from types import SimpleNamespace
+        course = SimpleNamespace(id=901, code="TEST-901", title="Test subject", units=3)
+        offering = SimpleNamespace(id=1, course_id=901, course=course, demand_count=5,
+            section_count=1, availability_count=1, status="Offered", notes="",
+            assigned_faculty_id=None, assigned_faculty=None, assignment_status=None)
+        plan = SimpleNamespace(id=1, program_id=1, program=SimpleNamespace(code="TEST"),
+            term_label="Next term", status="Submitted", notes="", created_at=None,
+            updated_at=None, submitted_at=None, approved_at=None, approved_by=None,
+            published_at=None, target_term_id=None, reference_term_id=None,
+            target_term=None, reference_term=None, offerings=[offering])
+        for delayed in (2, 0):
+            with self.subTest(delayed=delayed), patch.object(app_module, "course_demand_rows",
+                    return_value=[{"course": {"id": 901}, "delayed_count": delayed}]) as demand:
+                result = app_module.course_offering_plan_dict(plan)
+                self.assertEqual(result["offerings"][0]["delayed_count"], delayed)
+                self.assertEqual(result["offerings"][0]["demand_count"], 5)
+                demand.assert_called_once_with(plan.program, plan.target_term)
+
     @classmethod
     def tearDownClass(cls):
         try:
@@ -442,6 +461,21 @@ class AcademicFixTests(unittest.TestCase):
         )
         self.assertEqual(approved.status_code, 200, approved.get_json())
         return plan_id
+
+    def test_dean_delay_counts_match_coordinator_details_for_submitted_term(self):
+        selections = [{"course_id": cid, "offer": True, "section_count": 1} for cid in self.course_ids]
+        response = self._plan_call("draft", selections=selections)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertEqual(self._plan_call("submit").status_code, 200)
+        coordinator = self._client(self.academic_id, "academic_coordinator").get(
+            f"/api/course-adjustments?program_id={self.program_id}&term_id={self.term2_id}")
+        dean = self._client(self.dean_id, "dean").get("/api/approvals")
+        self.assertEqual(coordinator.status_code, 200)
+        self.assertEqual(dean.status_code, 200)
+        details = {row["course"]["id"]: row["delayed_count"] for row in coordinator.get_json()["demand"]}
+        self.assertGreater(max(details.values()), 0)
+        for offering in dean.get_json()["pending"][0]["offerings"]:
+            self.assertEqual(offering["delayed_count"], details[offering["course_id"]])
 
     def test_publishing_never_deletes_an_offering_that_has_enrolled_students(self):
         with app.app_context():

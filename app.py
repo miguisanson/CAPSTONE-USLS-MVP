@@ -4848,6 +4848,8 @@ def default_academic_year_options() -> list[str]:
 def course_offering_plan_dict(plan: CourseOfferingPlan | None) -> dict | None:
     if not plan:
         return None
+    impact = {row["course"]["id"]: row["delayed_count"]
+              for row in course_demand_rows(plan.program, plan.target_term)} if plan.program else {}
     return {
         "id": plan.id,
         "program_id": plan.program_id,
@@ -4865,7 +4867,8 @@ def course_offering_plan_dict(plan: CourseOfferingPlan | None) -> dict | None:
         "reference_term_id": plan.reference_term_id,
         "target_term": term_dict(plan.target_term) if plan.target_term else None,
         "reference_term": term_dict(plan.reference_term) if plan.reference_term else None,
-        "offerings": [course_offering_dict(o) for o in sorted(plan.offerings, key=lambda item: item.demand_count, reverse=True)],
+        "offerings": [{**course_offering_dict(o), "delayed_count": impact.get(o.course_id, 0)}
+                      for o in sorted(plan.offerings, key=lambda item: item.demand_count, reverse=True)],
     }
 
 
