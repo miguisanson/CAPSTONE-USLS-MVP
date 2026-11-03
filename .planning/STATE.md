@@ -1,19 +1,38 @@
 # State
 
-## Forms x Operations Manual — 2026-11-04 (in progress, forms session)
+## Forms x Operations Manual — 2026-11-04 (built, NOT on v6.1-migui; owner checks first)
 
-Owner asked: forms grouped by Operations Manual chapter, 5 platform-basis documents, 6 supplementary forms,
-app wiring (privacy consent, form-code labels, e-approval note). Contract: `.planning/forms-ops/CONTRACT.md`.
-Integration branch `pkt/forms-ops` (wt/forms). Helpers (Sonnet): `pkt/fdocs` (wt/fdocs: build_forms.py,
-Documents/USLS_Forms), `pkt/fman` (wt/fman: opsmanual + manual outputs), `pkt/fapp` (wt/fapp: app.py,
-frontend, tests/test_privacy_consent.py). Owner authorised Claude to commit and merge into v6.1-migui when
-verified. Fable session "Session progress report" was told before start.
-**HOLD (peer request 2026-11-04):** do not merge the forms move (pkt/fdocs) into v6.1-migui until the
-"Session progress report" session sends its Fable findings on Documents/USLS_Forms (fix them on our branch).
-Keep codes GS-F-01..44 / GS-P-01..02 stable (meeting print pack + ZOOM-CHEAT-SHEET table). Also hold pkt/fapp
-until after the stakeholder meeting: new UserAccount columns break sign-in if the live site restarts without a
-reseed. After merging, send that session the final code list so it can rebuild ZOOM-CHEAT-SHEET.
-**STOP AT 09:00 (owner, 2026-11-04):** helpers commit by 08:30; review + this note by 08:55; nothing runs after 09:00.
+All work is on branch `pkt/forms-ops` (worktree `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/forms`), merged from
+`pkt/fdocs`, `pkt/fman`, `pkt/fapp` (helper worktrees wt/fdocs, wt/fman, wt/fapp — already merged, can be removed;
+**first delete the `frontend/node_modules` junction with `cmd /c rmdir frontend
+ode_modules`** in wt/fapp and
+wt/forms so a worktree removal can never touch the main checkout's node_modules). Contract: `.planning/forms-ops/CONTRACT.md`.
+
+**Where everything is (after merge, same paths on v6.1-migui):**
+- Forms pack: `Documents/USLS_Forms/` — `0 Forms Control` (GS-P-01/02), `4.01 …` to `4.19 …` (one folder per
+  Operations Manual chapter, .docx + .pdf side by side), `Platform Basis` (GS-P-03..06, GS-F-45..48),
+  `Supplementary Forms` (GS-F-49..54). Print pack `Documents/USLS_Forms/USLS-GS-Forms-Pack.pdf` (108 pages).
+  Inventory + open questions (1-47): `Documents/USLS_Forms/00-INVENTORY.md`. Build: `scripts/docs/forms/build_forms.py`,
+  `scripts/docs/forms/build_pack.py` (docs venv `E:/Temp/claude/docs-venv`, LibreOffice `E:/LibreOffice`).
+- Operations Manual (same files in `Documents/CAPSTONE_ONLY/`): chapters 4.20-4.24 (FAC, ACC, EAP, PRV, DEX; all
+  Proposed), each chapter lists its GS codes, Appendix A = crosswalk of all 60 codes, OQ-45..50 new, OQ-27 honoraria
+  envelope note (FO6), change log 0.2.1. 113 pages (was 91).
+- App: privacy notice at first sign-in (`pages/PrivacyConsent.jsx`, `POST /api/auth/privacy-consent`, two new
+  `UserAccount` columns; seeded accounts pre-accepted), form line on process pages (`lib/formRefs.js` via
+  `PageHeader forms=`), e-approval note (`components/ui/EApprovalNote.jsx`, in `DecisionPanel`/`StepDialog`).
+- Codes: GS-F-01..44 and GS-P-01/02 unchanged (numbers and titles). New: GS-P-03..06, GS-F-45..54.
+
+**Checks done:** tests.test_forms_pack 10/10; tests.test_operations_manual_content 24 OK (+ policy_documents, health,
+crosscut, polish OK); test_privacy_consent(+_seed), seed_determinism, demo_password OK; build:web ok; check:ui:strict 0;
+e2e p112 43 passed; helper's full e2e 822 passed / 3 failed (p110, p84 line 373, p79 — p110 fails the same on the
+base code: Course Adjustments has no "Schedule" tab; p79 passes alone). Full Python gate result: see below.
+Fable P1 forms findings all fixed; P2/P3 mostly fixed; left: declaration line on page 2 of GS-F-10 and GS-F-42, some P3 polish.
+
+**To land (owner OK given; after the 2026-11-04 meeting):** `git fetch` + merge origin first (Myrine pushes to v6.1),
+merge `pkt/forms-ops` into v6.1-migui, run the gate, then reseed + restart the live site (new UserAccount columns need
+the reseed; IM4 — no ALTER patches). Tell the "Session progress report" session the final code list (it rebuilds
+`Documents/CAPSTONE_ONLY/Demo_Migui/ZOOM-CHEAT-SHEET`). Also update `scripts/demo/build_cheat_sheet.py` /
+README-FOR-MIGUI if they cite "44 forms".
 
 ## Merge recovery — 2026-11-04 (current)
 
