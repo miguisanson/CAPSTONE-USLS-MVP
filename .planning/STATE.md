@@ -19,6 +19,15 @@ Stakeholder meeting 2026-11-04. Owner asked for, in this order:
    tunnel token from a file the owner fills), `deploy/DOCKER.md` (helper C). Owner: domain NOT yet on Cloudflare;
    public sign-in page SHOWS the demo accounts (DEMO_SHOW_ACCOUNTS=1, owner choice, risk told).
 7. Then polish / improvement / optimization loop (IMPROVE.md) until 10:00 Manila.
+**Progress (22:05):** DONE+pushed: UAT revised (`Documents/CAPSTONE_ONLY/UAT/`), cheat sheet, deploy files (Docker +
+`deploy/START-SITE.cmd` no-Docker path; Docker engine cannot start: **SVM Mode off in BIOS**, owner must enable; official
+cloudflared at `E:/DevCache/cloudflared/`). Recorder `scripts/demo/record_demo.py` + `narration.json` + `tour_reports.py`
++ `build_narration.py`; final recording running -> `E:/Temp/claude/demo-rec/final` (server :5092, DB
+`E:/Temp/claude/demo-rec/final.sqlite3`), then copy mp4+srt to `Documents/CAPSTONE_ONLY/Demo_Migui/` (mp4 too big for git?
+check size; else keep outside git and say where). Helpers: forms pack (Documents/USLS_Forms), pkt/night2 (I-207 dates,
+wt/night2). pkt/night1 (I-003 pin, I-007, I-009, I-011; wt/night1) reviewed, merge after base gate
+(`E:/Temp/claude/gate-night/pc_base.txt`, wt/gatenight). Morning (before 09:00): merge gated packets, `npm run build:web`,
+re-seed main DB, start `deploy/START-SITE.cmd` site part (no token yet), health check.
 Shared doc tools: `E:/Temp/claude/docs-venv` (python-docx, pymupdf, openpyxl, imageio-ffmpeg); LibreOffice `E:/LibreOffice`.
 
 ## HANDED OFF (2026-11-03 morning) — read `.planning/HANDOFF-v6.1.md` first
