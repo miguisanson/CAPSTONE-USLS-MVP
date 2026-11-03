@@ -19,14 +19,14 @@ Stakeholder meeting 2026-11-04. Owner asked for, in this order:
    tunnel token from a file the owner fills), `deploy/DOCKER.md` (helper C). Owner: domain NOT yet on Cloudflare;
    public sign-in page SHOWS the demo accounts (DEMO_SHOW_ACCOUNTS=1, owner choice, risk told).
 7. Then polish / improvement / optimization loop (IMPROVE.md) until 10:00 Manila.
-**Progress (22:30):** ALL 5 DELIVERABLES DONE + pushed; owner entry point `Documents/CAPSTONE_ONLY/Demo_Migui/README-FOR-MIGUI.md`.
-Videos (local only, gitignored) `Documents/CAPSTONE_ONLY/Demo_Migui/videos/*.mp4`; narration docx/pdf + .srt; cheat sheet; UAT revised;
-forms pack 44+2 verified vs Handbook/Protocol; deploy (Docker blocked: SVM off in BIOS; `deploy/START-SITE.cmd` works without Docker).
-Base gate on 96d70ac..b9c3af7 code: PC 897 OK. Loop: pkt/night1 (I-007, I-009, I-011, I-003 pin) + pkt/night2 (I-207 dates)
-merged in wt/gatenight (detached) -> full e2e running -> `E:/Temp/claude/gate-night/e2e_night12.txt`; if green, merge both into
-v6.1. pkt/night3 (I-215 assistant F-12/13/14, wt/night3) in progress. Morning (before 09:00): merge gated packets,
-`npm run build:web`, `npm run seed` (main DB), start site with `cmd /c start "" deploy\START-SITE.cmd`, health check.
-When the run ends: restore BayoCoop watchdog registration from `E:/DevCache/dev-kit-workers/build-session.*.bayocoop-backup`.
+**Progress (00:00 Nov 4):** ALL 5 DELIVERABLES DONE + pushed; owner entry point `Documents/CAPSTONE_ONLY/Demo_Migui/README-FOR-MIGUI.md`.
+MERGED on v6.1 after gates (Python 911 OK on the merged tree; e2e 767 passed + the 2 Assigned Classes specs fixed and 93/93 targeted):
+pkt/night1 (I-003 pin, I-007, I-009, I-011), night2 (I-207 dates + AWOL name), night3 (I-215 F-12..F-14 assistant), night4
+(I-219 faculty Assigned Classes 403 + p105/p88 password specs). Known: I-220 flaky phone-footer spec, I-221 Gemini 503 tonight
+(offline fallback works). Worktrees wt/night1..4, wt/gatenight, wt/gatebase can be removed.
+Morning (before 09:00): re-check Gemini (`E:/Temp/claude/live/gem.py`), `npm run build:web`, `npm run seed` (main DB),
+start site `cmd /c start "" deploy\START-SITE.cmd`, health check on 127.0.0.1:5000. Restore BayoCoop watchdog registration
+from `E:/DevCache/dev-kit-workers/build-session.*.bayocoop-backup` when the run ends.
 Shared doc tools: `E:/Temp/claude/docs-venv` (python-docx, pymupdf, openpyxl, imageio-ffmpeg); LibreOffice `E:/LibreOffice`.
 
 ## HANDED OFF (2026-11-03 morning) — read `.planning/HANDOFF-v6.1.md` first
