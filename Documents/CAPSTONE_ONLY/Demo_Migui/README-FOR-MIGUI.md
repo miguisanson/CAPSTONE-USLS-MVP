@@ -25,7 +25,9 @@ SVM Mode under Tweaker > Advanced CPU Settings, save; then follow `deploy/DOCKER
 5. On the install page, choose **Windows**. Copy **only the long token** at the end of the command shown (don't run the command).
 6. In the project folder, copy `deploy\tunnel.env.example` to `deploy\tunnel.env`, open it in Notepad, make the line `TUNNEL_TOKEN=<paste the token>`, save.
 7. Back in Cloudflare: the tunnel > **Public hostname / Routes** > **Add** (Published application): subdomain **empty**, domain `miguisanson.dev`, service **HTTP**, URL `localhost:5000` (i.e. `http://localhost:5000`). Save.
-8. Double-click `deploy\START-SITE.cmd`. Leave both windows it opens. After a minute, open https://miguisanson.dev/api/health on your phone: it should say `"status":"ok"`.
+8. Double-click `deploy\START-SITE.cmd`. Leave both windows it opens. (The site itself is already running on this PC
+   since the night of 3 Nov, freshly seeded, in a window called "USLS site - keep open"; the script sees that and only
+   starts the Cloudflare tunnel.) After a minute, open https://miguisanson.dev/api/health on your phone: it should say `"status":"ok"`.
 
 Reset the demo data (the morning of the meeting): close the "USLS site" window, double-click `deploy\RESET-DEMO-DATA.cmd`, then `START-SITE.cmd` again.
 
