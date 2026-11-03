@@ -13050,12 +13050,16 @@ def register_routes(app: Flask) -> None:
         return jsonify({"term": term_dict(term) if term else None})
 
     @app.route("/api/admin/terms")
-    @require_api_login("staff")
+    @require_api_login("staff", "academic_coordinator")
     def admin_terms_list():
         # The management page shows every semester (the trimmed prior+active+next
-        # window only applies to the pickers elsewhere).
+        # window only applies to the pickers elsewhere). The Academic Coordinator may read it; only
+        # staff and admin edit (every other /api/admin/terms route stays staff-only).
         terms = AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()
-        return jsonify({"items": [term_dict(term) for term in terms]})
+        return jsonify({
+            "items": [term_dict(term) for term in terms],
+            "permissions": {"can_manage": current_account().role in {"staff", "admin"}},
+        })
 
     @app.route("/api/admin/terms/add-next", methods=["POST"])
     @require_api_login("staff")

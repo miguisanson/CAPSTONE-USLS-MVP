@@ -104,6 +104,7 @@ const EXPECTED_LINKS = {
     "/monitoring-sheet | Monitoring Sheet",
     "/reports | Reports & Analytics",
     "/students | Students",
+    "/term-settings | Academic Semesters", // CHANGED BY night 5: the coordinator reads the semester dates (read-only)
     "/work-queue | Work Queue",
     "/workflow/awol | AWOL & Residency",
     "/workflow/graduation | 9 · Graduation Endorsement",
