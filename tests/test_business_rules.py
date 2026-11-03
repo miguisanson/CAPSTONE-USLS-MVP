@@ -44,6 +44,8 @@ from app import (  # noqa: E402
     rules_for_process,
     subject_withdrawal_window,
     withdrawal_application_dict,
+    withdrawal_process_case,
+    withdrawal_registrar_workbook,
 )
 from business_rules_catalog import BUSINESS_RULE_CATALOG, BUSINESS_RULE_PROCESSES  # noqa: E402
 
@@ -435,6 +437,25 @@ class BusinessRulesTests(unittest.TestCase):
             self.assertFalse(first_late_day["eligible"])
             self.assertEqual(first_late_day["fee_percent"], 100)
             self.assertEqual(first_late_day["fee_tier"], "After the second week")
+
+    def test_withdrawal_reports_keep_the_window_recorded_at_submission(self):
+        """I-003: weeks later the case, the report and the Registrar workbook still show the submission-day window and fee."""
+        from openpyxl import load_workbook
+
+        self._seed()
+        response, _ = self._student_withdrawal(started_days_ago=3)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with app.app_context():
+            application = WithdrawalApplication.query.filter_by(student_id=self.student_id).one()
+            later = date.today() + timedelta(days=60)
+            with patch("app.ph_today", return_value=later):
+                self.assertFalse(subject_withdrawal_window(application.subject_enrollment)["eligible"])
+                window = withdrawal_application_dict(application)["withdrawal_window"]
+                self.assertEqual((window["eligible"], window["fee_tier"], window["fee_percent"]), (True, "First week", 10))
+                case_window = withdrawal_process_case(application, detail=True)["window"]
+                self.assertEqual((case_window["status"], case_window["fee_percent"]), ("First week of classes", 10))
+                sheet = load_workbook(BytesIO(withdrawal_registrar_workbook([application]))).active
+                self.assertEqual((sheet["Q4"].value, sheet["R4"].value), ("First week", 10))
 
     def test_late_withdrawal_names_the_rule_and_changing_the_register_changes_the_outcome(self):
         self._seed()

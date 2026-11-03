@@ -31871,6 +31871,7 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
         removed_records += DefenseVerdict.query.filter_by(student_id=student.id).delete(synchronize_session=False)
         removed_records += ScheduleRequest.query.filter_by(student_id=student.id).delete(synchronize_session=False)
         removed_records += PanelAssignment.query.filter_by(student_id=student.id).delete(synchronize_session=False)
+        removed_records += PanelInvitation.query.filter_by(student_id=student.id).delete(synchronize_session=False)  # I-007
         removed_records += Form1Endorsement.query.filter_by(student_id=student.id).delete(synchronize_session=False)
         removed_records += ResearchEvidenceFile.query.filter_by(student_id=student.id).delete(synchronize_session=False)
         removed_records += DocumentCheck.query.filter_by(student_id=student.id).delete(synchronize_session=False)

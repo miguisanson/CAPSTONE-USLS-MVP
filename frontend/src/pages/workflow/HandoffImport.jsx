@@ -24,15 +24,15 @@ import { WorkflowCaseModal } from "./shared";
 // Student Handoff — AIMS export import & reconciliation (no manual student creation).
 // Students come from the official AIMS export only (checklist items 2, 5, 66).
 // ---------------------------------------------------------------------------
-export function HandoffPanel() {
+export function HandoffPanel({ onImported }) {
   return (
     <div className="space-y-6">
-      <HandoffImport />
+      <HandoffImport onImported={onImported} />
     </div>
   );
 }
 
-function HandoffImport({ context }) {
+function HandoffImport({ context, onImported }) {
   const isAudit = context === "audit";
   const [file, setFile] = useState(null);
   const [dragging, setDragging] = useState(false);
@@ -42,7 +42,9 @@ function HandoffImport({ context }) {
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [resolvingIssue, setResolvingIssue] = useState(false);
   const [issueError, setIssueError] = useState("");
-  const { data: uploadHistory, refetch: refetchUploadHistory } = useApi(() => api.monitoringUploads(), []);
+  const { data: uploadHistory, refetch: fetchUploadHistory } = useApi(() => api.monitoringUploads(), []);
+  // I-011: the onboarding report panel below reads the same imports, so it reloads too.
+  const refetchUploadHistory = () => { fetchUploadHistory(); onImported?.(); };
 
   function pick(f) {
     if (!f) return;
