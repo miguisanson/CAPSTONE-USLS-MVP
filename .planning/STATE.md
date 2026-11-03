@@ -19,14 +19,15 @@ Stakeholder meeting 2026-11-04. Owner asked for, in this order:
    tunnel token from a file the owner fills), `deploy/DOCKER.md` (helper C). Owner: domain NOT yet on Cloudflare;
    public sign-in page SHOWS the demo accounts (DEMO_SHOW_ACCOUNTS=1, owner choice, risk told).
 7. Then polish / improvement / optimization loop (IMPROVE.md) until 10:00 Manila.
-**Progress (00:00 Nov 4):** ALL 5 DELIVERABLES DONE + pushed; owner entry point `Documents/CAPSTONE_ONLY/Demo_Migui/README-FOR-MIGUI.md`.
-MERGED on v6.1 after gates (Python 911 OK on the merged tree; e2e 767 passed + the 2 Assigned Classes specs fixed and 93/93 targeted):
-pkt/night1 (I-003 pin, I-007, I-009, I-011), night2 (I-207 dates + AWOL name), night3 (I-215 F-12..F-14 assistant), night4
-(I-219 faculty Assigned Classes 403 + p105/p88 password specs). Known: I-220 flaky phone-footer spec, I-221 Gemini 503 tonight
-(offline fallback works). Worktrees wt/night1..4, wt/gatenight, wt/gatebase can be removed.
-Morning (before 09:00): re-check Gemini (`E:/Temp/claude/live/gem.py`), `npm run build:web`, `npm run seed` (main DB),
-start site `cmd /c start "" deploy\START-SITE.cmd`, health check on 127.0.0.1:5000. Restore BayoCoop watchdog registration
-from `E:/DevCache/dev-kit-workers/build-session.*.bayocoop-backup` when the run ends.
+**Progress (01:20 Nov 4):** ALL 5 DELIVERABLES DONE + pushed (entry point `Documents/CAPSTONE_ONLY/Demo_Migui/README-FOR-MIGUI.md`).
+Owner 00:xx: leave the domain/Cloudflare to him; keep looping. MERGED on v6.1 after gates: night1..4 (Python 911, e2e 767+fixes),
+night5 (I-222..I-225 persona fixes) + night6 (Fable follow-up on the assistant) (Python 919 OK, e2e 772 + spec fixes 54/54).
+IN GATE (round 4): pkt/night7 (I-216: faculty .ics scoped to self, staff-set faculty passwords force a change) in wt/gatebase
+(Python -> gate-night/pc_r4.txt) and wt/gatenight (e2e -> e2e_r4.txt); merge if green.
+Live site: `npm run uat` on 127.0.0.1:5000 since 23:55 (code = night1-4). Morning (06:00-08:00): after the last merge, rebuild
+(`npm run build:web`), stop the site's python by its PID (netstat :5000), `npm run seed`, start `deploy\START-SITE.cmd`,
+re-record the videos (`scripts/demo/record_demo.py`, fresh DB on :5092, then build_narration.py) so screens match.
+Restore BayoCoop watchdog registration (`E:/DevCache/dev-kit-workers/build-session.*.bayocoop-backup`) when the run ends.
 Shared doc tools: `E:/Temp/claude/docs-venv` (python-docx, pymupdf, openpyxl, imageio-ffmpeg); LibreOffice `E:/LibreOffice`.
 
 ## HANDED OFF (2026-11-03 morning) — read `.planning/HANDOFF-v6.1.md` first
