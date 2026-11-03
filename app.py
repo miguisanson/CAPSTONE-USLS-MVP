@@ -1996,6 +1996,17 @@ def course_audit_subject_items() -> list[dict]:
     ]
 
 
+def faculty_roster_subject_items(faculty: "Faculty") -> list[dict]:
+    """The subjects on one faculty member's Assigned Classes page: those they teach and those their advisees take,
+    the same rule /api/course-audit/roster applies, so every listed subject opens."""
+    course_ids = {cid for (cid,) in db.session.query(CurriculumOffering.course_id).filter_by(assigned_faculty_id=faculty.id)}
+    course_ids |= {cid for (cid,) in db.session.query(CourseOffering.course_id).filter_by(assigned_faculty_id=faculty.id)}
+    advised = advisee_student_ids(faculty)
+    if advised:
+        course_ids |= {cid for (cid,) in db.session.query(CourseRecord.course_id).filter(CourseRecord.student_id.in_(advised)).distinct()}
+    return [item for item in course_audit_subject_items() if item["id"] in course_ids]
+
+
 # Academic calendar is semester-based: two semesters per academic year (not trimester).
 SEMESTER_NAMES = ["1st Semester", "2nd Semester"]
 
@@ -15946,7 +15957,7 @@ def register_routes(app: Flask) -> None:
             "advisees": advisees,
             "panel_count": len(panels),
             "terms": [term_dict(term) for term in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
-            "subjects": course_audit_subject_items(),
+            "subjects": faculty_roster_subject_items(faculty),
             "working_hours": faculty_working_hours(faculty),
             "availability": [
                 {

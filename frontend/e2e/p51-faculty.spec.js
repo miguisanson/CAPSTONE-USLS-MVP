@@ -764,8 +764,11 @@ test.describe("Assigned Classes", () => {
     const term = page.getByLabel("Semester");
     const subject = page.getByLabel("Subject");
     await expect(term).toHaveValue("AY 2026-2027 1st Semester"); // the active planning term
+    // The list holds only the subjects this faculty member may open (taught or advisees'), in the API's order.
+    const mine = (await portalContext(page)).subjects;
+    expect(mine.length, "the demo faculty has at least two subjects").toBeGreaterThan(1);
     const first = await subject.locator("option").first().textContent();
-    expect(first).toMatch(/^DBA-COG1 — /);
+    expect(first).toBe(`${mine[0].code} — ${mine[0].title}`);
 
     const table = tableWith(page, "Remarks");
     await expect(table).toBeVisible();
@@ -777,7 +780,7 @@ test.describe("Assigned Classes", () => {
     await shots(page, "classes");
 
     // another subject loads another roster
-    const otherCount = await rosterRows(page, () => subject.selectOption({ index: 18 })); // EDD-COG1
+    const otherCount = await rosterRows(page, () => subject.selectOption({ index: 1 }));
     await expect(rows).toHaveCount(otherCount);
     // another semester lists the same students (their status there is "Missing" when they have no record)
     await term.selectOption("AY 2027-2028 2nd Semester");
@@ -799,7 +802,7 @@ test.describe("Assigned Classes", () => {
     await expect(page.getByRole("button", { name: "Print roster" })).toBeVisible();
     const [popup] = await Promise.all([page.waitForEvent("popup"), page.getByRole("button", { name: "Print roster" }).click()]);
     await expect(popup.locator("h1")).toContainText("Class Roster");
-    await expect(popup.locator("h1")).toContainText("DBA-COG1");
+    await expect(popup.locator("h1")).toContainText((await portalContext(page)).subjects[0].code);
     expect(await popup.locator("thead th").allTextContents()).toEqual(["Student ID", "Student name", "Program", "Status", "Remarks"]);
     expect(await popup.locator("tbody tr").count()).toBe(rosterCount);
     await popup.close();

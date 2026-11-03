@@ -122,7 +122,8 @@ test.describe("demo accounts keep their password (I-212)", () => {
   });
 
   test("an ordinary account still can", async ({ page }) => {
-    await meWith(page, undefined);
+    // The e2e logins are seeded demo accounts (the server says demo_account: true), so pretend an ordinary one.
+    await meWith(page, false);
     await page.goto("/change-password");
     await expect(page.getByRole("heading", { name: "Change password" })).toBeVisible();
   });

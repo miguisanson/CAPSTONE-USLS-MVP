@@ -149,6 +149,13 @@ test.describe("Change password (staff, voluntary)", () => {
   test.use(STAFF);
 
   test("pin: three labelled fields, a mismatch is explained, nothing is sent, Sign out is there", async ({ page }) => {
+    // Seeded demo accounts cannot change their password (I-212); the page is pinned for an ordinary staff account.
+    await page.route("**/api/auth/me", async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      body.user.demo_account = false;
+      await route.fulfill({ response: res, json: body });
+    });
     await page.goto("/change-password");
     await expect(page.locator("h1")).toHaveText("Change password");
     await expect(page.locator("h1")).toHaveCount(1);
