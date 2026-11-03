@@ -526,7 +526,7 @@ test.describe("Defense Schedule", () => {
     await expect(first).toContainText("Reflective Practice Models for Graduate Educators");
     await expect(first).toContainText("Title Defense");
     // seed dates are relative to the seed day (IM16): pin the format, not one calendar date
-    await expect(first).toContainText(/[A-Z][a-z]{2} \d{1,2}, \d{4} · \d{2}:\d{2}/);
+    await expect(first).toContainText(/[A-Z][a-z]{2} \d{1,2}, \d{4} · \d{1,2}:\d{2} (AM|PM)/);
     await expect(first).toContainText("Philippine time");
     await expect(first).toContainText("In person");
     await expect(first).toContainText("Graduate School Conference Room");
@@ -627,7 +627,7 @@ test.describe("My Availability", () => {
     await expect(page.getByRole("region", { name: "Google Calendar connection" })).toHaveCount(0);
     const windows = page.getByRole("heading", { name: "Other open windows" });
     await expect(windows).toBeVisible();
-    await expect(main(page).getByText(/\d{1,2}:\d{2} (AM|PM) – \d{1,2}:\d{2} (AM|PM)/).first()).toBeVisible();
+    await expect(main(page).getByText(/\d{1,2}:\d{2}( (AM|PM))? – \d{1,2}:\d{2} (AM|PM)/).first()).toBeVisible();
     await shots(page, "availability");
   });
 
