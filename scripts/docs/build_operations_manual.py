@@ -36,6 +36,7 @@ from opsmanual.common import STATUSES  # noqa: E402
 from opsmanual.p_admission_to_drop import ADMISSION, DROPPING, ENROLLMENT, OFFERING, WITHDRAWAL  # noqa: E402
 from opsmanual.p_end import GRADUATION, HANDOFF, PRACTICUM  # noqa: E402
 from opsmanual.p_leave_to_compre import AWOL, COMPRE, LOA, READMISSION, RESIDENCY  # noqa: E402
+from opsmanual.p_platform import ACCOUNTS, DATAEXCHANGE, EAPPROVAL, FACULTY, PRIVACY  # noqa: E402
 from opsmanual.p_research import ADVISER, COMPLETION, FINAL, PROPOSAL, SCHEDULING, TITLE  # noqa: E402
 
 OUT_DIR = ROOT / "Documents" / "CAPSTONE_ONLY"
@@ -46,6 +47,7 @@ LO_PROFILE = os.environ.get("OPSMAN_LO_PROFILE", "file:///E:/Temp/claude/lo-prof
 PROCESSES = [
     ADMISSION, ENROLLMENT, OFFERING, WITHDRAWAL, DROPPING, LOA, READMISSION, AWOL, RESIDENCY,
     COMPRE, TITLE, ADVISER, PROPOSAL, FINAL, COMPLETION, SCHEDULING, PRACTICUM, GRADUATION, HANDOFF,
+    FACULTY, ACCOUNTS, EAPPROVAL, PRIVACY, DATAEXCHANGE,
 ]
 
 SHORT = {
@@ -54,6 +56,8 @@ SHORT = {
     "4.9": "4.9 Residency", "4.10": "4.10 Comprehensive exam", "4.11": "4.11 Title defense", "4.12": "4.12 Adviser",
     "4.13": "4.13 Proposal defense", "4.14": "4.14 Final defense", "4.15": "4.15 Completion", "4.16": "4.16 Scheduling",
     "4.17": "4.17 Practicum", "4.18": "4.18 Graduation", "4.19": "4.19 Registrar handoff",
+    "4.20": "4.20 Faculty load", "4.21": "4.21 Accounts and roles", "4.22": "4.22 E-approval",
+    "4.23": "4.23 Data privacy", "4.24": "4.24 AIMS exchange",
 }
 
 # Steps that rest on Practice or Proposed rules, or on the group's process model, rather than on the
@@ -63,6 +67,8 @@ STEP_FLAGS = {
     "4.6": [2, 5], "4.7": [2, 6], "4.8": [1], "4.9": [3, 4], "4.16": [2, 3, 4, 5],
     "4.17": [1, 2, 3, 4, 5, 6, 7, 8], "4.18": [1, 2, 3, 4, 5, 6], "4.19": [3, 4, 5],
 }
+# Chapters 4.20 to 4.24 are the group's proposal throughout: every step carries the dagger.
+STEP_FLAGS.update({p.num: list(range(1, len(p.steps) + 1)) for p in (FACULTY, ACCOUNTS, EAPPROVAL, PRIVACY, DATAEXCHANGE)})
 STEP_NOTE = (
     "† This step rests on a rule marked Practice or Proposed in section {n}.5, or on the group's process model; "
     "it is not described in the Handbook or the Research Protocol and is to be confirmed by the Graduate School."
@@ -74,6 +80,11 @@ def step_rows(proc):
     return [[f"{i}†" if i in flagged else str(i), w, a, f, t] for i, (w, a, f, t) in enumerate(proc.steps, 1)]
 
 
+def forms_line(proc) -> str:
+    """The forms of a chapter, for the start of section N.7."""
+    return "Forms of this process: " + "; ".join(f"{c} {t}" for c, t in proc.forms) + ". Appendix A gives the name each has in the Handbook or the Protocol." if proc.forms else ""
+
+
 SUBHEADS = [
     ("1", "Purpose"), ("2", "Who is involved"), ("3", "Trigger and preconditions"),
     ("4", "Procedure"), ("5", "Business rules"), ("6", "Exceptions and unusual cases"),
@@ -81,11 +92,20 @@ SUBHEADS = [
 ]
 
 CH4_INTRO = (
-    "Each of the nineteen sections below follows the same layout: purpose, who is involved, trigger and "
+    "Each of the twenty-four sections below (4.1 to 4.19 for the lifecycle, 4.20 to 4.24 for the platform basis) follows the same layout: purpose, who is involved, trigger and "
     "preconditions, the procedure as a numbered table, the business rules table, exceptions, records, and how "
     "the platform supports the process together with any difference between the platform and the rule. "
     "Rule statuses are Official, Practice and Proposed (see 1.4). Rows marked Practice or Proposed are the ones "
     "the Graduate School is asked to confirm."
+)
+
+APPENDIX_A_INTRO = (
+    "Every form and process document of the forms pack, in the order GS-P-01 and GS-P-02 (forms control), GS-F-01 to GS-F-44 "
+    "(lifecycle), GS-P-03 to GS-P-06 and GS-F-45 to GS-F-48 (platform basis) and GS-F-49 to GS-F-54 (supplementary forms). "
+    "Chapter is the section of Chapter 4 in which the form is used (1.4 is the forms control section of Chapter 1). "
+    "\"Official by name\" means the Handbook or the Research Protocol names the form; the Graduate School's own template was not "
+    "supplied to the group, so the group drafted it. \"Proposed\" means the group added the form where the sources name none. "
+    "The printed forms are in Documents/USLS_Forms/, one folder per chapter."
 )
 
 CH5_INTRO = (
@@ -224,7 +244,8 @@ def build_markdown() -> str:
     L += ["## 7 Validation and sign-off", "", CH7_INTRO, "", "### 7.1 Sign-off", ""]
     L += md_table(front.SIGNOFF_HEADER, [[""] * 5 for _ in range(front.SIGNOFF_ROWS)])
     L += ["### 7.2 Change log", ""] + md_table(front.CHANGELOG_HEADER, front.CHANGELOG)
-    L += ["## Appendix A Forms named in the sources", ""] + md_table(front.FORMS_HEADER, front.FORMS)
+    L += ["## Appendix A Forms crosswalk", "", APPENDIX_A_INTRO, ""] + md_table(front.FORMS_HEADER, front.FORMS)
+    L += ["**Other documents named in the sources**", ""] + md_table(front.OTHER_FORMS_HEADER, front.OTHER_FORMS)
     L += ["## Appendix B Glossary", ""] + md_table(["Term", "Meaning"], [[a, b] for a, b in front.GLOSSARY])
     return "\n".join(L) + "\n"
 
@@ -247,6 +268,8 @@ def process_md(proc) -> list[str]:
     L += md_table(["Rule", "Rule statement", "Source", "Status"], [[r.rid, r.text, r.source_text(), r.status] for r in proc.rules])
     L += [f"#### {proc.num}.6 Exceptions and unusual cases", ""] + [f"- {e}" for e in proc.exceptions] + [""]
     L += [f"#### {proc.num}.7 Records produced and where they go", ""]
+    if proc.forms:
+        L += [f"**{forms_line(proc)}**", ""]
     L += md_table(["Record", "Where it goes"], [list(r) for r in proc.records])
     L += [f"#### {proc.num}.8 How the platform supports this process", "", proc.platform, "", f"**Difference between the platform and the rule.** {proc.platform_diff}", ""]
     return L
@@ -269,7 +292,7 @@ def toc_entries() -> list[tuple[int, str]]:
         (1, "5 Consolidated business rules register"),
         (1, "6 Open questions for validation"),
         (1, "7 Validation and sign-off"),
-        (1, "Appendix A Forms named in the sources"),
+        (1, "Appendix A Forms crosswalk"),
         (1, "Appendix B Glossary"),
     ]
     return e
@@ -751,6 +774,10 @@ def build_docx(path: Path, toc_pages: dict[str, int] | None) -> None:
         heading(f"{n}.6 Exceptions and unusual cases", 3)
         bullets(proc.exceptions)
         heading(f"{n}.7 Records produced and where they go", 3)
+        if proc.forms:
+            p = para("")
+            p.runs[0].text = forms_line(proc)
+            p.runs[0].bold = True
         add_table(["Record", "Where it goes"], [list(r_) for r_ in proc.records], [8.0, 9.0])
         heading(f"{n}.8 How the platform supports this process", 3)
         para(proc.platform)
@@ -828,9 +855,11 @@ def build_docx(path: Path, toc_pages: dict[str, int] | None) -> None:
     add_table(front.CHANGELOG_HEADER, front.CHANGELOG, [1.6, 2.4, 3.2, 7.4, 2.4])
 
     # ---- appendices ----
-    heading("Appendix A Forms named in the sources", 1)
-    para("Forms named in the Handbook and the Research Protocol, with the process step in which each is used. The blank forms were not supplied to the group except where stated.")
-    add_table(front.FORMS_HEADER, front.FORMS, [3.6, 7.0, 2.6, 3.8], bold_first=True)
+    heading("Appendix A Forms crosswalk", 1)
+    para(APPENDIX_A_INTRO)
+    add_table(front.FORMS_HEADER, front.FORMS, [1.9, 4.6, 6.0, 1.7, 2.8], bold_first=True)
+    para("Other documents named in the sources", bold=True)
+    add_table(front.OTHER_FORMS_HEADER, front.OTHER_FORMS, [3.6, 7.0, 2.6, 3.8], bold_first=True)
     heading("Appendix B Glossary", 1)
     add_table(["Term", "Meaning"], [[a, b] for a, b in front.GLOSSARY], [3.6, 13.4], bold_first=True)
 
