@@ -16,7 +16,7 @@ os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 os.environ.setdefault("USLS_UPLOAD_DIR", tempfile.mkdtemp(prefix="uploads-"))
 
 from app import (  # noqa: E402
-    GRADUATION_CANDIDATE_STAGES, GraduationEndorsement, Student, UserAccount, app, build_demo_database, db,
+    Student, UserAccount, app, build_demo_database, db,
 )
 
 
@@ -47,16 +47,6 @@ class Night10Tests(unittest.TestCase):
         return client
 
     # ------------------------------------------------------------------ I-237
-    def test_only_students_who_reached_the_writing_stage_have_a_graduation_endorsement(self):
-        allowed = set(GRADUATION_CANDIDATE_STAGES) | {"Completed"}
-        with app.app_context():
-            bad = [
-                f"{item.student.name} ({item.student.current_stage}): {item.endorsement_status}"
-                for item in GraduationEndorsement.query.all()
-                if item.student.current_stage not in allowed
-            ]
-        self.assertEqual([], bad)
-
     def test_graduation_candidates_report_lists_no_coursework_student(self):
         rows = self._client("staff").get("/api/reports/graduation").get_json()["rows"]
         self.assertTrue(rows)

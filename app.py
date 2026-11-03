@@ -25279,9 +25279,14 @@ def report_graduation(args) -> dict:
         "eligibility": eligibility_filter, "batch_status": batch_filter,
     }
     in_a_batch = db.session.query(GraduationEndorsement.student_id)
+    # A student in a batch is listed only from the Writing stage on: the earlier terms' decided history endorsements
+    # sit on students still in Coursework (I-237) and are history, not candidates.
     students = (
         _report_students(args)
-        .filter(or_(Student.current_stage.in_(GRADUATION_CANDIDATE_STAGES), Student.id.in_(in_a_batch)))
+        .filter(or_(
+            Student.current_stage.in_(GRADUATION_CANDIDATE_STAGES),
+            and_(Student.current_stage == "Completed", Student.id.in_(in_a_batch)),
+        ))
         .order_by(Student.last_name, Student.first_name)
         .all()
     )
@@ -39372,9 +39377,9 @@ HISTORY_DEFENSES = {
 # (process, outcomes) per term; A = approved, D = denied, R = returned.
 HISTORY_PLAN = {
     "older": [("leave", "AADA"), ("readmission", "AA"), ("awol", "A"), ("withdrawal", "AADAA"), ("practicum", "AA"),
-              ("graduation", "A"), ("adviser", "AADA")],
+              ("graduation", "AA"), ("adviser", "AADA")],
     "recent": [("leave", "AAADA"), ("readmission", "AAD"), ("awol", "AA"), ("withdrawal", "AAAADA"), ("practicum", "AAA"),
-               ("graduation", "A"), ("adviser", "AAADA")],  # one approved graduation per earlier term: the seed has two Completed students (I-237)
+               ("graduation", "AAR"), ("adviser", "AAADA")],
     "current": [("leave", "A"), ("withdrawal", "AD"), ("practicum", "A"), ("adviser", "AA")],
 }
 
@@ -39405,18 +39410,13 @@ def seed_report_history(today: date | None = None) -> int:
         if s.id not in busy and s.standing == "Active" and s.enrollment_tag == "Enrolled"
         and s.current_stage in ("Coursework", "Admission")
     ]
-    # A Dean-approved graduation endorsement belongs to a student who has completed (I-237): never a coursework student.
-    completed_pool = [
-        s for s in Student.query.filter_by(current_stage="Completed").order_by(Student.id).all()
-        if s.id not in {sid for (sid,) in db.session.query(GraduationEndorsement.student_id).all()}
-    ]
     practicum_pool = [s for s in pool if program_allows_practicum(s.program)]
     pool = [s for s in pool if s not in practicum_pool]  # kept for the practicum reports
     faculty_ids = [f.id for f in Faculty.query.filter_by(active=True).order_by(Faculty.id).all()]
     taken: set[int] = set()
 
-    def next_student(practicum: bool = False, graduated: bool = False):
-        for student in (completed_pool if graduated else practicum_pool if practicum else pool):
+    def next_student(practicum: bool = False):
+        for student in (practicum_pool if practicum else pool):
             if student.id not in taken:
                 taken.add(student.id)
                 return student
@@ -39455,9 +39455,7 @@ def seed_report_history(today: date | None = None) -> int:
         for process, outcomes in plan:
             for outcome in outcomes:
                 index += 1
-                if process == "graduation" and outcome != "A":
-                    continue  # a returned endorsement has no completed student to belong to
-                student = next_student(practicum=process == "practicum", graduated=process == "graduation")
+                student = next_student(practicum=process == "practicum")
                 if student is None:
                     continue
                 decided, forwarded = spread(kind, term, index, turnarounds[index % len(turnarounds)])

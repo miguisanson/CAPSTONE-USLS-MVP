@@ -21,7 +21,6 @@ import {
   lockReasonFor,
   commonBatchActions,
   matchesFilters,
-  openCaseOfStudent,
   plural,
 } from "../pages/leave/leaveHelpers";
 
@@ -199,16 +198,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
     setSignal(null);
     setFilters(urlFilters());
     (async () => {
-      const res = await load({ quiet: true });
-      // ?student_id= (a dashboard task about one request) opens that student's request window, once (I-239).
-      const studentId = urlParams.get("student_id");
-      if (active && res && studentId) {
-        const target = openCaseOfStudent(res.cases, studentId);
-        if (target) setDetailId(target.id);
-        const next = new URLSearchParams(urlParams);
-        next.delete("student_id");
-        setUrlParams(next, { replace: true });
-      }
+      await load({ quiet: true });
       if (active && config.afterOpen) await config.afterOpen({ isStaff, reload: () => load({ quiet: true }) });
     })();
     return () => {

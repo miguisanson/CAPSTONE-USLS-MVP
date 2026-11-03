@@ -87,10 +87,6 @@ export const canOpen = (to, role) => {
 // drops it on request. Research Gate, Defense Scheduling and the like are not request boards and keep their plain link.
 const OPEN_REQUEST_BOARDS = new Set(["leave-of-absence", "readmission", "awol", "withdrawal", "practicum", "graduation"].map((slug) => `/workflow/${slug}`));
 const onOpenRequests = (to) => (OPEN_REQUEST_BOARDS.has(to) ? `${to}?show=open` : to);
-// A task about one student's request on a standalone board opens that request's window (?student_id=, I-239), not the whole board.
-const ONE_REQUEST_BOARDS = new Set(["leave-of-absence", "readmission", "awol", "withdrawal"].map((slug) => `/workflow/${slug}`));
-const onTaskRequest = (to, task) =>
-  ONE_REQUEST_BOARDS.has(to) && task.student_id ? `${to}?show=open&student_id=${encodeURIComponent(task.student_id)}` : onOpenRequests(to);
 
 /**
  * Where "Open" leads for one of the viewer's own tasks: the task's own action_url, else the workflow page its title
@@ -99,11 +95,11 @@ const onTaskRequest = (to, task) =>
  * @returns { to, label }
  */
 export function taskTarget(task, role) {
-  if (task.action_url && canOpen(task.action_url, role)) return { to: onTaskRequest(task.action_url, task), label: openPageLabel(task.action_url, task.action_label || "Open") };
+  if (task.action_url && canOpen(task.action_url, role)) return { to: onOpenRequests(task.action_url), label: openPageLabel(task.action_url, task.action_label || "Open") };
   for (const [pattern, to, withStudent] of TITLE_TARGETS) {
     if (pattern.test(task.title || "")) {
       if (canOpen(to, role)) {
-        const path = withStudent && task.student_id ? `${to}?student_id=${encodeURIComponent(task.student_id)}` : onTaskRequest(to, task);
+        const path = withStudent && task.student_id ? `${to}?student_id=${encodeURIComponent(task.student_id)}` : onOpenRequests(to);
         return { to: path, label: openPageLabel(to) };
       }
       break; // the page the title names is not this role's: fall through to the record or the queue
@@ -246,7 +242,7 @@ export function officeStats({ role, own, waiting, kpis }) {
     };
     // the Academic Coordinator watches risk; the Research Coordinator watches the defenses it schedules
     const focus = canOpen("/students", role)
-      ? { key: "risk", label: "At risk or delayed", value: kpis.at_risk, sub: `${kpis.high_risk} delayed (active students)`, tone: "warning", to: "/students?standing=Active&risk=At Risk of Delay/Delayed" }
+      ? { key: "risk", label: "At risk or delayed", value: kpis.at_risk, sub: `${kpis.high_risk} delayed (active students)`, tone: "warning", to: "/students?risk=At Risk of Delay/Delayed" }
       : { key: "defenses", label: "Confirmed defenses", value: kpis.confirmed_schedules, sub: `${kpis.needs_availability} awaiting availability`, tone: "info", to: "/workflow/defense-scheduling" };
     return [tasks, students, focus, soon];
   }
@@ -254,7 +250,7 @@ export function officeStats({ role, own, waiting, kpis }) {
     return [
       tasks,
       { key: "students", label: "Students monitored", value: kpis.total_students, sub: `${kpis.active_students} active students`, tone: "success", to: "/students" },
-      { key: "risk", label: "At risk or delayed", value: kpis.at_risk, sub: `${kpis.high_risk} delayed (active students)`, tone: "warning", to: "/students?standing=Active&risk=At Risk of Delay/Delayed" },
+      { key: "risk", label: "At risk or delayed", value: kpis.at_risk, sub: `${kpis.high_risk} delayed (active students)`, tone: "warning", to: "/students?risk=At Risk of Delay/Delayed" },
       { key: "defenses", label: "Confirmed defenses", value: kpis.confirmed_schedules, sub: `${kpis.needs_availability} awaiting availability`, tone: "info", to: "/workflow/defense-scheduling" },
     ];
   }

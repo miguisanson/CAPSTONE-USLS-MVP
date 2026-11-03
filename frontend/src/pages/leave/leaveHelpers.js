@@ -126,12 +126,6 @@ export function caseFlags(item, role) {
   return flags;
 }
 
-/** The request a task is about: the student's newest request that has not ended (null when there is none). */
-export function openCaseOfStudent(cases, studentId) {
-  const own = (cases || []).filter((item) => String(item.student?.id) === String(studentId) && !ENDED_STATUSES.has(item.status));
-  return own.sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")))[0] || null;
-}
-
 export function matchesFilters(item, filters) {
   if (filters.program && item.student?.program_code !== filters.program) return false;
   if (filters.status && item.status !== filters.status) return false;
