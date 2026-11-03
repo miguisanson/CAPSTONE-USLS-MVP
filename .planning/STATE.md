@@ -94,6 +94,10 @@
   handler; do not claim the live backend was restarted or verified.
 - Next: restart app and owner review of Offering setup dropdown.
 
+## Forms x Ops app wiring (branch pkt/fapp, worktree CAPSTONE-USLS-MVP-wt/fapp, 2026-11-04)
+
+Done, not merged: privacy consent (GS-P-04) backend + PrivacyConsent page, seeded accounts pre-accepted, lib/formRefs.js + PageHeader `forms`, EApprovalNote in DecisionPanel and faculty decisions, e2e p112. Full e2e: 822 passed, 3 failed (p110, p84 offering setup, p79 pictures flaked in the shared run; p110 and p84 still fail alone and look unrelated: they expect a Course Adjustments Schedule tab / Save button that the page does not have).
+
 ## Current Position — 2026-11-04: owner-requested teaching scheduling
 
 - **Branch:** `v6.1-migui`. Local commits `e7d7176` (Dean review context) and
