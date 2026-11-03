@@ -103,5 +103,55 @@ class CsvFormulaTests(unittest.TestCase):
         self.assertEqual(len(re.findall(r"\bcsv\.writer\(", APP_SOURCE)), 1, "only safe_csv_writer may call csv.writer")
 
 
+class UnexpectedErrorTests(unittest.TestCase):
+    """The staff 'Reset demo case' handler stands for the ~12 `except Exception` handlers."""
+
+    @classmethod
+    def setUpClass(cls):
+        app.config.update(TESTING=True)
+        with app.app_context():
+            db.drop_all()
+            db.create_all()
+            program = Program(code="UE", name="Err Program", college="Graduate School", has_practicum=False)
+            db.session.add(program)
+            db.session.flush()
+            cls.key, config = next(iter(app_module.WORKFLOW_DEMO_STUDENTS.items()))
+            db.session.add(Student(
+                student_number=config["student_number"], first_name="D", last_name="Demo", email="d@x.test",
+                program_id=program.id, entry_year=2025, academic_year_entry="25-26", year_level="1",
+                current_stage="Coursework", standing="Active"))
+            db.session.add(UserAccount(email="staff@ue.test", full_name="s", role="staff", active=True,
+                                       password_hash=generate_password_hash("x")))
+            db.session.commit()
+
+    @classmethod
+    def tearDownClass(cls):
+        with app.app_context():
+            db.session.remove()
+            db.engine.dispose()
+
+    def reset(self, error):
+        client = app.test_client()
+        with app.app_context():
+            account_id = UserAccount.query.filter_by(email="staff@ue.test").first().id
+        with client.session_transaction() as session:
+            session["account_id"] = account_id
+            session["role"] = "staff"
+        with patch.object(app_module, "reset_workflow_demo_case", side_effect=error):
+            return client.post(f"/api/auth/demo-students/{self.key}/reset")
+
+    def test_unexpected_exception_text_is_hidden_and_logged(self):
+        with self.assertLogs(app.logger, level="ERROR"):
+            response = self.reset(RuntimeError("secret C:/internal/path.py failed"))
+        self.assertGreaterEqual(response.status_code, 400)
+        self.assertNotIn("secret", response.get_data(as_text=True))
+        self.assertIn("error", response.get_json())
+
+    def test_deliberate_validation_message_is_kept(self):
+        response = self.reset(ValueError("Pick a date in the future."))
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "Pick a date in the future.")
+
+
 if __name__ == "__main__":
     unittest.main()
