@@ -12857,7 +12857,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         for stored_name in result.pop("stored_names"):
             (REQUEST_UPLOAD_ROOT / stored_name).unlink(missing_ok=True)
         for stored_name in result.pop("research_stored_names", []):
@@ -13282,7 +13282,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({
             "ok": True,
             "student": student_brief(target),
@@ -13725,7 +13725,7 @@ def register_routes(app: Flask) -> None:
                 path.unlink(missing_ok=True)
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({
             "ok": True,
             "document": document_check_dict(evidence.document_check),
@@ -13849,7 +13849,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({
             "ok": True,
             "attachment": {
@@ -14767,7 +14767,7 @@ def register_routes(app: Flask) -> None:
             evidence = store_research_evidence(student, doc.gate, doc.item_name, uploaded, doc)
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         ensure_open_task(student.id, f"Review submitted {doc.item_name}", "Research Coordinator", 3, 35)
         add_log(
             "research-gate",
@@ -16430,7 +16430,7 @@ def register_routes(app: Flask) -> None:
                 store_research_evidence(student, verdict.gate, revised_item, uploaded, revised_doc)
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         verdict.revision_status = REVISION_SUBMITTED
         verdict.revision_note = note or verdict.revision_note
         verdict.revisions_submitted_at = now_utc()
@@ -19517,7 +19517,7 @@ def register_routes(app: Flask) -> None:
             return _process_error_response(exc)
         except Exception as exc:  # noqa: BLE001 - a refused step must never be a server error
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         kind, record = process_load_record(slug, ref)
         return jsonify({
             "ok": True,
@@ -19777,7 +19777,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({
             "ok": True,
             "issue": monitoring_validation_issue_dict(issue),
@@ -19986,7 +19986,7 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "We could not find that student or record."}), 404
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         message = "Saved. The student record, queue, and monitoring indicators were updated."
         if slug in {"leave-of-absence", "readmission"}:
             message = "Forwarded to the Dean. The student's standing changes only after the Dean approves and the leave begins."
@@ -20051,7 +20051,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({"ok": True, "message": "Defense rescheduled. The previous booking is kept in the history."})
 
     @app.route("/api/defense-schedules/<int:schedule_id>/cancel", methods=["POST"])
@@ -21108,7 +21108,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         return jsonify({
             "ok": True,
             "message": "Clarification response saved." if message.action_type == "response" else "Message saved and the next owner was notified.",
@@ -21357,7 +21357,7 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"error": str(exc)}), 400
+            return unexpected_error_response(exc)
         for stored_name in result.pop("stored_names"):
             (REQUEST_UPLOAD_ROOT / stored_name).unlink(missing_ok=True)
         for stored_name in result.pop("research_stored_names", []):
@@ -25214,6 +25214,16 @@ def _report_cell(value):
     if isinstance(value, str) and value[:1] in ("=", "+", "-", "@"):
         return "'" + value
     return value
+
+
+def unexpected_error_response(exc: Exception, status: int = 400):
+    """The JSON error for a caught exception. A ValueError (incl. ProcessError, LeaveError) carries text the
+    code wrote for the user and is shown; anything else is logged and replaced by a generic message, so
+    file paths, SQL and library text never reach the browser."""
+    if isinstance(exc, ValueError):
+        return jsonify({"error": str(exc)}), status
+    app.logger.error("Unexpected error in %s", request.path, exc_info=exc)
+    return jsonify({"error": "Something went wrong and nothing was saved. Please try again; if it keeps happening, tell the Graduate School office."}), status
 
 
 class _SafeCsvWriter:
