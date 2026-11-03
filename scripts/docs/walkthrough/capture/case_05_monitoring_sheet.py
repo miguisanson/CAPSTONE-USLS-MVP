@@ -1,6 +1,7 @@
 """Case 05 - Monitoring Sheet: add a student, add / edit / remove subject rows, provenance and change history."""
 from __future__ import annotations
 
+import os
 import re
 import time
 
@@ -29,9 +30,8 @@ def panel(page):
 def run(rt: Runtime) -> None:
     safe_notes(rt)
     stamp = time.strftime("%H%M%S")
-    last = f"Monitor{stamp}"
-    first = "Dana"
-    idno = "9" + stamp
+    # WT_NEW_STUDENT="First Last IDNO" gives the recorded demo a realistic name (fresh database only).
+    first, last, idno = (os.environ.get("WT_NEW_STUDENT") or f"Dana Monitor{stamp} 9{stamp}").split()
     rt.note(f"new student: {first} {last}, IDNO {idno}, program {PROGRAM}")
     page = rt.new_page("staff@usls.edu.ph")
 
