@@ -13805,6 +13805,8 @@ def register_routes(app: Flask) -> None:
             ScheduleRequest.status.in_(SLOT_HOLDING_DEFENSE_STATUSES),
         ).first():
             return jsonify({"error": "This defense is booked. Cancel the schedule first."}), 409
+        if doc.status == "Complete":
+            return jsonify({"error": "Staff have already verified this file, so it cannot be removed. Ask the Research Coordinator if it must be replaced."}), 409
 
         original_name = evidence.original_name
         # Signed evidence is archived, never deleted: the adviser's signature points at the file.

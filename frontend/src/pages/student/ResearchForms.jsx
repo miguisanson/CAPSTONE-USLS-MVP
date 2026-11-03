@@ -230,7 +230,7 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
                   <Button as="a" variant="secondary" size="sm" href={file.url} target="_blank" rel="noreferrer">
                     {file.name}<Eye className="h-3.5 w-3.5" aria-hidden="true" />
                   </Button>
-                  {requirement.student_upload && (
+                  {requirement.student_upload && requirement.status !== "Complete" && (
                     <Button
                       variant="secondary"
                       size="sm"
