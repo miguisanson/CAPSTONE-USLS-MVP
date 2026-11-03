@@ -159,17 +159,13 @@ class Night8SeedTests(unittest.TestCase):
 
     # ------------------------------------------------------------------ R-001
     def test_a_second_seed_in_its_own_process_gives_the_same_data(self):
-        type(self).other_folder = tempfile.mkdtemp(prefix="night8-seed-")
-        _seed(Path(self.other_folder))
-        with app.app_context():
-            db.session.remove()
-            # In a full run `app` was imported by an earlier test module, so it may use that module's file, not _DB_FILE.
-            here = db.engine.url.database
-        differing = differing_tables(
-            table_fingerprints(here), table_fingerprints(Path(self.other_folder) / "demo.sqlite3")
-        )
+        # Two clean `npm run seed` processes: an in-process seed inside a long test run inherits settings earlier test
+        # modules changed, which is not what a teammate's machine does (R-001).
+        first, second = (Path(tempfile.mkdtemp(prefix=f"night8-seed-{n}-")) for n in (1, 2))
+        _seed(first)
+        _seed(second)
+        differing = differing_tables(table_fingerprints(first / "demo.sqlite3"), table_fingerprints(second / "demo.sqlite3"))
         self.assertEqual([], differing, "two seeds produced different data in these tables")
-
 
 if __name__ == "__main__":
     unittest.main()
