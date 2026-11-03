@@ -149,14 +149,14 @@ Stakeholder meeting 2026-11-04. Owner asked for, in this order:
    tunnel token from a file the owner fills), `deploy/DOCKER.md` (helper C). Owner: domain NOT yet on Cloudflare;
    public sign-in page SHOWS the demo accounts (DEMO_SHOW_ACCOUNTS=1, owner choice, risk told).
 7. Then polish / improvement / optimization loop (IMPROVE.md) until 10:00 Manila.
-**Progress (01:20 Nov 4):** ALL 5 DELIVERABLES DONE + pushed (entry point `Documents/CAPSTONE_ONLY/Demo_Migui/README-FOR-MIGUI.md`).
-Owner 00:xx: leave the domain/Cloudflare to him; keep looping. MERGED on v6.1 after gates: night1..4 (Python 911, e2e 767+fixes),
-night5 (I-222..I-225 persona fixes) + night6 (Fable follow-up on the assistant) (Python 919 OK, e2e 772 + spec fixes 54/54).
-IN GATE (round 4): pkt/night7 (I-216: faculty .ics scoped to self, staff-set faculty passwords force a change) in wt/gatebase
-(Python -> gate-night/pc_r4.txt) and wt/gatenight (e2e -> e2e_r4.txt); merge if green.
-Live site: `npm run uat` on 127.0.0.1:5000 since 23:55 (code = night1-4). Morning (06:00-08:00): after the last merge, rebuild
-(`npm run build:web`), stop the site's python by its PID (netstat :5000), `npm run seed`, start `deploy\START-SITE.cmd`,
-re-record the videos (`scripts/demo/record_demo.py`, fresh DB on :5092, then build_narration.py) so screens match.
+**Progress (02:10 Nov 4):** ALL 5 DELIVERABLES DONE + pushed (entry point `Documents/CAPSTONE_ONLY/Demo_Migui/README-FOR-MIGUI.md`).
+Owner: leave the domain/Cloudflare to him; keep looping. MERGED on v6.1 after gates: night1..7 (last Python 925 OK; e2e 773, the
+one fail I-235 flaky). Teammate Myrine pushed teaching-timetable work (I-226..I-234 rows are hers) at 02:00; merged into
+v6.1 (793a17b), ISSUES conflict resolved (my flaky row renumbered I-235). ALWAYS `git fetch` + merge origin before pushing.
+IN GATE (round 5 = v6.1 incl. Myrine + pkt/night8 seed realism F-25: advisers for research students, Completed waits for the Dean's
+endorsement approval): Python -> gate-night/pc_r5.txt (wt/gatebase), e2e -> e2e_r5.txt (wt/gatenight). Merge night8 if green.
+Live site: `npm run uat` on 127.0.0.1:5000 since 23:55 (old code). Morning (06:00-08:00): rebuild, stop the site's python by its
+PID (netstat :5000), `npm run seed`, start `deploy\START-SITE.cmd`, re-record the videos on the final code, rebuild narration.
 Restore BayoCoop watchdog registration (`E:/DevCache/dev-kit-workers/build-session.*.bayocoop-backup`) when the run ends.
 Shared doc tools: `E:/Temp/claude/docs-venv` (python-docx, pymupdf, openpyxl, imageio-ffmpeg); LibreOffice `E:/LibreOffice`.
 
