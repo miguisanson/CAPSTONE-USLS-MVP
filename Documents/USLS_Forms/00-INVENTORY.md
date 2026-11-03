@@ -6,8 +6,8 @@ lifecycle needs. Each form is clean (no watermark, no draft footer) and carries 
 revision no. (00) and effectivity date. Approval is collected once, on **GS-P-01 Graduate School Forms Approval Sheet**.
 
 All files are built by one script, `scripts/docs/forms/build_forms.py`, so a correction is a one-line change followed by a
-re-run (layout, fonts and control fields stay identical). Print pack: `USLS-GS-Forms-Pack.pdf` (approval sheet first, then the routing guide, then GS-F-01 to GS-F-44; 79 pages); the single PDFs are in `pdf/`.
-Layout: A4, Arial, 2 cm margins, page X of Y in the footer; 16 forms fit one page and the others two (none longer).
+re-run (layout, fonts and control fields stay identical). Print pack: `USLS-GS-Forms-Pack.pdf` (approval sheet first, then the routing guide, then GS-F-01 to GS-F-44; 82 pages); the single PDFs are in `pdf/`.
+Layout: A4, Arial, 2 cm margins, page X of Y in the footer; instruction boxes 9.5 pt, field captions 9 pt; 13 forms fit one page and 31 two pages (none longer); GS-P-01 is 3 pages and GS-P-02 (landscape, 9 pt table) is 4.
 
 ## What already exists officially
 
@@ -48,7 +48,7 @@ is shown in the title line of every research form, so each can be traced to the 
 | GS-F-17 | Panel Nomination and Invitation Reply Slip | Panel nomination, scheduling | Research Coordinator; nominees reply; Committee deliberates | Protocol, Title Defense I.4; Handbook pp. 60, 63; app `PanelAssignment`, `PanelInvitation` | drafted here (the reply slip is proposed) |
 | GS-F-18 | Report of Title Defense (Form 2) | Title defense | Panel members; Panel Chair | Protocol, Title Defense III; Handbook pp. 60-61; app `DefenseVerdict` | official exists by name, template not held; drafted here |
 | GS-F-19 | Application for Designation of Research Adviser (Form 3) | Adviser designation | Student; Academic Coordinator notes; Research Coordinator forwards | Protocol, Designation I; Handbook pp. 58-59, 61; app `AdviserAppointment` | official exists by name, template not held; drafted here |
-| GS-F-20 | Appointment of Research Adviser (Form 3.1) | Adviser designation | Research Coordinator, Associate Dean, Dean sign; adviser accepts | same | official exists by name, template not held; drafted here |
+| GS-F-20 | Appointment for Research Adviser (Form 3.1) | Adviser designation | Research Coordinator, Associate Dean, Dean sign; adviser accepts | same | official exists by name, template not held; drafted here |
 | GS-F-21 | Request for Change of Research Adviser (Form 3.1.1) | Change of adviser | Student; current and new adviser; Coordinator, Associate Dean, Dean | Protocol, Change of Adviser; Handbook p. 62 | official exists by name, template not held; drafted here |
 | GS-F-22 | Research Timetable (Form 3.2) | Research advising | Student; adviser | Protocol, Designation II; Handbook pp. 58, 61-62 | official exists by name, template not held; drafted here |
 | GS-F-23 | Thesis / Dissertation Advising Contract (Form 3.3) | Research advising | Student; adviser | Protocol, Designation II; Handbook p. 59 | official exists by name, template not held; drafted here |
@@ -67,9 +67,9 @@ is shown in the title line of every research form, so each can be traced to the 
 | GS-F-36 | Similarity Index (Turnitin) Certification | Revisions and completion | Turnitin administrator | Protocol, Final Defense III (Turnitin certificate); Handbook p. 68 | certificate is official by name (no form number); drafted here |
 | GS-F-37 | Editor Certification (Form 9) | Revisions and completion | Editor | Protocol, Final Defense III; Handbook p. 68 | official exists by name, template not held; drafted here |
 | GS-F-38 | Approval Sheet (Form 10) | Revisions and completion | Panel, adviser; Dean accepts | Protocol, Final Defense III; Handbook pp. 68, 77 | official exists by name, template not held; drafted here |
-| GS-F-39 | Formal Invitation to Co-Author a Journal Article (Form 11) | Publication | Student; co-author; adviser | Handbook p. 75 | official exists by name, template not held; drafted here |
+| GS-F-39 | Formal Invitation to Co-Author Journal Article (Form 11) | Publication | Student; co-author; adviser | Handbook p. 75 | official exists by name, template not held; drafted here |
 | GS-F-40 | Publication Information Form (Form 12) | Publication | Student; Research Committee; Dean | Handbook p. 75 | official exists by name, template not held; drafted here |
-| GS-F-41 | Evidence of Publication or Acceptance (Form 13) | Publication | Student; Research Coordinator | Handbook pp. 75, 77 | official exists by name, template not held; drafted here |
+| GS-F-41 | Evidence of Publication or Acceptance (Form 13) | Publication | Student; Research Coordinator | Handbook pp. 75, 77 | Form 13 is named only by number in the Handbook (p. 75); the title is descriptive; template not held; drafted here |
 | GS-F-42 | Application for Graduation | Graduation application | Student; Academic Coordinator; Research Coordinator; Dean | Ops Manual 4.18; Handbook pp. 55-56, 68-69, 75-77, 80; app `GraduationEndorsement` | drafted here |
 | GS-F-43 | Graduation Endorsement List | Graduation endorsement | GS staff; coordinators; Dean | Ops Manual 4.18; Handbook pp. 32, 77; app `GraduationEndorsement` (batch, Dean decision, export) | drafted here |
 | GS-F-44 | Records Transmittal to the University Registrar | Records handoff | Dean, Associate Dean or representative; Registrar acknowledges | Ops Manual 4.19; Handbook pp. 32, 49, 53; app `LeaveExportLog`, registrar status fields | drafted here (proposed) |
@@ -154,8 +154,86 @@ Operations Manual (OQ).
 18. Offices and titles: is the signatory "Graduate School Secretary" on GS-P-01 the same person as the "Graduate Program
     Secretary" in the Handbook, and are the mailboxes in the forms (gsresearch@, rerc@, turnitin@, gsm@usls.edu.ph) current (OQ-39)?
 
+19. Research adviser rules differ between the sources: the Handbook (p. 58) asks for a faculty member of the Graduate School
+    with a doctoral degree aligned with the discipline and at least one refereed publication, and counts five advisees per
+    semester (p. 59); the Protocol asks for a PhD for PhD students and at least PhD units for MA students (CHED CMO 15) and
+    five active advisees per academic year. GS-F-19 states both. Which governs?
+20. Project paper: the Protocol gives the provisional-pass score only for a thesis (below 85) and a dissertation (below 90).
+    GS-F-32 and GS-F-33 leave the project-paper threshold as a blank to be filled by the Graduate School.
+21. Proposal defense outcomes: the Protocol names the final-defense decisions (pass, pass with minor revisions, provisional
+    pass with major revisions) but only says that major revisions at the proposal defense mean a re-defense. GS-F-29 offers
+    Passed, Passed with minor revisions, Major revisions. Are those the outcomes to use?
+22. Mixed-methods studies and Form 4.1: the Protocol requires it for quantitative studies and excludes qualitative studies;
+    it says nothing about mixed methods. GS-F-25 offers only those two options.
+23. Readmission: the Handbook (p. 45) lists four requirements. GS-F-08 also records three platform checks (updated study
+    plan, adviser consultation, no pending accountability) under a separate heading marked as not Handbook requirements.
+    Keep or strike them?
+24. AWOL: the Handbook (p. 53) defines the status but does not say it is reported to the Registrar. GS-F-09 says so only as
+    "to be confirmed". Is the Registrar informed, and by which form?
+25. Rescheduling a defense (GS-F-28): is a new date subject to the two-week endorsement and 14-Day Rule lead times, as the
+    form states, and who may ask for it?
+26. Public final defense endorsement (Form 4.3): the Handbook names it "Endorsement for Public Defense" (pp. 72-73) and, in
+    a note, "Endorsement for Final Defense"; the Protocol uses "Endorsement for Public Final Defense" in a note. GS-F-35 uses
+    the Protocol's note wording. Is that the official title?
+27. Ethics committee mailbox: the Protocol gives rerc@usls.edu.ph, the Handbook (pp. 65, 68) gives another address; the forms
+    use the Protocol's. The Handbook calls the body the Social Research Ethics Committee (p. 23).
+28. Practicum Agreement (GS-F-11): the responsibilities paragraph is the group's draft wording, not a University text.
+    Who reviews it before it is used?
+
 Also still open from the process audit: waiver of the two-week rules (OQ-43), time limits and what follows when they are
 exceeded (OQ-41), and whether weekends and holidays count in lead times.
+
+## Verification (2026-11-03)
+
+Every rule sentence, citation, form number and form title in `build_forms.py` was checked against the Handbook
+(`GRADUATE-SCHOOL-HANDBOOK-22-23.pdf`, printed page = PDF page minus four, the convention of the rule register), the
+Research Protocol (AY 2024-2025 copy) and `operations_manual_rules.json`. About 310 statements (229 instruction sentences,
+21 paragraph blocks, checklist and classification lines) and about 160 citations were read against the source passage.
+Result: the numbers, periods, percentages, fees, scores and page cites were correct except as listed below. Statements that
+rest only on the register's Practice or Proposed rules (the Graduate School's own working practice, not the Handbook) are
+now marked on the form ("proposed practice", "to be confirmed") or left as blanks.
+
+Corrected:
+
+- Titles to the Protocol's wording: GS-F-20 "Appointment of Research Adviser" became "Appointment for Research Adviser"
+  (Form 3.1); GS-F-39 "Formal Invitation to Co-Author a Journal Article" became "Formal Invitation to Co-Author Journal
+  Article" (Form 11). Old files removed.
+- GS-F-05: removed "a student who will not return should file a leave"; now "a student who withdraws after the second week may
+  file a leave (Handbook p. 53)". Removed the claim that only the Business Office computes fees.
+- GS-F-06: citation p. 54 removed (p. 52 only); the Approved Absence rule now states who grants it (Dean's approval); removed an
+  invented right of the student to explain an absence to the Dean; the drop for another ground is marked "to be confirmed".
+- GS-F-08: the three non-Handbook checks (study plan, adviser consultation, pending accountability) moved to a separate list
+  marked as not Handbook requirements; the Handbook's four requirements now cited (p. 45) with no failed subject (p. 54).
+- GS-F-09: "curtailed until you return" became "curtailed or entirely withdrawn" (p. 53); removed the unsourced statement that
+  the years away count in maximum residence and that the Registrar is informed through GS-F-44 (now "to be confirmed").
+- GS-F-10: removed the unsourced "residency fee"; the Handbook states none.
+- GS-F-11: removed the unsourced list of programs (Psychology, MS Guidance and Counseling).
+- GS-F-16: removed "the Graduate School checks only completeness" and "read into the Graduate School record"; cited pp. 59-60.
+- GS-F-17: nomination rule restated as the Protocol states it (Academic Coordinator recommends; the research adviser
+  recommends the external member, GS Research Committee approves).
+- GS-F-19: removed "propose up to three faculty members"; removed the invented "nominate again" outcome; added that the Handbook
+  asks for a doctoral degree.
+- GS-F-21: "before the proposal defense application" became "before the proposal defense" (the Protocol's wording for the adviser;
+  the title change keeps "application", GS-F-24).
+- GS-F-22: one year to submit and defend the proposal applies to a thesis and a dissertation, not a project paper (p. 58).
+- GS-F-23: removed "within a reasonable time"; reworded "keep a copy of every approval".
+- GS-F-25: removed the mixed-methods option (not in the Protocol).
+- GS-F-27: "the same panel takes part in the proposal and final defense" became "the same set takes part in the closed-door
+  final defense"; students abroad: the panel chair recommends an online defense.
+- GS-F-32, GS-F-33: provisional-pass scores are below 85 for a thesis and below 90 for a dissertation only; the Protocol gives
+  none for a project paper (blank). GS-F-33 now says the criteria are the Handbook's outstanding thesis rubric (p. 76).
+  GS-F-32 cites pp. 72-73.
+- GS-F-35: the two-week rule is the Handbook's (p. 73), not the Protocol's; the Protocol says five days.
+- GS-F-42: the conference requirement is now stated as the Handbook and Protocol state it (GS Research Conference or an external
+  one; p. 80 for the Alumni seminar); the replacement-of-application rule is marked proposed practice.
+- GS-F-43: removed "the Graduate School does not issue the diploma"; GS-F-44 cites p. 50.
+- Role names unified (Research Adviser, Panel Chair, Graduate School Staff); signature order unified to student, adviser,
+  then coordinators and Dean (GS-F-23, 27, 34, 35 changed). GS-P-01: "program clusters" became "program areas".
+- Typography: instruction boxes 9.5 pt; GS-P-02 table 9 pt (4 pages). Three forms grew from one to two pages; none exceeds two.
+
+Could not verify: the content of Protocol Forms 1 to 13 themselves (the sources describe them but hold no layout); the Handbook
+does not name Form 13; the copy of the Protocol has no fee amounts; no residency fee, practicum hours or review-window dates
+exist in the sources; the CHED memorandum and the Facebook and e-mail addresses were not opened.
 
 ## Not verified
 

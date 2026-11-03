@@ -28,7 +28,8 @@ OUT = ROOT / "Documents" / "USLS_Forms"
 
 FONT = "Arial"
 BODY = 10.5      # body text, pt
-NOTE = 9.0       # instruction box, control labels, footer
+NOTE = 9.0       # control labels, field captions, footer
+INSTR = 9.5      # instruction box
 TITLE = 14.0
 CHECK_FONT = "Segoe UI Symbol"
 BOX = "\u2610"   # ballot box
@@ -335,14 +336,14 @@ def instruction_box(doc, items, width, heading="INSTRUCTIONS"):
     fix_widths(t, [width])
     c = t.rows[0].cells[0]
     shade(c, INSTR_FILL)
-    cell_text(c, heading, size=NOTE, bold=True, after=2)
+    cell_text(c, heading, size=INSTR, bold=True, after=2)
     for i, text in enumerate(items, 1):
         p = c.add_paragraph()
         fmt(p, after=1, line=0.93)
         p.paragraph_format.left_indent = Cm(0.5)
         p.paragraph_format.first_line_indent = Cm(-0.5)
-        add_text(p, f"{i}.\u00A0\u00A0", size=NOTE)
-        add_text(p, text, size=NOTE)
+        add_text(p, f"{i}.\u00A0\u00A0", size=INSTR)
+        add_text(p, text, size=INSTR)
     gap(doc, 5)
 
 
@@ -663,13 +664,13 @@ def add(code, title, process, sections, instructions=None, ref="", subtitle=None
 # ---- 01 ------------------------------------------------------------------------------------
 add("01", "Onboarding Report for the Dean", "Admission handoff and onboarding",
     instructions=[
-        "Prepared by the Graduate School staff for each batch of newly admitted students received from the Registrar (AIMS export) or the Academic Coordinator's monitoring workbook. One report covers one batch.",
+        "Prepared by the Graduate School Staff for each batch of newly admitted students received from the Registrar (AIMS export) or the Academic Coordinator's monitoring workbook. One report covers one batch.",
         "The Graduate School does not create student numbers or institutional emails; they are received from the University Registrar. Admission requirements are checked by the Admissions office (Handbook 2022-2023, pp. 42-47) and are not re-assessed here.",
         "Every item that is not complete is listed in Part C with the person who will follow it up. The Dean accepts the report only when no item is left open, or records which items remain open.",
     ],
     sections=[
         F("Batch information", ["Program", "Academic year / term of entry", "Source file / workbook name", "Date received",
-                                  "Number of students in the batch", "Number of new students", "Prepared by (GS staff)", "Date prepared"]),
+                                  "Number of students in the batch", "Number of new students", "Prepared by (Graduate School Staff)", "Date prepared"]),
         C("Onboarding checklist", "Tick each item that has been checked for every student in the batch.",
           ["Admission handoff recorded (admission approval received)", "Student profile sheet received for each student",
            "Student profiles created from the import", "Program assignment confirmed with the Academic Coordinator",
@@ -678,7 +679,7 @@ add("01", "Onboarding Report for the Dean", "Admission handoff and onboarding",
         T("Items needing follow-up", [("Student no.", 2.4), ("Student name", 4.2), ("Missing / unresolved item", 4.6), ("Assigned to", 2.8), ("Date resolved", 2.4)], 5),
         C("Dean's decision", None, ["Onboarding report accepted; admission is complete for this batch", "Returned to the Graduate School for the items marked above"], cols=1),
         B(None, "Dean's remarks:", 1.6),
-        S("Review and approval", [("Prepared by", "Graduate School staff"), ("Reviewed by", "Academic Coordinator of the program"),
+        S("Review and approval", [("Prepared by", "Graduate School Staff"), ("Reviewed by", "Academic Coordinator of the program"),
                                   ("Accepted by", "Graduate School Dean")]),
     ],
     gs=["Batch no."])
@@ -750,8 +751,8 @@ add("05", "Application for Withdrawal of Subject", "Withdrawal of subject",
     ref="Handbook pp. 49-51, 53",
     instructions=[
         "A student may withdraw subjects until the second week from the start of classes, whether or not classes have been attended. Charges: ten percent (10%) of the total amount due for the term in the first week of classes and twenty percent (20%) in the second week (Handbook pp. 49, 51).",
-        "After the second week a student keeps the right to withdraw all subjects but pays the full enrollment fees for the semester; if the reason is justifiable, fees are charged only up to and including the last month of attendance (Handbook pp. 49, 51). A student who will not return should file a leave of absence (GS-F-07).",
-        "This form is the written request to the Dean and, once approved, the Withdrawal Form. Fees are assessed only by the Business Office; the Graduate School does not compute them. Copies: Registrar, Accounting Office and the student (Handbook p. 49).",
+        "After the second week a student keeps the right to withdraw all subjects but pays the full enrollment fees for the semester; if the reason is justifiable, fees are charged only up to and including the last month of attendance (Handbook pp. 49, 51). A student who withdraws after the second week may instead file a leave of absence (GS-F-07) (Handbook p. 53).",
+        "This form is the written request to the Dean and, once approved, the Withdrawal Form. Fees are assessed by the Business Office. Copies: Registrar, Accounting Office and the student (Handbook p. 49).",
     ],
     sections=[
         F("Student information", STU_SHORT + ["Academic year / semester", "Date of the first class meeting", "Date of this request"]),
@@ -769,11 +770,11 @@ add("05", "Application for Withdrawal of Subject", "Withdrawal of subject",
 
 # ---- 06 ------------------------------------------------------------------------------------
 add("06", "Notice of Dropping from a Subject", "Dropping",
-    ref="Handbook pp. 52, 54",
+    ref="Handbook p. 52",
     instructions=[
         "Attendance is counted from the first regular class meeting. The maximum number of absences allowed is 20% of the total class hours of the semester. When unexcused absence is more than 20% of the stipulated hours in one course, the student is automatically dropped from the course by the professor and given the grade DRP with a 5.0 (Handbook p. 52).",
-        "Excused absences are a death in the family, illness (with a medical certificate from the USLS clinic or a personal doctor) and a graduate program activity endorsed by the Dean. An Approved Absence is not counted (Handbook p. 52).",
-        "A drop at any other time is arranged between the student and the Academic Coordinator. A student who wishes to leave a subject within the first two weeks files GS-F-05. The Graduate School does not enter or change grades; it records the drop in AIMS and in its own record.",
+        "Excused absences are a death in the family, illness (with a medical certificate from the USLS clinic or a personal doctor) and a graduate program activity endorsed by the Dean. A student who takes part in a school-sponsored activity or represents the University in an official capacity is granted an Approved Absence on the Dean's approval; it is not counted against the allowed absences (Handbook p. 52).",
+        "A student who wishes to leave a subject within the first two weeks files GS-F-05. In practice a drop for another documented ground is arranged between the student and the Academic Coordinator (to be confirmed by the Graduate School). The Graduate School records the drop in AIMS and in its own record.",
     ],
     sections=[
         F("Student and subject", STU_SHORT + ["Subject code", "Subject title", "Professor", "Academic year / semester", "Section / schedule"]),
@@ -781,7 +782,7 @@ add("06", "Notice of Dropping from a Subject", "Dropping",
         C("Basis of the drop", None, ["Unexcused absence is more than 20% of the total class hours (Handbook p. 52)",
                                        "Other documented ground agreed with the Academic Coordinator (state below)"], cols=1),
         B(None, "Other ground, with supporting documents:", 1.3),
-        P(None, "The student was informed of this drop on the date shown below and has the right to explain any excused absence in writing to the Dean."),
+        P(None, "The student was informed of this drop on the date shown below."),
         S("Signatures", [("Professor of the subject", "Reports the absences"), ("Academic Coordinator", "Verified; recorded as dropped"),
                          ("Student", "Informed of the drop"), ("Graduate School Dean", "Noted")]),
     ],
@@ -823,13 +824,14 @@ add("08", "Application for Readmission (Return from Leave or AWOL)", "Return fro
         F("Return", ["Semester of return (target term)", "Date of this application"]),
         P("Declaration of intention to enroll", "To the University Registrar, through the Graduate School Dean: I declare my intention to enroll in the term stated above. I have been away from the program for the reasons written below, and I will comply with the requirements of readmission."),
         B(None, "Reason for the absence and plans to complete the program:", 1.8),
-        C("Requirements of readmission", "Verified by the Graduate School:", [
+        C("Requirements of readmission (Handbook p. 45)", "Verified by the Graduate School:", [
             "Clearance from the Business Office", "Interview done (reason for delay, residency requirements)",
-            "Evaluation of subject and grade requirements; no failed subject", "Updated study plan confirmed",
-            "Consultation with the program or research adviser done", "No pending accountability", "Advice Slip issued by the Dean"], cols=1),
+            "Evaluation of subject and grade requirements; no failed subject (Handbook p. 54)", "Advice Slip issued by the Dean"], cols=1),
+        C(None, "Further checks recorded by the Graduate School (not requirements stated in the Handbook):", [
+            "Updated study plan confirmed", "Consultation with the program or Research Adviser done", "No pending accountability"], cols=1),
         F("Residence standing (Academic Coordinator)", ["Years in the program", "Normal limit (5 master's / 7 doctorate)", "Maximum limit (7 / 9, including leave)", "Refresher of 6 units required?"]),
         C(None, "Classification:", ["Within the normal limit", "Extension: graded six-unit refresher required", "Beyond the maximum: full re-enrollment required"], cols=1),
-        S("Signatures and endorsement", [("Student", "Applicant"), ("Academic Coordinator", "Evaluated; study plan confirmed"), ("Business Office", "Clearance issued"),
+        S("Signatures and endorsement", [("Student", "Applicant"), ("Academic Coordinator", "Evaluated subject and grade requirements"), ("Business Office", "Clearance issued"),
                                          ("Graduate School Dean", "Endorsed  /  Not endorsed  to the University Registrar"), ("University Registrar", "Received; readmission processed")]),
     ],
     gs=["Endorsed to Registrar on", "Registrar confirmation on"])
@@ -839,17 +841,17 @@ add("09", "Notice of Absence Without Leave (AWOL)", "Absence without leave",
     ref="Handbook p. 53",
     instructions=[
         "A student who withdraws from the College without a formal leave of absence is in absence-without-leave (AWOL) status and has registration privileges curtailed or entirely withdrawn (Handbook p. 53).",
-        "The status is recorded from evidence, for example an imported AWOL standing or an enrollment marked withdrawn with no approved leave. It is never based on absence alone and is not typed in without the source being stated below.",
-        "The student is told how to return (GS-F-08). The Registrar is informed through GS-F-44.",
+        "Proposed practice: the status is recorded from evidence, for example an imported AWOL standing or an enrollment marked withdrawn with no approved leave. It is not based on absence alone and is not entered without the source being stated below.",
+        "The student is told how to return (GS-F-08). The Handbook does not say that AWOL is reported to the Registrar; if the Graduate School reports it, GS-F-44 is used (to be confirmed).",
     ],
     sections=[
         F("Student information", STU_SHORT + ["Stage before the AWOL (research or coursework)", "Last term enrolled", "Date AWOL takes effect", "Years in the program"]),
         C("Source of the evidence", None, ["Imported enrollment or standing record (AIMS export)", "Semester enrollment marked withdrawn with no approved leave and no resolved return",
                                            "Report of the Academic Coordinator or professor", "Other (state): ____________________"], cols=1),
         B(None, "Details (what was found, dates, attempts to contact the student):", 2.2),
-        P("Notice to the student", "You are recorded as absent without leave from the date above. Your registration privileges are curtailed until you return. To return, file the Application for Readmission (GS-F-08) with the Graduate School Dean. Your years away count in your maximum residence."),
+        P("Notice to the student", "You are recorded as absent without leave from the date above. Your registration privileges are curtailed or entirely withdrawn (Handbook p. 53). To return, file the Application for Readmission (GS-F-08) with the Graduate School Dean."),
         F(None, ["Student notified on (date)", "Notified by (email / letter)", "Registrar informed on", "Informed by"]),
-        S("Signatures", [("Prepared by", "Graduate School staff or Academic Coordinator"), ("Graduate School Dean", "Noted")]),
+        S("Signatures", [("Prepared by", "Graduate School Staff or Academic Coordinator"), ("Graduate School Dean", "Noted")]),
     ],
     gs=["Platform status"])
 
@@ -859,7 +861,7 @@ add("10", "Application for Residency Enrollment", "Residency enrollment and maxi
     instructions=[
         "Residency applies to a student who has finished all coursework and is only working on the thesis or dissertation, or the practicum or internship, after a semester of enrollment for it. It also applies to a student who is not enrolled in any subject but will complete an INC, will take the comprehensive examination, or is waiting for the research publication. Registration for residence must be done within the semester (Handbook p. 48).",
         "A student who does not intend to enroll for a valid reason but still has remaining units may not enroll in residency and must file a leave of absence (GS-F-07).",
-        "Maximum residence: master's, candidacy within three years and all requirements within five years, with a possible two-year extension that requires a graded six-unit refresher, up to seven years including leave; doctorate, five and seven years, up to nine years including leave (Handbook pp. 54-55). The residency fee is assessed by the Business Office.",
+        "Maximum residence: master's, candidacy within three years and all requirements within five years, with a possible two-year extension that requires a graded six-unit refresher, up to seven years including leave; doctorate, five and seven years, up to nine years including leave (Handbook pp. 54-55). The Handbook states no residency fee; any fee is assessed by the Business Office.",
     ],
     sections=[
         F("Student information", STU + ["Date admitted to the program", "Years in the program"]),
@@ -867,9 +869,9 @@ add("10", "Application for Residency Enrollment", "Residency enrollment and maxi
         C("Purpose of the residency", None, ["Thesis or dissertation writing (after a semester of enrollment for it)", "Practicum or internship (after a semester of enrollment for it)",
                                               "Comprehensive examination", "Completion of an incomplete grade (INC)", "Waiting for the research publication"], cols=1),
         B(None, "Supporting details (thesis or practicum enrollment semester, subject with INC, exam date, journal and status):", 1.8),
-        P(None, "I confirm that I have no remaining subjects that I intend to enroll in this semester and that I will settle the residency fee with the Business Office."),
+        P(None, "I confirm that I have no remaining subjects that I intend to enroll in this semester and that I will settle any fee assessed by the Business Office."),
         S("Signatures and approval", [("Student", "Applicant"), ("Academic Coordinator", "Purpose and eligibility verified"), ("Graduate School Dean or authorized representative", "Approved  /  Not approved"),
-                                      ("Business Office", "Residency fee assessed; receipt no. ________")]),
+                                      ("Business Office", "Fee assessed, if any; receipt no. ________")]),
     ],
     gs=["Recorded in platform on"])
 
@@ -877,7 +879,7 @@ add("10", "Application for Residency Enrollment", "Residency enrollment and maxi
 add("11", "Practicum Agreement (Memorandum of Agreement)", "Practicum",
     ref="Handbook p. 48",
     instructions=[
-        "Used for programs with a practicum or internship (Psychology programs and the Master of Science in Guidance and Counseling). Complete it before the practicum starts; the Graduate School keeps the signed original and gives a copy to the host organization.",
+        "Used for programs with a practicum or internship (the programs are to be named by the Graduate School). Complete it before the practicum starts; the Graduate School keeps the signed original and gives a copy to the host organization.",
         "The Academic Coordinator reviews the agreement and marks the practicum as in progress once it is signed by all parties. The required number of practicum hours is stated by the Graduate School for the program.",
     ],
     sections=[
@@ -970,14 +972,14 @@ RES4 = RES_STU[:2]
 
 # ---- 16 ------------------------------------------------------------------------------------
 add("16", "Application for Title Defense", "Title defense", subtitle="Research Protocol Form 1",
-    ref="Protocol Form 1; Handbook p. 59",
+    ref="Protocol Form 1; Handbook pp. 59-60",
     instructions=[
         "Fill in this form and send it with the three (3) concept papers to your Academic Coordinator at least two (2) weeks before the proposed defense. The Academic Coordinator endorses the application to the Research Coordinator (gsresearch@usls.edu.ph) and recommends a set of panel members; the student does not need the Academic Coordinator's handwritten signature when the endorsement is sent by email with the e-signature.",
-        "The Graduate School checks only that this form, the three concept papers and the endorsement are complete before a panel is nominated. The panel deliberates the three titles without the student and decides the title to be pursued (GS-F-18).",
-        "Answer the four labelled items in Part D completely; they are read into the Graduate School record. Panel composition: project paper, a chair and two members; thesis, a chair and three members; dissertation, a chair and four members. The external panel member joins from the proposal defense onward.",
+        "The Research Coordinator then nominates the panel members as recommended by the Academic Coordinator, after deliberation with the GS Research Committee (GS-F-17). The panel deliberates the three titles without the student and decides the title to be pursued (GS-F-18).",
+        "Answer the four labelled items in Part D completely. Panel composition (Handbook p. 60): project paper, a chair and two members; thesis, a chair and three members; dissertation, a chair and four members. The external panel member joins from the proposal defense onward.",
     ],
     sections=[
-        F("Student information", RES_STU + ["Research adviser (if already designated)", "Comprehensive examination passed on"]),
+        F("Student information", RES_STU + ["Research Adviser (if already designated)", "Comprehensive examination passed on"]),
         F("Defense details", ["Type of paper", "Preferred date of title defense", "Preferred mode (onsite / online)", "Date of this application"]),
         T("Concept papers submitted (three required)", [("No.", 0.9), ("Title of concept paper", 9.5), ("Key terms", 4.6), ("Pages", 1.4)], 3, 0.95),
         F("Details of the concept paper preferred by the student",
@@ -993,12 +995,12 @@ add("16", "Application for Title Defense", "Title defense", subtitle="Research P
 add("17", "Panel Nomination and Invitation Reply Slip", "Panel nomination and scheduling",
     ref="Handbook pp. 60, 63; Protocol, Title Defense I.4",
     instructions=[
-        "The Research Coordinator nominates the panel members as recommended by the Academic Coordinator (title defense) or by the research adviser (proposal and final defense), after deliberation with the GS Research Committee. The recommendation of an external panel member is subject to the approval of the GS Research Committee.",
-        "Each nominated member answers the invitation below. A member who is not available on the date marks the slip as unavailable. A defense is confirmed only when the adviser and all required panel members are available.",
-        "The Graduate School Office coordinates the schedule with the panel; the panel chair reserves the venue through the Graduate School Office or prepares the online meeting details.",
+        "The Research Coordinator nominates the panel members as recommended by the Academic Coordinator, after deliberation with the GS Research Committee (title defense). For the proposal and final defenses the Research Adviser recommends the external panel member, subject to the approval of the GS Research Committee (Protocol, Proposal Defense I).",
+        "Each nominated member answers the invitation below; a member who is not available on the date marks the slip as unavailable. The defense date is confirmed once the Research Adviser and all required panel members have replied that they are available (proposed practice).",
+        "The Graduate School Office coordinates the schedule with the panel; the Panel Chair reserves the venue through the Graduate School Office or prepares the online meeting details.",
     ],
     sections=[
-        F("Student and defense", RES4 + ["Type of paper", "Defense (title / proposal / final)", "Proposed date and time", "Mode and venue", "Research adviser", "Date of nomination"]),
+        F("Student and defense", RES4 + ["Type of paper", "Defense (title / proposal / final)", "Proposed date and time", "Mode and venue", "Research Adviser", "Date of nomination"]),
         T("Panel nominated", [("Role", 3.2), ("Name of nominee", 4.8), ("Affiliation", 3.4), ("Reply (Accept / Decline / Unavailable)", 3.0), ("Signature and date", 2.6)],
           [["Panel Chair", "", "", "", ""], ["Content Specialist", "", "", "", ""], ["Method Specialist", "", "", "", ""],
            ["Content Specialist 2 (dissertation)", "", "", "", ""], ["External Panel (from proposal defense)", "", "", "", ""]], 0.95),
@@ -1013,12 +1015,12 @@ add("17", "Panel Nomination and Invitation Reply Slip", "Panel nomination and sc
 add("18", "Report of Title Defense", "Title defense", subtitle="Research Protocol Form 2",
     ref="Protocol Form 2; Handbook pp. 60-61",
     instructions=[
-        "The panel deliberates the three submitted titles without the student, then decides the title to be pursued. The decision must be reflected on this form. Each panel member accomplishes the form; the panel chair emails the accomplished form to the Research Coordinator (gsresearch@usls.edu.ph) and to the student within the first working day after the defense.",
+        "The panel deliberates the three submitted titles without the student, then decides the title to be pursued. The decision must be reflected on this form. Each panel member accomplishes the form; the Panel Chair emails the accomplished form to the Research Coordinator (gsresearch@usls.edu.ph) and to the student within the first working day after the defense.",
         "If all the proposed titles are disapproved, the student presents a new set of three (3) titles and follows the same protocol (new GS-F-16).",
         "The student settles the title defense fees by asking the panel members for their preferred mode of payment and emails the proof to the Graduate School Office within the first working day, with the subject line LAST NAME_type of defense_receipt.",
     ],
     sections=[
-        F("Student and defense", RES4 + ["Type of paper", "Date of the defense", "Mode and venue", "Research adviser (if any)"]),
+        F("Student and defense", RES4 + ["Type of paper", "Date of the defense", "Mode and venue", "Research Adviser (if any)"]),
         T("Titles deliberated", [("No.", 0.9), ("Title of concept paper", 11.0), ("Decision", 3.2), ("Selected", 1.9)],
           [["1", "", "Approved / Disapproved", ""], ["2", "", "Approved / Disapproved", ""], ["3", "", "Approved / Disapproved", ""]], 0.95),
         C("Result of the title defense", None, ["Approved: the title selected above is to be pursued", "Disapproved: the student presents a new set of three titles"], cols=1),
@@ -1030,53 +1032,53 @@ add("18", "Report of Title Defense", "Title defense", subtitle="Research Protoco
     gs=["Recorded in platform on"])
 
 # ---- 19 ------------------------------------------------------------------------------------
-add("19", "Application for Designation of Research Adviser", "Research adviser designation", subtitle="Research Protocol Form 3",
+add("19", "Application for Designation of Research Adviser", "Research Adviser designation", subtitle="Research Protocol Form 3",
     ref="Protocol Form 3; Handbook pp. 58-59, 61",
     instructions=[
-        "The adviser must be affiliated with the University, in a degree program aligned with the student's. The Protocol requires a PhD degree for PhD students and at least PhD units for MA students (CHED CMO 15), and a maximum of five active advisees in the current academic year; with the Dean's approval an adviser may take more in the exigency of service (Handbook p. 58).",
-        "The student may express a preference, but the Dean, the Associate Dean and the Research Coordinator make the final decision, considering degree, expertise, research work, number of advisees and workload (Handbook p. 59). Propose up to three faculty members.",
+        "The Research Adviser must be affiliated with the University, in a degree program aligned with the student's. The Protocol requires a PhD degree for PhD students and at least PhD units for MA students (CHED CMO 15), and a maximum of five active advisees in the current academic year; the Handbook (p. 58) asks for a doctoral degree aligned with the discipline, and with the Dean's approval a Research Adviser may take more than five advisees in the exigency of service.",
+        "The student may express a preference, but the Dean, the Associate Dean and the Research Coordinator make the final decision, considering degree, expertise, research work, number of advisees and workload (Handbook p. 59). List the faculty members you propose in order of preference.",
         "Email this form to your Academic Coordinator, who notes it by email or letter to the Research Coordinator. The Dean's signature is not required at this point. The Research Coordinator sends it to the Dean for deliberation.",
     ],
     sections=[
         F("Student information", RES_STU + ["Type of paper", "Comprehensive examination passed on", ("full", "Research interest or approved title (Form 2), if any")]),
-        T("Faculty proposed as adviser (in order of preference)", [("Pref.", 1.1), ("Name of faculty member", 4.8), ("Highest degree", 2.4), ("University-affiliated", 2.2), ("Active advisees now", 2.2), ("Expertise aligned with the study", 4.3)], 3, 0.9),
-        B(None, "Reason for the choice and how the expertise of the proposed adviser fits the study:", 1.5),
+        T("Faculty proposed as Research Adviser (in order of preference)", [("Pref.", 1.1), ("Name of faculty member", 4.8), ("Highest degree", 2.4), ("University-affiliated", 2.2), ("Active advisees now", 2.2), ("Expertise aligned with the study", 4.3)], 3, 0.9),
+        B(None, "Reason for the choice and how the expertise of the proposed Research Adviser fits the study:", 1.5),
         S("Signatures and routing", [("Applicant", "Student"), ("Noted by", "Academic Coordinator"), ("Forwarded to the Dean by", "Research Coordinator")]),
-        C("Deliberation (Research Coordinator, Associate Dean and Dean)", None, ["An adviser is designated (GS-F-20 issued)", "None of the nominees is approved; the student may nominate again"], cols=1),
+        C("Deliberation (Research Coordinator, Associate Dean and Dean)", None, ["A Research Adviser is designated (GS-F-20 issued)", "No proposed faculty member is designated; the Research Coordinator, Associate Dean and Dean decide on another Research Adviser"], cols=1),
     ],
     gs=["Form 3.1 issued on"])
 
 # ---- 20 ------------------------------------------------------------------------------------
-add("20", "Appointment of Research Adviser", "Research adviser designation", subtitle="Research Protocol Form 3.1",
+add("20", "Appointment for Research Adviser", "Research Adviser designation", subtitle="Research Protocol Form 3.1",
     ref="Protocol Form 3.1; Handbook pp. 58-59, 61-62",
     instructions=[
-        "Issued by the Research Coordinator after the Research Coordinator, the Associate Dean and the Dean have decided the designation. The Research Coordinator emails this form to the student and the appointed adviser, who email the accomplished form back (acceptance) to gsresearch@usls.edu.ph.",
-        "The adviser is bound only to advising and may not be selected as the student's editor or to any other appointment related to the conduct of the study (Handbook p. 59).",
-        "The student and the adviser must submit the Research Timetable (GS-F-22) and the Advising Contract (GS-F-23) to the Research Coordinator within five (5) days of receiving this form.",
+        "Issued by the Research Coordinator after the Research Coordinator, the Associate Dean and the Dean have decided the designation. The Research Coordinator emails this form to the student and the appointed Research Adviser, who email the accomplished form back (acceptance) to gsresearch@usls.edu.ph.",
+        "The Research Adviser is bound only to advising and may not be selected as the student's editor or to any other appointment related to the conduct of the study (Handbook p. 59).",
+        "The student and the Research Adviser must submit the Research Timetable (GS-F-22) and the Advising Contract (GS-F-23) to the Research Coordinator within five (5) days of receiving this form.",
     ],
     sections=[
         F("Student", RES4 + ["Type of paper", "Approved title (if any)"]),
-        F("Appointed research adviser", ["Name of adviser", "Highest degree", "College / department", "Date of appointment", ("full", "Active advisees including this student (above five only with the Dean's approval in the exigency of service)")]),
-        P("Appointment", "The Graduate School appoints the adviser named above as research adviser of the student named above, to perform the duties stated in the Handbook (p. 59) and the Research Protocol."),
+        F("Appointed Research Adviser", ["Name of Research Adviser", "Highest degree", "College / department", "Date of appointment", ("full", "Active advisees including this student (above five only with the Dean's approval in the exigency of service)")]),
+        P("Appointment", "The Graduate School appoints the Research Adviser named above as Research Adviser of the student named above, to perform the duties stated in the Handbook (p. 59) and the Research Protocol."),
         S("Appointment signed by", [("Research Coordinator", None), ("Associate Dean", None), ("Graduate School Dean", None)]),
-        C("Acceptance of the adviser", None, ["I accept the appointment", "I decline the appointment; reason: ____________________"], cols=1),
+        C("Acceptance of the Research Adviser", None, ["I accept the appointment", "I decline the appointment; reason: ____________________"], cols=1),
         S("Acknowledgement", [("Research Adviser", "Accepted on ________"), ("Student", "Received on ________")]),
     ],
     gs=["Contract due on (5 days)"])
 
 # ---- 21 ------------------------------------------------------------------------------------
-add("21", "Request for Change of Research Adviser", "Change of research adviser", subtitle="Research Protocol Form 3.1.1",
+add("21", "Request for Change of Research Adviser", "Change of Research Adviser", subtitle="Research Protocol Form 3.1.1",
     ref="Protocol Form 3.1.1; Handbook p. 62",
     instructions=[
-        "A student may make only one (1) request to change the research adviser, for justifiable reasons, and it must be done before the proposal defense application (Handbook p. 62).",
-        "The current adviser and the new adviser must both agree and sign this form. The student emails it to the Research Coordinator. The request is deliberated by the Research Coordinator, the Associate Dean and the Dean; if approved, the Research Coordinator prepares a new Appointment (GS-F-20) for the student and the new adviser.",
+        "A student may make only one (1) request to change the Research Adviser, for justifiable reasons, and it must be done before the proposal defense (Handbook p. 62).",
+        "The current Research Adviser and the new Research Adviser must both agree and sign this form. The student emails it to the Research Coordinator. The request is deliberated by the Research Coordinator, the Associate Dean and the Dean; if approved, the Research Coordinator prepares a new Appointment (GS-F-20) for the student and the new Research Adviser.",
     ],
     sections=[
         F("Student", RES4 + ["Type of paper", "Approved title", "Date of this request"]),
-        F("Advisers", ["Current adviser", "Date appointed", "Proposed new adviser", "Active advisees of the new adviser"]),
-        C("Stage of the study", None, ["The student has not yet applied for the proposal defense", "This is the first request to change the adviser"], cols=1),
+        F("Advisers", ["Current Research Adviser", "Date appointed", "Proposed new Research Adviser", "Active advisees of the new Research Adviser"]),
+        C("Stage of the study", None, ["The proposal defense has not yet been held", "This is the first request to change the Research Adviser"], cols=1),
         B("Justifiable reason for the change", "State the reason clearly:", 2.6),
-        S("Agreement", [("Student", "Requests the change"), ("Current Research Adviser", "Agrees to release the advisee"), ("Proposed New Adviser", "Agrees to advise")]),
+        S("Agreement", [("Student", "Requests the change"), ("Current Research Adviser", "Agrees to release the advisee"), ("Proposed New Research Adviser", "Agrees to advise")]),
         C("Deliberation (Research Coordinator, Associate Dean, Dean)", None, ["Approved; a new Form 3.1 is prepared", "Not approved"], cols=2),
         S("Decision", [("Research Coordinator", None), ("Associate Dean", None), ("Graduate School Dean", None)]),
     ],
@@ -1086,12 +1088,12 @@ add("21", "Request for Change of Research Adviser", "Change of research adviser"
 add("22", "Research Timetable", "Research advising", subtitle="Research Protocol Form 3.2",
     ref="Protocol Form 3.2; Handbook pp. 58-59, 61-62",
     instructions=[
-        "Accomplished by the student together with the research adviser after the adviser has accepted the appointment. The adviser monitors the research according to this timetable. Submit it with the Advising Contract (GS-F-23) to the Research Coordinator within five (5) days of receiving the Appointment (GS-F-20).",
-        "Time limits: a thesis or project paper must be finished within two (2) years from the title or proposal defense, and the student has one (1) year from the title defense to submit and defend the proposal; a dissertation must be finished within three (3) years from the title defense (Handbook p. 58). Set target dates within these limits.",
+        "Accomplished by the student together with the Research Adviser once the Research Adviser has been appointed. The Research Adviser monitors the research according to this timetable. Submit it with the Advising Contract (GS-F-23) to the Research Coordinator within five (5) days of receiving the Appointment (GS-F-20).",
+        "Time limits: a thesis or project paper must be finished within two (2) years from the title or proposal defense; for a thesis and for a dissertation the student has one (1) year from the title defense to submit and defend the proposal; a dissertation must be finished within three (3) years from the title defense (Handbook p. 58). Set target dates within these limits.",
     ],
     sections=[
-        F("Student and adviser", RES4 + ["Type of paper", "Research adviser", "Date of Form 3.1"]),
-        T("Timetable", [("Activity", 8.0), ("Target date", 3.0), ("Actual date", 3.0), ("Adviser's initials", 3.0)],
+        F("Student and Research Adviser", RES4 + ["Type of paper", "Research Adviser", "Date of Form 3.1"]),
+        T("Timetable", [("Activity", 8.0), ("Target date", 3.0), ("Actual date", 3.0), ("Research Adviser's initials", 3.0)],
           [["Title defense (Form 1 and Form 2)", "", "", ""], ["Chapters 1 to 3 drafted", "", "", ""], ["Statistical consultation (Form 4.1, quantitative studies)", "", "", ""],
            ["Endorsement for proposal defense (Form 4)", "", "", ""], ["Proposal defense", "", "", ""], ["Revisions and technical review (Form 5.1)", "", "", ""],
            ["Application for ethics review (within one month of the proposal defense)", "", "", ""], ["Ethics clearance", "", "", ""], ["Data gathering and analysis", "", "", ""],
@@ -1106,15 +1108,15 @@ add("22", "Research Timetable", "Research advising", subtitle="Research Protocol
 add("23", "Thesis / Dissertation Advising Contract", "Research advising", subtitle="Research Protocol Form 3.3",
     ref="Protocol Form 3.3; Handbook p. 59",
     instructions=[
-        "Accomplished and signed by the student and the research adviser, and emailed to the Research Coordinator within five (5) days of receipt of the Appointment (GS-F-20).",
-        "The responsibilities of the adviser follow the Handbook, p. 59. A change of adviser follows GS-F-21 and may be requested only once, before the proposal defense.",
+        "Accomplished and signed by the student and the Research Adviser, and emailed to the Research Coordinator within five (5) days of receipt of the Appointment (GS-F-20).",
+        "The responsibilities of the Research Adviser follow the Handbook, p. 59. A change of Research Adviser follows GS-F-21 and may be requested only once, before the proposal defense.",
     ],
     sections=[
-        F("Parties", RES4 + ["Type of paper", "Research adviser", "Approved title", "Date of Form 3.1"]),
-        P("The adviser agrees to", "(1) monitor the research according to the timetable in Form 3.2; (2) review proposals, questionnaires and chapters and return comments within a reasonable time; (3) give technical and moral guidance; (4) conduct a mock defense when necessary; (5) attend the defense of the advisee and the orientations of the Graduate School; (6) endorse the manuscript for defense only when it complies with the research paper guidelines of the Graduate School; and (7) verify that the panel's recommendations are reflected in the final manuscript. The adviser is bound only to advising and is not the student's editor."),
-        P("The student agrees to", "(1) follow the research timetable; (2) send manuscripts to the adviser by email and consult regularly; (3) give the panel the manuscript within the lead times of the Research Protocol, including the 14-Day Rule; (4) settle the defense fees with the panel members and send the proof to the Graduate School Office; (5) keep a copy of every approval; and (6) observe the University's rules on research integrity, ethics clearance and authorship."),
-        F("Working arrangements", [("full", "Consultation schedule and mode (meetings, email, online)"), ("full", "How and when the adviser returns comments"), ("full", "Authorship arrangement (see Form 4.2 if there is a co-author)")]),
-        S("Signatures", [("Research Adviser", None), ("Student", None), ("Received by", "Research Coordinator")]),
+        F("Parties", RES4 + ["Type of paper", "Research Adviser", "Approved title", "Date of Form 3.1"]),
+        P("The Research Adviser agrees to", "(1) monitor the research according to the timetable in Form 3.2; (2) review proposals, questionnaires and chapters and return comments as agreed below; (3) give technical and moral guidance; (4) conduct a mock defense when necessary; (5) attend the defense of the advisee and the orientations of the Graduate School; (6) endorse the manuscript for defense only when it complies with the research paper guidelines of the Graduate School; and (7) verify that the panel's recommendations are reflected in the final manuscript. The Research Adviser is bound only to advising and is not the student's editor."),
+        P("The student agrees to", "(1) follow the research timetable; (2) send manuscripts to the Research Adviser by email and consult regularly; (3) give the panel the manuscript within the lead times of the Research Protocol, including the 14-Day Rule; (4) settle the defense fees with the panel members and send the proof to the Graduate School Office; (5) keep the emails in which the panel members approve the manuscript; and (6) observe the University's rules on research integrity, ethics clearance and authorship."),
+        F("Working arrangements", [("full", "Consultation schedule and mode (meetings, email, online)"), ("full", "How and when the Research Adviser returns comments"), ("full", "Authorship arrangement (see Form 4.2 if there is a co-author)")]),
+        S("Signatures", [("Student", None), ("Research Adviser", None), ("Received by", "Research Coordinator")]),
     ],
     gs=["Received on"])
 
@@ -1123,10 +1125,10 @@ add("24", "Request for Change of Title of the Study", "Change of title", subtitl
     ref="Protocol Form 3.4; Handbook p. 62",
     instructions=[
         "A student may make only one (1) request to change the title of the study, before the proposal defense application (Handbook p. 62).",
-        "Email this form and the new concept paper to the research adviser. The adviser endorses the request to the panel members for deliberation and sends a copy of the email to the Research Coordinator. The panel members decide among themselves; the panel chair emails the decision to the student, the adviser and the Research Coordinator.",
+        "Email this form and the new concept paper to the Research Adviser. The Research Adviser endorses the request to the panel members for deliberation and sends a copy of the email to the Research Coordinator. The panel members decide among themselves; the Panel Chair emails the decision to the student, the Research Adviser and the Research Coordinator.",
     ],
     sections=[
-        F("Student", RES4 + ["Type of paper", "Research adviser", "Date of this request"]),
+        F("Student", RES4 + ["Type of paper", "Research Adviser", "Date of this request"]),
         F("Title", [("tall", "Present approved title", 2), ("tall", "Proposed new title", 2)]),
         C(None, None, ["The proposal defense has not yet been applied for", "This is the first request to change the title", "The new concept paper is attached"], cols=1),
         B("Reason for the change", "State the reason:", 2.0),
@@ -1141,12 +1143,12 @@ add("24", "Request for Change of Title of the Study", "Change of title", subtitl
 add("25", "Statistical Consultation Form", "Proposal defense", subtitle="Research Protocol Form 4.1",
     ref="Protocol Form 4.1; Handbook p. 63",
     instructions=[
-        "Required before the proposal defense for quantitative studies, accomplished by the Statistician. It is not required for qualitative studies. The student attaches it to the proposal paper when emailing the research adviser, and the adviser sends it to the Research Coordinator with Form 4.",
+        "Required before the proposal defense for quantitative studies, accomplished by the Statistician. It is not required for qualitative studies. The student attaches it to the proposal paper when emailing the Research Adviser, and the Research Adviser sends it to the Research Coordinator with Form 4.",
     ],
     sections=[
-        F("Student", RES4 + ["Type of paper", "Research adviser", "Date of consultation"]),
+        F("Student", RES4 + ["Type of paper", "Research Adviser", "Date of consultation"]),
         F(None, [("tall", "Title of the study", 2)]),
-        C("Type of study", None, ["Quantitative", "Qualitative (this form is not required)", "Mixed methods (quantitative part only)"], cols=2),
+        C("Type of study", None, ["Quantitative", "Qualitative (this form is not required)"], cols=2),
         F("Design reviewed", [("full", "Research design"), ("full", "Population, sampling and sample size"), ("full", "Instrument and its validity and reliability"), ("full", "Statistical tools to be used")]),
         B("Findings and recommendations of the Statistician", "", 2.6),
         C(None, "Status:", ["The statistical plan is appropriate for the study", "The statistical plan is appropriate after the changes recommended above"], cols=1),
@@ -1163,7 +1165,7 @@ add("26", "Co-authorship Information for Publication", "Proposal defense", subti
         "Co-authorship and study-grant agreements follow the institutional guidelines of the Center for Research and Engagement.",
     ],
     sections=[
-        F("Student", RES4 + ["Type of paper", "Research adviser", "Date"]),
+        F("Student", RES4 + ["Type of paper", "Research Adviser", "Date"]),
         F(None, [("tall", "Title of the study", 2)]),
         T("Co-author(s)", [("Name", 3.6), ("Affiliation and email", 3.8), ("Expected contribution to the manuscript", 4.6), ("Share (%)", 1.4), ("Signature", 3.6)], 4, 1.0),
         F(None, ["Student's share (%)", "Study grant (sponsor, if any)"]),
@@ -1176,12 +1178,12 @@ add("26", "Co-authorship Information for Publication", "Proposal defense", subti
 add("27", "Endorsement for Proposal / Final Defense", "Proposal defense and closed-door final defense", subtitle="Research Protocol Form 4",
     ref="Protocol Form 4; Handbook pp. 63, 65-66",
     instructions=[
-        "Accomplished by the research adviser, with e-signature, once the paper complies with the research paper guidelines of the Graduate School Office. It must reach the Research Coordinator (gsresearch@usls.edu.ph) at least two (2) weeks before the defense.",
-        "14-Day Rule: at least fourteen (14) days, inclusive of weekends, must pass from the date the panel members receive their copies of the manuscript to the date of the oral defense (Handbook p. 66). The panel members must not agree to a schedule without the manuscript. The same panel takes part in the proposal and the closed-door final defense. For a student abroad the defense is online.",
-        "Attach the manuscript; for a proposal defense of a quantitative study, Form 4.1; for a final defense, the Ethics Clearance. The adviser recommends the external panel member, subject to approval of the GS Research Committee.",
+        "Accomplished by the Research Adviser, with e-signature, once the paper complies with the research paper guidelines of the Graduate School Office. It must reach the Research Coordinator (gsresearch@usls.edu.ph) at least two (2) weeks before the defense.",
+        "14-Day Rule: at least fourteen (14) days, inclusive of weekends, must pass from the date the panel members receive their copies of the manuscript to the date of the oral defense (Handbook p. 66). The panel members must not agree to a schedule without the manuscript. The same set of panel members takes part in the closed-door final defense. For a student who is abroad, the Panel Chair recommends an online defense and sends the online details.",
+        "Attach the manuscript; for a proposal defense of a quantitative study, Form 4.1; for a final defense, the Ethics Clearance. The Research Adviser recommends the external panel member, subject to approval of the GS Research Committee.",
     ],
     sections=[
-        F("Student", RES4 + ["Type of paper", "Research adviser", "Date of this endorsement"]),
+        F("Student", RES4 + ["Type of paper", "Research Adviser", "Date of this endorsement"]),
         F(None, [("tall", "Title of the study", 2)]),
         C("Defense endorsed", None, ["Proposal defense", "Closed-door final defense"], cols=2),
         F("Agreed schedule", ["Date of the defense", "Time", "Mode (onsite / online)", "Venue or online platform", "Manuscript given to the panel on", "Days from receipt to defense"]),
@@ -1189,7 +1191,7 @@ add("27", "Endorsement for Proposal / Final Defense", "Proposal defense and clos
           [["Panel Chair", "", "", ""], ["Content Specialist", "", "", ""], ["Method Specialist", "", "", ""], ["Content Specialist 2 (dissertation)", "", "", ""], ["External Panel", "", "", ""]], 0.8),
         C("Attachments", None, ["Manuscript", "Form 4.1 Statistical Consultation (quantitative proposal)", "Ethics Clearance (final defense)", "Form 4.2 Co-authorship (if any)"], cols=2),
         P(None, "I certify that I have reviewed the manuscript, that it complies with the research paper guidelines of the Graduate School Office, and that the student is ready for the defense."),
-        S("Signatures", [("Research Adviser", "Endorses the defense"), ("Student", "Acknowledged"), ("Research Coordinator", "Received; schedule recorded")]),
+        S("Signatures", [("Student", "Acknowledged"), ("Research Adviser", "Endorses the defense"), ("Research Coordinator", "Received; schedule recorded")]),
     ],
     gs=["Venue reserved on", "Forms 5 / 6 / 7 sent on"])
 
@@ -1197,16 +1199,16 @@ add("27", "Endorsement for Proposal / Final Defense", "Proposal defense and clos
 add("28", "Request for Rescheduling or Cancellation of a Defense", "Defense scheduling and rescheduling",
     ref="Handbook pp. 63-67",
     instructions=[
-        "Use this form when a confirmed defense cannot take place on its date. A rescheduled defense follows the same protocol as the original: the lead times and the 14-Day Rule apply to the new date.",
-        "Give the reason and say who is asking. The Research Coordinator records the change and informs the panel, the adviser and the student. A defense is confirmed again only when the adviser and every panel member are available.",
+        "Use this form when a confirmed defense cannot take place on its date. It is a Graduate School form, not a form of the Research Protocol. The new date must meet the lead times the Protocol sets for any defense: Form 4 at least two (2) weeks before the defense and the 14-Day Rule.",
+        "Give the reason and say who is asking. The Research Coordinator records the change and informs the panel, the Research Adviser and the student. The new date is confirmed once the Research Adviser and every panel member have replied that they are available.",
     ],
     sections=[
-        F("Student and defense", RES4 + ["Defense (title / proposal / final)", "Research adviser", "Present date and time", "Present venue or platform"]),
+        F("Student and defense", RES4 + ["Defense (title / proposal / final)", "Research Adviser", "Present date and time", "Present venue or platform"]),
         C("Request", None, ["Reschedule to the new date and time below", "Cancel the defense"], cols=2),
         F(None, ["New date", "New time", "Mode (onsite / online)", "New venue or platform"]),
         C("Requested by", None, ["Student", "Research Adviser", "Panel member", "Graduate School Office"], cols=2),
         B("Reason for the request", "", 2.2),
-        T("Availability of the new date", [("Adviser / panel member", 6.6), ("Role", 3.4), ("Available? (yes / no)", 3.2), ("Initials", 3.8)], 6, 0.65),
+        T("Availability of the new date", [("Research Adviser / panel member", 6.6), ("Role", 3.4), ("Available? (yes / no)", 3.2), ("Initials", 3.8)], 6, 0.65),
         S("Signatures", [("Requested by", "Name and signature of the requester"), ("Research Adviser", "Noted"), ("Research Coordinator", "Approved  /  Not approved")]),
     ],
     gs=["Panel informed on", "Platform schedule updated on"])
@@ -1215,11 +1217,11 @@ add("28", "Request for Rescheduling or Cancellation of a Defense", "Defense sche
 add("29", "Comments Sheet for Proposal Defense", "Proposal defense", subtitle="Research Protocol Form 5",
     ref="Protocol Form 5; Handbook pp. 63-65",
     instructions=[
-        "Each panel member accomplishes a sheet and emails it to the panel chair for consolidation. The panel chair emails the consolidated Form 5 to the student, the adviser and the Research Coordinator within the first working day after the defense. The research adviser records the comments of the panel during the defense.",
-        "If major revisions are recommended, the student is advised to do a re-defense following the same protocol, and the decision must be reflected here. After the revisions, the adviser endorses the paper to the panel for approval and the release of the Technical Review Certificate (GS-F-30).",
+        "Each panel member accomplishes a sheet and emails it to the Panel Chair for consolidation. The Panel Chair emails the consolidated Form 5 to the student, the Research Adviser and the Research Coordinator within the first working day after the defense. The Research Adviser records the comments of the panel during the defense.",
+        "If major revisions are recommended, the student is advised to do a re-defense following the same protocol, and the decision must be reflected here. After the revisions, the Research Adviser endorses the paper to the panel for approval and the release of the Technical Review Certificate (GS-F-30).",
     ],
     sections=[
-        F("Student and defense", RES4 + ["Type of paper", "Research adviser", "Date of the defense", "Mode and venue"]),
+        F("Student and defense", RES4 + ["Type of paper", "Research Adviser", "Date of the defense", "Mode and venue"]),
         F(None, [("tall", "Title of the study", 2)]),
         F("Panel member", ["Name of panel member", "Role (chair, content, method, external)"]),
         T("Comments and suggestions", [("No.", 0.9), ("Page / section", 2.4), ("Comment or suggestion", 9.6), ("Action taken by the student", 4.1)], 9, 0.85),
@@ -1232,11 +1234,11 @@ add("29", "Comments Sheet for Proposal Defense", "Proposal defense", subtitle="R
 add("30", "Technical Review Certificate", "Proposal defense and ethics review", subtitle="Research Protocol Form 5.1",
     ref="Protocol Form 5.1; Handbook pp. 64-65",
     instructions=[
-        "Released after the student has addressed the comments of the proposal defense (Form 5), the adviser has endorsed the revised paper, and the panel members have approved it. The panel chair facilitates the accomplishment of this form and emails it to the student and the research adviser, with a copy to the Research Coordinator.",
+        "Released after the student has addressed the comments of the proposal defense (Form 5), the Research Adviser has endorsed the revised paper, and the panel members have approved it. The Panel Chair facilitates the accomplishment of this form and emails it to the student and the Research Adviser, with a copy to the Research Coordinator.",
         "The student attaches this certificate to the Application for Ethics Review (GS-F-31), which must be filed within one (1) month after the proposal defense.",
     ],
     sections=[
-        F("Student", RES4 + ["Type of paper", "Research adviser", "Date of proposal defense", "Date revised paper given to the panel"]),
+        F("Student", RES4 + ["Type of paper", "Research Adviser", "Date of proposal defense", "Date revised paper given to the panel"]),
         F(None, [("tall", "Title of the study", 2)]),
         P("Certification", "This is to certify that the panel members named below reviewed the revised proposal of the student named above, that the comments and suggestions raised at the proposal defense have been addressed, and that the proposal is technically sound and may proceed to ethics review."),
         T("Panel approval", [("Role", 3.4), ("Name of panel member", 5.2), ("Approved", 2.2), ("Signature", 3.6), ("Date", 2.6)],
@@ -1251,10 +1253,10 @@ add("31", "Application for Ethics Review", "Ethics review", subtitle="Research P
     ref="Protocol Form 5.2; Handbook pp. 23, 65",
     instructions=[
         "Email this form with the revised manuscript and the Technical Review Certificate (GS-F-30) to the research ethics committee (rerc@usls.edu.ph) within one (1) month after the proposal defense, so that there is enough time for review and revisions.",
-        "Ethics clearance is needed before the closed-door final defense; the research adviser submits the Ethics Clearance with Form 4 (GS-F-27). The Graduate School records that the clearance was received; it does not judge its content.",
+        "Ethics clearance is needed before the closed-door final defense; the Research Adviser submits the Ethics Clearance with Form 4 (GS-F-27). The Graduate School records that the clearance was received; it does not judge its content.",
     ],
     sections=[
-        F("Applicant", RES4 + ["Type of paper", "Research adviser", "Date of proposal defense", "Date of this application"]),
+        F("Applicant", RES4 + ["Type of paper", "Research Adviser", "Date of proposal defense", "Date of this application"]),
         F(None, [("tall", "Title of the study", 2)]),
         F("Study details", [("full", "Research design (quantitative, qualitative or mixed)"), ("full", "Participants or sources of data, and sample size"), ("full", "Where and when data will be gathered"), ("full", "How data will be collected")]),
         C("The study involves", None, ["Human participants", "Minors or vulnerable persons", "Sensitive topics or personal data", "Interviews, focus groups or surveys", "Existing records or secondary data only", "No participants"], cols=2),
@@ -1270,12 +1272,12 @@ add("31", "Application for Ethics Review", "Ethics review", subtitle="Research P
 add("32", "Comments Sheet for Final Defense", "Closed-door and public final defense", subtitle="Research Protocol Form 6",
     ref="Protocol Form 6; Handbook pp. 66-73",
     instructions=[
-        "The Research Coordinator sends this form to the panel members. Each panel member accomplishes it and emails it to the panel chair within the first working day after the defense. The panel chair emails all the sheets with the consolidated comments to the Research Coordinator, the research adviser and the student within the same time.",
-        "The student states, for every comment, the action taken and the page number where the improvement appears (Handbook p. 72). At the public final defense, the panel members keep this sheet in hand to check compliance.",
-        "A provisional pass with major revisions must be reflected here and must agree with the score on the Evaluation Sheet (GS-F-33): below 85 for a thesis or project paper, below 90 for a dissertation (Handbook p. 67).",
+        "The Research Coordinator sends this form to the panel members. Each panel member accomplishes it and emails it to the Panel Chair within the first working day after the defense. The Panel Chair emails all the sheets with the consolidated comments to the Research Coordinator, the Research Adviser and the student within the same time.",
+        "The student states, for every comment, the action taken and the page number where the improvement appears (Handbook pp. 72-73). At the public final defense, the panel members keep this sheet in hand to check compliance.",
+        "A provisional pass with major revisions must be reflected here and must agree with the score on the Evaluation Sheet (GS-F-33): below 85 for a thesis, below 90 for a dissertation (Handbook p. 67); the Protocol states no score for a project paper.",
     ],
     sections=[
-        F("Student and defense", RES4 + ["Type of paper", "Research adviser", "Date of the defense", "Mode and venue"]),
+        F("Student and defense", RES4 + ["Type of paper", "Research Adviser", "Date of the defense", "Mode and venue"]),
         C(None, "Defense:", ["Closed-door final defense", "Public final defense"], cols=2),
         F(None, [("tall", "Title of the study", 2), "Name of panel member", "Role (chair, content, method, external)"]),
         T("Comments and suggestions", [("No.", 0.8), ("Page", 1.2), ("Comment or suggestion of the panel", 6.4), ("Action taken by the student", 5.0), ("Page where it appears", 1.8), ("Panel check", 1.8)], 8, 0.9),
@@ -1288,12 +1290,12 @@ add("32", "Comments Sheet for Final Defense", "Closed-door and public final defe
 add("33", "Evaluation Sheet for Final Defense", "Closed-door final defense", subtitle="Research Protocol Form 7",
     ref="Protocol Form 7; Handbook pp. 66-67, 76",
     instructions=[
-        "Each panel member and the research adviser accomplish this sheet and email it to the Research Coordinator (gsresearch@usls.edu.ph) within the first working day after the defense.",
-        "The criteria and points are those of the Handbook (p. 76), out of 100 points. A provisional pass with major revisions (subject to re-defense) must agree with the score: a score below 85 for a thesis or project paper, below 90 for a dissertation (Handbook p. 67).",
+        "Each panel member and the Research Adviser accomplish this sheet and email it to the Research Coordinator (gsresearch@usls.edu.ph) within the first working day after the defense.",
+        "The criteria and points are those the Handbook gives for the selection of the outstanding thesis or dissertation (p. 76), out of 100 points; the Graduate School confirms that they are the criteria of this form. A provisional pass with major revisions (subject to re-defense) must agree with the score: below 85 for a thesis, below 90 for a dissertation (Handbook p. 67); the Protocol states no score for a project paper.",
         "Mark the box below that matches the paper type and the result recorded in the Comments Sheet (GS-F-32).",
     ],
     sections=[
-        F("Student and defense", RES4 + ["Type of paper", "Date of the defense", "Name of evaluator", "Role (panel member or adviser)"]),
+        F("Student and defense", RES4 + ["Type of paper", "Date of the defense", "Name of evaluator", "Role (panel member or Research Adviser)"]),
         F(None, [("tall", "Title of the study", 2)]),
         T("Evaluation", [("Criterion", 6.0), ("Maximum points", 2.2), ("Score", 2.0), ("Basis of the rating", 6.8)],
           [["Format and content", "15", "", "Theoretical or conceptual framework; conceptualization, nature and sources of data; standard format"],
@@ -1301,8 +1303,9 @@ add("33", "Evaluation Sheet for Final Defense", "Closed-door final defense", sub
            ["Findings, action plan or program", "15", "", "Synthesis of results; quality of execution and depth"],
            ["Originality, contribution to new knowledge, applicability", "30", "", "Contribution to knowledge or practice; originality; practicability"],
            ["TOTAL", "100", "", ""]], 1.0),
-        C("Result consistent with the score", None, ["Thesis or project paper: score of 85 or above", "Thesis or project paper: score below 85 (provisional pass, major revisions)",
-                                                      "Dissertation: score of 90 or above", "Dissertation: score below 90 (provisional pass, major revisions)"], cols=1),
+        C("Result consistent with the score", None, ["Thesis: score of 85 or above", "Thesis: score below 85 (provisional pass, major revisions)",
+                                                      "Dissertation: score of 90 or above", "Dissertation: score below 90 (provisional pass, major revisions)",
+                                                      "Project paper: threshold set by the Graduate School: ________"], cols=1),
         B(None, "Remarks:", 1.4),
         S("Signature", [("Evaluator", "Panel member / Research Adviser"), ("Research Coordinator", "Received on ________")]),
     ],
@@ -1313,16 +1316,16 @@ add("34", "Settlement of Provisional Thesis / Dissertation Approval", "Revisions
     ref="Protocol Form 8; Handbook p. 67",
     instructions=[
         "Used when the panel gave a provisional pass with major revisions and did not recommend a re-defense. The student complies with the corrections; once the revised manuscript is given to the panel members for approval, the 14-Day Rule applies.",
-        "The research adviser accomplishes this form and emails it to the Research Coordinator (gsresearch@usls.edu.ph). If the student fails to meet the recommendations of all panel members at a given time, the student is advised to re-defend following the same protocol.",
+        "The Research Adviser accomplishes this form and emails it to the Research Coordinator (gsresearch@usls.edu.ph). If the student fails to meet the recommendations of all panel members at a given time, the student is advised to re-defend following the same protocol.",
     ],
     sections=[
-        F("Student and defense", RES4 + ["Type of paper", "Research adviser", "Date of the defense", "Score on Form 7"]),
+        F("Student and defense", RES4 + ["Type of paper", "Research Adviser", "Date of the defense", "Score on Form 7"]),
         F(None, [("tall", "Title of the study", 2), "Revised manuscript given to the panel on", "14 days complete on"]),
         T("Revisions and compliance", [("No.", 1.0), ("Required revision (from Form 6)", 6.0), ("Action taken", 5.0), ("Page", 1.3), ("Member and initials", 3.7)], 7, 0.85),
         T("Panel approval of the revised manuscript", [("Role", 3.4), ("Name of panel member", 5.2), ("Approved", 2.2), ("Signature", 3.6), ("Date", 2.6)],
           [["Panel Chair", "", "☐", "", ""], ["Content Specialist", "", "☐", "", ""], ["Method Specialist", "", "☐", "", ""], ["Content Specialist 2 / External", "", "☐", "", ""]], 0.8),
         P(None, "I certify that the revisions required by the panel are reflected in the revised manuscript."),
-        S("Signatures", [("Research Adviser", "Certifies compliance"), ("Student", None), ("Research Coordinator", "Received; provisional approval settled")]),
+        S("Signatures", [("Student", None), ("Research Adviser", "Certifies compliance"), ("Research Coordinator", "Received; provisional approval settled")]),
     ],
     gs=["Result recorded in platform on"])
 
@@ -1331,18 +1334,18 @@ add("35", "Endorsement for Public Final Defense", "Public final defense", subtit
     ref="Protocol Form 4.3; Handbook pp. 70-73",
     instructions=[
         "For students admitted in August 2020 and onwards. The student is given two (2) to four (4) weeks after the closed-door final defense to prepare and apply (Handbook p. 71). Students admitted earlier present at a research conference instead.",
-        "The research adviser first checks that the revised manuscript complies with the suggestions of the panel at the closed-door defense, then emails this form to the Research Coordinator. It must be fully accomplished with the e-signature of the panel members and the date the panel received the manuscript. Application is made five (5) days before the preferred schedule for posting; the Handbook and the Protocol also mention two (2) weeks (Handbook pp. 72-73).",
-        "The Graduate School Office reserves the venue. The Research Coordinator prepares the public announcement, sends it to the adviser, the student and the panel, with copy to the Associate Dean and the Dean, and posts it on the Graduate School Facebook page with the pre-registration link.",
+        "The Research Adviser first checks that the revised manuscript complies with the suggestions of the panel at the closed-door defense, then emails this form to the Research Coordinator. It must be fully accomplished with the e-signature of the panel members and the date the panel received the manuscript. The Protocol requires the application five (5) days before the preferred schedule, for posting; the Handbook (p. 73) also says at least two (2) weeks before the defense (the Graduate School to confirm which applies).",
+        "The Graduate School Office reserves the venue. The Research Coordinator prepares the public announcement, sends it to the Research Adviser, the student and the panel, with copy to the Associate Dean and the Dean, and posts it on the Graduate School Facebook page with the pre-registration link.",
     ],
     sections=[
-        F("Student", RES4 + ["Type of paper", "Research adviser", "Date of the closed-door defense", "Date of this endorsement"]),
+        F("Student", RES4 + ["Type of paper", "Research Adviser", "Date of the closed-door defense", "Date of this endorsement"]),
         F(None, [("tall", "Title of the study", 2)]),
         F("Preferred schedule", ["Preferred date", "Time", "Mode (onsite / online)", "Venue requested (reserved by the GS Office)"]),
         T("Panel", [("Role", 3.6), ("Name", 5.4), ("Received the revised manuscript on", 3.8), ("E-signature", 4.2)],
           [["Panel Chair", "", "", ""], ["Content Specialist", "", "", ""], ["Method Specialist", "", "", ""], ["Content Specialist 2 (dissertation)", "", "", ""], ["External Panel", "", "", ""]], 0.8),
         C("Attached", None, ["Revised manuscript", "Accomplished Form 6 with the action taken", "Ethics Clearance"], cols=2),
         P(None, "I certify that the revised manuscript complies with the comments and suggestions of the panel at the closed-door final defense and that the student is ready for the public final defense."),
-        S("Signatures", [("Research Adviser", "Endorses the public defense"), ("Student", "Acknowledged"), ("Research Coordinator", "Schedule approved; announcement prepared")]),
+        S("Signatures", [("Student", "Acknowledged"), ("Research Adviser", "Endorses the public defense"), ("Research Coordinator", "Schedule approved; announcement prepared")]),
     ],
     gs=["Announcement posted on", "Venue reserved on"])
 
@@ -1350,11 +1353,11 @@ add("35", "Endorsement for Public Final Defense", "Public final defense", subtit
 add("36", "Similarity Index (Turnitin) Certification", "Revisions and completion",
     ref="Handbook p. 68; Protocol, Closed-door Final Defense III",
     instructions=[
-        "After the research adviser has verified that the panel's recommendations are reflected in the manuscript and has endorsed it for scanning, the student requests the Turnitin scan by emailing turnitin@usls.edu.ph. A similarity index rating (SIR) of not more than 15% is required before the paper goes to the editor (Handbook p. 68).",
+        "After the Research Adviser has verified that the panel's recommendations are reflected in the manuscript and has endorsed it for scanning, the student requests the Turnitin scan by emailing turnitin@usls.edu.ph. A similarity index rating (SIR) of not more than 15% is required before the paper goes to the editor (Handbook p. 68).",
         "The administrator who ran the scan completes and signs this certification. Attach the Turnitin similarity report. The certification is one of the documents the student sends to the Graduate School when the manuscript is ready for hard-bound reproduction.",
     ],
     sections=[
-        F("Student and paper", RES4 + ["Type of paper", "Research adviser", "Date endorsed by the adviser for scanning"]),
+        F("Student and paper", RES4 + ["Type of paper", "Research Adviser", "Date endorsed by the Research Adviser for scanning"]),
         F(None, [("tall", "Title of the study", 2)]),
         F("Scan result", ["Date the paper was submitted for scanning", "Date of the scan", "Similarity index rating (%)", "Number of words scanned"]),
         C("Result", None, ["The similarity index is 15% or below; the paper may go to the editor", "The similarity index is above 15%; the student revises and the paper is scanned again"], cols=1),
@@ -1367,11 +1370,11 @@ add("36", "Similarity Index (Turnitin) Certification", "Revisions and completion
 add("37", "Editor Certification", "Revisions and completion", subtitle="Research Protocol Form 9",
     ref="Protocol Form 9; Handbook p. 68",
     instructions=[
-        "The student chooses an editor from the pool of editors affiliated with the University, so that the USLS Institutional Research Format (IRF) is applied. The research adviser may not be the student's editor (Handbook p. 59). The 14-Day Rule applies to the time the editor has for review. The editor gives this certification once the corrections have been carried out.",
+        "The student chooses an editor from the pool of editors affiliated with the University, so that the USLS Institutional Research Format (IRF) is applied. The Research Adviser may not be the student's editor (Handbook p. 59). The 14-Day Rule applies to the time the editor has for review. The editor gives this certification once the corrections have been carried out.",
         "The student sends the Editor Certification, with the final manuscript, the panel approval emails, the Ethics Clearance and the Turnitin certification, to the Graduate School Office (gsresearch@usls.edu.ph), copy to the ethics committee.",
     ],
     sections=[
-        F("Student and paper", RES4 + ["Type of paper", "Research adviser", "Turnitin similarity index (%)"]),
+        F("Student and paper", RES4 + ["Type of paper", "Research Adviser", "Turnitin similarity index (%)"]),
         F(None, [("tall", "Title of the study", 2)]),
         F("Editor", ["Name of editor", "College / office (University-affiliated)", "Date manuscript received by the editor", "Date returned to the student"]),
         C("Editing carried out", None, ["The USLS Institutional Research Format (IRF) was applied", "Language, grammar, mechanics and references were checked", "The student carried out the corrections of the editor"], cols=1),
@@ -1384,14 +1387,14 @@ add("37", "Editor Certification", "Revisions and completion", subtitle="Research
 add("38", "Approval Sheet", "Revisions and completion", subtitle="Research Protocol Form 10",
     ref="Protocol Form 10; Handbook pp. 68, 77",
     instructions=[
-        "The Graduate School Office coordinates with the panel members and the adviser for the signing of this sheet. The signed sheet is bound into the bound copies, which must carry the official approval of the members of the defense panel and the official acceptance of the Dean (Handbook p. 77).",
+        "The Graduate School Office coordinates with the panel members and the Research Adviser for the signing of this sheet. The signed sheet is bound into the bound copies, which must carry the official approval of the members of the defense panel and the official acceptance of the Dean (Handbook p. 77).",
         "Submit the bound copies and the CD with the signed approval sheets as part of the requirements for the diploma, the transcript of records and related documents.",
     ],
     sections=[
         F("Student", RES4 + ["Degree", "Date of the final defense"]),
         F(None, [("tall", "Title of the study", 2)]),
         P("Approval", "This project paper, thesis or dissertation, prepared and submitted by the student named above in partial fulfillment of the requirements for the degree stated, has been examined by the defense panel, has complied with the required revisions, and is recommended for acceptance."),
-        T("Panel and adviser", [("Role", 3.8), ("Name", 5.8), ("Signature", 4.2), ("Date", 3.2)],
+        T("Panel and Research Adviser", [("Role", 3.8), ("Name", 5.8), ("Signature", 4.2), ("Date", 3.2)],
           [["Research Adviser", "", "", ""], ["Panel Chair", "", "", ""], ["Content Specialist", "", "", ""], ["Method Specialist", "", "", ""],
            ["Content Specialist 2 (dissertation)", "", "", ""], ["External Panel", "", "", ""]], 0.95),
         P("Acceptance", "Accepted by the Graduate School in partial fulfillment of the requirements for the degree."),
@@ -1400,14 +1403,14 @@ add("38", "Approval Sheet", "Revisions and completion", subtitle="Research Proto
     gs=["Bound copies and CD received on"])
 
 # ---- 39 ------------------------------------------------------------------------------------
-add("39", "Formal Invitation to Co-Author a Journal Article", "Publication", subtitle="Research Protocol Form 11",
+add("39", "Formal Invitation to Co-Author Journal Article", "Publication", subtitle="Research Protocol Form 11",
     ref="Protocol Form 11; Handbook pp. 64, 75",
     instructions=[
         "Use only if the co-author was pre-identified during the proposal (GS-F-26). The student sends the invitation to the prospective co-author and attaches the signed form to the publication request (GS-F-40).",
         "The student must have the major part and contribute at least 80% (Handbook p. 64). The published article must show the authors' affiliation in the format given in the Handbook, p. 75.",
     ],
     sections=[
-        F("Student", RES4 + ["Research adviser", "Date of invitation"]),
+        F("Student", RES4 + ["Research Adviser", "Date of invitation"]),
         F("Prospective co-author", ["Name", "Position", "Institution and department", "Email", ("full", "Title of the study")]),
         F(None, [("full", "Journal intended for submission (from the PEO list)")]),
         P("Invitation", "I respectfully invite you to be co-author of the journal article prepared from the study named above. Your expected contribution is stated below. I understand that my own contribution remains the major part of the work and not less than 80%."),
@@ -1426,7 +1429,7 @@ add("40", "Publication Information Form", "Publication", subtitle="Research Prot
         "If the paper comes from a course requirement, state the professor and the course. The article must show the authors' affiliation in the format given in the Handbook (p. 75).",
     ],
     sections=[
-        F("Student", RES4 + ["Research adviser", "Date of application"]),
+        F("Student", RES4 + ["Research Adviser", "Date of application"]),
         F("Article and journal", [("full", "Title of the article"), ("full", "Name of the journal"), "Publisher", "ISSN", "Journal website"]),
         C("Indexing of the journal", None, ["Scopus", "Web of Science", "ISI", "Peer-reviewed (MA students)", "The journal is on the PEO approved list"], cols=2),
         F(None, [("full", "Authors and affiliations, in the format of the Handbook"), "Professor (if required by a course)", "Course"]),
@@ -1445,7 +1448,7 @@ add("41", "Evidence of Publication or Acceptance", "Publication", subtitle="Rese
         "A student can only be declared a graduate and join the graduation ceremony once this form and the evidence have been submitted (Handbook p. 75). For students enrolled from AY 2022-2023, at least one research paper must be published in a Scopus, Web of Science or ISI journal while enrolled (Handbook p. 77).",
     ],
     sections=[
-        F("Student", RES4 + ["Research adviser", "Date submitted"]),
+        F("Student", RES4 + ["Research Adviser", "Date submitted"]),
         F("Article", [("full", "Title of the article"), ("full", "Name of the journal"), "Volume, issue and pages", "DOI or web address", "Date accepted or published", "Date of approval of Form 12"]),
         C("Status", None, ["Accepted for publication", "Published"], cols=2),
         C("Attached", None, ["Copy of the journal", "Certificate of publication or letter of acceptance", "The authors' affiliation follows the Handbook format"], cols=1),
@@ -1458,8 +1461,8 @@ add("42", "Application for Graduation", "Graduation application and endorsement"
     ref="Handbook pp. 55-56, 68-69, 75-77, 80",
     instructions=[
         "A student is considered a graduate only after completing all the requirements below; a student who has not met them may not go up the stage (Handbook p. 77). The student must be officially enrolled in the semester of application.",
-        "The Graduate School checks that each document is present. It does not verify the content of the documents. The University Registrar certifies the eligibility of candidates for graduation and honors (Handbook p. 32). An application with wrong information is returned and replaced by a new corrected form; the first form is kept.",
-        "Graduating students attend the Alumni seminar and present at the Graduate School Research Conference (Handbook pp. 69, 80).",
+        "The Graduate School checks that each document is present. It does not verify the content of the documents. The University Registrar certifies the eligibility of candidates for graduation and honors (Handbook p. 32). Proposed practice: an application with wrong information is returned and replaced by a new corrected form; the first form is kept.",
+        "Graduating students attend the Alumni seminar (Handbook p. 80) and present the thesis or dissertation at a research conference, either the Graduate School Research Conference or an external one (Handbook pp. 69, 74).",
     ],
     sections=[
         F("Student", STU + ["Degree applied for", "Term and academic year of graduation"]),
@@ -1478,21 +1481,21 @@ add("42", "Application for Graduation", "Graduation application and endorsement"
 add("43", "Graduation Endorsement List", "Graduation application and endorsement",
     ref="Handbook pp. 32, 77",
     instructions=[
-        "The Graduate School staff compile the candidates whose coursework, research and, where applicable, practicum are complete and who have submitted a signed graduation application (GS-F-42). The Academic Coordinator checks the coursework; the Research Coordinator validates the research completion documents.",
-        "The Dean approves the list and sends it to the University Registrar by official email with GS-F-44. The Registrar certifies eligibility and honors; the Graduate School does not issue the diploma.",
+        "The Graduate School Staff compile the candidates whose coursework, research and, where applicable, practicum are complete and who have submitted a signed graduation application (GS-F-42). The Academic Coordinator checks the coursework; the Research Coordinator validates the research completion documents.",
+        "The Dean approves the list and sends it to the University Registrar by official email with GS-F-44. The Registrar certifies the eligibility of candidates for graduation and honors (Handbook p. 32).",
     ],
     sections=[
-        F("Batch", ["Academic year", "Review window", "Batch name", "Date prepared", "Prepared by (GS staff)", "Number of candidates"]),
+        F("Batch", ["Academic year", "Review window", "Batch name", "Date prepared", "Prepared by (Graduate School Staff)", "Number of candidates"]),
         T("Candidates endorsed", [("No.", 0.9), ("Student no.", 2.0), ("Name of student", 3.8), ("Program", 1.8), ("Coursework", 2.3), ("Research", 1.9), ("Practicum", 2.1), ("Remarks", 2.2)], 12, 0.62),
         C("Dean's decision", None, ["The list is approved and endorsed to the University Registrar", "Returned to the Graduate School (see remarks)"], cols=1),
         B(None, "Remarks of the Dean:", 1.2),
-        S("Signatures", [("Prepared by", "Graduate School staff"), ("Coursework checked by", "Academic Coordinator"), ("Research documents validated by", "Research Coordinator"), ("Approved by", "Graduate School Dean")]),
+        S("Signatures", [("Prepared by", "Graduate School Staff"), ("Coursework checked by", "Academic Coordinator"), ("Research documents validated by", "Research Coordinator"), ("Approved by", "Graduate School Dean")]),
     ],
     gs=["File exported on", "Sent to Registrar on"])
 
 # ---- 44 ------------------------------------------------------------------------------------
 add("44", "Records Transmittal to the University Registrar", "Records handoff to the Registrar",
-    ref="Handbook pp. 32, 49, 53",
+    ref="Handbook pp. 32, 49-50, 53",
     instructions=[
         "Use one transmittal for each handoff to the Registrar: a notice of an approved leave with the reasons and any refund, a copy of the Withdrawal Form, the Dean's endorsement of a returning student, or the graduation endorsement list. The Graduate School's responsibility ends at sending the request to the Registrar.",
         "The Registrar records receipt in the last section. The Graduate School keeps the original and does not treat the matter as done until the Registrar's confirmation is on file. Official enrollment and grade data stay with the Registrar.",
@@ -1509,50 +1512,50 @@ add("44", "Records Transmittal to the University Registrar", "Records handoff to
 # =========================================================================== routing data for GS-P-02
 # code: (when used, submitted by, reviewed by, approved / decided by, goes next to, platform step)
 ROUTES = {
-    "01": ("After each admission handoff or import of the monitoring workbook", "GS staff", "Academic Coordinator", "Dean", "Enrollment and advising", "Admission: Dean onboarding gate"),
+    "01": ("After each admission handoff or import of the monitoring workbook", "Graduate School Staff", "Academic Coordinator", "Dean", "Enrollment and advising", "Admission: Dean onboarding gate"),
     "02": ("Before enrollment each term", "Student", "Academic Coordinator", "Academic Coordinator", "Student enrolls in AIMS; Business Office", "Enrollment: study plan, Academic Coordinator review"),
     "03": ("First week of classes only", "Student", "Academic Coordinator", "Associate Dean (added subject)", "GS Office issues the Advice Slip; Business Office", "Course Adjustments"),
     "04": ("Term break, before enrollment", "Academic Coordinator", "Associate Dean", "Dean", "Published to students; Business Office", "Course Adjustments: offering plan (draft, submitted, approved, published)"),
-    "05": ("Up to the second week of classes (later only as the Handbook allows)", "Student", "Academic Coordinator; GS staff", "Dean", "Registrar; Accounting Office; Business Office", "Withdrawal: Dean Review, then Registrar"),
+    "05": ("Up to the second week of classes (later only as the Handbook allows)", "Student", "Academic Coordinator; Graduate School Staff", "Dean", "Registrar; Accounting Office; Business Office", "Withdrawal: Dean Review, then Registrar"),
     "06": ("Unexcused absences above 20% of class hours", "Professor", "Academic Coordinator", "Academic Coordinator (Dean noted)", "Registrar (AIMS); GS record", "Monitoring: drop with absence evidence"),
     "07": ("Before a semester the student will not enroll in; not within 2 weeks of the last day of classes", "Student", "Academic Coordinator", "Dean", "Registrar (notice with refund); Business Office", "Leave of Absence board"),
     "08": ("When a student returns from leave or AWOL", "Student", "Academic Coordinator; Business Office", "Dean (endorses to Registrar)", "Registrar; enrollment", "Readmission board"),
-    "09": ("When AWOL is found from source evidence", "GS staff or Academic Coordinator", "Academic Coordinator", "Dean (noted)", "Student; Registrar; GS-F-08 on return", "AWOL case (AWOL Declared)"),
+    "09": ("When AWOL is found from source evidence", "Graduate School Staff or Academic Coordinator", "Academic Coordinator", "Dean (noted)", "Student; Registrar; GS-F-08 on return", "AWOL case (AWOL Declared)"),
     "10": ("Term of residency (thesis, practicum, comprehensive exam, INC, publication)", "Student", "Academic Coordinator", "Dean or authorized representative", "Business Office; enrollment", "Residency enrollment"),
     "11": ("Before the practicum starts", "Student", "Academic Coordinator", "Dean (for the University)", "Host organization; GS file", "Practicum: MOA Received"),
     "12": ("During and at the end of the practicum", "Student; host supervisor", "Academic Coordinator", "Host supervisor certifies", "GS-F-13", "Practicum: hours and certificates"),
     "13": ("When the required hours are complete", "Academic Coordinator", "Academic Coordinator", "Dean reviews (no approval)", "Graduation review", "Practicum: Report Sent to Dean, Dean Reviewed"),
     "14": ("At least 2 weeks before the examination", "Student", "Academic Coordinator or College Dean", "Graduate Program Secretary", "Examination; GS-F-15", "Comprehensive exam status"),
-    "15": ("After the examination", "Academic Coordinator", "Graduate Program Secretary", "Dean (noted)", "Monitoring workbook (COMPRE); adviser designation", "Comprehensive exam: result recorded"),
+    "15": ("After the examination", "Academic Coordinator", "Graduate Program Secretary", "Dean (noted)", "Monitoring workbook (COMPRE); Research Adviser designation", "Comprehensive exam: result recorded"),
     "16": ("At least 2 weeks before the title defense", "Student", "Academic Coordinator", "Academic Coordinator endorses; Research Coordinator", "Panel nomination (GS-F-17)", "Research gate: Form 1 - Title Defense"),
     "17": ("When a panel is nominated for any defense", "Research Coordinator", "GS Research Committee", "Research Coordinator; Committee for external panel", "Defense scheduling", "Panel matching and panel invitations"),
-    "18": ("Within the first working day after the title defense", "Panel Chair", "Panel members", "Panel", "Adviser designation (GS-F-19)", "Title defense verdict"),
+    "18": ("Within the first working day after the title defense", "Panel Chair", "Panel members", "Panel", "Research Adviser designation (GS-F-19)", "Title defense verdict"),
     "19": ("After the comprehensive examination, while taking courses or after the title defense", "Student", "Academic Coordinator (notes)", "Research Coordinator, Associate Dean, Dean", "GS-F-20", "Adviser Appointments: Applied, Noted by AC, Under deliberation"),
-    "20": ("After the designation is decided", "Research Coordinator", "Associate Dean", "Dean", "Student and adviser; GS-F-22 and GS-F-23 within 5 days", "Adviser Appointments: Appointed, Accepted"),
-    "21": ("Once only, before the proposal defense application", "Student", "Current and new adviser", "Research Coordinator, Associate Dean, Dean", "New GS-F-20", "Adviser Appointments: Change request"),
-    "22": ("Within 5 days of GS-F-20", "Student and adviser", "Adviser", "Research Coordinator receives", "Research file", "Adviser Appointments: contract received"),
-    "23": ("Within 5 days of GS-F-20", "Student and adviser", "Adviser", "Research Coordinator receives", "Research file", "Adviser Appointments: contract received"),
-    "24": ("Once only, before the proposal defense application", "Student", "Adviser", "Panel members", "Research file", "Not a separate step yet; title kept in the research case"),
+    "20": ("After the designation is decided", "Research Coordinator", "Associate Dean", "Dean", "Student and Research Adviser; GS-F-22 and GS-F-23 within 5 days", "Adviser Appointments: Appointed, Accepted"),
+    "21": ("Once only, before the proposal defense", "Student", "Current and new Research Adviser", "Research Coordinator, Associate Dean, Dean", "New GS-F-20", "Adviser Appointments: Change request"),
+    "22": ("Within 5 days of GS-F-20", "Student and Research Adviser", "Research Adviser", "Research Coordinator receives", "Research file", "Adviser Appointments: contract received"),
+    "23": ("Within 5 days of GS-F-20", "Student and Research Adviser", "Research Adviser", "Research Coordinator receives", "Research file", "Adviser Appointments: contract received"),
+    "24": ("Once only, before the proposal defense application", "Student", "Research Adviser", "Panel members", "Research file", "Not a separate step yet; title kept in the research case"),
     "25": ("Before the proposal defense (quantitative studies)", "Student", "Statistician", "Statistician", "GS-F-27", "Research gate: Form 4"),
-    "26": ("When a co-author is pre-identified", "Student", "Adviser", "Panel Chair (noted)", "GS-F-39 and GS-F-40 at publication", "Not a separate step yet"),
-    "27": ("At least 2 weeks before the proposal or closed-door final defense", "Adviser", "Research Coordinator", "Adviser endorses", "Panel; GS-F-29 or GS-F-32 and GS-F-33", "Research gate: Form 4; Final Defense; defense scheduling"),
-    "28": ("When a confirmed defense cannot proceed", "Student, adviser, panel or GS Office", "Adviser", "Research Coordinator", "Panel informed; GS-F-27 dates revised", "Defense scheduling: reschedule or cancel with reason"),
+    "26": ("When a co-author is pre-identified", "Student", "Research Adviser", "Panel Chair (noted)", "GS-F-39 and GS-F-40 at publication", "Not a separate step yet"),
+    "27": ("At least 2 weeks before the proposal or closed-door final defense", "Research Adviser", "Research Coordinator", "Research Adviser endorses", "Panel; GS-F-29 or GS-F-32 and GS-F-33", "Research gate: Form 4; Final Defense; defense scheduling"),
+    "28": ("When a confirmed defense cannot proceed", "Student, Research Adviser, panel or GS Office", "Research Adviser", "Research Coordinator", "Panel informed; GS-F-27 dates revised", "Defense scheduling: reschedule or cancel with reason"),
     "29": ("After the proposal defense, first working day", "Panel members", "Panel Chair consolidates", "Panel", "Revisions; GS-F-30", "Proposal defense verdict"),
-    "30": ("After the revised proposal is approved by the panel", "Panel Chair", "Adviser", "Panel members", "GS-F-31", "Research gate: Form 5.1"),
-    "31": ("Within 1 month after the proposal defense", "Student", "Adviser", "Research ethics committee", "Ethics Clearance; GS-F-27 (final)", "Ethics clearance status and date"),
+    "30": ("After the revised proposal is approved by the panel", "Panel Chair", "Research Adviser", "Panel members", "GS-F-31", "Research gate: Form 5.1"),
+    "31": ("Within 1 month after the proposal defense", "Student", "Research Adviser", "Research ethics committee", "Ethics Clearance; GS-F-27 (final)", "Ethics clearance status and date"),
     "32": ("After the closed-door and the public final defense, first working day", "Panel members", "Panel Chair consolidates", "Panel", "Revisions; GS-F-34 or GS-F-35", "Final defense verdict"),
-    "33": ("After the closed-door final defense, first working day", "Panel members and adviser", "Research Coordinator", "Panel", "Result and score recorded", "Final defense verdict with Form 7 score"),
-    "34": ("After a provisional pass without re-defense", "Adviser", "Panel members", "Panel", "Turnitin and editing (GS-F-36)", "Verdict follow-up: revisions confirmed by the panel chair"),
-    "35": ("2 to 4 weeks after the closed-door defense (admitted August 2020 onward)", "Adviser", "Panel members", "Research Coordinator", "Announcement and public defense", "Not modeled yet (Public Final Defense)"),
-    "36": ("After the adviser endorses the final manuscript", "Student", "Turnitin administrator", "Turnitin administrator", "Editor (GS-F-37)", "Completion Evidence: Turnitin certificate"),
+    "33": ("After the closed-door final defense, first working day", "Panel members and Research Adviser", "Research Coordinator", "Panel", "Result and score recorded", "Final defense verdict with Form 7 score"),
+    "34": ("After a provisional pass without re-defense", "Research Adviser", "Panel members", "Panel", "Turnitin and editing (GS-F-36)", "Verdict follow-up: revisions confirmed by the Panel Chair"),
+    "35": ("2 to 4 weeks after the closed-door defense (admitted August 2020 onward)", "Research Adviser", "Panel members", "Research Coordinator", "Announcement and public defense", "Not modeled yet (Public Final Defense)"),
+    "36": ("After the Research Adviser endorses the final manuscript", "Student", "Turnitin administrator", "Turnitin administrator", "Editor (GS-F-37)", "Completion Evidence: Turnitin certificate"),
     "37": ("After the similarity check is passed", "Student", "Editor", "Editor", "GS Office (GS-F-38)", "Completion Evidence: Form 9"),
-    "38": ("After the manuscript is ready for hard-bound reproduction", "GS Office", "Panel and adviser", "Dean accepts", "Bound copies and CD; graduation", "Completion Evidence: Form 10"),
-    "39": ("When a co-author was pre-identified", "Student", "Adviser", "Co-author accepts", "GS-F-40", "Not modeled yet"),
+    "38": ("After the manuscript is ready for hard-bound reproduction", "GS Office", "Panel and Research Adviser", "Dean accepts", "Bound copies and CD; graduation", "Completion Evidence: Form 10"),
+    "39": ("When a co-author was pre-identified", "Student", "Research Adviser", "Co-author accepts", "GS-F-40", "Not modeled yet"),
     "40": ("Before submitting to a journal", "Student", "GS Research Committee", "Dean", "Student submits to the journal", "Not modeled yet"),
     "41": ("When the article is accepted or published", "Student", "Research Coordinator", "Research Coordinator", "Graduation application", "Not modeled yet"),
     "42": ("In the review window of the graduating term", "Student", "Academic Coordinator; Research Coordinator", "Dean", "GS-F-43", "Graduation: signed application, For Review"),
-    "43": ("After candidates are checked", "GS staff", "Academic Coordinator; Research Coordinator", "Dean", "Registrar with GS-F-44", "Graduation: Dean Approved, exported list"),
-    "44": ("Whenever a record is sent to the Registrar", "Dean, Associate Dean or representative", "GS staff", "University Registrar acknowledges", "Registrar; GS log", "Registrar status and handoff log"),
+    "43": ("After candidates are checked", "Graduate School Staff", "Academic Coordinator; Research Coordinator", "Dean", "Registrar with GS-F-44", "Graduation: Dean Approved, exported list"),
+    "44": ("Whenever a record is sent to the Registrar", "Dean, Associate Dean or representative", "Graduate School Staff", "University Registrar acknowledges", "Registrar; GS log", "Registrar status and handoff log"),
 }
 
 
@@ -1578,7 +1581,7 @@ def build_approval_sheet():
     section_bar(doc, "C.  Review and approval", PORTRAIT_W)
     sign_block(doc, [
         ("Submitted by", "Capstone group CAP-IT1 (platform project)"), ("Reviewed by", "Research Coordinator"), ("Reviewed by", "Associate Dean"),
-        ("Reviewed by", "Academic Coordinators of the five program clusters"), ("Reviewed by", "Graduate School Secretary"),
+        ("Reviewed by", "Academic Coordinators of the five program areas"), ("Reviewed by", "Graduate School Secretary"),
         ("Approved by", "Graduate School Dean"),
     ], PORTRAIT_W)
     gs_box(doc, [], PORTRAIT_W)
@@ -1606,7 +1609,7 @@ def build_routing_guide():
         when, sub, rev, appr, nxt, plat = ROUTES[key]
         rows.append([f["code"], f["title"], when, sub, rev, appr, nxt, plat])
     cols = [("Form", 1.9), ("Title", 3.6), ("When used", 4.2), ("Submitted by", 2.5), ("Reviewed by", 2.7), ("Approved / decided by", 2.9), ("Goes next to", 3.4), ("Platform step", 3.5)]
-    t = grid_table(doc, cols, rows, width, row_h=0.9, size=8)
+    t = grid_table(doc, cols, rows, width, row_h=0.9, size=9)
     for r in t.rows[1:]:
         no_split(r)
     OUT.mkdir(parents=True, exist_ok=True)
