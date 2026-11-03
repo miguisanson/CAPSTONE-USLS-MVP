@@ -16,7 +16,7 @@ os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="pol
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 os.environ.setdefault("USLS_UPLOAD_DIR", tempfile.mkdtemp(prefix="uploads-"))
 
-from app import AcademicTerm, UserAccount, app, build_demo_database, db  # noqa: E402
+from app import AcademicTerm, CourseRecord, Student, UserAccount, app, build_demo_database, db  # noqa: E402
 
 
 class Night5Base(unittest.TestCase):
@@ -76,6 +76,29 @@ class AcademicSemestersReadOnlyTests(Night5Base):
     def test_other_roles_still_cannot_read_the_semesters(self):
         for email in ("dean@usls.edu.ph", "student@usls.edu.ph"):
             self.assertEqual(self.client_for(email).get("/api/admin/terms").status_code, 403, email)
+
+
+class EnrollmentOfferedSubjectsTests(Night5Base):
+    """Item 4: Camille Bernardo (DBA) saw only subjects she had completed. Reproduced: the server is right.
+
+    The Enrollment page lists the semester's OFFERING list; the seed offers DBA-MAJ3/4/5 (the fixture of another DBA
+    student), which Camille completed. Her not-taken DBA-COG4..COG10 are real "available" subjects, but nobody offered them.
+    """
+
+    def test_camille_bernardo_is_offered_only_subjects_she_completed_and_her_not_taken_ones_are_not_offered(self):
+        client = self.client_for("academic@usls.edu.ph")
+        with app.app_context():
+            camille = Student.query.filter_by(first_name="Camille", last_name="Bernardo").one()
+            program_id, student_id = camille.program_id, camille.id
+        data = client.get(f"/api/enrollment?program_id={program_id}&student_id={student_id}").get_json()
+        offered = {item["course_code"]: item["enrollment_state"] for item in data["offered_subjects"]}
+        self.assertEqual(offered, {"DBA-MAJ3": "completed", "DBA-MAJ4": "completed", "DBA-MAJ5": "completed"})
+        not_taken = {item["code"]: item for item in data["curriculum_subjects"] if item["enrollment_state"] == "available"}
+        self.assertEqual(sorted(not_taken), sorted(f"DBA-COG{n}" for n in range(4, 11)))
+        self.assertFalse(any(item["is_offered"] for item in not_taken.values()))
+        with app.app_context():  # the Monitoring Sheet record says the same: not taken
+            statuses = {r.course.code: r.status for r in CourseRecord.query.filter_by(student_id=student_id).all()}
+        self.assertTrue(all(statuses[code] == "Missing" for code in not_taken))
 
 
 if __name__ == "__main__":
