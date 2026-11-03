@@ -54,7 +54,8 @@ function senderInitial(message) {
 function senderIdentity(message) {
   const sender = senderLabel(message);
   const role = message.sender_role;
-  return role && sender !== role ? `${sender} (${role})` : sender;
+  // the name may already carry its role ("Maria Santos (Student)"): say it once
+  return role && sender !== role && !sender.toLowerCase().endsWith(`(${role.toLowerCase()})`) ? `${sender} (${role})` : sender;
 }
 
 export default function WorkflowDiscussion({

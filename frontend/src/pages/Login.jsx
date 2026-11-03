@@ -75,6 +75,7 @@ const STANDALONE_STUDENT_DEMOS = [
 
 export default function Login() {
   const { user, refresh } = useAuth();
+  const expired = new URLSearchParams(window.location.search).get("expired") === "1"; // sent by api.js on a 401 (I-211)
   // The form always starts empty: nothing is pre-filled, so a real typed login can be shown.
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -412,6 +413,11 @@ export default function Login() {
               {signingIn ? "Signing in…" : "Sign in"}
             </Button>
             {/* Under the button, so the message appears without moving anything that was already on screen */}
+            {expired && !signInError && (
+              <InlineNotice tone="warning" id="session-ended">
+                Your session ended — please sign in again.
+              </InlineNotice>
+            )}
             {signInError && (
               <InlineNotice tone="danger" id="sign-in-error">
                 {signInError}

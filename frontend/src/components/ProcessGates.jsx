@@ -252,12 +252,12 @@ export function StudyPlanPanel({ students = [], studentId: fixedStudentId, stude
         <>
           {p.status === "Draft" ? (
             <Button variant="secondary" icon={Send} disabled={busy} onClick={() => act(() => api.sendStudyPlan(p.id))}>
-              Send to AC
+              Send to Academic Coordinator
             </Button>
           ) : null}
           {p.status === "Returned for Revision" && role === "staff" ? (
             <Button variant="secondary" icon={Send} disabled={busy} onClick={() => act(() => api.sendStudyPlan(p.id))}>
-              Send to AC again
+              Send to Academic Coordinator again
             </Button>
           ) : null}
           {p.status === "Sent to Academic Coordinator" && role === "academic_coordinator" ? (

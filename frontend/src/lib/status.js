@@ -8,7 +8,7 @@
 export const STATUS_GROUPS = {
   success: ["On Track","Active","Confirmed","Scheduled","Appointed","Accepted","Answered","Entered","Ready",
     "Verified Complete","Dean Reviewed","Subject Tagged - Registrar Preparation","Implemented","Withdrawn Confirmed",
-    "Cleared","Record Updated","Passed","Pass","Present","Eligible","Eligible to Return","Compliant","Open","Complete",
+    "Cleared","Record Updated","Passed","Pass","Present","Eligible","Eligible to Return","Compliant","Complete",
     "Completed","Verified","Verified by staff","Done","Generated","Synced","Published","Offered","Sent to Registrar",
     "Dean Approved","Active planning","Approved","Taken","Endorsed","Acknowledged","Return Approved",
     "Extension Approved - Refresher Required","Re-enrollment Completed","Revisions confirmed","Received"],
@@ -26,7 +26,7 @@ export const STATUS_GROUPS = {
     "Upload required","Not Enough Evidence","Blocked",
     "Not Accepted - New Organization Required","Re-defense Required","Resubmission Required","Expired"],
   info: ["Submitted","Submitted to GS Staff","Staff Review","Return Submitted","Submitted for review","Documents Submitted",
-    "Awaiting Review","For Review","MOA Submitted","MOA Received","Report Sent to Dean","Applied","Noted by AC","Uploaded",
+    "Open","Awaiting Review","For Review","MOA Submitted","MOA Received","Report Sent to Dean","Applied","Noted by AC","Uploaded",
     "Invited","Rescheduled","Enrolled","Current","Planned","Upcoming","Suggested","Practicum In Progress",
     "Waiting for student submission","Requirements Verified","Exported - Ready to Send","Approved - Follow-through",
     "Approved - Registrar Preparation","Sent - Awaiting Receipt","Leave Scheduled","Residency","Eligible to take",
@@ -40,6 +40,10 @@ export const STATUS_GROUPS = {
 export const STATUS_TONE = Object.fromEntries(
   Object.entries(STATUS_GROUPS).flatMap(([tone, list]) => list.map((status) => [status.toLowerCase(), tone])),
 );
+
+/** Server status words that are jargon, shown in words (the tone still follows the original). */
+const STATUS_LABEL = { "noted by ac": "Noted by Academic Coordinator" };
+export const statusLabel = (status) => STATUS_LABEL[String(status || "").trim().toLowerCase()] || status;
 
 /** The server's `status_tone` words -> tone names. */
 export const SERVER_TONE = { good: "success", warn: "warning", bad: "danger", info: "info", muted: "neutral" };

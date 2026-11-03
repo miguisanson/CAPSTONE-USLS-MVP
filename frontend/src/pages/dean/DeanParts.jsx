@@ -18,6 +18,11 @@ import { GraduationRoster } from "../WorkflowPage";
 import { leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
 import { LeaveCaseSummary, isLeaveCaseItem } from "./DeanLeaveParts";
 import { CLARIFICATION_TEMPLATES, graduationBatchLabel } from "./deanHelpers";
+import { processLabel } from "./DeanShared";
+
+// Who did it, in words: the server sends the actor's name when it knows it; otherwise the office, never "User #12" (F-11).
+const ACTOR_OFFICE = { staff: "Graduate School staff", dean: "Dean", student: "Student", faculty: "Faculty", academic_coordinator: "Academic Coordinator", research_coordinator: "Research Coordinator", admin: "Administrator" };
+const actorOf = (entry) => entry.actor_name || ACTOR_OFFICE[String(entry.actor_role || "").toLowerCase().replace(/\s+/g, "_")] || entry.actor_role || "Graduate School staff";
 
 export function DeanGraduationWorkspace({ batchesOnly = false }) {
   const { data: context, loading, error, refetch } = useApi(
@@ -125,7 +130,7 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
     title: `Confirm: ${title}`,
     confirmLabel: title,
     message: [
-      `${item.student?.name} · ${item.student?.student_number} · ${item.type}`,
+      `${item.student?.name} · ${item.student?.student_number} · ${processLabel(item.type)}`,
       `Workflow movement: ${item.workflow_status || item.status} → ${target}`,
       comment.trim() ? `Recorded comment: ${comment.trim()}` : "No optional comment was entered. A student-visible status notice will still be recorded.",
     ].join("\n\n"),
@@ -145,8 +150,8 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
     id: entry.id,
     title: entry.result,
     at: entry.created_at,
-    actor: entry.actor_user_id ? `User #${entry.actor_user_id}` : "",
-    actorRole: [entry.actor_role, entry.action_type].filter(Boolean).join(" · "),
+    actor: actorOf(entry),
+    actorRole: entry.action_type || "",
     from: entry.previous_status,
     to: entry.new_status,
     note: entry.notes,
@@ -220,9 +225,10 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
       />
       </div>}
       {/* The buttons stay on screen while the case is read, like the graduation detail window's footer (I-191). */}
-      <div data-testid="decision-footer" className={canDecide ? "sticky bottom-3 z-20 mt-4 rounded-xl border border-slate-200 bg-white p-3 shadow-lift" : "mt-3"}>
+      <div data-testid="decision-footer" className={canDecide ? "sticky bottom-3 z-20 mt-4 rounded-xl border border-slate-200 bg-white p-3 shadow-lift max-sm:p-2" : "mt-3"}>
       <DecisionPanel
         variant="plain"
+        compact
         actions={actions}
         busy={isBusy}
         onDecide={(decision, text) => onDecide(item, decision, text)}
@@ -231,7 +237,8 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
         onCommentChange={(value) => setNote((current) => ({ ...current, [key]: value }))}
         commentLabel={decisionOnly ? "Review comment" : "Your comment"}
         commentPlaceholder={decisionOnly ? "Add a review comment. It will be saved with your name, role, date, and time." : "Write your reason. It is saved with your name, role, date and time."}
-        commentRows={2}
+        commentRows={phone ? 1 : 2}
+        commentHint={phone ? "" : undefined}
         commentRequiredMessage="Choose a reason or enter a comment before returning or denying the request."
         extra={
           <>

@@ -137,6 +137,7 @@ test.describe("P2.2 Monitoring Sheet dialogs", () => {
     await expect(saveCorrection).toBeEnabled();
     await shotBothWidths(page, "p22-reason-dialog");
     await page.keyboard.press("Escape");
+    await page.getByRole("dialog", { name: "Discard your changes?" }).getByRole("button", { name: "Discard" }).click(); // a typed reason is asked about first (Fable F-18)
     await expect(reason).toBeHidden();
     await expect(panel, "Escape closed only the reason window").toBeVisible();
     await panel.getByRole("button", { name: "Review correction" }).click();

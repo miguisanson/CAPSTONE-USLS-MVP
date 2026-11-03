@@ -47,7 +47,7 @@ function HandoffImport({ context }) {
   function pick(f) {
     if (!f) return;
     if (!/\.(xlsx|xlsm)$/i.test(f.name)) {
-      setError("Please choose an Excel .xlsx file in the AC Student Monitoring format.");
+      setError("Please choose an Excel .xlsx file in the Academic Coordinator Student Monitoring format.");
       return;
     }
     setError("");
@@ -119,8 +119,8 @@ function HandoffImport({ context }) {
         title={isAudit ? "Update audits from monitoring sheet" : "Import from monitoring sheet"}
         subtitle={
           isAudit
-            ? "Upload the latest AC Student Monitoring sheet — each student's completed subjects are updated from it"
-            : "Upload the AC Student Monitoring Excel file — students, programs, and course audits are created automatically"
+            ? "Upload the latest Academic Coordinator Student Monitoring sheet — each student's completed subjects are updated from it"
+            : "Upload the Academic Coordinator Student Monitoring Excel file — students, programs, and course audits are created automatically"
         }
         icon={FileSpreadsheet}
         action={<Button as={Link} to="/monitoring-sheet" variant="secondary" icon={Table2} className="shrink-0">Full sheet</Button>}
@@ -167,7 +167,7 @@ function HandoffImport({ context }) {
           <span className="btn-ghost cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500">{file ? "Choose a different file" : "Browse files"}</span>
         </label>
         <p className="meta mt-3">
-          Expected format: AC Student Monitoring template — program in cell A1, one student per row.
+          Expected format: Academic Coordinator Student Monitoring template — program in cell A1, one student per row.
         </p>
       </div>
 
@@ -311,7 +311,7 @@ function ValidationIssueTable({ issues = [], onOpen, onBulkResolved, title = "",
   function chooseCorrectionFile(file) {
     if (!file) return;
     if (!/\.(xlsx|xlsm)$/i.test(file.name)) {
-      setUploadError("Choose an Excel .xlsx file in the AC Student Monitoring format.");
+      setUploadError("Choose an Excel .xlsx file in the Academic Coordinator Student Monitoring format.");
       return;
     }
     setCorrectionFile(file);

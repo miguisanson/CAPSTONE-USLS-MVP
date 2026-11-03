@@ -156,6 +156,8 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       await box.fill("Attach the signed form.");
       await expect(message).toHaveCount(0); // typing clears the message
       await page.keyboard.press("Escape");
+      // a typed reason is not thrown away by a slip of the key: Escape asks first (Fable F-18)
+      await page.getByRole("dialog", { name: "Discard your changes?" }).getByRole("button", { name: "Discard" }).click();
       await expect(page.getByRole("dialog")).toHaveCount(1);
     });
 

@@ -1,13 +1,29 @@
 // Thin fetch wrapper around the Flask JSON API.
 const BASE = "/api";
 
+const NOT_REACHABLE = "The site is not reachable right now. Check your connection and try again.";
+// Sign-in calls answer 401 on purpose (nobody is signed in yet); a 401 anywhere else means the session ended (I-211).
+const SIGN_IN_PATHS = ["/auth/login", "/auth/logout", "/auth/me", "/auth/config", "/auth/demo-accounts", "/auth/demo-students"];
+let signingOut = false;
+
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    ...options,
-  });
+  if (path === "/auth/logout") signingOut = true; // a poll still in flight must not look like an expired session
+  if (path === "/auth/login") signingOut = false;
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      ...options,
+    });
+  } catch {
+    throw new Error(NOT_REACHABLE);
+  }
   if (!res.ok) {
+    if (res.status === 401 && !signingOut && !SIGN_IN_PATHS.some((p) => path.startsWith(p)) && window.location.pathname !== "/login") {
+      window.location.assign("/login?expired=1"); // a fresh load clears the signed-in user
+    }
+    if ([502, 503, 504].includes(res.status)) throw new Error(NOT_REACHABLE);
     let message = `Request failed (${res.status})`;
     try {
       const body = await res.json();
