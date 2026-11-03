@@ -482,7 +482,7 @@ test.describe("P82 student pages (pinned)", () => {
       await expect(next).toContainText("Final Defense");
       await expect(next).toContainText("Scheduled");
       await expect(next).toContainText("In 12 days");
-      await expect(next).toContainText("09:00-10:30");
+      await expect(next).toContainText("9:00 – 10:30 AM");
       await expect(next).toContainText("Spec Room 1 (On-site)");
       await expect(next).toContainText("Dr. Spec Adviser");
       await expect(next).toContainText("Dr. Panel One");

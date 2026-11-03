@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, CheckCheck } from "lucide-react";
 import { api } from "../api";
 import { Button } from "./ui/index.js";
+import { formatDate } from "../lib/format";
 
 // In-app notification bell for the top bar of the shared shell (every role). A read never makes anything on the
 // server (I-071), so when the page loads, and again every minute, the bell first asks the server to make the
@@ -18,7 +19,7 @@ function when(value) {
   if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes} min ago`;
   if (minutes < 1440) return `${Math.round(minutes / 60)} h ago`;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return formatDate(date);
 }
 
 export default function NotificationBell() {

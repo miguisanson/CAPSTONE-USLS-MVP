@@ -77,7 +77,7 @@ export function WorkflowStatusPanel({ data }) {
   });
   if (data.student.enrollment_tag === "AWOL" || data.student.enrollment_tag === "Residency" || data.awol_case || data.residency_record) {
     rows.push({
-      label: data.student.enrollment_tag === "Residency" ? "Residency" : "AWOL / Return",
+      label: data.student.enrollment_tag === "Residency" ? "Residency" : PAGE.returnFromAwol,
       icon: UserX,
       status: data.residency_record?.status || data.awol_case?.status || data.student.enrollment_tag,
       detail: data.residency_record

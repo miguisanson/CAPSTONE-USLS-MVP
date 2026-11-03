@@ -560,7 +560,7 @@ test.describe("Defense Schedule", () => {
     const row = tableWith(page, "Date / time").locator("tbody tr");
     await expect(row).toHaveCount(1);
     await expect(row).toContainText("Research title pending");
-    await expect(row).toContainText("Mar 1, 2027 · 13:00");
+    await expect(row).toContainText("Mar 1, 2027 · 1:00 PM");
     await expect(row).toContainText("Needs Re-confirmation");
     await expect(row).toContainText("A panel member cannot attend. A new date is needed.");
     await expect(row).toContainText("Online");

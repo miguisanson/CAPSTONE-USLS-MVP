@@ -10,8 +10,7 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { Button, Card, EmptyState, Field, InlineNotice, SectionTitle, StatusChip, Textarea } from "../../components/ui/index.js";
-import { formatDate } from "../../lib/format";
-import { parseDay } from "../../components/calendar/CalendarView";
+import { formatDate, formatDay, formatTimeRange } from "../../lib/format";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { useConfirm } from "../../components/confirm";
 
@@ -394,14 +393,12 @@ export function SubmitState({ busy, error, message, label, disabled = false, dis
 
 // ---- dates and defense schedules (Philippine time, never converted) ----
 
-// "Mon, Oct 5, 2026" from a YYYY-MM-DD (or naive datetime) string, read as a local date.
+// "Mon, Oct 5, 2026" (long: "Monday, October 5, 2026") from a YYYY-MM-DD (or naive datetime) string, read as a local date.
 export function fmtDay(value, long = false) {
   if (!value) return "Not set";
-  const day = parseDay(value);
-  if (Number.isNaN(day.getTime())) return String(value);
-  return day.toLocaleDateString(undefined, long
-    ? { weekday: "long", month: "long", day: "numeric", year: "numeric" }
-    : { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  return long
+    ? formatDate(value, { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+    : formatDay(value);
 }
 
 // "in 3 days" / "tomorrow" / "today" / "2 days ago" from a whole number of days.
@@ -414,8 +411,7 @@ export function daysPhrase(days) {
 }
 
 export function timeRange(start, end) {
-  if (!start) return "Time not set";
-  return end ? `${start}-${end}` : start;
+  return start ? formatTimeRange(start, end) : "Time not set";
 }
 
 // Statuses in which a booking is alive: a new request must not be filed on top of it.

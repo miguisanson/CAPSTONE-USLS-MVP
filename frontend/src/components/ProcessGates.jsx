@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { Button, DataTable, EmptyState, Field, InlineNotice, Input, SectionCard, Select, Spinner, StatusChip } from "./ui/index.js";
 import StepDialog from "./StepDialog";
+import { formatDate } from "../lib/format";
 
 /* Panels for the process steps the BPMN models require but that previously had
    no screen: the Dean onboarding gate (BPMN 1), the derived study plan and
@@ -157,7 +158,7 @@ export function OnboardingGatePanel({ role }) {
                 ) : null}
                 {item.admission_completed_at ? (
                   <span className="meta font-semibold text-brand-700">
-                    Admission completion recorded {new Date(item.admission_completed_at).toLocaleDateString()}
+                    Admission completion recorded {formatDate(item.admission_completed_at)}
                   </span>
                 ) : null}
               </div>

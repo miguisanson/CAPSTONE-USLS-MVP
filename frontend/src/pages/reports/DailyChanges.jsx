@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { CheckSquare, Download, FileText, Printer, RefreshCw, Square } from "lucide-react";
 import { api } from "../../api";
 import { Button, DataTable, InlineNotice, Input, SectionCard, Spinner, StatCard, StatusChip } from "../../components/ui/index.js";
-import { csvCell, downloadBlob, todayISO } from "../../lib/format";
+import { csvCell, downloadBlob, formatClock, formatDate, todayISO } from "../../lib/format";
 import { printDataTable } from "../../lib/print";
 
 function downloadCsv(filename, lines) {
@@ -83,10 +83,10 @@ export default function DailyChanges() {
   function printChanges() {
     printDataTable({
       title: "Daily changes list",
-      subtitle: `Date: ${date}`,
+      subtitle: `Date: ${formatDate(date)}`,
       columns: ["Time", "Change type", "Student", "Student No", "Program", "Change", "By", "Sent"],
       rows: items.map((item) => [
-        item.time ? new Date(item.time).toLocaleTimeString() : "",
+        formatClock(item.time),
         item.change_type, item.student_name, item.student_number, item.program_code,
         changeText(item), item.actor, item.reflected_in_aims ? "Yes" : "No",
       ]),
@@ -97,7 +97,7 @@ export default function DailyChanges() {
     {
       key: "time",
       header: "Time",
-      cell: (item) => <span className="whitespace-nowrap text-slate-500">{item.time ? new Date(item.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</span>,
+      cell: (item) => <span className="whitespace-nowrap text-slate-500">{item.time ? formatClock(item.time) : "—"}</span>,
     },
     { key: "type", header: "Change type", cell: (item) => <StatusChip status={item.change_type} dot={false} /> },
     {

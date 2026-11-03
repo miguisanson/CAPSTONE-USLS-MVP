@@ -17,7 +17,7 @@ import { Button, Card, DataTable, InlineNotice, PageHeader, StatusChip } from ".
 import RoleHome, { MAX_WAITING } from "../../components/RoleHome.jsx";
 import { facultyActions, facultyStats, facultyUpcoming, facultyWaiting } from "../../lib/facultyHome.js";
 import { firstNameOf } from "../../lib/staffHome.js";
-import { formatDate, todayISO } from "../../lib/format";
+import { formatClock, formatDate, todayISO } from "../../lib/format";
 import FacultyResearchWorkspace from "../../components/FacultyResearchWorkspace";
 import FacultyVerdicts from "./FacultyVerdicts";
 import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
@@ -51,7 +51,7 @@ function CalendarLink({ calendar }) {
 }
 
 function defenseTime(defense) {
-  return `${formatDate(defense.preferred_date)}${defense.start_time ? ` · ${defense.start_time}` : ""}`;
+  return `${formatDate(defense.preferred_date)}${defense.start_time ? ` · ${formatClock(defense.start_time)}` : ""}`;
 }
 
 export function FacultyDashboard() {

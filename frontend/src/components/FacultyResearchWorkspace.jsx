@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { BookOpen, CalendarClock, CheckCircle2, Eye, FileSignature, Gavel, Users } from "lucide-react";
 import { api } from "../api";
 import { Card, EmptyState, SectionTitle, StatusChip } from "./ui/index.js";
-import { formatDate, formatDateTime } from "../lib/format";
+import { formatClock, formatDate, formatDateTime } from "../lib/format";
 import SignaturePad from "./SignaturePad";
 
 const TITLE_GATE = "Form 1 - Title Defense";
@@ -113,7 +113,7 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
           <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{panel.student.name}</p><p className="text-xs text-slate-500">{panel.student.program_code} · {panel.gate}</p></div><StatusChip status={panel.panel_role} dot={false} /></div>
           <p className="mt-2 flex items-start gap-1.5 text-sm text-slate-600"><BookOpen className="mt-0.5 h-4 w-4 shrink-0" />{panel.research_title || "Research title pending"}</p>
           <div className="mt-3 rounded-lg bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Current-stage papers</p>{panel.documents?.length ? <div className="mt-2 flex flex-wrap gap-2">{panel.documents.map((document) => <a key={document.id} href={document.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-2 text-xs"><Eye className="h-3.5 w-3.5" />{document.document_type}: {document.name}</a>)}</div> : <p className="mt-1 text-xs text-slate-500">No uploaded papers for this assigned stage.</p>}</div>
-          {panel.defense && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-brand-800"><CalendarClock className="h-4 w-4" /><span className="font-semibold">{panel.defense.defense_type} · {formatDate(panel.defense.preferred_date)} {panel.defense.start_time || ""}</span><StatusChip status={panel.defense.display_status || panel.defense.status} dot={false} /></div>}
+          {panel.defense && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-brand-800"><CalendarClock className="h-4 w-4" /><span className="font-semibold">{panel.defense.defense_type} · {formatDate(panel.defense.preferred_date)} {formatClock(panel.defense.start_time)}</span><StatusChip status={panel.defense.display_status || panel.defense.status} dot={false} /></div>}
           {verdict && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
             <p className="text-sm font-semibold text-emerald-800">Verdict: {verdict.label || verdict.result}{verdict.selected_title ? ` · ${verdict.selected_title}` : ""}</p>
             <p className="mt-1 text-xs text-emerald-700">Submitted by {verdict.chair_name} · {formatDateTime(verdict.submitted_at)}{verdict.revision_status ? ` · ${verdict.revision_status}` : ""}</p>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BookOpenCheck, BriefcaseBusiness, Clock3, ExternalLink, FileSearch, FileText, Gauge, Mail, Search } from "lucide-react";
 import { api } from "../api";
 import { Button, Modal, StatusChip } from "./ui/index.js";
+import { formatDate, formatTimeRange } from "../lib/format";
 
 export default function FacultyAssignmentProfile({ faculty, onClose }) {
   if (!faculty) return null;
@@ -12,7 +13,7 @@ export default function FacultyAssignmentProfile({ faculty, onClose }) {
   const cv = faculty.cv_profile;
   const updatedDate = faculty.availability_updated_at ? new Date(faculty.availability_updated_at) : null;
   const updatedLabel = updatedDate && !Number.isNaN(updatedDate.getTime())
-    ? updatedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    ? formatDate(updatedDate)
     : "";
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(null);
@@ -148,7 +149,7 @@ export default function FacultyAssignmentProfile({ faculty, onClose }) {
             <div className="grid gap-2 sm:grid-cols-2">
               {hours.map((item) => (
                 <div key={item.weekday} className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                  <span className="font-semibold text-ink">{item.day}</span> · {item.start}–{item.end}
+                  <span className="font-semibold text-ink">{item.day}</span> · {formatTimeRange(item.start, item.end)}
                 </div>
               ))}
             </div>
