@@ -238,9 +238,9 @@ bullets([
 
 doc.add_heading("9. Documents to hand over and get signed", 1)
 bullets([
-    "Forms pack (Documents/Graduate_School/Forms/USLS-GS-Forms-Pack.pdf, print it): 44 Graduate School forms GS-F-01 to GS-F-44 in lifecycle order, plus GS-P-01 Forms Approval Sheet (first page) and GS-P-02 Forms Routing Guide.",
+    "Forms pack (Documents/Graduate_School/Forms/USLS-GS-Forms-Pack.pdf, print it, 108 pages): 60 documents, that is 54 forms GS-F-01 to GS-F-54 and 6 policy and control documents GS-P-01 to GS-P-06. Each sits in the folder of its Operations Manual chapter (4.01 to 4.19), with two more folders: Platform Basis (privacy, accounts, electronic approval, AIMS data exchange, faculty load) and Supplementary Forms (forms the Handbook names). GS-P-01 Forms Approval Sheet is the first page and GS-P-02 Forms Routing Guide the second.",
     "How to present it: \"The panel asked for the school's forms. Apart from the Handbook and the Research Protocol, most were never written down, so we drafted them from those two documents, keeping the Protocol's form numbers. Each form cites its rule. Please review, mark changes on the Approval Sheet, and sign it; once signed with an effectivity date they are the official forms, and the portal already asks for the same information.\"",
-    "Open questions for the forms are listed at the end of Documents/Graduate_School/Forms/00-INVENTORY.md (e.g. whether the office already has templates for Forms 1-13, defense fees, ethics committee forms). Ask these questions while the Dean signs.",
+    "Open questions for the forms are numbered 1 to 47 in Documents/Graduate_School/Forms/00-INVENTORY.md (e.g. whether the office already has templates for Forms 1-13, defense fees, ethics committee forms; questions 37 to 47 cover the new policy documents and forms). Ask these questions while the Dean signs.",
     "UAT form (Documents/Capstone/UAT/[CAP-IT2] UAT Instrument - Revised.pdf): one per evaluator, after the demo. Sections A, I, J for everyone plus the sections marked for the evaluator's own role. Allow about 20-25 minutes.",
     "Operations Manual (PDF: Documents/Graduate_School/Operations_Manual/USLS GS Operations Manual - DRAFT for Validation.pdf): the process descriptions the forms follow; ask for validation the same way.",
 ])

@@ -145,14 +145,16 @@ s.add_run("Meeting with the group and the Graduate School, 4 November 2026. "
           "Marked check = the sources do not settle it. Say it as open.").italic = True
 
 # ---------------------------------------------------------------- PART 1
-doc.add_heading("Part 1 - USLS Graduate School forms pack (46 documents)", 1)
+doc.add_heading("Part 1 - USLS Graduate School forms pack (60 documents)", 1)
 bullets([
-    "What it is: 44 forms (GS-F-01 to GS-F-44) plus 2 process documents: GS-P-01 Forms Approval Sheet and GS-P-02 Forms Routing Guide. One print pack, 82 pages, approval sheet first.",
+    "What it is: 54 forms (GS-F-01 to GS-F-54) plus 6 policy and control documents: GS-P-01 Forms Approval Sheet, GS-P-02 Forms Routing Guide, GS-P-03 Electronic Approval and Signature Policy, GS-P-04 Data Privacy Notice and Records Retention Schedule, GS-P-05 Platform Access and Roles Matrix, GS-P-06 AIMS and Registrar Data Exchange Specification. One print pack, 108 pages, approval sheet first.",
+    "Where each sits: every form is in the folder of its Operations Manual chapter (4.01 to 4.19, for example 4.06 Leave of Absence), with its PDF beside the Word file. 0 Forms Control holds GS-P-01 and GS-P-02. Platform Basis (manual chapters 4.20 to 4.24) holds GS-F-45 to GS-F-48 and GS-P-03 to GS-P-06. Supplementary Forms holds GS-F-49 to GS-F-54, forms the Handbook names that the manual chapters did not cover. Each form names its manual section under its title.",
     "Why it was made: the Graduate School has almost nothing written down besides the Handbook 2022-2023. The Research Protocol describes Forms 1 to 13 but holds no layouts. The group drafted one clean, consistent set that matches the Handbook, the Protocol and the web app's workflows. Every form has blank control fields: form code, revision no. (00), effectivity date.",
     "How it was checked (3 Nov): every rule sentence, citation, form number and title was read against the Handbook, the Protocol and the Operations Manual rules file. About 310 statements and 160 citations. Errors found were fixed. Rules that rest only on working practice are marked 'proposed practice' or 'to be confirmed', or left blank. The forms never state a fee, deadline or limit that the Handbook or Protocol does not state.",
     "Honest line: nothing was shown to the Graduate School before today. The readings are not confirmed with the Dean yet. If the Graduate School already has its own form, that form replaces ours and the GS-F number is retired.",
-    "GS-P-01 (the page the Dean signs): lists all 44 forms. For each form the reviewer marks Approved or writes the change required. The signatures approve the forms at Revision 00 and fix the effectivity date. Reviewers: Research Coordinator, Associate Dean, five Academic Coordinators, Graduate School Secretary. Approver: the Dean.",
-    "GS-P-02 (read-only guide): one row per form. It shows when the form is used, who submits, who reviews, who decides, where the form goes next, and which web-app step records the same event.",
+    "New on 4 Nov (14 documents): GS-P-03 to GS-P-06 and GS-F-45 to GS-F-54. Handbook pages were read from the PDF before any rule was written. Section numbers of RA 8792 and RA 10173 were checked against the text of the Acts. What the platform sends to outside services, its roles and its import files were read from the program code. The new documents print no open questions; each is a numbered question below (29 to 47).",
+    "GS-P-01 (the page the Dean signs): lists all 60 documents, grouped by manual chapter. For each document the reviewer marks Approved or writes the change required. The signatures approve the documents at Revision 00 and fix the effectivity date. Reviewers: Research Coordinator, Associate Dean, five Academic Coordinators (one for each college), Graduate Program Secretary. Approver: the Dean.",
+    "GS-P-02 (read-only guide): one row per form, with its manual chapter. It shows when the form is used, who submits, who reviews, who decides, where the form goes next, and which web-app step records the same event.",
 ])
 
 H = ["Code", "Document", "What it is for", "Filled by", "Signs / approves", "Based on", "Web-app process"]
@@ -223,8 +225,24 @@ grp("Graduation and records")
 row("GS-F-42", "Application for Graduation", "Student applies in the review window of the graduating term.", "Student", "Academic Coordinator (coursework); Research Coordinator (research documents); Dean endorses or returns", "Ops Manual 4.18; Handbook pp. 55-56, 68-69, 75-77, 80", "Graduation: signed application, For Review")
 row("GS-F-43", "Graduation Endorsement List", "Batch list of checked candidates for the Dean.", "Graduate School staff", "Academic Coordinator; Research Coordinator; Dean approves", "Ops Manual 4.18; Handbook pp. 32, 77", "Graduation: Dean Approved, exported list")
 row("GS-F-44", "Records Transmittal to the University Registrar", "Records sent to the Registrar, with acknowledgement.", "Dean, Associate Dean or representative", "Registrar acknowledges", "Ops Manual 4.19; Handbook pp. 32, 49-50, 53. Proposed", "Registrar status and handoff log")
-grp("Process documents (control of forms)")
-row("GS-P-01", "Graduate School Forms Approval Sheet", "The page that approves all 44 forms and fixes the effectivity date.", "Capstone group", "Reviewers (see above); Dean approves", "Inventory (00-INVENTORY.md)", "-")
+grp("Platform Basis (folder Platform Basis, Ops Manual 4.20 to 4.24)")
+row("GS-F-45", "Data Privacy Consent and Acknowledgement", "Paper twin of the privacy notice shown at first sign-in. Consent item by item, for a person without an account or when a signed copy is wanted.", "Person (any account holder)", "Person signs; Graduate School Staff receives", "Ops Manual 4.23; RA 10173 sections 11, 12, 16; GS-P-04", "Privacy notice and consent at first sign-in")
+row("GS-F-46", "Platform Account and Role Request", "Ask for an account, a change of role or removal of an account. Every account except a student's.", "Requester", "Head of office endorses; Dean approves; Graduate School Staff or administrator sets up", "Ops Manual 4.21; GS-P-05", "Account set-up by the Graduate School")
+row("GS-F-47", "Faculty Course Preference and Availability", "Each term: subjects preferred, usual weekly hours, dated availability, reply to an availability request.", "Faculty member", "Faculty member signs; Academic Coordinator receives and keys it in", "Ops Manual 4.20; fields of the platform's faculty records", "Faculty record: preferences, weekly hours, availability")
+row("GS-F-48", "Teaching Load Assignment", "Professor proposed for each subject section, and the load of each professor. The maximum load is left blank (question 42).", "Academic Coordinator", "Academic Coordinator prepares; Dean approves; faculty member acknowledges", "Ops Manual 4.20; GS-F-04, GS-F-47; Handbook p. 48", "Course offering: professor assignment")
+row("GS-P-03", "Electronic Approval and Signature Policy", "When an approval recorded in the platform counts as the officer's signature on the matching form. Policy, not a form.", "Capstone group drafts", "Dean approves; Research Coordinator and University legal counsel review", "Ops Manual 4.22; RA 8792 sections 7, 8, 9, 12; Protocol and Handbook pp. 61, 63, 72-73", "Transaction log of every recorded step; role gates")
+row("GS-P-04", "Data Privacy Notice and Records Retention Schedule", "What personal data is kept, why, who sees it, what goes to outside services, how long it is kept, rights of the person. Data Protection Officer name left blank.", "Capstone group drafts", "Dean approves; Data Protection Officer reviews", "Ops Manual 4.23; RA 10173 sections 2, 7, 11, 12, 16, 20; outside calls read from the program code on 4 Nov", "First sign-in notice; Policy Assistant (Google Gemini only when a key is set); Google Calendar for a connected faculty member")
+row("GS-P-05", "Platform Access and Roles Matrix", "The roles of the platform, what each can see and do, and how an account is requested, set up, reviewed and removed.", "Capstone group drafts", "Dean approves; Academic Coordinators and Graduate School Staff review", "Ops Manual 4.21; roles and role gates of the platform", "Role check on every function; GS-F-46 account set-up")
+row("GS-P-06", "AIMS and Registrar Data Exchange Specification", "Files that come in from AIMS and files that go out to the University Registrar: columns, sender, timing. Exchange by file only.", "Capstone group drafts", "Dean approves; University Registrar acknowledges", "Ops Manual 4.24; the platform's import and export files; Documents/Sample_Data/AIMS_Export", "Student Handoff and class-list imports; Registrar lists (sent, acknowledged). The proposed AIMS export workbook is not read yet")
+grp("Supplementary Forms (folder Supplementary Forms, named in the Handbook, filed in the chapter each belongs to)")
+row("GS-F-49", "Request for Approved Absence", "Absence for a school-sponsored activity, official representation of the University or a Dean-endorsed program activity. Not counted against allowed absences; work missed is still made up.", "Student", "Academic Coordinator recommends; Dean approves", "Ops Manual 4.5; Handbook p. 52", "Kept on paper only (no web-app step)")
+row("GS-F-50", "Incomplete Grade Removal Form", "Remove an INC within one academic year by meeting the requirements; final grade given by the professor.", "Student", "Professor gives final grade; Academic Coordinator and Dean note", "Ops Manual 4.5; Handbook pp. 48, 54", "Kept on paper only (grades are outside the platform)")
+row("GS-F-51", "Application for Cross-enrollment", "Dean's advance written permission to take a course at another institution. Basis for the permit the Registrar issues.", "Student", "Academic Coordinator verifies conditions; Dean approves; Registrar issues the permit", "Ops Manual 4.2; Handbook p. 50", "Kept on paper only (no web-app step)")
+row("GS-F-52", "Request for a Special Class", "Ask for a special class or an undersized class, through the Dean, addressed to the Vice Chancellor for Academic Affairs. Minimum enrollees left blank.", "Academic Coordinator", "Dean (through); Vice Chancellor for Academic Affairs approves", "Ops Manual 4.3; Handbook p. 48", "Kept on paper only (no web-app step)")
+row("GS-F-53", "Request for Transfer between Master's Options", "Master's student asks to move to another master's option; Dean decides which subjects are credited.", "Student", "Academic Coordinator recommends; Associate Dean endorses; Dean approves", "Ops Manual 4.2; Handbook p. 48", "Kept on paper only (no web-app step)")
+row("GS-F-54", "Nomination for Best Thesis / Dissertation", "Nominate a work after the final defense. Committee scores it (Handbook rubric, 100 points); cut-off 96.", "Research Adviser or Panel Chair", "Committee members score; Dean approves the award", "Ops Manual 4.18; Handbook pp. 76-77", "Kept on paper only (no web-app step)")
+grp("Forms control (folder 0 Forms Control)")
+row("GS-P-01", "Graduate School Forms Approval Sheet", "The page that approves all 60 documents and fixes the effectivity date.", "Capstone group", "Reviewers (see above); Dean approves", "Inventory (00-INVENTORY.md)", "-")
 row("GS-P-02", "Forms Routing Guide", "Who files, reviews, decides and where each form goes next.", "Read-only guide", "-", "Ops Manual chapters 2 and 4", "Maps each form to its web-app step")
 table(rows, Wd, size=8, group_rows=G)
 
@@ -241,13 +259,13 @@ Q = [
     ["9", "Adviser: who approves (Dean alone, or with Associate Dean and Research Coordinator)? Do students nominate three faculty? Who approves an external panel member? Is there a cap on panel service?"],
     ["10", "Form 7 uses the Handbook p. 76 rubric (15, 40, 15, 30 points) and the 85 / 90 thresholds of p. 67. Is that the intended rubric? Does it apply to a project paper?"],
     ["11", "Public final defense: apply five days or two weeks before? 30 or 60 minutes? Which admission date decides between public defense and the research-conference track?"],
-    ["12", "Defense fees and honoraria: the Protocol fee tables are empty, so the forms state no amounts."],
+    ["12", "Defense fees and honoraria: the Protocol fee tables are empty, so the forms state no amounts. Is the practice of handing panel honoraria in an envelope at the defense the one to record?"],
     ["13", "Ethics review: does the ethics committee have its own application and clearance forms? GS-F-31 is a general draft."],
     ["14", "Turnitin certificate: who issues it and in what form? (GS-F-36 is proposed.)"],
     ["15", "Publication: who is the external expert? Does the Scopus / Web of Science / ISI requirement apply to every program from AY 2022-2023? What happens when a student cannot publish in time?"],
     ["16", "Practicum: which programs? How many hours (the platform default of 200 is the group's assumption; forms leave it blank)? Who signs for the University? Does University counsel review the agreement? May a Psychology student do it before the comprehensive exam?"],
     ["17", "Graduation: review window, deadline, late applicants, document checklist. Registrar acknowledgement and file formats."],
-    ["18", "Is the 'Graduate School Secretary' on GS-P-01 the same person as the Handbook's 'Graduate Program Secretary'? Are the mailboxes on the forms current?"],
+    ["18", "Offices and titles: GS-P-01 uses the Handbook's 'Graduate Program Secretary'. Is that the right signatory? Are the mailboxes on the forms current?"],
     ["19", "Adviser rules differ. Handbook p. 58: doctoral degree and one refereed publication; five advisees per semester (p. 59). Protocol: PhD for PhD students, PhD units for MA students; five active advisees per academic year. GS-F-19 states both. Which governs?"],
     ["20", "Project paper: the Protocol gives no provisional-pass score. GS-F-32 and GS-F-33 leave a blank."],
     ["21", "Proposal defense outcomes on GS-F-29: Passed, Passed with minor revisions, Major revisions. Are those the right outcomes?"],
@@ -258,7 +276,25 @@ Q = [
     ["26", "Is 'Endorsement for Public Final Defense' (Form 4.3) the official title? Handbook and Protocol word it differently."],
     ["27", "Ethics committee mailbox: Protocol gives rerc@usls.edu.ph, the Handbook another address. The forms use the Protocol's."],
     ["28", "Practicum Agreement wording is the group's draft, not University text. Who reviews it?"],
-    ["+", "Also open: waiver of the two-week rules, time limits and what follows when exceeded, whether weekends and holidays count in lead times."],
+    ["29", "GS-F-35: five days before the schedule (Protocol) or two weeks (Handbook p. 73)?"],
+    ["30", "Project paper: provisional-pass score on GS-F-32 and GS-F-33 (left blank). Are the Handbook p. 76 criteria those of Form 7?"],
+    ["31", "GS-F-06: a drop for a documented ground other than absences is arranged between student and Academic Coordinator. Is that the practice?"],
+    ["32", "GS-F-09: status recorded from evidence; GS-F-44 used if the Registrar is told. Right?"],
+    ["33", "GS-F-17: defense date confirmed once the adviser and all panel members replied. Does the Associate Dean note the form?"],
+    ["34", "GS-F-42: a wrong application is returned and replaced by a new form, the first is kept. Is that the practice?"],
+    ["35", "GS-F-10 and GS-F-11: residency fee and practicum hours left blank. Which programs have a practicum, and how many hours?"],
+    ["36", "GS-F-28 is a Graduate School form, not a Protocol form. Who may ask for a rescheduling and who decides?"],
+    ["37", "GS-P-03: does University legal counsel accept the procedure under RA 8792 section 8? The Associate Dean signs forms but has no platform role: add the role or keep paper? How is a delegate designated?"],
+    ["38", "GS-P-04: Data Protection Officer name and contact; University retention rules (the schedule prints 5 years, permanent, 1 year); answer period (fifteen working days); data sharing agreement with Google before real data; hosting outside the University."],
+    ["39", "GS-P-05 and GS-F-46: should an Academic Coordinator be limited to one program? Who is the named administrator? Roles for the Associate Dean and Graduate Program Secretary? Account review each term? Is the approval chain right?"],
+    ["40", "GS-P-06: who exports from AIMS and in what layout? Is the proposed AIMS export workbook acceptable? How often? What does the Registrar need to acknowledge a file? Layouts of the AWOL and residency reports."],
+    ["41", "GS-F-45: are the five consent items the ones the Data Protection Officer wants?"],
+    ["42", "GS-F-47 and GS-F-48: maximum teaching load (blank, the Handbook states none). Does a faculty member acknowledge the load in writing?"],
+    ["43", "GS-F-49: keep the Academic Coordinator's recommendation, which the Handbook does not name?"],
+    ["44", "GS-F-50: deadline for the form, and the Registrar's procedure to post the final grade."],
+    ["45", "GS-F-51, 52, 53: who checks that the cross-enrolled course is not a major course; minimum enrollees and fee of a special class; credit of subjects, deadline and Registrar notice on a transfer."],
+    ["46", "GS-F-54: who may nominate, who sits on the committee, is the final score the average, when nominations close."],
+    ["47", "All new documents: do manual chapters 4.20 to 4.24 (faculty load, accounts and roles, electronic approval, data privacy, data exchange) belong in the manual as written?"],
 ]
 table([["#", "Question"]] + Q, [1.0, 25.7], size=8.5)
 
@@ -388,7 +424,7 @@ qa([
 doc.add_heading("Where every file is", 1)
 table([
     ["What", "Where (under E:\\Github_Projects\\CAPSTONE-USLS-MVP\\Documents\\)"],
-    ["Forms pack to print (82 pages, approval sheet first)", "Graduate_School\\Forms\\USLS-GS-Forms-Pack.pdf. Single PDFs in Graduate_School\\Forms\\pdf\\. Inventory and open questions: Graduate_School\\Forms\\00-INVENTORY.md"],
+    ["Forms pack to print (108 pages, approval sheet first)", "Graduate_School\\Forms\\USLS-GS-Forms-Pack.pdf. Each form is in the folder of its manual chapter (Graduate_School\\Forms\\4.01 ... 4.19, plus 0 Forms Control, Platform Basis, Supplementary Forms), with its single PDF beside the .docx. Inventory and open questions 1-47: Graduate_School\\Forms\\00-INVENTORY.md"],
     ["UAT instrument", "Capstone\\UAT\\[CAP-IT2] UAT Instrument - Revised.docx (and .pdf). Every change and source: UAT-REVIEW-NOTES.md. Original draft: C:\\Users\\Windows10\\Downloads\\[CAP-IT2] UAT Instrument Draft.docx"],
     ["Videos (this PC only)", "Capstone\\Meeting_2026-11-04\\videos\\ - 2d-Monitoring-Sheet, 2h-1-Leave-of-Absence, 2h-2-Readmission, 2h-3-AWOL-and-Return-from-AWOL, 2l-Reports-Analytics (.mp4 with .srt subtitles)"],
     ["Narration script", "Capstone\\Meeting_2026-11-04\\NARRATION-SCRIPT.docx (and .pdf). 2m Best Features is at the end."],
