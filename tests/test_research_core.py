@@ -560,6 +560,29 @@ class VerdictOutcomeTests(ResearchCoreBase):
             self.assertEqual(ResearchCase.query.filter_by(student_id=self.student_id).first().title, "The Approved Title")
             self.assertEqual(detected_research_progress(self.student_obj())["gate"], PROPOSAL)
 
+    def test_correcting_an_approved_title_to_disapproved_puts_the_earlier_title_back(self):
+        with app.app_context():
+            self.endorse(self.student_id)
+            self.fill_uploads(self.student_id, TITLE, status="Complete")
+            self.panel(self.student_id, TITLE)
+            schedule = self.schedule(self.student_id, "Title Defense")
+            from app import sync_research_progress
+            sync_research_progress(self.student_obj(), "Original Typed Title")
+            db.session.commit()
+            schedule_id = schedule.id
+        ok = self.submit(schedule_id, "Passed", selected_title="Panel Picked Title")
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        verdict_id = ok.get_json()["verdict"]["id"]
+        with app.app_context():
+            self.assertEqual(ResearchCase.query.filter_by(student_id=self.student_id).first().title, "Panel Picked Title")
+        fixed = self.faculty_client("Chair Person").post(
+            f"/api/faculty-portal/defense-verdicts/{verdict_id}/correction",
+            json={"result": "Failed", "reason": "Entered Approved by mistake; the panel disapproved"})
+        self.assertEqual(fixed.status_code, 200, fixed.get_json())
+        with app.app_context():
+            self.assertEqual(ResearchCase.query.filter_by(student_id=self.student_id).first().title, "Original Typed Title")
+            self.assertEqual(DefenseVerdict.query.get(verdict_id).research_title, "Original Typed Title")
+
     def test_disapproved_title_keeps_old_files_and_asks_for_a_new_set_of_three(self):
         with app.app_context():
             self.endorse(self.student_id)

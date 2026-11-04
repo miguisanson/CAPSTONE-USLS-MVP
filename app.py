@@ -1587,6 +1587,7 @@ class DefenseVerdict(db.Model):
     revision_confirm_note = db.Column(db.Text)
     evaluation_score = db.Column(db.Float)
     selected_title = db.Column(db.String(220))
+    title_before_verdict = db.Column(db.String(220))  # the study title before the panel's pick; put back if the verdict is corrected
     original_result = db.Column(db.String(60))
     correction_reason = db.Column(db.Text)
     corrected_by = db.Column(db.String(160))
@@ -36022,6 +36023,8 @@ def apply_verdict_effects(student: Student, schedule: ScheduleRequest, verdict: 
     verdict.revision_status = None
     if gate == RESEARCH_GATE_TITLE and verdict.selected_title:
         # The panel selected one of the three titles; that is the title of the study from now on.
+        case_before = ResearchCase.query.filter_by(student_id=student.id).first()
+        verdict.title_before_verdict = case_before.title if case_before else None
         sync_research_progress(student, verdict.selected_title)
     after_defense_cleared(student, gate, verdict)
     return "Research Coordinator"
@@ -36037,6 +36040,12 @@ def revert_verdict_effects(verdict: DefenseVerdict, schedule: ScheduleRequest) -
     verdict.revision_status = None
     verdict.revision_note = None
     verdict.revisions_submitted_at = None
+    if verdict.title_before_verdict:
+        case = ResearchCase.query.filter_by(student_id=verdict.student_id).first()
+        if case and case.title == verdict.selected_title:
+            case.title = verdict.title_before_verdict
+        verdict.research_title = verdict.title_before_verdict
+        verdict.title_before_verdict = None
     defense_type = verdict.defense_type
     close_research_tasks(
         verdict.student_id,
