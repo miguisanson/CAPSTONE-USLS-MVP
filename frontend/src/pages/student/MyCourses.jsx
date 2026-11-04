@@ -42,7 +42,7 @@ export function MyCoursesPanel({ data, onSaved }) {
     setError("");
     setMessage("");
     try {
-      const result = await api.saveStudentEnrollment([...selected], data.current_term?.id);
+      const result = await api.saveStudentEnrollment([...selected]);
       setMessage(result.message);
       await onSaved();
     } catch (err) {
