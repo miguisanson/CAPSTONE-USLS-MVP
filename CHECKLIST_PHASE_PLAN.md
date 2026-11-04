@@ -315,7 +315,7 @@ Finish research and practicum authority, access, scheduling, and history without
 | 45 | Decision | P0 | Resolve D7 and make every panel/availability/verdict screen use the same validated participant rule. |
 | 46 | Partial | P1 | Complete common-slot ranking and honest Google/profile availability labeling; never present fixtures as live calendar data. |
 | 47 | Existing | P1 | Regression-test immediate refresh and downstream state propagation after every research, panel, scheduling, and graduation action. |
-| 48 | Partial | P0 | Keep chair-only final verdict and add the validated supporting evaluation record. |
+| 48 | Partial | P0 | Keep the panel chair or panel lead verdict action and let Graduate School staff record or correct the same signed panel verdict from the selected student's Research Gate record as a fallback. Keep the recorder identity and the assigned chair separately in the audit record. Merge v6.4 (owner): the Research Coordinator may do the same, a reason is required, and staff may also confirm revisions for the panel. |
 | 49 | Partial | P1 | Preserve scoped document access and audit opens, comments, signatures, and decisions. |
 | 50 | Partial | P1 | Display original/additional files, updated hours, requests, and responses with New/Revised/Replaced/Superseded labels. |
 | 51 | Decision | P0 | Resolve D8 and align every practicum action/button with confirmed authority. |
@@ -327,7 +327,7 @@ Finish research and practicum authority, access, scheduling, and history without
 - [ ] No adviser-dependent action works without a valid designation.
 - [ ] Participant counts and roles are consistent across every screen.
 - [ ] Panel members have scoped access and document-open auditing.
-- [ ] Only the authorized chair can submit the final verdict.
+- [ ] The authorized chair can submit the final verdict; Graduate School staff can record or correct the same signed panel verdict from Research Gate as a fallback, with the actual recorder audited.
 - [ ] Scheduling recommends the earliest valid common slot and labels data sources honestly.
 - [ ] Practicum authority matches the confirmed workflow.
 - [ ] Full practicum history survives resubmission and forwarding.

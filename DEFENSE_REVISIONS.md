@@ -291,3 +291,16 @@ test first.
   other is the date time-bomb in C6. Neither is caused by the v5 commits.
 - `.venv` was rebuilt on Python 3.14 (the old one pointed at a removed 3.12).
 - No frontend test runner exists.
+
+**Owner revision, 2026-11-04:** Research Gate shows Title Defense, Proposal Defense,
+and Completion as its three overview columns. The panel chair or panel lead keeps the
+verdict action. Graduate School staff may record or correct the same signed panel
+verdict from the selected student's Research Gate record as a fallback. The five
+verdicts are Passed; Passed with minor revisions; Provisional pass - revisions or
+re-defense; Deferred; and Failed. Deferred and Failed reopen the required documents
+for that defense stage before another schedule can be booked.
+
+**Merge v6.4 (owner, 2026-11-04, `.planning/MERGE-v6.4.md` M3-M5):** the third column is
+labelled Final Defense. Graduate School staff and the Research Coordinator record or correct
+the verdict for the panel from the board card or the student's record, always with a reason
+and a "Recorded by ... for the panel" stamp, and may also confirm revisions for the panel.

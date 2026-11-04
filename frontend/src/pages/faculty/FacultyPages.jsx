@@ -264,7 +264,7 @@ export function FacultyVerdictsPage() {
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title="Verdicts"
-        description="The panel chair or panel lead submits the final verdict for a scheduled defense. Graduate School staff have read-only access."
+        description="The panel chair or panel lead submits the final verdict for a scheduled defense. Graduate School staff can record the same verdict from Research Gate when needed."
         icon={Scale}
       />
       <FacultyVerdicts panels={data.panels || []} refetch={refetch} />

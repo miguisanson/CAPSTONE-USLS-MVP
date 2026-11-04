@@ -15,7 +15,7 @@
 - Not tested: the return/deny branch actions (resend, denied) and the Hours Incomplete detour of Practicum (autopilot takes the
   200-hours path).
 
-**Current branch: `v6.2-migui`** (made 2026-11-04 13:3x from `v6.1-migui` 9bf95ac, identical code). Natalie works here: `git fetch` then `git switch v6.2-migui`, `npm run seed` once, `/continue_CAPSTONE-USLS-MVP`.
+**Current branch: `v6.4-migui`** (v6.2-migui + Natalie's v6.3-natalie, see `.planning/MERGE-v6.4.md`). Earlier: `v6.2-migui` (made 2026-11-04 13:3x from `v6.1-migui` 9bf95ac, identical code). Natalie works here: `git fetch` then `git switch v6.2-migui`, `npm run seed` once, `/continue_CAPSTONE-USLS-MVP`.
 
 ## 2026-11-04 evening - edit anything, with history (packet `pkt/edit-history`, worktree `CAPSTONE-USLS-MVP-wt/kedit`; not pushed)
 
@@ -727,3 +727,36 @@ Fixed and marked in ISSUES.md: I-342, I-351, I-349, I-294, I-295, I-301, I-300, 
 `test_loa_readmission`, `test_monitoring_crud`, `test_academic_fixes`. The API refuses an unconsented account except when `TESTING` (set
 `app.config["ENFORCE_PRIVACY_CONSENT"]` in a test to turn it on). Known old failure: e2e p113 line 141 expects no "Defense type" text, the form has had that label since 05a8e5a.
 
+
+## Active implementation — Research Gate staff fallback and three-stage board (2026-11-04)
+
+- Branch: `v6.3-natalie` (clean before this packet). Latest owner instruction supersedes the older chair-only checklist rule: Graduate School staff may record or correct the panel verdict as a fallback; the assigned chair keeps the same authority. Staff cannot confirm later revision submissions.
+- Test-first contract added in `tests/test_research_core.py`: exactly five visible verdict words; provisional follow-up requires revisions or re-defense; staff action context and audited submit/correct; chair verdict notifies staff; Deferred and Failed reopen only the current stage's documents; overview exposes Title Defense / Proposal Defense / Completion board columns. The old Deferred-preserves-files and Approved/Disapproved title assertions were replaced because the owner changed those rules.
+- Playwright contract added in `frontend/e2e/p114-research-gate.spec.js`: real staff navigation, three-column board at 1366/1920/390, no page overflow, five-option staff verdict form, and mocked write payload.
+- RED evidence captured before implementation: the verdict-option test returned six choices (and Approved/Disapproved at Title); the provisional result was rejected; staff context raised `KeyError: staff_defense_action`; p114 could not find either the stage board or the staff fallback region.
+- Scope clarification from the owner: staff fallback is the verdict control inside Research Gate for the selected student, similar to the chair's form. Preserve chair submit/correct authority. Do not add GS staff authority to confirm later revision submissions or other unrelated panel actions.
+- Read-only audit helpers completed. The implementer reached the usage limit after the backend work; the main session completed the six-file production packet under the fallback rule and reviewed the result.
+
+## Current Position - Research Gate owner revision complete (2026-11-04)
+
+- Implemented on `v6.3-natalie`. The helper reached its usage limit after the backend packet; the main session used the AGENTS fallback ladder and completed the focused UI inline. Production packet commit: `113002b`; final tests/docs and two accessibility refinements remain in the working tree for the final local commit.
+- Graduate School staff now gets a verdict form inside the selected student's Research Gate record. Staff can record or correct the panel result; the stored verdict keeps the assigned chair and separately audits the staff recorder. Staff cannot confirm later panel revisions. The chair/lead Faculty Portal flow remains and supports the same five options.
+- Research Gate overview is a responsive three-stage board: Title Defense, Proposal Defense, Completion. Completion combines the internal Final Defense and Completion evidence progress without removing either workflow step. Student number is visible and part of the unique accessible card name.
+- Verdicts are exactly Passed; Passed with minor revisions; Provisional pass - revisions or re-defense; Deferred; Failed. Provisional requires revisions or re-defense. Deferred and Failed supersede only the current stage's evidence, create a student resubmission task, and block rebooking until requirements are restored.
+- Verification: `VerdictOutcomeTests` 22/22 PASS; production build PASS; strict UI 0; p114 staff verdict test PASS; focused p114 three-width board + p51 chair provisional test 2/2 PASS after 7 role setup tests. Full p51 run had 37/39 pass before two accessibility findings; both failed steps then passed focused. Screenshots at 1366/1920/390 opened and reviewed, with no page overflow.
+- Demo database rebuilt successfully with `npm run seed`: 148 students, 12 faculty, fingerprint `3e1a3477c7d47ac292f8291be11d663fcde26d1233218e80fdd5f67220654ea6`. Implementation, tests, documents, and accessibility refinements are committed together; `.worktrees/research-gate` and its helper branch were removed after the root was verified clean. Next action for a running local server: restart it so the new model and routes load.
+
+## Compact Research Gate board complete (2026-11-04)
+
+- Owner feedback: the three columns and counts are correct, but 120 full student cards make the page tens of thousands of pixels tall and push the selected student's submissions too far below.
+- Test-first UI contract added to `frontend/e2e/p114-research-gate.spec.js`: the board must stay under 700 px at desktop widths and 1300 px at 390 px; every stage keeps its total count; each stage exposes a bounded scroll area; every student remains in exactly one correct stage and is still keyboard/click reachable by the unique name + student number.
+- Implemented a compact directory-style board: each student is a semantic clickable row; each stage has a bounded internal scroll area; stage totals remain the unfiltered totals while search/status filtering narrows the rows. The three columns now share the full desktop width without a horizontal stage scroller and remain stacked on phones. No workflow, permission, API, or verdict behavior changed.
+- RED evidence: the original board measured 23,937 px against the `<700 px` desktop contract; a follow-up visual-review assertion also failed while 1366 px still showed "1 more stage to the right". Both passed after the compact rows and responsive column fit were applied.
+- Verification: `npm run build:web` PASS; `npm --prefix frontend run check:ui:strict` PASS with every metric 0; focused p114 board walkthrough PASS at 1366/1920/390; focused p114 staff-verdict walkthrough PASS; all three screenshots opened and reviewed. The e2e wrapper was stopped with Ctrl+C only after Playwright printed the passing result and artifact paths because its Flask wrapper remained open.
+- Next action: none for this refinement. The running development server only needs a normal frontend refresh/restart to load the rebuilt UI.
+
+## Research Gate stage terminology corrected (2026-11-04)
+
+- Owner correction: the three visible stages are Title Defense, Proposal Defense, and Final Defense; "Completion" must not be shown as the third stage name.
+- Test-first contract updated in `frontend/e2e/p114-research-gate.spec.js`: the API's existing `Completion` grouping key must render in a region labeled `Final Defense`, retain its accurate total, and contain the same students. RED confirmed the old visible `Completion` region; the board now shows `Final Defense` with the description "Final defense requirements and panel decision." No backend key, grouping, workflow, or data changed.
+- Verification: `npm run build:web` PASS; `npm --prefix frontend run check:ui:strict` PASS with every metric 0; focused p114 board walkthrough PASS at 1366/1920/390; regenerated 1366 screenshot opened and reviewed. The e2e wrapper was stopped only after Playwright printed the passing result and artifact paths because its Flask wrapper remained open. Next action: none.

@@ -12,6 +12,7 @@ import { PanelStamp } from "../../components/process";
 // Verdict words, follow-ups and who acts next come from the API (`verdict_options` per panel); nothing is hard-coded.
 const TITLE_GATE = "Form 1 - Title Defense";
 const FINAL_GATE = "Final Defense";
+const PROVISIONAL = "Provisional pass - revisions or re-defense";
 const HISTORY_OPEN = 5;
 
 const whenOf = (panel) => `${panel.defense.preferred_date || ""}T${panel.defense.start_time || "00:00"}`;
@@ -129,6 +130,7 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
         remarks: draft.remarks || "",
         selected_title: draft.selected_title || "",
         evaluation_score: draft.evaluation_score || "",
+        provisional_follow_up: draft.result === PROVISIONAL ? draft.provisional_follow_up || "" : undefined,
       }),
     );
   }
@@ -136,7 +138,11 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
   function correctVerdict(panel) {
     const verdictId = panel.defense.verdict.id;
     const draft = corrections[verdictId] || {};
-    return run(() => api.correctDefenseVerdict(verdictId, { result: draft.result || panel.verdict_options?.[0]?.value, reason: draft.reason || "" }));
+    return run(() => api.correctDefenseVerdict(verdictId, {
+      result: draft.result || panel.verdict_options?.[0]?.value,
+      reason: draft.reason || "",
+      provisional_follow_up: draft.result === PROVISIONAL ? draft.provisional_follow_up || "" : undefined,
+    }));
   }
 
   function submitForm(panel) {
@@ -152,9 +158,20 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
           <p className="text-sm font-semibold text-ink">Submit panel chair verdict</p>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label="Verdict result" hint={chosen?.summary}>
-            <Select placeholder={null} options={options} value={result} onChange={(event) => setDraft(scheduleId, { result: event.target.value })} />
+          <Field label="Verdict result">
+            <Select placeholder={null} options={options} value={result} onChange={(event) => setDraft(scheduleId, { result: event.target.value, provisional_follow_up: "" })} />
           </Field>
+          {chosen?.summary && <p className="meta sm:col-span-2">{chosen.summary}</p>}
+          {result === PROVISIONAL && (
+            <Field label="Required follow-up">
+              <Select
+                placeholder="Choose revisions or re-defense"
+                options={[{ value: "revisions", label: "Revisions for panel approval" }, { value: "re-defense", label: "Re-defense" }]}
+                value={draft.provisional_follow_up || ""}
+                onChange={(event) => setDraft(scheduleId, { provisional_follow_up: event.target.value })}
+              />
+            </Field>
+          )}
           <Field label="Remarks or conditions">
             <Textarea rows={3} value={draft.remarks || ""} onChange={(event) => setDraft(scheduleId, { remarks: event.target.value })} placeholder="Optional conditions, revisions, or notes" />
           </Field>
@@ -171,9 +188,9 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
             </Field>
           )}
         </div>
-        <Button icon={Gavel} className="mt-3" disabled={busy} onClick={() => submitVerdict(panel)}>{busy ? "Submitting…" : "Submit final verdict"}</Button>
+        <Button icon={Gavel} className="mt-3" disabled={busy || (result === PROVISIONAL && !draft.provisional_follow_up)} onClick={() => submitVerdict(panel)}>{busy ? "Submitting…" : "Submit final verdict"}</Button>
         <EApprovalNote className="mt-2" />
-        <p className="mt-2 text-xs text-brand-800">Tied to defense schedule #{scheduleId}. GS staff have read-only access.</p>
+        <p className="mt-2 text-xs text-brand-800">Tied to defense schedule #{scheduleId}. Graduate School staff can record the same signed panel result from Research Gate when needed.</p>
       </div>
     );
   }
@@ -188,13 +205,23 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
         <p className="mt-1 text-xs text-slate-600">You can correct it until the student or staff act on it. The reason is recorded.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label="Correct verdict">
-            <Select placeholder={null} options={options} value={correction.result || options[0]?.value || ""} onChange={(event) => setCorrection(verdict.id, { result: event.target.value })} />
+            <Select placeholder={null} options={options} value={correction.result || options[0]?.value || ""} onChange={(event) => setCorrection(verdict.id, { result: event.target.value, provisional_follow_up: "" })} />
           </Field>
+          {(correction.result || options[0]?.value) === PROVISIONAL && (
+            <Field label="Required follow-up">
+              <Select
+                placeholder="Choose revisions or re-defense"
+                options={[{ value: "revisions", label: "Revisions for panel approval" }, { value: "re-defense", label: "Re-defense" }]}
+                value={correction.provisional_follow_up || ""}
+                onChange={(event) => setCorrection(verdict.id, { provisional_follow_up: event.target.value })}
+              />
+            </Field>
+          )}
           <Field label="Reason for the correction" required>
             <Input value={correction.reason || ""} onChange={(event) => setCorrection(verdict.id, { reason: event.target.value })} placeholder="Required" />
           </Field>
         </div>
-        <Button variant="secondary" className="mt-3" disabled={busy || !(correction.reason || "").trim()} onClick={() => correctVerdict(panel)}>Correct the verdict</Button>
+        <Button variant="secondary" className="mt-3" disabled={busy || !(correction.reason || "").trim() || ((correction.result || options[0]?.value) === PROVISIONAL && !correction.provisional_follow_up)} onClick={() => correctVerdict(panel)}>Correct the verdict</Button>
       </div>
     );
   }
@@ -246,7 +273,7 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
         <Card>
           <SectionTitle
             title="Verdict history"
-            subtitle="Finished verdicts for the panels you sit on, newest first. GS staff have read-only access."
+            subtitle="Finished verdicts for the panels you sit on, newest first."
             icon={History}
           />
           {history.length ? (

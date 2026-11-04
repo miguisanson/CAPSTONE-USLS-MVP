@@ -12,7 +12,7 @@ export function StageColumnHeader({ column, count, total = count, number = null,
           <h3 className="section-title break-words">{column.label}</h3>
           {column.description && <p className="meta mt-1 leading-relaxed">{column.description}</p>}
         </div>
-        <span className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200" aria-label={countLabel || (total !== count ? `${count} shown of ${total}` : `${count} in ${column.label}`)}>{total !== count ? `${count} of ${total}` : count}</span>
+        <span data-testid="stage-count" className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200" aria-label={countLabel || (total !== count ? `${count} shown of ${total}` : `${count} in ${column.label}`)}>{total !== count ? `${count} of ${total}` : count}</span>
       </div>
       {children}
     </header>
