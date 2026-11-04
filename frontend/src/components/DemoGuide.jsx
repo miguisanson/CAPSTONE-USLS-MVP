@@ -421,9 +421,9 @@ export default function DemoGuide() {
       tabIndex={-1}
       className={`fixed z-drawer flex flex-col overflow-hidden border border-slate-200 bg-white shadow-lift focus:outline-none ${dockClass} ${
         collapsed
-          ? `${slideshow ? "bottom-52 sm:bottom-44" : "bottom-3"} max-w-[calc(100vw-1.5rem)] rounded-full ${side === "left" ? "max-sm:left-3 max-sm:right-auto" : "max-sm:right-3 max-sm:left-auto"}`
+          ? `${slideshow ? "bottom-60 sm:bottom-44" : "bottom-3"} max-w-[calc(100vw-1.5rem)] rounded-full ${side === "left" ? "max-sm:left-3 max-sm:right-auto" : "max-sm:right-3 max-sm:left-auto"}`
           : slideshow
-            ? "bottom-52 left-0 right-0 max-h-[40vh] rounded-t-2xl sm:bottom-44 sm:w-96 sm:max-h-[calc(100vh-15rem)] sm:rounded-2xl"
+            ? "bottom-60 left-0 right-0 max-h-[40vh] rounded-t-2xl sm:bottom-44 sm:w-96 sm:max-h-[calc(100vh-15rem)] sm:rounded-2xl"
             : "bottom-0 left-0 right-0 max-h-[60vh] rounded-t-2xl sm:bottom-4 sm:w-96 sm:max-h-[calc(100vh-6rem)] sm:rounded-2xl"
       }`}
     >

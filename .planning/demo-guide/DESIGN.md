@@ -69,7 +69,7 @@ Returns `{demo_mode, role, skip_date_waits, process, student, case, candidates}`
 | Server error / offline | "Could not read the record; try again" — no wrong jump. |
 
 ## Not doing (now)
-Voice, auto-clicking, recording. The guide never clicks or types for the presenter.
+Voice, recording. (Auto-clicking is now built: see Autopilot below, which supersedes "the guide never clicks".)
 
 ## Autopilot (owner 2026-11-04, supersedes "never clicks for the presenter")
 
@@ -96,3 +96,12 @@ process ... it should lock onto this kind of slideshow ... when click next arrow
 - **Every process has a guide**, one per walkthrough case in `scripts/docs/walkthrough/cases/`.
 - **Test:** each guide has an e2e spec that plays it end to end in autopilot on the seeded e2e database and checks
   the final record status; this doubles as an end-to-end check of every process.
+
+### Autopilot: how it was built (2026-11-04)
+- `lib/demoGuide/autopilot.js` is the player: targets are `"data-demo name"`, `"#id"` or `{role + name | label | text | css, in, nth}`;
+  `{stamp}` in typed text, a target's `text` or `name` is the time of day, the same for the whole run. `window.__uslsDemoPlayer` exposes it
+  in demo mode for the e2e specs.
+- `lib/demoGuide/useAutopilot.js` is the controller; `DemoGuide.jsx` passes it the step the record says is next. Running state lives
+  in memory; the step to resume after a sign-in as another person is in sessionStorage.
+- Slideshow on/off is `slideshow` in the panel's saved state (`SAVED_KEY`). Choosing a demo (sign-in box or panel) turns it on; the
+  bar's Stop or "Change demo" turns it off, "Play as a slideshow" in the panel turns it back on.
