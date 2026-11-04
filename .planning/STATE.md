@@ -1,5 +1,17 @@
 # State
 
+## FINAL 2026-11-04 09:10 — all sessions merged and pushed (v6.1-migui @ 21f92b5)
+
+- Merged: night1-13 fixes, Myrine's teaching schedule, pkt/forms-ops (60 forms in chapter folders, Ops Manual 113 pp,
+  privacy consent), Documents reorganised (Documents/README.md), two Fable reviews with fixes.
+- Gates on a0ca1de: e2e 822 passed / 3 failed (p110, p84:373 = I-236 base code; p79 flaky, passes alone 8/8);
+  targeted Python (forms_pack, ops manual, privacy, policy docs, health, panel matching) OK; build + check:ui strict 0.
+  Full Python gate was still running at 09:10 when the owner closed the session: re-run it first next session.
+- Demo DB reseeded 08:5x (148 students); .rag_index rebuilt. Site is OFF: start with deploy/START-SITE.cmd.
+- Leftover: wt/fdocs locked (remove after reboot, rmdir its node_modules junction first). Open: I-236, I-240, I-241,
+  I-218 (smarter assistant reminder), forms GS-F-10/42 declaration on p.2, GS-P-02 lacks GS-P-03..06 rows, LOA Dean
+  narration ~10 s behind, AWOL card shows "Demo", UAT length untimed.
+
 ## Documents reorganised + Fable review fixes — 2026-11-04 08:20 (session cb21b273, NOT committed)
 
 - Fable review of meeting deliverables: report kept in the session scratchpad (REVIEW.md). Fixed here: UAT (P1+P2,
