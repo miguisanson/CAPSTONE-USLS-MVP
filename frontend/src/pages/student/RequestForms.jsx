@@ -185,9 +185,16 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
       >
         <ErrorSummary errors={errors} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label={extension ? "Extra time starts" : "Leave starts"} required error={messageFor("loa-start")}>
-            <Select id="loa-start" value={form.effective_start} onChange={changeStart} placeholder="Choose a semester" options={startOptions} />
-          </Field>
+          {extension && startChoices.length === 1 && form.effective_start === startChoices[0].label ? (
+            // I-254: an extension can only start the semester after the current leave ends, so it is shown, not picked.
+            <Field label="Extra time starts" hint="The semester right after your current leave ends.">
+              <p id="loa-start" className="text-sm font-medium text-ink">{form.effective_start}</p>
+            </Field>
+          ) : (
+            <Field label={extension ? "Extra time starts" : "Leave starts"} required error={messageFor("loa-start")}>
+              <Select id="loa-start" value={form.effective_start} onChange={changeStart} placeholder="Choose a semester" options={startOptions} />
+            </Field>
+          )}
           <Field label={extension ? "Extra time ends" : "Leave ends"} required hint={semesterCount ? `That is ${pluralize(semesterCount, "semester")}.` : ""} error={messageFor("loa-end")}>
             <Select id="loa-end" value={form.effective_end} onChange={set("effective_end")} placeholder={startIndex >= 0 ? "Choose a semester" : "Choose when it starts first"} options={endOptions} disabled={startIndex < 0 && !form.effective_end} />
           </Field>

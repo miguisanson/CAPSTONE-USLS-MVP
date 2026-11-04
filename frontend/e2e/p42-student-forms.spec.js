@@ -297,9 +297,10 @@ test.describe("P4.2 student request forms", () => {
       await expect(form).toContainText("Your leave can be renewed once, and never beyond 4 semesters in all. The extra time starts in the semester after your current leave ends (Nov 29, 2026).");
       await expect(form).toContainText("You can ask for up to 1 more semester now.");
       await expect(form).not.toContainText("It can be renewed once.");
-      await expectRequired(page, "Extra time starts", true);
+      // I-254: the extra time can only start the semester after the leave ends, so it is shown, not picked.
+      await expect(fieldOf(page, "Extra time starts")).toContainText("AY 2026-2027 2nd Semester");
+      await expect(fieldOf(page, "Extra time starts").locator("select, input")).toHaveCount(0);
       await expectRequired(page, "Extra time ends", true);
-      await expect(ctl(page, "Extra time starts")).toHaveValue("AY 2026-2027 2nd Semester"); // the only choice, preselected
       await expect(ctl(page, "Extra time ends")).toHaveValue("AY 2026-2027 2nd Semester");
       const submit = submitButton(page, "Submit leave extension request");
       await expect(submit).toBeEnabled();

@@ -346,7 +346,7 @@ export const GUIDES = [
       {
         id: "rp-tabs", title: "The other reports", role: "staff", route: "/reports", page: "Reports & Analytics",
         say: "reports-tour-10",
-        do: "Open the other tabs in turn: Where students get stuck, Office speed, Records to fix, then the older reports after them. Each has its own filters and downloads.",
+        do: "Open the other tabs in turn: Where students get stuck, Office speed, Records to fix, then the older reports further along. Each has its own filters and downloads.",
         doneWhen: "manual",
         ifAsked: [{ q: "Can a report be downloaded?", a: "Yes, as Excel and PDF on every report; the Registrar changes list also has CSV and Print." }],
       },
