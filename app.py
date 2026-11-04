@@ -204,7 +204,7 @@ TRANSACTIONS = [
         "title": "Research Gate",
         "icon": "file-check",
         "group": "Research",
-        "short": "Check Form 1, Form 4, or completion evidence and set readiness or revision state. The Academic Coordinator endorses Form 1; the panel chair records each defense verdict.",
+        "short": "Check Form 1, Form 4, or completion evidence and set readiness or revision state. The Academic Coordinator endorses Form 1; the panel chair or Graduate School staff records each defense verdict.",
         "actor": "Student / Academic Coordinator / Adviser / Research Coordinator / Panel Chair",
         "data": "Form gate, required evidence, missing documents, decision result, next owner, milestone status.",
     },
@@ -1562,7 +1562,7 @@ class ScheduleRequest(db.Model):
 
 
 class DefenseVerdict(db.Model):
-    """Schedule-bound verdict submitted only by the assigned panel chair/lead."""
+    """Schedule-bound panel verdict, recorded by the chair/lead or GS staff fallback."""
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False)
     schedule_request_id = db.Column(db.Integer, db.ForeignKey("schedule_request.id"), nullable=False, unique=True)
@@ -1575,6 +1575,7 @@ class DefenseVerdict(db.Model):
     research_title = db.Column(db.String(220))
     chair_name = db.Column(db.String(160), nullable=False)
     result = db.Column(db.String(60), nullable=False)
+    provisional_follow_up = db.Column(db.String(20))
     remarks = db.Column(db.Text)
     defense_date = db.Column(db.Date, nullable=False)
     submitted_at = db.Column(db.DateTime, default=now_utc, nullable=False)
@@ -1591,7 +1592,11 @@ class DefenseVerdict(db.Model):
     original_result = db.Column(db.String(60))
     correction_reason = db.Column(db.Text)
     corrected_by = db.Column(db.String(160))
+    corrected_by_role = db.Column(db.String(40))
     corrected_at = db.Column(db.DateTime)
+    recorded_by_account_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    recorded_by_role = db.Column(db.String(40))
+    recorded_by_name = db.Column(db.String(160))
     reset_log = db.Column(db.Text)
 
     student = db.relationship("Student")
@@ -2950,6 +2955,7 @@ def defense_verdict_dict(verdict: DefenseVerdict | None) -> dict | None:
         "research_title": verdict.research_title,
         "chair_name": verdict.chair_name,
         "result": verdict.result,
+        "provisional_follow_up": verdict.provisional_follow_up,
         "remarks": verdict.remarks,
         "defense_date": iso(verdict.defense_date),
         "submitted_at": iso(verdict.submitted_at),
@@ -2967,7 +2973,11 @@ def defense_verdict_dict(verdict: DefenseVerdict | None) -> dict | None:
         "original_result": verdict.original_result,
         "correction_reason": verdict.correction_reason,
         "corrected_by": verdict.corrected_by,
+        "corrected_by_role": verdict.corrected_by_role,
         "corrected_at": iso(verdict.corrected_at),
+        "recorded_by_account_id": verdict.recorded_by_account_id,
+        "recorded_by_role": verdict.recorded_by_role,
+        "recorded_by_name": verdict.recorded_by_name,
     }
 
 
@@ -15159,9 +15169,22 @@ def register_routes(app: Flask) -> None:
             row = research_gate_overview_row(db.session.get(Student, case.student_id), case)
             if row:
                 rows.append(row)
+        for student in Student.query.filter(active_student_clause()).order_by(Student.last_name, Student.first_name).all():
+            if student.id in seen:
+                continue
+            has_research_record = bool(
+                DocumentCheck.query.filter_by(student_id=student.id).first()
+                or PanelAssignment.query.filter_by(student_id=student.id).first()
+                or ScheduleRequest.query.filter_by(student_id=student.id).first()
+            )
+            if not has_research_record:
+                continue
+            row = research_gate_overview_row(student, None)
+            if row:
+                rows.append(row)
         rows.sort(key=lambda row: (row["student"]["name"] or "").lower())
         counts = {key: sum(row["state"] == key for row in rows) for key in ("ready", "blocked", "waiting", "done")}
-        return jsonify({"items": rows, "counts": counts, "stages": [name for name, _ in RESEARCH_PORTAL_STAGE_SEQUENCE]})
+        return jsonify({"items": rows, "counts": counts, "stages": ["Title Defense", "Proposal Defense", "Completion"]})
 
     @app.route("/api/research-gate/form1-endorsements/<int:student_id>", methods=["POST"])
     @require_api_login("academic_coordinator")
@@ -16467,6 +16490,20 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": f"{result} is not a possible outcome of this defense. Choose one of: {offered}."}), 400
         return None
 
+    def provisional_follow_up_or_error(data, raw_result: str, result: str, stored: str | None = None):
+        if result != VERDICT_PROVISIONAL:
+            return None, None
+        legacy_follow_up = {
+            VERDICT_PANEL_APPROVAL: "revisions",
+            VERDICT_REDEFENSE: "re-defense",
+        }.get(raw_result)
+        follow_up = (data.get("provisional_follow_up") or legacy_follow_up or stored or "").strip()
+        if follow_up not in {"revisions", "re-defense"}:
+            return None, (jsonify({
+                "error": "Choose whether the provisional pass requires revisions or re-defense."
+            }), 400)
+        return follow_up, None
+
     def evaluation_score_or_error(data, result: str, gate: str, student: Student, stored=None):
         """Protocol Form 7: below 85 (thesis / project paper) or 90 (dissertation) means the
         panel cannot record a plain pass at the closed-door final defense; at or above it the
@@ -16497,7 +16534,7 @@ def register_routes(app: Flask) -> None:
                         "provisional pass with major revisions, not a pass."
                     )
                 }), 400)
-            if result in (VERDICT_REDEFENSE, VERDICT_PANEL_APPROVAL) and score >= threshold:
+            if result == VERDICT_PROVISIONAL and score >= threshold:
                 return None, (jsonify({
                     "error": (
                         f"A score of {score:g} is {threshold} or above (Form 7), which is a pass. "
@@ -16507,19 +16544,27 @@ def register_routes(app: Flask) -> None:
         return score, None
 
     @app.route("/api/faculty-portal/defense-verdicts/<int:schedule_id>", methods=["POST"])
-    @require_api_login("faculty")
+    @require_api_login("faculty", "staff")
     def faculty_defense_verdict(schedule_id: int):
         account = current_account()
         faculty = Faculty.query.get(account.faculty_id) if account and account.faculty_id else None
         schedule = ScheduleRequest.query.get_or_404(schedule_id)
         gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(schedule.defense_type or "")
-        assignment = PanelAssignment.query.filter_by(
-            faculty_id=faculty.id if faculty else 0,
-            student_id=schedule.student_id,
-            gate=gate,
-        ).first()
-        if not assignment or assignment.panel_role.lower() not in {"panel chair", "panel lead"}:
-            return jsonify({"error": "Only the assigned panel chair or panel lead can submit this verdict."}), 403
+        if account.role == "staff":
+            assignment = next((
+                row for row in PanelAssignment.query.filter_by(student_id=schedule.student_id, gate=gate).all()
+                if row.panel_role.lower() in {"panel chair", "panel lead"}
+            ), None)
+            chair = assignment.faculty if assignment else None
+        else:
+            assignment = PanelAssignment.query.filter_by(
+                faculty_id=faculty.id if faculty else 0,
+                student_id=schedule.student_id,
+                gate=gate,
+            ).first()
+            chair = faculty
+        if not assignment or not chair or assignment.panel_role.lower() not in {"panel chair", "panel lead"}:
+            return jsonify({"error": "An assigned panel chair or panel lead is required before the chair or Graduate School staff can record this verdict."}), 403
         try:
             require_open_standing(schedule.student, "recording a defense verdict")
         except ValueError as exc:
@@ -16539,10 +16584,14 @@ def register_routes(app: Flask) -> None:
                 )
             }), 400
         data = request_payload()
-        result = normalize_verdict_result(data.get("result"))
+        raw_result = (data.get("result") or "").strip()
+        result = normalize_verdict_result(raw_result)
         error = allowed_verdict_or_error(result, gate)
         if error:
             return error
+        provisional_follow_up, follow_up_error = provisional_follow_up_or_error(data, raw_result, result)
+        if follow_up_error:
+            return follow_up_error
         student = schedule.student
         score, score_error = evaluation_score_or_error(data, result, gate, student)
         if score_error:
@@ -16553,26 +16602,49 @@ def register_routes(app: Flask) -> None:
             student_id=student.id,
             schedule_request_id=schedule.id,
             panel_assignment_id=assignment.id,
-            faculty_id=faculty.id,
+            faculty_id=chair.id,
             gate=gate,
             defense_type=schedule.defense_type,
             research_title=selected_title or (research_case.title if research_case else None),
-            chair_name=faculty.name,
+            chair_name=chair.name,
             result=result,
+            provisional_follow_up=provisional_follow_up,
             remarks=(data.get("remarks") or "").strip() or None,
             defense_date=schedule.preferred_date,
             submitted_at=now_utc(),
             evaluation_score=score,
             selected_title=selected_title or None,
+            recorded_by_account_id=account.id,
+            recorded_by_role=account.role,
+            recorded_by_name=(
+                f"{ROLE_LABELS['staff']} - {account.full_name}"
+                if account.role == "staff" else account.full_name
+            ),
         )
         db.session.add(verdict)
         db.session.flush()
         next_owner = apply_verdict_effects(student, schedule, verdict)
-        add_log(
-            "research-gate", student.id, f"Panel Chair · {faculty.name}", gate,
-            f"{schedule.defense_type}: {result}", next_owner,
-            f"Schedule #{schedule.id}; verdict submitted by assigned {assignment.panel_role}. {verdict.remarks or 'No remarks.'}",
+        actor_label = (
+            f"Panel Chair - {chair.name}"
+            if account.role == "faculty"
+            else f"{ROLE_LABELS['staff']} - {account.full_name}"
         )
+        add_log(
+            "research-gate", student.id, actor_label, gate,
+            f"{schedule.defense_type}: {result}", next_owner,
+            f"Schedule #{schedule.id}; panel chair: {chair.name}; recorded by {account.full_name}. {verdict.remarks or 'No remarks.'}",
+        )
+        if account.role == "faculty":
+            notify_many(
+                accounts_for_roles("staff"),
+                "defense_verdict_recorded",
+                f"{schedule.defense_type} verdict recorded",
+                f"{chair.name} recorded the panel verdict for {student.name}.",
+                link=f"/workflow/research-gate?student_id={student.id}",
+                related_type="defense_verdict",
+                related_id=verdict.id,
+                dedupe_key=f"defense-verdict-recorded:{verdict.id}",
+            )
         sync_research_progress(student)
         db.session.commit()
         return jsonify({
@@ -16584,23 +16656,32 @@ def register_routes(app: Flask) -> None:
         })
 
     @app.route("/api/faculty-portal/defense-verdicts/<int:verdict_id>/correction", methods=["POST"])
-    @require_api_login("faculty")
+    @require_api_login("faculty", "staff")
     def faculty_defense_verdict_correction(verdict_id: int):
         """The chair may correct a wrongly entered verdict until it is acted on, with a reason."""
         account = current_account()
         faculty = Faculty.query.get(account.faculty_id) if account and account.faculty_id else None
         verdict = DefenseVerdict.query.get_or_404(verdict_id)
-        if not (verdict.faculty_id == (faculty.id if faculty else 0) or panel_chair_assignment(faculty, verdict.student_id, verdict.gate)):
-            return jsonify({"error": "Only the panel chair who submitted this verdict can correct it."}), 403
+        if account.role != "staff" and not (
+            verdict.faculty_id == (faculty.id if faculty else 0)
+            or panel_chair_assignment(faculty, verdict.student_id, verdict.gate)
+        ):
+            return jsonify({"error": "Only the assigned panel chair or Graduate School staff can correct this verdict."}), 403
         data = request_payload()
         reason = (data.get("reason") or "").strip()
         if len(reason) < 5:
             return jsonify({"error": "Explain why the verdict is being corrected."}), 400
-        result = normalize_verdict_result(data.get("result"))
+        raw_result = (data.get("result") or "").strip()
+        result = normalize_verdict_result(raw_result)
         error = allowed_verdict_or_error(result, verdict.gate)
         if error:
             return error
-        if result == normalize_verdict_result(verdict.result):
+        provisional_follow_up, follow_up_error = provisional_follow_up_or_error(
+            data, raw_result, result, stored=verdict.provisional_follow_up
+        )
+        if follow_up_error:
+            return follow_up_error
+        if result == normalize_verdict_result(verdict.result) and provisional_follow_up == verdict.provisional_follow_up:
             return jsonify({"error": f"The recorded verdict is already {result}."}), 400
         if verdict_is_acted_on(verdict):
             return jsonify({"error": "This verdict can no longer be corrected: the student or staff have already acted on it."}), 409
@@ -16612,18 +16693,28 @@ def register_routes(app: Flask) -> None:
         revert_verdict_effects(verdict, verdict.schedule)
         verdict.original_result = verdict.original_result or previous
         verdict.result = result
+        verdict.provisional_follow_up = provisional_follow_up
         if data.get("remarks") not in (None, ""):
             verdict.remarks = str(data.get("remarks")).strip() or None
         if score is not None:
             verdict.evaluation_score = score
         selected_title = (data.get("selected_title") or "").strip()[:220]
         verdict.selected_title = selected_title or (verdict.selected_title if result == VERDICT_PASSED else None)
-        verdict.corrected_by = faculty.name if faculty else None
+        verdict.corrected_by = (
+            f"{ROLE_LABELS['staff']} - {account.full_name}"
+            if account.role == "staff" else account.full_name
+        )
+        verdict.corrected_by_role = account.role
         verdict.corrected_at = now_utc()
         verdict.correction_reason = reason
         next_owner = apply_verdict_effects(student, verdict.schedule, verdict)
+        actor_label = (
+            f"Panel Chair - {faculty.name}"
+            if account.role == "faculty" and faculty
+            else f"{ROLE_LABELS['staff']} - {account.full_name}"
+        )
         add_log(
-            "research-gate", student.id, f"Panel Chair · {faculty.name if faculty else 'Chair'}", verdict.gate,
+            "research-gate", student.id, actor_label, verdict.gate,
             f"{verdict.defense_type}: verdict corrected from {previous} to {result}", next_owner,
             f"Schedule #{verdict.schedule_request_id}. Reason: {reason}",
         )
@@ -26524,6 +26615,11 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                     for item in final_panel
                 ],
             }
+            account = current_account()
+            if account and account.role == "staff":
+                context["staff_defense_action"] = staff_defense_action_for_student(
+                    selected_student, progress["gate"]
+                )
             context["documents_by_gate"] = {}
             for doc in DocumentCheck.query.filter_by(student_id=selected_student.id).all():
                 context["documents_by_gate"].setdefault(doc.gate, []).append(document_check_dict(doc))
@@ -33959,43 +34055,41 @@ VERDICT_PASSED = "Passed"  # Title: "Approved"
 VERDICT_MINOR = "Passed with minor revisions"
 VERDICT_REDEFENSE = "Provisional pass - re-defense required"
 VERDICT_PANEL_APPROVAL = "Provisional pass - revisions for panel approval"
+VERDICT_PROVISIONAL = "Provisional pass - revisions or re-defense"
 VERDICT_DEFERRED = "Deferred"
 VERDICT_FAILED = "Failed"  # Title: "Disapproved"
 # Words written by earlier versions of the app; accepted on input, migrated at startup.
 LEGACY_VERDICT_ALIASES = {
     "Passed with revisions": VERDICT_MINOR,
     "For resubmission": VERDICT_FAILED,
+    VERDICT_REDEFENSE: VERDICT_PROVISIONAL,
+    VERDICT_PANEL_APPROVAL: VERDICT_PROVISIONAL,
 }
 
 _ALL_RESEARCH_GATES = (RESEARCH_GATE_TITLE, RESEARCH_GATE_PROPOSAL, RESEARCH_GATE_FINAL)
-_DEFENSE_GATES = (RESEARCH_GATE_PROPOSAL, RESEARCH_GATE_FINAL)
 
 # effect: complete (stage done) | revise (adviser confirms revisions) |
 # panel_revise (panel chair confirms revisions) | redefense / resubmit (same
 # protocol again, evidence superseded) | reschedule (defense did not take place).
 RESEARCH_VERDICTS = {
     VERDICT_PASSED: {
-        "label": "Passed", "title_label": "Approved", "effect": "complete", "gates": _ALL_RESEARCH_GATES,
+        "label": "Passed", "effect": "complete", "gates": _ALL_RESEARCH_GATES,
         "summary": "The stage is complete.",
     },
     VERDICT_MINOR: {
-        "label": "Passed with minor revisions", "effect": "revise", "gates": _DEFENSE_GATES,
+        "label": "Passed with minor revisions", "effect": "revise", "gates": _ALL_RESEARCH_GATES,
         "summary": "The student submits the revised manuscript; the research adviser confirms it and the stage completes.",
     },
-    VERDICT_PANEL_APPROVAL: {
-        "label": "Provisional pass - revisions for panel approval", "effect": "panel_revise", "gates": _DEFENSE_GATES,
-        "summary": "Major revisions without a re-defense: the student submits the revised manuscript and the panel chair confirms the panel's approval (14-Day Rule).",
-    },
-    VERDICT_REDEFENSE: {
-        "label": "Provisional pass - re-defense required", "effect": "redefense", "gates": _DEFENSE_GATES,
-        "summary": "Re-defense following the same protocol: the student resubmits, the adviser re-signs, the defense is scheduled again.",
+    VERDICT_PROVISIONAL: {
+        "label": "Provisional pass – revisions or re-defense", "effect": "provisional", "gates": _ALL_RESEARCH_GATES,
+        "summary": "The panel chooses whether revisions need panel approval or the student must complete another defense.",
     },
     VERDICT_DEFERRED: {
         "label": "Deferred", "effect": "reschedule", "gates": _ALL_RESEARCH_GATES,
-        "summary": "The defense did not take place; the Research Coordinator reschedules it. Nothing is reset.",
+        "summary": "The student resubmits this stage's requirements before the Research Coordinator reschedules the defense.",
     },
     VERDICT_FAILED: {
-        "label": "Failed", "title_label": "Disapproved", "effect": "resubmit", "gates": _ALL_RESEARCH_GATES,
+        "label": "Failed", "effect": "resubmit", "gates": _ALL_RESEARCH_GATES,
         "summary": "Resubmission: at the Title stage a new set of three titles, otherwise a re-defense following the same protocol.",
     },
 }
@@ -34073,7 +34167,13 @@ def verdict_options_for_gate(gate: str | None) -> list[dict]:
 
 
 def verdict_effect(verdict) -> str | None:
-    result = normalize_verdict_result(getattr(verdict, "result", None))
+    raw_result = getattr(verdict, "result", None)
+    result = normalize_verdict_result(raw_result)
+    if result == VERDICT_PROVISIONAL:
+        follow_up = getattr(verdict, "provisional_follow_up", None)
+        if not follow_up:
+            follow_up = "re-defense" if raw_result == VERDICT_REDEFENSE else "revisions" if raw_result == VERDICT_PANEL_APPROVAL else None
+        return {"revisions": "panel_revise", "re-defense": "redefense"}.get(follow_up)
     return RESEARCH_VERDICTS[result]["effect"] if result else None
 
 
@@ -35436,16 +35536,15 @@ def research_stage_status(milestone: dict) -> str:
     return "Pending Staff Action"
 
 
-def research_gate_overview_row(student: Student, case: ResearchCase) -> dict | None:
+def research_gate_overview_row(student: Student, case: ResearchCase | None) -> dict | None:
     """I-205: where one student stands at their research gate, in the words of the Research Gate overview.
 
     state: "ready" (documents are in; the next step is the Research Coordinator's), "blocked" (the student must act),
     "waiting" (someone else must review, sign or record a verdict), "done" (stage complete). Read-only."""
-    gate = case.current_gate
-    if gate not in RESEARCH_MILESTONES:
-        return None
-    milestone = research_milestone_payload(student, gate)
-    stage = next((name for name, stage_gate in RESEARCH_PORTAL_STAGE_SEQUENCE if stage_gate == gate), milestone["short_label"])
+    progress = detected_research_progress(student)
+    gate = progress["gate"]
+    milestone = progress["milestone"]
+    stage = progress["stage"]
     status = research_stage_status(milestone)
     student_owner, academic, research = ROLE_LABELS["student"], ROLE_LABELS["academic_coordinator"], ROLE_LABELS["research_coordinator"]
     pending = [item for item in milestone["requirements"] if item["status"] != "Complete"]
@@ -35481,15 +35580,62 @@ def research_gate_overview_row(student: Student, case: ResearchCase) -> dict | N
         elif first["source_type"].endswith("_schedule"):
             state, owner, reason = "ready", research, "Panel is in place; the defense has not been scheduled yet."
         elif first["source_type"] == "system_defense_result":
-            state, owner, reason = "waiting", "Panel chair", "Defense is scheduled; the panel chair has not recorded the verdict yet."
+            state, owner, reason = "waiting", "Panel chair or Graduate School staff", "Defense is scheduled; the panel chair or Graduate School staff has not recorded the verdict yet."
         elif first["source_type"] == "ethics_clearance_record":
             state, owner, reason = "ready", research, "The ethics clearance has to be recorded."
         else:
             state, owner, reason = "waiting", student_owner, first["status_label"]
     return {
-        "student": student_brief(student), "stage": stage, "gate": gate, "status": status,
+        "student": student_brief(student), "stage": stage,
+        "board_stage": "Completion" if stage in {"Final Defense", "Completion"} else stage,
+        "gate": gate, "status": status,
         "state": state, "waiting_on": owner if state != "done" else None, "reason": reason,
-        "research_title": case.title, "adviser_name": student.adviser_name,
+        "research_title": case.title if case else None, "adviser_name": student.adviser_name,
+    }
+
+
+def staff_defense_action_for_student(student: Student, gate: str) -> dict:
+    """The existing panel verdict action exposed to GS staff as a fallback only."""
+    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
+    schedule = (
+        ScheduleRequest.query.filter_by(student_id=student.id, defense_type=defense_type)
+        .order_by(ScheduleRequest.id.desc())
+        .first()
+        if defense_type else None
+    )
+    verdict = DefenseVerdict.query.filter_by(schedule_request_id=schedule.id).first() if schedule else None
+    panel_chair_name = None
+    if schedule:
+        try:
+            snapshot = json.loads(schedule.panel_snapshot or "[]")
+        except (TypeError, json.JSONDecodeError):
+            snapshot = []
+        chair_snapshot = next((
+            row for row in snapshot
+            if str(row.get("role") or "").lower() in {"panel chair", "panel lead"}
+        ), None)
+        panel_chair_name = chair_snapshot.get("name") if chair_snapshot else None
+    if not panel_chair_name:
+        chair_assignment = next((
+            row for row in PanelAssignment.query.filter_by(student_id=student.id, gate=gate).all()
+            if row.panel_role.lower() in {"panel chair", "panel lead"}
+        ), None)
+        panel_chair_name = chair_assignment.faculty.name if chair_assignment and chair_assignment.faculty else None
+    can_submit = bool(
+        schedule
+        and not verdict
+        and schedule.status in ACTIVE_DEFENSE_STATUSES
+        and (demo_skip_date_waits() or defense_start_datetime(schedule) <= manila_now())
+    )
+    return {
+        "gate": gate,
+        "schedule": schedule_request_dict(schedule) if schedule else None,
+        "verdict": defense_verdict_dict(verdict),
+        "panel_chair_name": panel_chair_name,
+        "can_submit": can_submit,
+        "can_correct": bool(verdict and not verdict_is_acted_on(verdict)),
+        "can_confirm_revisions": False,
+        "verdict_options": verdict_options_for_gate(gate),
     }
 
 
@@ -36009,8 +36155,10 @@ def apply_verdict_effects(student: Student, schedule: ScheduleRequest, verdict: 
         schedule.status = DEFERRED_DEFENSE_STATUS
         schedule.conflict_reason = "Defense deferred by the panel chair; it must be rescheduled."
         run_google_calendar_hook(remove_defense_google_events, schedule)
+        verdict.reset_log = json.dumps(supersede_research_gate_evidence(student, gate))
+        ensure_open_task(student.id, f"Resubmit {defense_type} requirements", "Student", 5, 45)
         ensure_open_task(student.id, f"Reschedule deferred {defense_type}", "Research Coordinator", 3, 50)
-        return "Research Coordinator"
+        return "Student"
     schedule.status = HELD_DEFENSE_STATUS
     if effect in RESUBMIT_EFFECTS:
         verdict.reset_log = json.dumps(supersede_research_gate_evidence(student, gate))
@@ -37499,6 +37647,10 @@ def migrate_research_vocabulary() -> None:
     """Idempotent: move rows written with older words onto the current vocabulary."""
     for old_word, new_word in LEGACY_VERDICT_ALIASES.items():
         for verdict in DefenseVerdict.query.filter_by(result=old_word).all():
+            if old_word == VERDICT_PANEL_APPROVAL:
+                verdict.provisional_follow_up = "revisions"
+            elif old_word == VERDICT_REDEFENSE:
+                verdict.provisional_follow_up = "re-defense"
             verdict.result = new_word
             if new_word == VERDICT_MINOR and not verdict.revision_status:
                 # These students were stranded before; they can now submit revisions.

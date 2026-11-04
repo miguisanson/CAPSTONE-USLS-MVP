@@ -7,6 +7,7 @@ import SignaturePad from "./SignaturePad";
 
 const TITLE_GATE = "Form 1 - Title Defense";
 const FINAL_GATE = "Final Defense";
+const PROVISIONAL = "Provisional pass - revisions or re-defense";
 
 // Verdict words, follow-ups and who acts next come from the API (`verdict_options` per panel,
 // RESEARCH_VERDICTS in app.py). Nothing is hard-coded here.
@@ -63,13 +64,18 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
       remarks: draft.remarks || "",
       selected_title: draft.selected_title || "",
       evaluation_score: draft.evaluation_score || "",
+      provisional_follow_up: draft.result === PROVISIONAL ? draft.provisional_follow_up || "" : undefined,
     }));
   }
 
   function correctVerdict(panel) {
     const verdictId = panel.defense.verdict.id;
     const draft = corrections[verdictId] || {};
-    return run(() => api.correctDefenseVerdict(verdictId, { result: draft.result || panel.verdict_options?.[0]?.value, reason: draft.reason || "" }));
+    return run(() => api.correctDefenseVerdict(verdictId, {
+      result: draft.result || panel.verdict_options?.[0]?.value,
+      reason: draft.reason || "",
+      provisional_follow_up: draft.result === PROVISIONAL ? draft.provisional_follow_up || "" : undefined,
+    }));
   }
 
   const setDraft = (scheduleId, patch) => setDrafts((current) => ({ ...current, [scheduleId]: { ...(current[scheduleId] || {}), ...patch } }));
@@ -126,22 +132,24 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
             <p className="text-sm font-semibold text-ink">Entered the wrong verdict?</p>
             <p className="mt-1 text-xs text-slate-600">You can correct it until the student or staff act on it. The reason is recorded.</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label><span className="field-label">Correct verdict</span><select className="field-input cursor-pointer" value={correction.result || options[0]?.value || ""} onChange={(event) => setCorrection(verdict.id, { result: event.target.value })}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+              <label><span className="field-label">Correct verdict</span><select className="field-input cursor-pointer" value={correction.result || options[0]?.value || ""} onChange={(event) => setCorrection(verdict.id, { result: event.target.value, provisional_follow_up: "" })}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+              {(correction.result || options[0]?.value) === PROVISIONAL && <label><span className="field-label">Required follow-up</span><select className="field-input cursor-pointer" value={correction.provisional_follow_up || ""} onChange={(event) => setCorrection(verdict.id, { provisional_follow_up: event.target.value })}><option value="">Choose revisions or re-defense</option><option value="revisions">Revisions for panel approval</option><option value="re-defense">Re-defense</option></select></label>}
               <label><span className="field-label">Reason for the correction</span><input className="field-input" value={correction.reason || ""} onChange={(event) => setCorrection(verdict.id, { reason: event.target.value })} placeholder="Required" /></label>
             </div>
-            <button type="button" disabled={busy || !(correction.reason || "").trim()} onClick={() => correctVerdict(panel)} className="btn-ghost mt-3 cursor-pointer">Correct the verdict</button>
+            <button type="button" disabled={busy || !(correction.reason || "").trim() || ((correction.result || options[0]?.value) === PROVISIONAL && !correction.provisional_follow_up)} onClick={() => correctVerdict(panel)} className="btn-ghost mt-3 cursor-pointer">Correct the verdict</button>
           </div>}
           {panel.verdict_blocked_reason && <p className="mt-3 text-xs font-semibold text-amber-700">{panel.verdict_blocked_reason}</p>}
           {panel.can_submit_verdict && <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50 p-4">
             <div className="flex items-center gap-2"><Gavel className="h-4 w-4 text-brand-700" /><p className="text-sm font-semibold text-ink">Submit panel chair verdict</p></div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label><span className="field-label">Verdict result</span><select className="field-input cursor-pointer" value={draft.result || options[0]?.value || ""} onChange={(event) => setDraft(scheduleId, { result: event.target.value })}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{chosen?.summary && <span className="mt-1 block text-xs text-slate-500">{chosen.summary}</span>}</label>
+              <label><span className="field-label">Verdict result</span><select className="field-input cursor-pointer" value={draft.result || options[0]?.value || ""} onChange={(event) => setDraft(scheduleId, { result: event.target.value, provisional_follow_up: "" })}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{chosen?.summary && <span className="mt-1 block text-xs text-slate-500">{chosen.summary}</span>}</label>
+              {(draft.result || options[0]?.value) === PROVISIONAL && <label><span className="field-label">Required follow-up</span><select className="field-input cursor-pointer" value={draft.provisional_follow_up || ""} onChange={(event) => setDraft(scheduleId, { provisional_follow_up: event.target.value })}><option value="">Choose revisions or re-defense</option><option value="revisions">Revisions for panel approval</option><option value="re-defense">Re-defense</option></select></label>}
               <label><span className="field-label">Remarks or conditions</span><textarea className="field-input min-h-24" value={draft.remarks || ""} onChange={(event) => setDraft(scheduleId, { remarks: event.target.value })} placeholder="Optional conditions, revisions, or notes" /></label>
               {panel.gate === TITLE_GATE && (draft.result || options[0]?.value) === "Passed" && <label className="sm:col-span-2"><span className="field-label">Title selected by the panel (from the three submitted)</span><input className="field-input" value={draft.selected_title || ""} onChange={(event) => setDraft(scheduleId, { selected_title: event.target.value })} placeholder="Recorded as the title of the study" /></label>}
               {panel.gate === FINAL_GATE && <label><span className="field-label">Evaluation score (Form 7, optional)</span><input className="field-input" type="number" min="0" max="100" step="0.01" value={draft.evaluation_score || ""} onChange={(event) => setDraft(scheduleId, { evaluation_score: event.target.value })} placeholder="Below 85 thesis / 90 dissertation cannot be a pass" /></label>}
             </div>
-            <button type="button" onClick={() => submitVerdict(panel)} disabled={busy} className="btn-primary mt-3 cursor-pointer"><Gavel className="h-4 w-4" />{busy ? "Submitting…" : "Submit final verdict"}</button>
-            <p className="mt-2 text-xs text-brand-800">Tied to defense schedule #{panel.defense.id}. GS staff have read-only access.</p>
+            <button type="button" onClick={() => submitVerdict(panel)} disabled={busy || ((draft.result || options[0]?.value) === PROVISIONAL && !draft.provisional_follow_up)} className="btn-primary mt-3 cursor-pointer"><Gavel className="h-4 w-4" />{busy ? "Submitting…" : "Submit final verdict"}</button>
+            <p className="mt-2 text-xs text-brand-800">Tied to defense schedule #{panel.defense.id}. Graduate School staff can record the same signed panel result from Research Gate when needed.</p>
           </div>}
         </article>;
       })}</div>}

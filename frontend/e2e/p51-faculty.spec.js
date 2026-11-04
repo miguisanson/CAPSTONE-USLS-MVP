@@ -346,7 +346,7 @@ test.describe("Signatures, Panels, Verdicts", () => {
       finished(5, "Fixture Five", "2026-05-02"), finished(6, "Fixture Six", "2026-11-11"), finished(7, "Fixture Seven", "2026-02-14")];
     await mockJson(page, "**/api/faculty-portal/context", () => context);
     await openFromSidebar(page, "Verdicts", "Verdicts");
-    await expect(page.getByText("The panel chair or panel lead submits the final verdict for a scheduled defense. Graduate School staff have read-only access.")).toBeVisible();
+    await expect(page.getByText("The panel chair or panel lead submits the final verdict for a scheduled defense. Graduate School staff can record the same verdict from Research Gate when needed.")).toBeVisible();
     // I-090: the "needs your verdict" group comes first; nothing waits, so it is a clear empty state
     const headings = await main(page).locator("h2").allTextContents();
     expect(headings.slice(0, 2)).toEqual(["Needs your verdict", "Verdict history"]);
@@ -372,7 +372,13 @@ test.describe("Signatures, Panels, Verdicts", () => {
     const context = await (await page.request.get("/api/faculty-portal/context")).json();
     const waiting = {
       student: { id: 901, name: "Mock Waiting Student", program_code: "MAED" }, gate: "Final Defense", panel_role: "Panel Chair", research_title: "A study that waits", documents: [],
-      can_submit_verdict: true, verdict_options: [{ value: "Passed", label: "Passed", summary: "The stage is complete." }, { value: "Failed", label: "Failed", summary: "Re-defense." }],
+      can_submit_verdict: true, verdict_options: [
+        { value: "Passed", label: "Passed", summary: "The stage is complete." },
+        { value: "Passed with minor revisions", label: "Passed with minor revisions", summary: "Revisions." },
+        { value: "Provisional pass - revisions or re-defense", label: "Provisional pass – revisions or re-defense", summary: "Choose the required follow-up." },
+        { value: "Deferred", label: "Deferred", summary: "Resubmit and reschedule." },
+        { value: "Failed", label: "Failed", summary: "Resubmit and schedule another defense." },
+      ],
       defense: { id: 777, defense_type: "Final Defense", preferred_date: "2027-03-01", start_time: "13:00", status: "Scheduled", display_status: "Scheduled", verdict: null },
     };
     context.panels = [waiting, ...context.panels];
@@ -387,10 +393,21 @@ test.describe("Signatures, Panels, Verdicts", () => {
     await expect(needs).toContainText("Mock Waiting Student");
     await expect(page.getByText("No verdicts are waiting for you")).toHaveCount(0);
     await expect(page.getByRole("region", { name: "Verdict history" }).getByText("Mock Waiting Student")).toHaveCount(0);
+    const outcome = needs.getByLabel("Verdict result");
+    await expect(outcome.locator("option")).toHaveText([
+      "Passed",
+      "Passed with minor revisions",
+      "Provisional pass – revisions or re-defense",
+      "Deferred",
+      "Failed",
+    ]);
+    await outcome.selectOption("Provisional pass - revisions or re-defense");
+    await needs.getByLabel("Required follow-up").selectOption("re-defense");
     await needs.getByRole("button", { name: "Submit final verdict" }).click();
     await expect.poll(() => calls.length).toBe(1);
     expect(calls[0].url).toBe("/faculty-portal/defense-verdicts/777");
-    expect(calls[0].body.result).toBe("Passed");
+    expect(calls[0].body.result).toBe("Provisional pass - revisions or re-defense");
+    expect(calls[0].body.provisional_follow_up).toBe("re-defense");
     await shots(page, "verdicts-waiting");
   });
 });

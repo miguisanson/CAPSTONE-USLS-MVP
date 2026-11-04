@@ -28,6 +28,7 @@ from app import (  # noqa: E402
     DocumentCheck,
     Faculty,
     Form1Endorsement,
+    Notification,
     PanelAssignment,
     Program,
     ResearchCase,
@@ -309,6 +310,91 @@ class VerdictOutcomeTests(ResearchCoreBase):
             json={"result": result, **extra},
         )
 
+    def test_verdict_choices_are_the_five_owner_words_for_every_defense_stage(self):
+        from app import verdict_options_for_gate
+
+        expected = [
+            "Passed",
+            "Passed with minor revisions",
+            "Provisional pass – revisions or re-defense",
+            "Deferred",
+            "Failed",
+        ]
+        for gate in (TITLE, PROPOSAL, FINAL):
+            with self.subTest(gate=gate):
+                self.assertEqual([row["label"] for row in verdict_options_for_gate(gate)], expected)
+
+    def test_provisional_pass_requires_the_panel_follow_up_choice(self):
+        schedule_id = self.at_proposal_ready_for_verdict()
+        missing = self.submit(schedule_id, "Provisional pass - revisions or re-defense")
+        self.assertEqual(missing.status_code, 400, missing.get_json())
+        self.assertIn("revisions or re-defense", missing.get_json()["error"])
+
+        saved = self.submit(
+            schedule_id,
+            "Provisional pass - revisions or re-defense",
+            provisional_follow_up="revisions",
+        )
+        self.assertEqual(saved.status_code, 200, saved.get_json())
+        self.assertEqual(saved.get_json()["verdict"]["provisional_follow_up"], "revisions")
+        self.assertEqual(saved.get_json()["verdict"]["effect"], "panel_revise")
+
+    def test_gs_staff_can_record_and_correct_the_panel_verdict(self):
+        schedule_id = self.at_proposal_ready_for_verdict()
+        context = self.staff().get(
+            f"/api/transactions/research-gate/context?student_id={self.student_id}"
+        )
+        self.assertEqual(context.status_code, 200, context.get_json())
+        action = context.get_json()["staff_defense_action"]
+        self.assertEqual(action["schedule"]["id"], schedule_id)
+        self.assertTrue(action["can_submit"])
+        self.assertEqual(len(action["verdict_options"]), 5)
+
+        recorded = self.staff().post(
+            f"/api/faculty-portal/defense-verdicts/{schedule_id}",
+            json={"result": "Passed", "remarks": "Recorded from the signed panel result."},
+        )
+        self.assertEqual(recorded.status_code, 200, recorded.get_json())
+        self.assertEqual(recorded.get_json()["verdict"]["recorded_by_role"], "staff")
+        self.assertIn("Graduate School Staff", recorded.get_json()["verdict"]["recorded_by_name"])
+        verdict_id = recorded.get_json()["verdict"]["id"]
+        with app.app_context():
+            verdict = db.session.get(DefenseVerdict, verdict_id)
+            self.assertEqual(verdict.chair_name, "Chair Person")
+            self.assertEqual(verdict.faculty_id, self.faculty_ids["Chair Person"])
+
+        corrected = self.staff().post(
+            f"/api/faculty-portal/defense-verdicts/{verdict_id}/correction",
+            json={
+                "result": "Passed with minor revisions",
+                "reason": "The signed panel result requires minor revisions.",
+            },
+        )
+        self.assertEqual(corrected.status_code, 200, corrected.get_json())
+        self.assertEqual(corrected.get_json()["verdict"]["result"], "Passed with minor revisions")
+        self.assertEqual(corrected.get_json()["verdict"]["corrected_by_role"], "staff")
+        self.assertIn("Graduate School Staff", corrected.get_json()["verdict"]["corrected_by"])
+
+    def test_panel_chair_verdict_notifies_graduate_school_staff(self):
+        schedule_id = self.at_proposal_ready_for_verdict()
+        response = self.submit(schedule_id, "Passed")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with app.app_context():
+            notes = Notification.query.filter_by(account_id=self.staff_id, kind="defense_verdict_recorded").all()
+            self.assertEqual(len(notes), 1)
+            self.assertIn("Proposal Defense", notes[0].title)
+            self.assertEqual(notes[0].link, f"/workflow/research-gate?student_id={self.student_id}")
+
+    def test_research_gate_overview_groups_students_into_three_board_columns(self):
+        self.at_proposal_ready_for_verdict()
+        response = self.staff().get("/api/research-gate/overview")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        body = response.get_json()
+        self.assertEqual(body["stages"], ["Title Defense", "Proposal Defense", "Completion"])
+        row = next(item for item in body["items"] if item["student"]["id"] == self.student_id)
+        self.assertEqual(row["stage"], "Proposal Defense")
+        self.assertEqual(row["board_stage"], "Proposal Defense")
+
     def test_failed_proposal_verdict_does_not_delete_signed_files_and_survives_foreign_keys(self):
         """R31: a Failed verdict used to delete files the adviser had signed and crash under MySQL-style FK enforcement."""
         schedule_id = self.at_proposal_ready_for_verdict()
@@ -461,6 +547,9 @@ class VerdictOutcomeTests(ResearchCoreBase):
             # Stage evidence is superseded so the manuscript is resubmitted and re-signed.
             manuscript = next(i for i in progress["milestone"]["requirements"] if i["item_name"] == "Proposal manuscript")
             self.assertEqual(manuscript["status"], "Missing")
+            title_docs = DocumentCheck.query.filter_by(student_id=self.student_id, gate=TITLE).all()
+            self.assertTrue(title_docs)
+            self.assertTrue(all(doc.status == "Complete" for doc in title_docs), title_docs)
             # The panel is kept: the same panel conducts the re-defense.
             self.assertEqual(PanelAssignment.query.filter_by(student_id=self.student_id, gate=PROPOSAL).count(), 4)
 
@@ -477,7 +566,7 @@ class VerdictOutcomeTests(ResearchCoreBase):
             f"/api/faculty-portal/defense-verdicts/{verdict_id}/confirm-revisions", json={})
         self.assertEqual(by_chair.status_code, 200, by_chair.get_json())
 
-    def test_deferred_defense_is_reschedulable_and_the_old_record_is_linked(self):
+    def test_deferred_defense_reopens_that_stages_documents_before_rescheduling(self):
         schedule_id = self.at_proposal_ready_for_verdict()
         response = self.submit(schedule_id, "Deferred", remarks="Panelist ill")
         self.assertEqual(response.status_code, 200, response.get_json())
@@ -485,9 +574,12 @@ class VerdictOutcomeTests(ResearchCoreBase):
             self.assertEqual(ScheduleRequest.query.get(schedule_id).status, "Deferred")
             progress = detected_research_progress(self.student_obj())
             self.assertEqual(progress["status"], "Defense Deferred")
-            # Nothing was reset: the student keeps files and the panel.
+            # Latest owner rule: Deferred, like Failed, reopens this stage's required documents.
             manuscript = next(i for i in progress["milestone"]["requirements"] if i["item_name"] == "Proposal manuscript")
-            self.assertNotEqual(manuscript["status"], "Missing")
+            self.assertEqual(manuscript["status"], "Missing")
+            self.assertTrue(any(
+                t.owner_role == "Student" and "Resubmit" in t.title for t in self.open_tasks()
+            ))
             self.assertTrue(any(
                 t.owner_role == "Research Coordinator" and "Reschedule" in t.title for t in self.open_tasks()
             ))
@@ -544,7 +636,7 @@ class VerdictOutcomeTests(ResearchCoreBase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("before", response.get_json()["error"].lower())
 
-    def test_title_outcomes_are_approved_or_disapproved_and_do_not_allow_revision_words(self):
+    def test_title_outcome_uses_passed_instead_of_approved(self):
         with app.app_context():
             self.endorse(self.student_id)
             self.fill_uploads(self.student_id, TITLE, status="Complete")
@@ -552,10 +644,9 @@ class VerdictOutcomeTests(ResearchCoreBase):
             schedule = self.schedule(self.student_id, "Title Defense")
             db.session.commit()
             schedule_id = schedule.id
-        bad = self.submit(schedule_id, "Passed with minor revisions")
-        self.assertEqual(bad.status_code, 400, bad.get_json())
         ok = self.submit(schedule_id, "Passed", selected_title="The Approved Title")
         self.assertEqual(ok.status_code, 200, ok.get_json())
+        self.assertEqual(ok.get_json()["verdict"]["label"], "Passed")
         with app.app_context():
             self.assertEqual(ResearchCase.query.filter_by(student_id=self.student_id).first().title, "The Approved Title")
             self.assertEqual(detected_research_progress(self.student_obj())["gate"], PROPOSAL)
@@ -1438,6 +1529,11 @@ class VerdictFlowTests(ResearchCoreBase):
 
     def test_deferred_defense_is_rebooked_and_linked_to_the_deferred_record(self):
         deferred_id, _ = self.proposal_booked_and_held("Deferred", remarks="Chair was ill")
+        blocked = self.book()
+        self.assertEqual(blocked.status_code, 400, blocked.get_json())
+        with app.app_context():
+            self.fill_uploads(self.student_id, PROPOSAL, status="Complete")
+            db.session.commit()
         booked = self.book()
         self.assertEqual(booked.status_code, 200, booked.get_json())
         with app.app_context():
