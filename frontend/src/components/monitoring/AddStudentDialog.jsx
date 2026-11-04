@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { api } from "../../api";
 import { Button, Field, InlineNotice, Input, Modal, Select } from "../ui/index.js";
+import { facultyOptions, useActiveFaculty } from "./knownData";
 
 const EMPTY = {
   student_number: "",
@@ -10,13 +11,14 @@ const EMPTY = {
   program_id: "",
   academic_year_entry: "",
   email: "",
-  adviser_name: "",
+  adviser_faculty_id: "",
   enrollment_tag: "Enrolled",
 };
 
 // "Add student" form: same required fields and duplicate checks as the sheet import.
-export default function AddStudentDialog({ programs = [], defaultProgramId = "", onClose, onCreated }) {
-  const [form, setForm] = useState({ ...EMPTY, program_id: String(defaultProgramId || "") });
+export default function AddStudentDialog({ programs = [], defaultProgramId = "", defaultAyEntry = "", onClose, onCreated }) {
+  const [form, setForm] = useState({ ...EMPTY, program_id: String(defaultProgramId || ""), academic_year_entry: defaultAyEntry });
+  const { faculty } = useActiveFaculty();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [possible, setPossible] = useState(null);
@@ -37,6 +39,7 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
     try {
       const result = await api.createMonitoringStudent({
         ...form,
+        adviser_faculty_id: Number(form.adviser_faculty_id) || undefined,
         program_id: Number(form.program_id) || undefined,
         confirm_possible_duplicate: confirmDuplicate || undefined,
       });
@@ -106,7 +109,7 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
             <Field label="Last name" required>
               <Input value={form.last_name} onChange={set("last_name")} required maxLength={80} autoComplete="off" />
             </Field>
-            <Field label="School year / AY entry" required hint="Format 26-27 (or 2026-2027).">
+            <Field label="School year / AY entry" required hint="Starts as the current semester's school year. Format 26-27 (or 2026-2027).">
               <Input value={form.academic_year_entry} onChange={set("academic_year_entry")} required maxLength={20} placeholder="26-27" autoComplete="off" />
             </Field>
             <Field label="Enrollment status">
@@ -116,7 +119,7 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
               <Input type="email" value={form.email} onChange={set("email")} maxLength={160} autoComplete="off" />
             </Field>
             <Field label="Adviser (optional)">
-              <Input value={form.adviser_name} onChange={set("adviser_name")} maxLength={120} autoComplete="off" />
+              <Select value={form.adviser_faculty_id} onChange={set("adviser_faculty_id")} options={facultyOptions(faculty)} placeholder="No adviser yet" />
             </Field>
           </div>
 

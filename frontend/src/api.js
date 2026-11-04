@@ -383,10 +383,11 @@ export const api = {
   awolPolicyReview: (payload) =>
     request("/awol/policy-review", { method: "POST", body: JSON.stringify(payload) }),
   studentPortalContext: () => request("/student-portal/context"),
-  saveStudentEnrollment: (courseIds, termId) =>
+  // The server always enrolls into the current semester, so no term is sent.
+  saveStudentEnrollment: (courseIds) =>
     request("/student-portal/enrollment", {
       method: "POST",
-      body: JSON.stringify({ course_ids: courseIds, term_id: termId || null }),
+      body: JSON.stringify({ course_ids: courseIds }),
     }),
   studentAssistant: (question) =>
     request("/student-portal/assistant", { method: "POST", body: JSON.stringify({ question }) }),

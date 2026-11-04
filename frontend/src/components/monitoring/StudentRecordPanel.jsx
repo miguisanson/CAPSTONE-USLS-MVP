@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   X, Pencil, Trash2, Plus, History, ListChecks, UserRound, Undo2, ListPlus, ExternalLink, AlertTriangle,
 } from "lucide-react";
@@ -8,6 +8,7 @@ import { useConfirm } from "../confirm";
 import { formatDateTime } from "../../lib/format";
 import ProvenanceBadge from "./ProvenanceBadge";
 import ReasonDialog from "./ReasonDialog";
+import { facultyOptions, useActiveFaculty } from "./knownData";
 
 const TABS = [
   { id: "subjects", label: "Subjects", icon: ListChecks },
@@ -28,7 +29,7 @@ const ACTION_LABELS = {
 // Side panel for one student's monitoring record: subject rows (inline add / edit /
 // remove), header fields, and the change history. Read-only when permissions.can_edit
 // is false (research coordinator, dean).
-export default function StudentRecordPanel({ studentId, focusCourseId, termLabels = [], onClose, onChanged, onOpenProfile }) {
+export default function StudentRecordPanel({ studentId, focusCourseId, termLabels = [], currentTermLabel = "", onClose, onChanged, onOpenProfile }) {
   const [tab, setTab] = useState("subjects");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -119,7 +120,7 @@ export default function StudentRecordPanel({ studentId, focusCourseId, termLabel
           ) : error ? (
             <InlineNotice tone="danger">{error}</InlineNotice>
           ) : tab === "subjects" ? (
-            <SubjectsTab data={data} canEdit={canEdit} focusCourseId={focusCourseId} termLabels={termLabels} onChanged={changed} />
+            <SubjectsTab data={data} canEdit={canEdit} focusCourseId={focusCourseId} termLabels={termLabels} currentTermLabel={currentTermLabel} onChanged={changed} />
           ) : tab === "details" ? (
             <DetailsTab data={data} canEdit={canEdit} onChanged={changed} />
           ) : (
@@ -133,7 +134,7 @@ export default function StudentRecordPanel({ studentId, focusCourseId, termLabel
 
 /* ---------------------------------------------------------------- subjects */
 
-function SubjectsTab({ data, canEdit, focusCourseId, termLabels, onChanged }) {
+function SubjectsTab({ data, canEdit, focusCourseId, termLabels, currentTermLabel, onChanged }) {
   const confirm = useConfirm();
   const studentId = data.student.id;
   const statuses = data.statuses || [];
@@ -270,7 +271,7 @@ function SubjectsTab({ data, canEdit, focusCourseId, termLabels, onChanged }) {
       )}
       {bulkError && <InlineNotice tone="danger">{bulkError}</InlineNotice>}
       {showFreeForm && canEdit && (
-        <FreeFormForm studentId={studentId} statuses={statuses} termLabels={termLabels} onCancel={() => setShowFreeForm(false)} onSaved={(m) => { setShowFreeForm(false); onChanged(m); }} />
+        <FreeFormForm studentId={studentId} subjects={data.subjects} statuses={statuses} termLabels={termLabels} defaultTerm={currentTermLabel} onCancel={() => setShowFreeForm(false)} onSaved={(m) => { setShowFreeForm(false); onChanged(m); }} />
       )}
       {editingRow && (
         <div id={`subject-row-${editingRow.course_id}`} className="rounded-xl border border-brand-200 bg-brand-50/40 p-3">
@@ -280,6 +281,7 @@ function SubjectsTab({ data, canEdit, focusCourseId, termLabels, onChanged }) {
             studentId={studentId}
             statuses={statuses}
             termLabels={termLabels}
+            defaultTerm={currentTermLabel}
             onCancel={() => setEditing(null)}
             onSaved={(m) => { setEditing(null); onChanged(m); }}
           />
@@ -325,8 +327,10 @@ function SubjectsTab({ data, canEdit, focusCourseId, termLabels, onChanged }) {
             <div className="mt-3">
               <FreeFormForm
                 studentId={studentId}
+                subjects={data.subjects}
                 statuses={statuses}
                 termLabels={termLabels}
+                defaultTerm={currentTermLabel}
                 fixedCourse={removedRows.find((r) => r.course_id === editing.courseId)}
                 onCancel={() => setEditing(null)}
                 onSaved={(m) => { setEditing(null); onChanged(m); }}
@@ -373,13 +377,12 @@ function dropEvidence(form) {
 }
 
 // Add or edit one curriculum row in place. Enter saves, Esc cancels.
-function InlineEditor({ row, studentId, statuses, termLabels, onCancel, onSaved }) {
+function InlineEditor({ row, studentId, statuses, termLabels, defaultTerm, onCancel, onSaved }) {
   const isAdd = row.status === "Missing";
   const needsReason = !isAdd && (row.source === "Imported" || row.source === "System");
-  const listId = useId();
   const [form, setForm] = useState({
     status: isAdd ? "Planned" : row.status,
-    term_label: row.term_label || "",
+    term_label: row.term_label || (isAdd ? defaultTerm : ""),
     remarks: row.remarks || "",
     reason: "",
     unexcused_absence_percent: "",
@@ -423,10 +426,7 @@ function InlineEditor({ row, studentId, statuses, termLabels, onCancel, onSaved 
       <p className="text-sm font-semibold text-ink">{isAdd ? "Add" : "Edit"} {row.code} — {row.title}</p>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Status"><Select autoFocus value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} placeholder="" /></Field>
-        <Field label="Term taken">
-          <Input list={listId} value={form.term_label} onChange={(e) => setForm({ ...form, term_label: e.target.value })} maxLength={40} placeholder="AY 2026-2027 1st Semester" />
-          <datalist id={listId}>{termLabels.map((label) => <option key={label} value={label} />)}</datalist>
-        </Field>
+        <Field label="Term taken"><TermSelect value={form.term_label} onChange={(term_label) => setForm({ ...form, term_label })} termLabels={termLabels} /></Field>
         <Field label="Remarks"><Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} maxLength={500} /></Field>
       </div>
       {form.status === "Dropped" && form.status !== row.status && <DropEvidenceFields form={form} setForm={setForm} />}
@@ -446,19 +446,23 @@ function InlineEditor({ row, studentId, statuses, termLabels, onCancel, onSaved 
 }
 
 // Free-form subject (not in the curriculum), or re-adding a removed row (fixedCourse).
-function FreeFormForm({ studentId, statuses, termLabels, fixedCourse, onCancel, onSaved }) {
-  const listId = useId();
-  const [form, setForm] = useState({ code: "", title: "", units: "3", status: "Completed", term_label: "", remarks: "", unexcused_absence_percent: "", drop_exception_reason: "" });
+function FreeFormForm({ studentId, subjects = [], statuses, termLabels, defaultTerm, fixedCourse, onCancel, onSaved }) {
+  const [form, setForm] = useState({ code: "", title: "", units: "3", status: "Completed", term_label: defaultTerm || "", remarks: "", unexcused_absence_percent: "", drop_exception_reason: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  // A code the program's subject list already has: title and units come from it (no retyping, no second spelling).
+  const typed = form.code.trim().toLowerCase();
+  const known = fixedCourse || !typed ? null : subjects.find((s) => s.code.trim().toLowerCase() === typed && (s.in_curriculum || (!s.removed && s.status !== "Missing"))) || null;
+  const alreadyOnRecord = Boolean(known && !known.removed && known.status !== "Missing");
 
   async function save(event) {
     event.preventDefault();
     setBusy(true);
     setError("");
     try {
-      const payload = fixedCourse
-        ? { course_id: fixedCourse.course_id, status: form.status, term_label: form.term_label, remarks: form.remarks, ...dropEvidence(form) }
+      const payload = fixedCourse || known
+        ? { course_id: (fixedCourse || known).course_id, status: form.status, term_label: form.term_label, remarks: form.remarks, ...dropEvidence(form) }
         : { code: form.code, title: form.title, units: Number(form.units), status: form.status, term_label: form.term_label, remarks: form.remarks, ...dropEvidence(form) };
       const result = await api.addMonitoringSubject(studentId, payload);
       onSaved(result.message);
@@ -475,16 +479,14 @@ function FreeFormForm({ studentId, statuses, termLabels, fixedCourse, onCancel, 
       {!fixedCourse && (
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Subject code" required><Input autoFocus value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required maxLength={40} /></Field>
-          <div className="sm:col-span-1"><Field label="Title" required><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required maxLength={160} /></Field></div>
-          <Field label="Units" required><Input type="number" min="1" max="12" value={form.units} onChange={(e) => setForm({ ...form, units: e.target.value })} required /></Field>
+          <div className="sm:col-span-1"><Field label="Title" required><Input value={known ? known.title : form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required maxLength={160} readOnly={Boolean(known)} /></Field></div>
+          <Field label="Units" required><Input type="number" min="1" max="12" value={known ? known.units : form.units} onChange={(e) => setForm({ ...form, units: e.target.value })} required readOnly={Boolean(known)} /></Field>
+          {known && <p className="text-xs text-slate-600 sm:col-span-3">{alreadyOnRecord ? `${known.code} is already on this record. Use Edit on its row to change it.` : `${known.code} is in this program's curriculum, so its title and units come from there.`}</p>}
         </div>
       )}
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Status"><Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statuses} placeholder="" autoFocus={Boolean(fixedCourse)} /></Field>
-        <Field label="Term taken">
-          <Input list={listId} value={form.term_label} onChange={(e) => setForm({ ...form, term_label: e.target.value })} maxLength={40} />
-          <datalist id={listId}>{termLabels.map((label) => <option key={label} value={label} />)}</datalist>
-        </Field>
+        <Field label="Term taken"><TermSelect value={form.term_label} onChange={(term_label) => setForm({ ...form, term_label })} termLabels={termLabels} /></Field>
         <Field label="Remarks"><Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} maxLength={500} /></Field>
       </div>
       {form.status === "Dropped" && <DropEvidenceFields form={form} setForm={setForm} />}
@@ -492,10 +494,16 @@ function FreeFormForm({ studentId, statuses, termLabels, fixedCourse, onCancel, 
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel}>Cancel</Button>
-        <Button type="submit" disabled={busy}>{busy ? "Saving…" : "Add row"}</Button>
+        <Button type="submit" disabled={busy || alreadyOnRecord}>{busy ? "Saving…" : "Add row"}</Button>
       </div>
     </form>
   );
+}
+
+// "Term taken" is one of the configured semesters. A value a row already holds stays selectable even when it is not in the list.
+function TermSelect({ value, onChange, termLabels }) {
+  const labels = value && !termLabels.includes(value) ? [value, ...termLabels] : termLabels;
+  return <Select value={value} onChange={(e) => onChange(e.target.value)} options={labels} placeholder="Not recorded" />;
 }
 
 function RemoveDialog({ row, studentId, onCancel, onDone }) {
@@ -530,27 +538,36 @@ function RemoveDialog({ row, studentId, onCancel, onDone }) {
 
 function DetailsTab({ data, canEdit, onChanged }) {
   const student = data.student;
+  const { faculty, loaded } = useActiveFaculty();
   const initial = {
     student_number: student.student_number || "",
     first_name: student.first_name || "",
     last_name: student.last_name || "",
     email: student.email || "",
     academic_year_entry: student.academic_year_entry || "",
-    adviser_name: student.adviser_name || "",
   };
+  // The adviser is a faculty record. null = not touched; otherwise the picked faculty id ("" = no adviser).
+  const [adviserPick, setAdviserPick] = useState(null);
+  const current = (student.adviser_name || "").trim().toLowerCase();
+  const matched = current ? faculty.find((f) => f.name.trim().toLowerCase() === current) : null;
+  const matchedId = matched ? String(matched.id) : "";
+  const adviserChanged = adviserPick !== null && adviserPick !== matchedId;
+  const adviserLabel = (id) => faculty.find((f) => String(f.id) === id)?.name || "";
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(initial);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const dirty = Object.keys(initial).some((key) => form[key] !== initial[key]);
+  const dirty = adviserChanged || Object.keys(initial).some((key) => form[key] !== initial[key]);
+  const stopEditing = () => { setEditing(false); setForm(initial); setAdviserPick(null); };
 
   async function save(reason) {
     setBusy(true);
     setError("");
     try {
-      const result = await api.updateMonitoringStudent(student.id, { ...form, reason });
+      const result = await api.updateMonitoringStudent(student.id, { ...form, ...(adviserChanged ? { adviser_faculty_id: adviserPick ? Number(adviserPick) : null } : {}), reason });
       setConfirming(false);
+      setAdviserPick(null);
       setEditing(false);
       await onChanged(result.message);
     } catch (e) {
@@ -593,7 +610,7 @@ function DetailsTab({ data, canEdit, onChanged }) {
   return (
     <form
       onSubmit={(event) => { event.preventDefault(); if (dirty) setConfirming(true); }}
-      onKeyDown={(event) => { if (event.key === "Escape" && !confirming) { event.preventDefault(); event.stopPropagation(); setEditing(false); setForm(initial); } }}
+      onKeyDown={(event) => { if (event.key === "Escape" && !confirming) { event.preventDefault(); event.stopPropagation(); stopEditing(); } }}
       className="space-y-4"
     >
       <div className="grid gap-4 sm:grid-cols-2">
@@ -602,17 +619,22 @@ function DetailsTab({ data, canEdit, onChanged }) {
         <Field label="First name" required><Input value={form.first_name} onChange={set("first_name")} required maxLength={80} /></Field>
         <Field label="Last name" required><Input value={form.last_name} onChange={set("last_name")} required maxLength={80} /></Field>
         <Field label="Email (student login)" required><Input type="email" value={form.email} onChange={set("email")} required maxLength={160} /></Field>
-        <Field label="Adviser"><Input value={form.adviser_name} onChange={set("adviser_name")} maxLength={120} /></Field>
+        <Field label="Adviser" hint={loaded && !matched && student.adviser_name ? `${student.adviser_name} is not a faculty record. Choose one, or leave it as it is.` : undefined}>
+          <Select value={adviserPick ?? matchedId} onChange={(e) => setAdviserPick(e.target.value)} options={facultyOptions(faculty)} placeholder="No adviser yet" />
+        </Field>
       </div>
       <p className="text-xs text-slate-500">Changing the email also changes the student's login. A reason is asked for next.</p>
       <div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={() => { setEditing(false); setForm(initial); setError(""); }}>Cancel</Button>
+        <Button variant="secondary" onClick={() => { stopEditing(); setError(""); }}>Cancel</Button>
         <Button type="submit" disabled={!dirty}>Review correction</Button>
       </div>
       {confirming && (
         <ReasonDialog
           title="Save this correction?"
-          message={Object.keys(initial).filter((key) => form[key] !== initial[key]).map((key) => `${key.replace(/_/g, " ")}: ${initial[key] || "(blank)"} → ${form[key] || "(blank)"}`).join("\n")}
+          message={[
+            ...Object.keys(initial).filter((key) => form[key] !== initial[key]).map((key) => `${key.replace(/_/g, " ")}: ${initial[key] || "(blank)"} → ${form[key] || "(blank)"}`),
+            ...(adviserChanged ? [`adviser: ${student.adviser_name || "(blank)"} → ${adviserLabel(adviserPick) || "(blank)"}`] : []),
+          ].join("\n")}
           confirmLabel="Save correction"
           busy={busy}
           error={error}

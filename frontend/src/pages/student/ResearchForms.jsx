@@ -32,6 +32,8 @@ export function ResearchRequestForm({ data, onSaved }) {
   // Nothing left to send once staff verified every file of the milestone; the next step may be the defense date.
   const allVerified = uploadRequirements.length > 0 && uploadRequirements.every((item) => item.status === "Complete");
   const requestDefenseDate = Boolean(defenseToRequest(data));
+  // The title is typed (or read from Form 1) only at the Title Defense gate while none is on record; after that it is shown, never asked.
+  const askTitle = progress.stage === "Title Defense" && !savedTitle;
 
   useEffect(() => {
     setForm((current) => ({
@@ -47,18 +49,17 @@ export function ResearchRequestForm({ data, onSaved }) {
   function onSubmit(e) {
     e.preventDefault();
     // Submit is off only when no answer can fix it (files still missing); a missing title is reported here.
-    if (progress.stage === "Title Defense" && !form.research_title.trim()) {
+    if (askTitle && !form.research_title.trim()) {
       fail([{ id: "research-title", message: "Upload Form 1 below so the research title can be read, or type the title." }]);
       return;
     }
     clear();
     submit(
       {
-        student_id: data.student.id,
-        research_title: form.research_title,
+        ...(askTitle ? { research_title: form.research_title } : {}),
         submitted_package: form.submitted_package,
       },
-      { lines: [`${milestone.label || "Research milestone"} for review`, progress.stage === "Title Defense" ? `Research title: ${form.research_title}` : ""] },
+      { lines: [`${milestone.label || "Research milestone"} for review`, askTitle ? `Research title: ${form.research_title}` : ""] },
     );
   }
 
@@ -80,7 +81,7 @@ export function ResearchRequestForm({ data, onSaved }) {
       <div className="grid gap-2 sm:grid-cols-4">
         {(progress.stages || []).map((stage, index) => <div key={stage.name} className={`rounded-lg border px-2.5 py-2 text-xs font-semibold ${index === progress.stage_index ? "border-brand-400 bg-brand-50 text-brand-800" : stage.complete ? "border-brand-200 bg-brand-50/60 text-brand-700" : "border-slate-200 text-slate-500"}`}>{stage.name}</div>)}
       </div>
-      {progress.stage === "Title Defense" && (
+      {askTitle && (
         <Field label="Research title from uploaded Form 1" required hint="This fills automatically after the Form 1 application PDF is uploaded below." error={messageFor("research-title")}>
           <Input id="research-title" value={form.research_title} onChange={set("research_title")} placeholder="Upload Form 1 below to auto-fill" />
           {prefillNote && <p className="meta mt-1 font-medium text-brand-700">{prefillNote}</p>}
@@ -370,8 +371,9 @@ function RevisionSubmitForm({ followUp, onSaved }) {
 }
 
 export function ScheduleRequestForm({ data, onSaved }) {
-  const studentId = data.student.id;
   const stage = data.research_progress?.stage;
+  // The defense type follows the student's stage; the server works it out, so it is shown here and not sent.
+  const nextDefense = BOOKABLE_DEFENSES.includes(stage) ? stage : "";
   const schedules = data.schedules || [];
   const liveSchedule = schedules.find(isLiveSchedule) || null;
   // The stage's defense already took place (e.g. revisions are due): the office schedules another only if the result requires it.
@@ -380,7 +382,6 @@ export function ScheduleRequestForm({ data, onSaved }) {
   const followUp = data.defense_follow_up;
   const [form, setForm] = useState({
     preferred_date: "",
-    defense_type: BOOKABLE_DEFENSES.includes(stage) ? stage : BOOKABLE_DEFENSES[0],
     mode: "On-site",
     venue: "",
     constraints: "",
@@ -397,7 +398,7 @@ export function ScheduleRequestForm({ data, onSaved }) {
       return;
     }
     clear();
-    submit({ student_id: studentId, ...form }, { lines: [`${form.defense_type} schedule request`, `Preferred date: ${formatDate(form.preferred_date)}`, `Mode: ${form.mode}`] });
+    submit({ ...form }, { lines: [`${nextDefense || "Defense"} schedule request`, `Preferred date: ${formatDate(form.preferred_date)}`, `Mode: ${form.mode}`] });
   }
 
   return (
@@ -420,9 +421,10 @@ export function ScheduleRequestForm({ data, onSaved }) {
             <Field label="Preferred date" required error={messageFor("schedule-date")}>
               <Input id="schedule-date" type="date" value={form.preferred_date} onChange={set("preferred_date")} />
             </Field>
-            <Field label="Defense type" required hint={stage && BOOKABLE_DEFENSES.includes(stage) ? `Your current stage is ${stage}.` : undefined}>
-              <Select value={form.defense_type} onChange={set("defense_type")} placeholder="" options={BOOKABLE_DEFENSES} />
-            </Field>
+            <div className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+              <p className="eyebrow">Defense type</p>
+              <p className="mt-1 text-sm text-ink">{nextDefense ? <>Your next defense: <span className="font-semibold">{nextDefense}</span></> : "No defense is due at your current stage."}</p>
+            </div>
             <Field label="Mode">
               <Select value={form.mode} onChange={set("mode")} placeholder="" options={["On-site", "Online", "Hybrid"]} />
             </Field>

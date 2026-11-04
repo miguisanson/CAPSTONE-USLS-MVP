@@ -8,6 +8,7 @@ import { csvCell, downloadBlob } from "../lib/format";
 import { toneOf } from "../lib/tone";
 import AddStudentDialog from "../components/monitoring/AddStudentDialog";
 import StudentRecordPanel from "../components/monitoring/StudentRecordPanel";
+import { ayEntryOf } from "../components/monitoring/knownData";
 import { PAGE } from "../lib/labels.js";
 
 // One colour per subject status in the matrix. The colours follow the semantic tones (UI-SPEC section 3): brand
@@ -230,6 +231,7 @@ export default function MonitoringGrid() {
 
   const openFlags = (flagStudent?.flags || []).filter((item) => item.status === "Open");
   const programOptions = (meta?.programs || []).map((p) => ({ value: String(p.id), label: `${p.code} — ${p.name}` }));
+  const currentTermLabel = (grid?.terms || meta?.terms || []).find((term) => term.relative_label === "Current")?.label || "";
   const termOptions = (grid?.terms || meta?.terms || []).map((term) => ({ value: String(term.id), label: `${term.label}${term.relative_label ? ` (${term.relative_label})` : ""}` }));
 
   return (
@@ -501,6 +503,7 @@ export default function MonitoringGrid() {
         <AddStudentDialog
           programs={meta?.programs || grid?.programs || []}
           defaultProgramId={programId}
+          defaultAyEntry={ayEntryOf(currentTermLabel)}
           onClose={() => setAddOpen(false)}
           onCreated={(result, openNow) => {
             load(programId);
@@ -515,6 +518,7 @@ export default function MonitoringGrid() {
           studentId={recordPanel.studentId}
           focusCourseId={recordPanel.courseId}
           termLabels={(grid?.terms || meta?.terms || []).map((term) => term.label)}
+          currentTermLabel={currentTermLabel}
           onClose={() => setRecordPanel(null)}
           onChanged={() => load(programId)}
           onOpenProfile={(id) => navigate(`/students/${id}`)}

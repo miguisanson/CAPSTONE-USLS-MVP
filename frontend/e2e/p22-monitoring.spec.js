@@ -72,6 +72,7 @@ test.describe("P2.2 Monitoring Sheet dialogs", () => {
     await add.getByLabel("Student ID").fill("7700123");
     await add.getByLabel("First name").fill("Pia");
     await add.getByLabel("Last name").fill("Testwell");
+    await add.getByLabel("School year / AY entry").fill(""); // it starts filled with the current semester's year (I-262)
     await expect(addButton, "school-year still empty").toBeDisabled();
     await add.getByLabel("School year / AY entry").fill("26-27");
     await expect(addButton).toBeEnabled();
@@ -122,11 +123,11 @@ test.describe("P2.2 Monitoring Sheet dialogs", () => {
     await expect(panel.getByText("Student ID", { exact: true })).toBeVisible();
     await expect(panel.locator('[aria-label^="Manual entry"]').first()).toHaveText("Manual entry");
     await panel.getByRole("button", { name: "Correct details" }).click();
-    await panel.getByLabel("Adviser").fill("Dr. Reason Check");
+    await panel.locator("label", { hasText: "Adviser" }).locator("select").selectOption({ index: 1 }); // a faculty record, not typed text (I-247)
     await panel.getByRole("button", { name: "Review correction" }).click();
     const reason = page.getByRole("dialog", { name: "Save this correction?" });
     await expect(reason).toBeVisible();
-    await expect(reason.getByText(/adviser name: \(blank\) → Dr\. Reason Check/)).toBeVisible();
+    await expect(reason.getByText(/adviser: \(blank\) → \S/)).toBeVisible();
     const saveCorrection = reason.getByRole("button", { name: "Save correction" });
     await expect(saveCorrection, "no reason yet").toBeDisabled();
     const reasonBox = reason.getByLabel(/Reason/);
@@ -195,8 +196,8 @@ test.describe("P2.2 Monitoring Sheet dialogs", () => {
 
     // the history tab lists the portal changes with their reason
     await panel.getByRole("tab", { name: /Change history/ }).click();
-    await expect(panel.getByText("Subject row removed")).toBeVisible();
-    await expect(panel.getByText("Reason: added by mistake")).toBeVisible();
+    await expect(panel.getByText("Subject row removed").first()).toBeVisible(); // logged for the status and for the new row's term (I-249)
+    await expect(panel.getByText("Reason: added by mistake").first()).toBeVisible();
 
     // ---- an imported student -----------------------------------------------------------------------------------
     await panel.getByRole("button", { name: "Close record panel" }).click();
