@@ -3,7 +3,14 @@
 import { defineConfig, devices } from "@playwright/test";
 import { BASE_URL, PORT, ARTIFACTS_DIR } from "./e2e/support/paths.mjs";
 import { join } from "node:path";
+import { existsSync } from "node:fs";
 import { assertOwnership } from "./e2e/support/check-ownership.mjs";
+
+// Migui's PC keeps the browsers on E: (drive C: is kept free); use them without anyone setting the variable by hand.
+// Any other PC: `npx playwright install chromium` once and the default location is used.
+if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync("E:/DevCache/ms-playwright")) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = "E:/DevCache/ms-playwright";
+}
 
 const negative = process.env.E2E_NEGATIVE === "1";
 
