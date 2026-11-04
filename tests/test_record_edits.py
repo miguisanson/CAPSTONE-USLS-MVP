@@ -298,14 +298,13 @@ class RecordEditTests(unittest.TestCase):
         self.assertEqual(bad.status_code, 400)
         self.assertEqual(self.edit_rows(), 1)
 
-    def test_after_staff_act_the_student_is_refused_but_staff_may_edit_with_a_reason(self):
+    def test_after_staff_act_the_student_and_staff_can_both_still_edit_with_a_reason(self):
         case_id = self.file_loa()
         with app.app_context():
             db.session.get(LeaveCase, case_id).status = "Dean Review"
             db.session.commit()
-        refused = self.patch(self.student_client(), "leave_case", case_id, "reason_text", "New text", "r")
-        self.assertEqual(refused.status_code, 409)
-        self.assertIn("Graduate School", refused.get_json()["error"])
+        later = self.patch(self.student_client(), "leave_case", case_id, "reason_text", "Student fix", "typo")
+        self.assertEqual(later.status_code, 200, later.get_json())
         self.assertEqual(self.patch(self.staff_client(), "leave_case", case_id, "reason_text", "New text").status_code, 400)
         ok = self.patch(self.staff_client(), "leave_case", case_id, "reason_text", "New text", "Student asked by phone")
         self.assertEqual(ok.status_code, 200, ok.get_json())
@@ -335,7 +334,7 @@ class RecordEditTests(unittest.TestCase):
         with app.app_context():
             db.session.get(WithdrawalApplication, application_id).status = "Dean Review"
             db.session.commit()
-        self.assertEqual(self.patch(self.student_client(), "withdrawal_application", application_id, "reason", "x", "typo").status_code, 409)
+        self.assertEqual(self.patch(self.student_client(), "withdrawal_application", application_id, "reason", "Work again", "typo").status_code, 200)
 
     # ---- 5. verdict remarks ---------------------------------------------------------------
     def _verdict(self, faculty_account_id_holder):
@@ -356,7 +355,7 @@ class RecordEditTests(unittest.TestCase):
             db.session.commit()
             faculty_account_id_holder.extend([verdict.id, account.id])
 
-    def test_verdict_remarks_editable_by_the_chair_until_acted_on(self):
+    def test_verdict_remarks_editable_by_the_chair_even_after_later_steps(self):
         ids = []
         self._verdict(ids)
         verdict_id, account_id = ids
@@ -379,9 +378,8 @@ class RecordEditTests(unittest.TestCase):
             self.assertEqual(ResearchCase.query.filter_by(student_id=self.student_id).one().title, "Wrong title fixed")
             db.session.get(DefenseVerdict, verdict_id).revision_status = app_module.REVISION_SUBMITTED
             db.session.commit()
-        refused = self.patch(chair, "defense_verdict", verdict_id, "remarks", "Again", "typo")
-        self.assertEqual(refused.status_code, 409)
-        self.assertIn("Return or reopen", refused.get_json()["error"])
+        later = self.patch(chair, "defense_verdict", verdict_id, "remarks", "Again", "typo")
+        self.assertEqual(later.status_code, 200, later.get_json())
 
 
 if __name__ == "__main__":

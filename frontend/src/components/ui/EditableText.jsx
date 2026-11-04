@@ -23,7 +23,7 @@ function EditDialog({ edit, value, onClose, onSaved }) {
   const [error, setError] = useState("");
   const needReason = edit.reason_required;
   const changed = text.trim() !== String(value || "").trim();
-  const canSave = !busy && changed && (!needReason || reason.trim().length >= 3);
+  const canSave = !busy && changed && text.trim().length > 0 && (!needReason || reason.trim().length >= 3);
 
   async function save() {
     setBusy(true);

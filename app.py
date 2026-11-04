@@ -5498,14 +5498,16 @@ def _build_editable() -> dict:
                 "reason": _f("request", label="Reason for the change"),
                 "ac_note": _note("Coordinator note", ("academic_coordinator", "research_coordinator"), 600),
                 "decision_note": _note("Dean note", ("dean",)),
+                "adviser_response_reason": _f("faculty", label="Adviser's reason", check=_edit_text(blank=True)),
+                "current_adviser_consent_reason": _f("faculty", label="Consent reason", check=_edit_text(blank=True)),
             },
         },
         "defense_verdict": {
             "model": DefenseVerdict, "student": lambda r: r.student_id, "slug": lambda r: "research-gate",
             "request": lambda r: r.schedule_request_id,
             "fields": {
-                "remarks": _f("verdict", label="Panel remarks", check=_edit_text(blank=True)),
-                "selected_title": _f("verdict", label="Title selected by the panel", multiline=False, check=_edit_text(220),
+                "remarks": _f("faculty", label="Panel remarks", check=_edit_text(blank=True)),
+                "selected_title": _f("faculty", label="Title selected by the panel", multiline=False, check=_edit_text(220),
                                     apply=_apply_verdict_title),
             },
         },
@@ -5537,11 +5539,10 @@ def record_edit_rule(account, entity: str, row, field: str) -> dict:
             raise EditRefused("Only the author can edit this.", 403)
         created = getattr(row, "created_at", None)
         return {"reason_required": not (created and now_utc() - created <= RECORD_EDIT_GRACE)}
-    if kind == "verdict":
+    if kind == "faculty":
+        # Stakeholder rule (I-354): the person who wrote it can always fix it; the Edited chip and history tell everyone.
         if role != "faculty" or not account.faculty_id or account.faculty_id != row.faculty_id:
-            raise EditRefused("Only the panel chair who recorded this verdict can edit it.", 403)
-        if verdict_is_acted_on(row):
-            raise EditRefused("Later steps already rest on this verdict. Return or reopen the request instead.", 409)
+            raise EditRefused("Only the faculty member who wrote this can edit it.", 403)
         return {"reason_required": True}
     if kind == "note":
         if role not in fspec["roles"]:
@@ -5551,10 +5552,7 @@ def record_edit_rule(account, entity: str, row, field: str) -> dict:
     if account.role == "student":
         if not account.student_id or account.student_id != spec["student"](row):
             raise EditRefused("This is not your request.", 403)
-        if spec.get("open") and not spec["open"](row):
-            raise EditRefused(
-                "Graduate School staff have already acted on this request. Ask Graduate School staff to correct it.", 409)
-        return {"reason_required": True}
+        return {"reason_required": True}  # even after staff acted: the history and chip show the change to everyone
     if role in EDIT_STAFF_ROLES:
         return {"reason_required": True}
     raise EditRefused("Only the student or Graduate School staff can edit this.", 403)

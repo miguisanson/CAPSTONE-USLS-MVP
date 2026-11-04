@@ -103,9 +103,13 @@ test.describe("p116 edit anything with history", () => {
     await okJson(await staff.post(`/api/leave-cases/${caseId}/transition`, { data: { action: "forward", eligibility_result: "Eligible" } }), "staff forward");
     const stale = await editField(page, "reason_text", "Surgery, recovery and rest.", "Adding detail");
     await stale.getByRole("button", { name: "Save change" }).click();
-    await expect(stale.getByRole("alert")).toContainText("Graduate School staff have already acted on this request");
-    await stale.getByRole("button", { name: "Cancel" }).click();
-    await expect(field(page, "reason_text")).toContainText("Surgery and recovery.");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(field(page, "reason_text")).toContainText("Surgery, recovery and rest.");
+    await expect(field(page, "reason_text").locator("[data-edit-chip]")).toHaveText("Edited (2)");
+    // A refused edit shows its reason: a blank value is refused by the server in plain words.
+    const blank = await editField(page, "reason_text", " ", "Clearing it");
+    await expect(blank.getByRole("button", { name: "Save change" })).toBeDisabled();
+    await blank.getByRole("button", { name: "Cancel" }).click();
 
     await context.close();
     await Promise.all([student.dispose(), staff.dispose()]);
