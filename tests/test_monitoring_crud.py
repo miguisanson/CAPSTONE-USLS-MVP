@@ -22,6 +22,7 @@ from app import (  # noqa: E402
     AcademicTerm,
     Course,
     CourseRecord,
+    Faculty,
     MonitoringEdit,
     MonitoringSheetUpload,
     MonitoringValidationIssue,
@@ -73,6 +74,8 @@ class MonitoringPortalCrudTests(unittest.TestCase):
                 end_date=date(2026, 12, 15),
                 is_active_planning_term=True,
             ))
+            db.session.add(Faculty(name="Dr. Reyes", college="Graduate School", role="Faculty",
+                                   specialization="Education", active=True))
             db.session.flush()
             self.program_id = program.id
             self.other_program_id = other.id
@@ -147,6 +150,37 @@ class MonitoringPortalCrudTests(unittest.TestCase):
             result = import_ac_monitoring(parsed, upload=upload)
             db.session.commit()
             return result
+
+    # -- owner rule 2026-11-04: never make a user type what the system knows (I-247, I-249) --
+    def test_the_adviser_must_be_a_faculty_record_not_a_typed_name(self):
+        unknown = self._client("staff").post("/api/monitoring/students", json=self._student_payload(adviser_name="Dr. Nobody"))
+        self.assertEqual(unknown.status_code, 400, unknown.get_json())
+        self.assertIn("faculty", unknown.get_json()["error"].lower())
+        with app.app_context():
+            faculty_id = Faculty.query.filter_by(name="Dr. Reyes").one().id
+        by_id = self._create_student(adviser_faculty_id=faculty_id)
+        with app.app_context():
+            self.assertEqual(Student.query.get(by_id["student"]["id"]).adviser_name, "Dr. Reyes")
+        url = f"/api/monitoring/students/{by_id['student']['id']}"
+        bad = self._client("staff").patch(url, json={"adviser_name": "Dr. Typo", "reason": "New adviser"})
+        self.assertEqual(bad.status_code, 400, bad.get_json())
+        with app.app_context():
+            self.assertEqual(Student.query.get(by_id["student"]["id"]).adviser_name, "Dr. Reyes")
+
+    def test_term_taken_must_be_a_real_semester_label(self):
+        student_id = self._create_student()["student"]["id"]
+        staff = self._client("staff")
+        url = f"/api/monitoring/students/{student_id}/subjects"
+        typo = staff.post(url, json={"course_id": self._course_id("MPT-501"), "status": "Enrolled",
+                                     "term_label": "1st sem this year"})
+        self.assertEqual(typo.status_code, 400, typo.get_json())
+        known = staff.post(url, json={"course_id": self._course_id("MPT-501"), "status": "Enrolled",
+                                      "term_label": "AY 2026-2027 1st Semester"})
+        self.assertEqual(known.status_code, 201, known.get_json())
+        # An older semester that is not set up in Term settings is kept when it is a well-formed label.
+        older = staff.post(url, json={"course_id": self._course_id("MPT-502"), "status": "Completed",
+                                      "term_label": "AY 2019-2020 2nd Semester"})
+        self.assertEqual(older.status_code, 201, older.get_json())
 
     # -- create student ---------------------------------------------------
     def test_staff_can_create_a_student_in_the_portal_like_the_import_does(self):

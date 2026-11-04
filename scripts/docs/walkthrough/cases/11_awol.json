@@ -35,11 +35,11 @@
  "data": [
   [
    "Intended return semester",
-   "AY 2026-2027 2nd Semester (the running semester is not accepted as a return semester)"
+   "AY 2026-2027 2nd Semester (preselected: the next semester that has not started; the running semester is not offered)"
   ],
   [
    "Last enrolled semester",
-   "AY 2025-2026 2nd Semester"
+   "AY 2025-2026 2nd Semester (shown from the enrollment records; the student does not pick it)"
   ],
   [
    "Written intention",
@@ -114,7 +114,7 @@
      ]
     },
     {
-     "text": "Choose **Intended return semester** (AY 2026-2027 2nd Semester) and **Last enrolled semester** (AY 2025-2026 2nd Semester). Type the **Written intention to resume enrollment** and the **Reason for returning and readiness to continue**.",
+     "text": "**Intended return semester** is already set to AY 2026-2027 2nd Semester, the next semester that has not started. **Last enrolled semester** (AY 2025-2026 2nd Semester) is shown read-only from the enrollment records. Type the **Written intention to resume enrollment** and the **Reason for returning and readiness to continue**.",
      "shots": [
       {
        "id": "awol-06",

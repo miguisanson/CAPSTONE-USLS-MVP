@@ -11,7 +11,7 @@ EMAIL = "readmission.therese@usls.edu.ph"
 SLUG = "readmission"
 WHO = "Therese"
 INTENT = "My leave is ending and I am ready to resume thesis work with my adviser. My study plan is updated and I have no pending accountability."
-STAFF_NOTE = "Return semester is after the leave; checklist is complete. Forwarded for the Dean's decision."
+STAFF_NOTE = "Business Office clearance and interview done. Forwarded for the Dean's decision."
 DEAN_COMMENT = "Approved. The Academic Coordinator will plan the enrollment for the return semester."
 
 
@@ -37,13 +37,11 @@ def run(rt):
 
     def s_fill():
         student.locator("main select").first.select_option(index=1)  # AY 2026-2027 2nd Semester
-        student.locator("main textarea").fill(INTENT)
-        for box in student.locator("main input[type=checkbox]").all():
-            box.check()
+        student.locator("main textarea").fill(INTENT)  # nothing to tick: the checks are shown read-only
         student.get_by_role("button", name=re.compile("Submit readmission")).scroll_into_view_if_needed()
         rt.shot(student, f"{S}-03", full=True)
 
-    rt.step("student fills the request and ticks the four items", s_fill)
+    rt.step("student fills the request (no ticks)", s_fill)
 
     def s_submit():
         student.get_by_role("button", name=re.compile("Submit readmission")).click()
@@ -102,7 +100,7 @@ def run(rt):
         frame(staff, "Submitted")
         rt.shot(staff, f"{S}-12")
 
-    rt.step("staff verifies the checklist and forwards to the Dean", st_forward)
+    rt.step("staff ticks the two office checks and forwards to the Dean", st_forward)
 
     dean = rt.new_page("dean@usls.edu.ph")
 

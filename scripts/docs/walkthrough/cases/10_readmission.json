@@ -42,12 +42,12 @@
    "My leave is ending and I am ready to resume thesis work with my adviser. My study plan is updated and I have no pending accountability."
   ],
   [
-   "Return checklist (student)",
-   "all four items ticked: Structured return intention completed, Updated study plan confirmed, Program or adviser consultation completed, No pending accountability confirmed"
+   "Return checklist",
+   "nothing for the student to tick (Handbook p. 45): the system checks Written intention to enroll and Evaluation of subject/grade requirements; staff confirm Clearance from Business Office and Interview (reason for delay, residency requirements)"
   ],
   [
    "Staff note to the Dean",
-   "Return semester is after the leave; checklist is complete. Forwarded for the Dean's decision."
+   "Business Office clearance and interview done. Forwarded for the Dean's decision."
   ],
   [
    "Dean note",
@@ -78,11 +78,11 @@
      ]
     },
     {
-     "text": "Choose **Semester you want to return in** (AY 2026-2027 2nd Semester), type the text in **Why you are ready to come back**, and tick all four items under **Before you send this, confirm each item**. The page says she may ask to return before the leave ends, but the Dean decides whether that is allowed.",
+     "text": "Choose **Semester you want to return in** (AY 2026-2027 2nd Semester), and type the text in **Why you are ready to come back**. There is nothing to tick: **What is checked for you** lists the two items the system checks from the records (the written intention and the subjects still to take) and the two that Graduate School staff confirm. The page says she may ask to return before the leave ends, but the Dean decides whether that is allowed.",
      "shots": [
       {
        "id": "readmission-03",
-       "caption": "Readmission form filled in with the four items ticked."
+       "caption": "Readmission form filled in; the return checks are shown read-only."
       }
      ]
     },
@@ -96,7 +96,7 @@
      ]
     },
     {
-     "text": "The badge is **Submitted** and the page says 'Submitted. Graduate School staff will review your readmission request.' The card shows **Waiting for: Graduate School Staff**, the leave she is ending, her text, the checklist ('you ticked this') and a four-step tracker (Request submitted, Staff review, Dean decision, Back in the program).",
+     "text": "The badge is **Submitted** and the page says 'Submitted. Graduate School staff will review your readmission request.' The card shows **Waiting for: Graduate School Staff**, the leave she is ending, her text, the return checklist (what the system checked and what staff still confirm) and a four-step tracker (Request submitted, Staff review, Dean decision, Back in the program).",
      "shots": [
       {
        "id": "readmission-05",
@@ -138,7 +138,7 @@
      ]
     },
     {
-     "text": "Scroll to **Return checklist**: the four items, each 'The student ticked this. Not verified by staff yet.' Below are **The student so far** (1 year in the program, 2 of 4 leave semesters already approved) and **Earlier requests by this student**.",
+     "text": "Scroll to **Return checklist**: the two system items, each 'Checked by the system' with what the records show, and the two office checks, each 'Not verified by staff yet.' Below are **The student so far** (1 year in the program, 2 of 4 leave semesters already approved) and **Earlier requests by this student**.",
      "shots": [
       {
        "id": "readmission-09",
@@ -156,11 +156,11 @@
      ]
     },
     {
-     "text": "Click **Forward to Dean**. The box shows 'In staff review to With the Dean', **Eligibility result** (leave on 'Use the policy check result'), the **Return checklist** with a tick box for each item (staff tick what they verified themselves; anything left unticked reaches the Dean as Needs Review) and **Note for the Dean**. Tick the four items, type the note and click **Forward to Dean**.",
+     "text": "Click **Forward to Dean**. The box shows 'In staff review to With the Dean', **Eligibility result** (leave on 'Use the policy check result'), the **Return checklist** (the two system items read-only, and a tick box for each office check: Clearance from Business Office and the interview; anything left unticked reaches the Dean as Needs Review) and **Note for the Dean**. Tick the two office checks, type the note and click **Forward to Dean**.",
      "shots": [
       {
        "id": "readmission-11",
-       "caption": "Forward to Dean box with the verified checklist."
+       "caption": "Forward to Dean box with the office checks ticked."
       }
      ]
     },

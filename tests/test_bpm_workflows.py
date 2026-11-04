@@ -863,12 +863,14 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
             replacement_file = self._attachment("graduation", "corrected-student-application")
             db.session.commit()
+            # Owner rule 2026-11-04 (I-251): the school year is known, so the form no longer sends it.
             resubmit_response = student_client.post(
                 "/api/student-portal/requests/graduation",
-                json={"review_window": active_year, "attachment_id": replacement_file.id},
+                json={"attachment_id": replacement_file.id},
             )
             self.assertEqual(resubmit_response.status_code, 200, resubmit_response.get_json())
             db.session.refresh(endorsement)
+            self.assertEqual(endorsement.review_window, active_year)
             db.session.refresh(return_message)
             self.assertEqual(endorsement.endorsement_status, "For Review")
             self.assertEqual(endorsement.request_attachment_id, replacement_file.id)
@@ -1029,6 +1031,26 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(research_case.status, "Verified Complete")
             self.assertTrue(eligibility["research_progress"]["completion_evidence"]["complete"])
             self.assertEqual(eligibility["research_progress"]["completion_evidence"]["requirements_complete"], 5)
+
+    def test_a_student_request_cannot_rename_the_research_title_after_title_defense(self):
+        # Owner rule 2026-11-04 (I-245): once the title is on record, a typed title must not replace it.
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.comprehensive_exam_status = "Passed"
+            db.session.add(CourseRecord(student_id=student.id, course_id=self.course_id, status="Completed"))
+            db.session.add(ResearchCase(
+                student_id=student.id, case_type="Thesis", title="Title approved by the panel",
+                current_gate="Final Defense", status="Complete",
+            ))
+            self._complete_research_gate_defenses(student)
+            account = self._account("student", "student-title-lock@example.test")
+            account.student_id = student.id
+            db.session.commit()
+            self.assertEqual(detected_research_progress(student)["gate"], "Completion Evidence")
+            client = self._role_client(account.id, "student")
+            client.post("/api/student-portal/requests/research-gate", json={"research_title": "Renamed by the student"})
+            titles = {row.title for row in ResearchCase.query.filter_by(student_id=student.id).all()}
+            self.assertEqual(titles, {"Title approved by the panel"})
 
     def test_usls_course_audit_grade_writes_are_disabled(self):
         with app.app_context():

@@ -56,9 +56,8 @@ def run(rt):
     rt.step("student opens Return from AWOL", s_open)
 
     def s_submit():
-        sels = student.locator("main select")
-        sels.nth(0).select_option(label="AY 2026-2027 2nd Semester")
-        sels.nth(1).select_option(label="AY 2025-2026 2nd Semester")
+        # The next open semester is preselected and the last enrolled semester comes from the records.
+        student.locator("main select").first.select_option(label="AY 2026-2027 2nd Semester")
         areas = student.locator("main textarea")
         areas.nth(0).fill(INTENT)
         areas.nth(1).fill(REASON)

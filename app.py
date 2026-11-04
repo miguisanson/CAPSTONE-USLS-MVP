@@ -13736,7 +13736,11 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": str(exc)}), 400
         title = (data.get("research_title") or "").strip()
         source = (data.get("source_reference") or data.get("submitted_package") or "").strip()
-        research_case, progress = sync_research_progress(student, title)
+        research_case, progress = sync_research_progress(student)
+        if progress["gate"] == "Form 1 - Title Defense" and title:
+            research_case, progress = sync_research_progress(student, title)
+        else:
+            title = ""  # owner rule 2026-11-04 (I-245): after the title defense the title on record stands
         gate = progress["gate"]
         effective_title = (title or (research_case.title if research_case else "")).strip()
         if gate == "Form 1 - Title Defense" and (
@@ -14057,10 +14061,7 @@ def register_routes(app: Flask) -> None:
         data = request.get_json(silent=True) or {}
         account = current_account()
         student = Student.query.get_or_404(account.student_id)
-        term = (
-            AcademicTerm.query.get(safe_int(data.get("term_id")))
-            if data.get("term_id") else get_active_term()
-        )
+        term = get_active_term()  # owner rule 2026-11-04 (I-246): never a term id sent by the browser
         if not term:
             return jsonify({"error": "No active academic semester is available."}), 400
         try:
@@ -14820,7 +14821,7 @@ def register_routes(app: Flask) -> None:
             }), 400
         try:
             review_window = validate_graduation_school_year(
-                data.get("review_window") or data.get("term")
+                data.get("review_window") or data.get("term") or default_graduation_school_year()
             )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
@@ -28263,6 +28264,36 @@ _MONITORING_IMPORT_HINTS = ("ac student monitoring", "aims", "import", "monitori
 MONITORING_WRITE_ROLES = {"staff", "academic_coordinator", "admin"}
 
 
+def _monitoring_adviser_from(data: dict, current: str | None = None) -> dict:
+    """Resolve `adviser_faculty_id` / `adviser_name` to a faculty name (owner rule 2026-11-04, I-247)."""
+    if "adviser_faculty_id" not in data and "adviser_name" not in data:
+        return data
+    data = dict(data)
+    faculty_id = safe_int(data.pop("adviser_faculty_id", None))
+    name = _monitoring_clean(data.get("adviser_name"), 120)
+    if faculty_id:
+        faculty = db.session.get(Faculty, faculty_id)
+    elif name and name != (current or ""):
+        faculty = Faculty.query.filter(func.lower(Faculty.name) == name.lower()).first()
+    else:
+        return data  # cleared, or unchanged from what is already on record
+    if not faculty or faculty.active is False:
+        raise MonitoringEntryError("Choose the adviser from the faculty list.")
+    data["adviser_name"] = faculty.name
+    return data
+
+
+_MONITORING_TERM_LABEL = re.compile(r"^AY (\d{4})-(\d{4}) (1st Semester|2nd Semester|Summer)$")
+
+
+def _monitoring_term_label_ok(label: str) -> bool:
+    """A configured semester, or a well-formed older one (owner rule 2026-11-04, I-249)."""
+    if not label or AcademicTerm.query.filter_by(label=label).first():
+        return True
+    match = _MONITORING_TERM_LABEL.match(label)
+    return bool(match) and int(match.group(2)) == int(match.group(1)) + 1
+
+
 class MonitoringEntryError(ValueError):
     """A portal-entry request that cannot be accepted, with the HTTP status to use."""
 
@@ -28454,7 +28485,7 @@ def monitoring_portal_create_student(data: dict) -> tuple[Student, UserAccount]:
         current_stage="Admission",
         standing="Active",
         enrollment_tag=enrollment_tag,
-        adviser_name=_monitoring_clean(data.get("adviser_name"), 120) or None,
+        adviser_name=_monitoring_clean(_monitoring_adviser_from(data).get("adviser_name"), 120) or None,
         monitoring_new_student=True,
     )
     student.year_level = str(years_in_program(student, term=term) or 1)
@@ -28495,6 +28526,7 @@ def monitoring_portal_update_student(student: Student, data: dict) -> list[dict]
     """Edit the header fields a monitoring sheet holds. Returns the recorded changes."""
     account, actor_name = _monitoring_actor()
     reason = _monitoring_clean(data.get("reason"), 500)
+    data = _monitoring_adviser_from(data, student.adviser_name)
     incoming: dict[str, str] = {}
     for field in MONITORING_STUDENT_EDIT_FIELDS:
         if field not in data:
@@ -28621,6 +28653,8 @@ def _monitoring_row_values(data: dict) -> dict:
         term_label = _monitoring_clean(data.get("term_label"), 60)
         if len(term_label) > 40:
             raise MonitoringEntryError("Term taken is too long (40 characters at most).")
+        if not _monitoring_term_label_ok(term_label):
+            raise MonitoringEntryError("Choose the semester from the list (for example AY 2026-2027 1st Semester).")
         values["term_label"] = term_label
     if "remarks" in data:
         values["remarks"] = _monitoring_clean(data.get("remarks"), 500)

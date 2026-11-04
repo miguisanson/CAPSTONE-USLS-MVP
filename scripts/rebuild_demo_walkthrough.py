@@ -1145,9 +1145,9 @@ def build_scenarios_13_to_16(
     )
     builder.step(
         6,
-        "Mark Structured return intention completed, Updated study plan "
-        "confirmed, Program or adviser consultation completed, and No pending "
-        "accountability confirmed.",
+        "Read What is checked for you: the system shows the written intention and "
+        "the subject evaluation from the records; Graduate School staff confirm "
+        "Business Office clearance and the interview. Nothing to tick.",
     )
     builder.step(
         7,
@@ -1305,7 +1305,8 @@ def build_scenarios_13_to_16(
     )
     builder.step(
         7,
-        "Choose the Target return semester and Last enrolled semester.",
+        "Check the preselected return semester; the last enrolled semester is shown "
+        "from the enrollment records.",
     )
     builder.step(
         8,

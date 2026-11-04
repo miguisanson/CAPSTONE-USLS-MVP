@@ -253,12 +253,24 @@ class AcademicFixTests(unittest.TestCase):
     def test_student_cannot_have_the_same_subject_active_in_two_semesters(self):
         with app.app_context():
             self._enroll_row(self.student_id, self.course_ids[0], self.term1_id)
+            # The student portal always saves into the current semester (I-246), so make semester 2 current.
+            db.session.get(AcademicTerm, self.term1_id).is_active_planning_term = False
+            db.session.get(AcademicTerm, self.term2_id).is_active_planning_term = True
             db.session.commit()
         response = self._student_enroll([self.course_ids[0]], term_id=self.term2_id)
         self.assertEqual(response.status_code, 409, response.get_json())
         with app.app_context():
             self.assertFalse(SubjectEnrollment.query.filter_by(
                 student_id=self.student_id, term_id=self.term2_id).count())
+
+    def test_a_student_saves_subjects_only_into_the_current_semester(self):
+        # Owner rule 2026-11-04 (I-246): the semester is known; a term id sent by the browser is ignored.
+        response = self._student_enroll([self.course_ids[0]], term_id=self.term2_id)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with app.app_context():
+            self.assertEqual(SubjectEnrollment.query.filter_by(student_id=self.student_id, term_id=self.term2_id).count(), 0)
+            self.assertEqual(SubjectEnrollment.query.filter_by(student_id=self.student_id, term_id=self.term1_id,
+                                                               course_id=self.course_ids[0]).count(), 1)
 
     def test_student_overload_is_flagged_from_the_register_not_a_hard_coded_number(self):
         # five 3-unit subjects = 15 units, above the 12-unit full-time load

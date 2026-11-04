@@ -632,9 +632,6 @@ def capture_standing_changes(
             form_anchor=None,
         )
         readmission_context = student_context(page, base_url)
-        readmission_payload["readmission_items"] = readmission_context[
-            "readmission_requirements"
-        ]
         submit_student_request(
             page,
             base_url,
@@ -651,7 +648,6 @@ def capture_standing_changes(
 
         awol_payload = {
             "target_return_term": "AY 2026-2027 1st Semester",
-            "last_enrolled_term": "AY 2025-2026 2nd Semester",
             "return_intent": (
                 "I intend to resume enrollment and complete the remaining "
                 "requirements under the approved study plan."
