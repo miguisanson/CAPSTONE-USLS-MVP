@@ -2,8 +2,7 @@
 // changes a subject shows the same banner and turns its controls off while the period is closed. The period is the term's
 // planning window (`planning_window_open` .. `planning_window_close`, set in Term settings). Plain JavaScript on purpose:
 // Node can import it (scripts/enrollment-period.test.mjs).
-// shortcut: the screen decides from the term's dates; the server does not refuse a change after the window yet
-// (see the packet report: POST /api/enrollment and /api/student-portal/enrollment should check the same window).
+// The server decides the same way (app.py enrollment_window) and refuses a change outside the period with a message naming the dates.
 
 export const CLOSED_REASON = "Enrollment is closed. Changes can only be made during the enrollment period.";
 
