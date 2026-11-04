@@ -89,6 +89,7 @@ export default function CaseConversation({ slug, detail, onNoteSent, onEdited })
         showHeader={false}
         title="Messages about this request"
         emptyText="No messages yet."
+        onEdited={onEdited}
       />
       <div className="mt-4">
         <NoteForm slug={slug} detail={detail} onSent={onNoteSent} />

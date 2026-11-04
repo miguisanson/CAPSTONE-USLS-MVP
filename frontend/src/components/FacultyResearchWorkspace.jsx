@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { BookOpen, CalendarClock, CheckCircle2, Eye, FileSignature, Gavel, Users } from "lucide-react";
 import { api } from "../api";
-import { Card, EmptyState, SectionTitle, StatusChip } from "./ui/index.js";
+import { Card, EditableText, EmptyState, SectionTitle, StatusChip } from "./ui/index.js";
 import { formatClock, formatDate, formatDateTime } from "../lib/format";
 import SignaturePad from "./SignaturePad";
 
@@ -118,7 +118,7 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
             <p className="text-sm font-semibold text-emerald-800">Verdict: {verdict.label || verdict.result}{verdict.selected_title ? ` · ${verdict.selected_title}` : ""}</p>
             <p className="mt-1 text-xs text-emerald-700">Submitted by {verdict.chair_name} · {formatDateTime(verdict.submitted_at)}{verdict.revision_status ? ` · ${verdict.revision_status}` : ""}</p>
             {verdict.follow_up && <p className="mt-1 text-xs text-emerald-700">{verdict.follow_up}</p>}
-            {verdict.remarks && <p className="mt-2 text-sm text-slate-700">{verdict.remarks}</p>}
+            {verdict.remarks && <div className="mt-2 text-sm text-slate-700"><EditableText edit={verdict.edits?.remarks} value={verdict.remarks} /></div>}
             {verdict.correction_reason && <p className="mt-2 text-xs text-slate-600">Corrected from {verdict.original_result}: {verdict.correction_reason}</p>}
           </div>}
           {panel.can_confirm_revisions && <button type="button" disabled={busy} onClick={() => run(() => api.confirmDefenseRevisions(verdict.id))} className="btn-primary mt-3 cursor-pointer"><CheckCircle2 className="h-4 w-4" />Confirm the panel's approval of the revisions</button>}

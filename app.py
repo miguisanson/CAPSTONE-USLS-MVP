@@ -5475,7 +5475,7 @@ def _build_editable() -> dict:
             "fields": {
                 "practicum_site": _f("request", label="Practicum site", multiline=False, check=_edit_text(180)),
                 "supervisor_name": _f("request", label="Supervisor", multiline=False, check=_edit_text(160)),
-                "remarks": _note("Remarks", _NOTE_STAFF + ("dean",)),
+                "remarks": _f("request", label="Remarks", check=_edit_text(blank=True)),
             },
         },
         "onboarding_review": {

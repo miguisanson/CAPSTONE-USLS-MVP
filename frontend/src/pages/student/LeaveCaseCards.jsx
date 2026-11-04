@@ -129,6 +129,7 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
   const [notice, setNotice] = useState("");
 
   const isReadmission = item.kind === "READMISSION";
+  const edits = item.edits || {};
   const open = OPEN_LEAVE_STATUSES.includes(item.status);
   const canWithdraw = ["Submitted", "Staff Review", "Dean Review", "Returned"].includes(item.status);
   const canCancel = item.status === "Leave Scheduled" && item.kind === "LOA";
@@ -232,8 +233,20 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
           </Fact>
         ) : (
           <>
-            <Fact label="Leave starts">{item.period?.start_date ? `${item.period.start_label ? `${item.period.start_label}, ` : ""}${formatDate(item.period.start_date)}` : item.period?.start_label}</Fact>
-            <Fact label="Leave ends">{item.period?.end_date ? `${item.period.end_label ? `${item.period.end_label}, ` : ""}${formatDate(item.period.end_date)}` : item.period?.end_label}</Fact>
+            <Fact label="Leave starts">
+              {item.period?.start_label ? (
+                <EditableText edit={edits.start_term} value={item.period.start_label} onSaved={onChanged}>
+                  {(value) => <span>{item.period.start_date ? `${value}, ${formatDate(item.period.start_date)}` : value}</span>}
+                </EditableText>
+              ) : null}
+            </Fact>
+            <Fact label="Leave ends">
+              {item.period?.end_label ? (
+                <EditableText edit={edits.end_term} value={item.period.end_label} onSaved={onChanged}>
+                  {(value) => <span>{item.period.end_date ? `${value}, ${formatDate(item.period.end_date)}` : value}</span>}
+                </EditableText>
+              ) : null}
+            </Fact>
           </>
         )}
         <Fact label="Leave began">{item.started_at ? formatDate(item.started_at) : null}</Fact>
@@ -258,8 +271,16 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
       {!isReadmission && (item.reason_category || item.reason_text) && (
         <div className="mt-3">
           <p className="eyebrow">Your reason</p>
-          {item.reason_category && <p className="mt-0.5 text-sm font-semibold text-ink">{item.reason_category}</p>}
-          {item.reason_text && <p className="mt-0.5 whitespace-pre-line text-sm text-slate-600">{item.reason_text}</p>}
+          {item.reason_category && (
+            <div className="mt-0.5 text-sm font-semibold text-ink">
+              <EditableText edit={edits.reason_category} value={item.reason_category} onSaved={onChanged} />
+            </div>
+          )}
+          {item.reason_text && (
+            <div className="mt-0.5 text-sm text-slate-600">
+              <EditableText edit={edits.reason_text} value={item.reason_text} onSaved={onChanged} />
+            </div>
+          )}
         </div>
       )}
       {isReadmission && item.return_intent && (

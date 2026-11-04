@@ -141,9 +141,9 @@ export function LeaveCaseSummary({ item }) {
                 {c.linked_case.kind_label}{c.linked_case.period_text ? ` · ${c.linked_case.period_text}` : ""}{c.linked_case.status_label ? ` · ${c.linked_case.status_label}` : ""}
               </Fact>
             )}
-            {c.reason_category && <Fact label="Reason">{c.reason_category}</Fact>}
-            {c.reason_text && <Fact label="Reason in the student's words">{c.reason_text}</Fact>}
-            {c.return_intent && <Fact label="What the student intends to do">{c.return_intent}</Fact>}
+            {c.reason_category && <Fact label="Reason"><EditableText edit={edits.reason_category} value={c.reason_category} /></Fact>}
+            {c.reason_text && <Fact label="Reason in the student's words"><EditableText edit={edits.reason_text} value={c.reason_text} /></Fact>}
+            {c.return_intent && <Fact label="What the student intends to do"><EditableText edit={edits.return_intent} value={c.return_intent} /></Fact>}
             {c.batch_name && <Fact label="Group">{c.batch_name}</Fact>}
           </dl>
         </Panel>
@@ -250,7 +250,9 @@ export function LeaveCaseSummary({ item }) {
               <li key={event.id} className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 <span className="font-semibold">{event.actor_name || event.actor_role || "Staff"}</span>
                 <span className="text-xs text-slate-500"> · {event.actor_role}{event.created_at ? ` · ${formatDate(event.created_at)}` : ""}</span>
-                <p className="mt-0.5 whitespace-pre-wrap">{event.comment}</p>
+                <div className="mt-0.5">
+                  <EditableText edit={event.edit} value={event.comment} />
+                </div>
               </li>
             ))}
           </ul>

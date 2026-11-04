@@ -68,6 +68,7 @@ export default function WorkflowDiscussion({
   canReply = null,
   renderMessageFooter = null,
   highlightLatest = false,
+  onEdited = null,
 }) {
   const thread = buildWorkflowMessageThread(messages);
   const latestMessage = [...messages].sort(messageSort).at(-1) || null;

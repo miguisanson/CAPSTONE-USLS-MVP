@@ -16,6 +16,7 @@ import { CaseHistory, CaseSummary, ChecklistView, EarlierCases, FileList, Follow
 export default function CaseDetailModal({ caseId, slug, vocabulary, version, onClose, onAction, onNoteSent }) {
   const [loaded, setLoaded] = useState(null);
   const [error, setError] = useState("");
+  const [edited, setEdited] = useState(0); // an edit in the window re-reads the request
 
   useEffect(() => {
     let active = true;

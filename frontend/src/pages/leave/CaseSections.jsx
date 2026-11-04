@@ -27,7 +27,9 @@ function SummaryRows({ item, onEdited }) {
         </Row>
         {item.summary_rows.map((row) => (
           <Row key={row.label} label={row.label} full={Boolean(row.full)}>
-            {row.date ? formatDate(row.value) : row.value || "-"}
+            {row.edit ? (
+              <EditableText edit={row.edit} value={row.value === "None" ? "" : row.value} onSaved={onEdited} />
+            ) : row.date ? formatDate(row.value) : row.value || "-"}
           </Row>
         ))}
       </dl>
@@ -35,8 +37,9 @@ function SummaryRows({ item, onEdited }) {
   );
 }
 
-export function CaseSummary({ item }) {
-  if (item.summary_rows) return <SummaryRows item={item} />;
+export function CaseSummary({ item, onEdited }) {
+  if (item.summary_rows) return <SummaryRows item={item} onEdited={onEdited} />;
+  const edits = item.edits || {};
   const readmission = item.kind === "READMISSION";
   const linked = item.linked_case;
   const before = [item.prior_stage, item.prior_enrollment_tag].filter(Boolean).join(" / ");
@@ -58,11 +61,33 @@ export function CaseSummary({ item }) {
           <Row label="Leave period">
             {whenText(item)}
             {whenDates(item) && <span className="block text-xs text-slate-500">{whenDates(item)}</span>}
+            {(edits.start_term?.can || edits.end_term?.can || edits.start_term?.count || edits.end_term?.count) && (
+              <span className="mt-1 block space-y-1 text-xs text-slate-500">
+                <EditableText edit={edits.start_term} value={item.period?.start_label} onSaved={onEdited}>
+                  {(value) => <span className="block">First semester: {value}</span>}
+                </EditableText>
+                <EditableText edit={edits.end_term} value={item.period?.end_label} onSaved={onEdited}>
+                  {(value) => <span className="block">Last semester: {value}</span>}
+                </EditableText>
+              </span>
+            )}
           </Row>
         )}
-        <Row label="Reason">{item.reason_category || "-"}</Row>
-        {item.reason_text && <Row label="What the student wrote" full>{item.reason_text}</Row>}
-        {item.return_intent && <Row label="Intention after the leave" full>{item.return_intent}</Row>}
+        {!readmission && (
+          <Row label="Reason">
+            <EditableText edit={edits.reason_category} value={item.reason_category} empty="-" onSaved={onEdited} />
+          </Row>
+        )}
+        {item.reason_text && (
+          <Row label="What the student wrote" full>
+            <EditableText edit={edits.reason_text} value={item.reason_text} onSaved={onEdited} />
+          </Row>
+        )}
+        {item.return_intent && (
+          <Row label={readmission ? "Intention to return" : "Intention after the leave"} full>
+            <EditableText edit={edits.return_intent} value={item.return_intent} onSaved={onEdited} />
+          </Row>
+        )}
         {linked && (
           <Row label="Linked leave" full>
             {linked.kind_label}: {linked.period_text || "period not set"} ({linked.status_label})
@@ -76,8 +101,12 @@ export function CaseSummary({ item }) {
         <Row label="Sent to the Dean">{formatDate(item.forwarded_at)}</Row>
         <Row label="Dean decided">{formatDate(item.decided_at)}</Row>
         {item.batch_name && <Row label="Batch">{item.batch_name}</Row>}
-        <Row label="Staff notes" full>{item.staff_notes || "None"}</Row>
-        <Row label="Dean remarks" full>{item.dean_remarks || "None"}</Row>
+        <Row label="Staff notes" full>
+          <EditableText edit={edits.staff_notes} value={item.staff_notes} onSaved={onEdited} />
+        </Row>
+        <Row label="Dean remarks" full>
+          <EditableText edit={edits.dean_remarks} value={item.dean_remarks} onSaved={onEdited} />
+        </Row>
       </dl>
     </Block>
   );

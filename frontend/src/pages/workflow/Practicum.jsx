@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, Eye, MessageSquare } from "lucide-react";
-import { Button, DataTable, EmptyState, StatCard, StatusChip } from "../../components/ui/index.js";
+import { Button, DataTable, EditableText, EmptyState, StatCard, StatusChip } from "../../components/ui/index.js";
 import StepDialog from "../../components/StepDialog";
 import WorkflowTimeline from "../../components/WorkflowTimeline";
 import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
@@ -354,7 +354,7 @@ function PracticumCaseDetails({ row }) {
           {record?.remarks && (
             <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
               <p className="eyebrow">Latest student submission remark</p>
-              <p className="mt-1 text-sm text-slate-700">{record.remarks}</p>
+              <div className="mt-1 text-sm text-slate-700"><EditableText edit={record.edits?.remarks} value={record.remarks} /></div>
             </div>
           )}
           <div className="mt-2 flex flex-wrap gap-2">

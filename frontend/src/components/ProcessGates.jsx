@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, XCircle, Send, FileSpreadsheet, GraduationCap, ClipboardList, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
-import { Button, DataTable, EmptyState, Field, InlineNotice, Input, SectionCard, Select, Spinner, StatusChip } from "./ui/index.js";
+import { Button, DataTable, EditableText, EmptyState, Field, InlineNotice, Input, SectionCard, Select, Spinner, StatusChip } from "./ui/index.js";
 import StepDialog from "./StepDialog";
 import { formatDate } from "../lib/format";
 
@@ -40,11 +40,12 @@ function GateStepDialog({ step, onClose }) {
 }
 
 /** A remark from the person who reviewed the item (Dean, Coordinator). */
-function Remark({ who, children }) {
+function Remark({ who, edit, children }) {
   return (
-    <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
-      <span className="font-semibold">{who}:</span> {children}
-    </p>
+    <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+      <span className="font-semibold">{who}:</span>{" "}
+      {edit ? <EditableText edit={edit} value={children} className="inline" /> : children}
+    </div>
   );
 }
 
@@ -127,7 +128,7 @@ export function OnboardingGatePanel({ role }) {
                 ))}
               </ul>
 
-              {item.dean_remarks ? <Remark who="Dean">{item.dean_remarks}</Remark> : null}
+              {item.dean_remarks ? <Remark who="Dean" edit={item.edits?.dean_remarks}>{item.dean_remarks}</Remark> : null}
 
               <div className="flex flex-wrap items-center gap-2">
                 {role !== "dean" && (item.status === "Draft" || item.status === "Returned") ? (
@@ -244,9 +245,9 @@ export function StudyPlanPanel({ students = [], studentId: fixedStudentId, stude
         <>
           <StatusChip status={p.status} dot={false} />
           {p.coordinator_remarks ? (
-            <p className="mt-1.5 max-w-xs rounded-xl bg-slate-50 px-2.5 py-1.5 text-xs font-normal text-slate-600">
-              <span className="font-semibold">Coordinator:</span> {p.coordinator_remarks}
-            </p>
+            <div className="mt-1.5 max-w-xs rounded-xl bg-slate-50 px-2.5 py-1.5 text-xs font-normal text-slate-600">
+              <span className="font-semibold">Coordinator:</span> <EditableText edit={p.edits?.coordinator_remarks} value={p.coordinator_remarks} className="inline" />
+            </div>
           ) : null}
         </>
       ),
@@ -452,7 +453,7 @@ export function CourseworkReportPanel({ role }) {
                 <span><span className="font-semibold text-ink">{item.completion_issue_count}</span> with completion issues</span>
                 <span><span className="font-semibold text-ink">{item.missing_subject_count}</span> missing subjects</span>
               </div>
-              {item.dean_remarks ? <Remark who="Dean">{item.dean_remarks}</Remark> : null}
+              {item.dean_remarks ? <Remark who="Dean" edit={item.edits?.dean_remarks}>{item.dean_remarks}</Remark> : null}
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 {role !== "dean" && item.status === "Draft" ? (
                   <Button variant="secondary" icon={Send} disabled={busy} onClick={() => act(() => api.sendCourseworkReport(item.id))}>
