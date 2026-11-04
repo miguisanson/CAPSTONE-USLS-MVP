@@ -7,8 +7,8 @@
  "owner": "GS Staff (books, reschedules, cancels), Panel Chair (verdict), Adviser, other panelists (evening only)",
  "duration": "25 min",
  "story": [
-  "Part of the research demo slot, after {case:defense-scheduling} and {case:calendars}. After a defense only the assigned Panel Chair (or Panel Lead) can record the official verdict, and only once the defense has started: before that the Verdicts page says \"The defense has not started yet.\" In demonstration mode (DEMO_MODE) this date wait is skipped, so the presenter can record the verdict right after booking. The Proposal Defense has six possible outcomes. Each one has its own follow-up, and the research stage moves on only when that follow-up is done.",
-  "All the seeded upcoming defenses are in the future, so to show the verdict screens live the GS Staff move three demonstration defenses to a short slot a few minutes ahead (a reschedule with a reason), and the chairs record the verdicts as soon as each start time has passed: Nico Barrientos (Panel Chair Dr. Marco Villanueva) receives Passed with minor revisions; Bea Salonga (Panel Chair Dr. Angela Cruz) is Deferred, booked again, receives Provisional pass - re-defense required, and then the re-defense is booked and cancelled with a reason; Gab Tolentino (Panel Chair Dr. Marco Villanueva) receives Failed.",
+  "Part of the research demo slot, after {case:defense-scheduling} and {case:calendars}. After a defense only the assigned Panel Chair (or Panel Lead) can record the official verdict, and only once the defense has started: before that the Verdicts page says \"The defense has not started yet.\" The sign-in page switch **Skip date waits** is ON by default for the demo, and then this date wait is skipped, so the presenter can record the verdict right after booking. Switch it OFF to show the real rule. The Proposal Defense has six possible outcomes. Each one has its own follow-up, and the research stage moves on only when that follow-up is done.",
+  "All the seeded upcoming defenses are in the future, so with Skip date waits OFF, to show the verdict screens live the GS Staff move three demonstration defenses to a short slot a few minutes ahead (a reschedule with a reason), and the chairs record the verdicts as soon as each start time has passed. With Skip date waits ON (the default), Part A and the waits are not needed and the chairs record the verdicts straight away: Nico Barrientos (Panel Chair Dr. Marco Villanueva) receives Passed with minor revisions; Bea Salonga (Panel Chair Dr. Angela Cruz) is Deferred, booked again, receives Provisional pass - re-defense required, and then the re-defense is booked and cancelled with a reason; Gab Tolentino (Panel Chair Dr. Marco Villanueva) receives Failed.",
   "The booking form refuses a slot outside the hours a panelist entered (weekdays 8:00 AM to 5:00 PM) and that rule cannot be overridden. If the demo is run in office hours nothing extra is needed. This walk-through was recorded on a Monday evening, so it starts with Part 0: the six panelists first add today's hours in My Availability, which is exactly what a real panelist would do. Dates and times on the screens follow the clock of the day of the demo."
  ],
  "accounts": [
@@ -82,7 +82,7 @@
  ],
  "parts": [
   {
-   "title": "Part 0 - Only outside office hours: the panelists add today's hours",
+   "title": "Part 0 - Only for a booking outside entered hours: the panelists add today's hours",
    "steps": [
     {
      "text": "Sign in as Dr. Marco Villanueva (**marco.villanueva@usls.edu.ph**) and open **My Availability**. Under **Specific dates** choose **I am available ONLY these hours**, enter **First date** today, **From (Philippine time)** 08:00 AM and **To (Philippine time)** 11:59 PM, type the **Note** \"Extra hours for the demonstration defenses\" and select **Add date**.",
@@ -105,7 +105,7 @@
    ]
   },
   {
-   "title": "Part A - Staff move three defenses to a slot a few minutes ahead",
+   "title": "Part A - Only with Skip date waits OFF: staff move three defenses to a slot a few minutes ahead",
    "steps": [
     {
      "text": "Sign in as GS Staff (**staff@usls.edu.ph**), open **7 · Defense Scheduling** and search **Barrientos** (Nico Barrientos). Scroll to **Final schedule**. Enter today's date, a **Start time** a few minutes from now and an **End time** four minutes later, and the venue \"Graduate School Conference Room\". Type the **Scheduling constraints** \"Booked as a short session for the walkthrough.\" The amber box **Needs a reason** appears (before the 14-day lead time): tick **Staff override** (under **Student readiness**) and **Warning override**, and write the **Reason for the staff override** \"Requirements and lead time are waived for this demonstration defense; panel confirmed by phone.\" In the blue box \"This stage is already booked ...\" write the **Reason for rescheduling** \"Panel chair asked to bring the defense forward to today\" and choose **Requested by** Panel chair.",
@@ -154,10 +154,10 @@
    ]
   },
   {
-   "title": "Part B - The verdict form is closed until the defense starts",
+   "title": "Part B - Only with Skip date waits OFF: the verdict form is closed until the defense starts",
    "steps": [
     {
-     "text": "Sign in as the Panel Chair Dr. Marco Villanueva (**marco.villanueva@usls.edu.ph**). In the faculty sidebar open **Verdicts**. Before the start time the group **Needs your verdict** says \"No verdicts are waiting for you\", and Nico Barrientos's Proposal Defense is listed under **Waiting on others** with its date and time, the chip **Scheduled** and, in amber, \"The defense has not started yet.\" There is no verdict form yet. The finished Title Defense stays under **Verdict history**.",
+     "text": "With **Skip date waits** switched OFF on the sign-in page, sign in as the Panel Chair Dr. Marco Villanueva (**marco.villanueva@usls.edu.ph**). In the faculty sidebar open **Verdicts**. Before the start time the group **Needs your verdict** says \"No verdicts are waiting for you\", and Nico Barrientos's Proposal Defense is listed under **Waiting on others** with its date and time, the chip **Scheduled** and, in amber, \"The defense has not started yet.\" There is no verdict form yet. The finished Title Defense stays under **Verdict history**. With Skip date waits ON this message does not appear: the form is open as soon as the defense is booked.",
      "shots": [
       {
        "id": "verdicts-07",
@@ -171,7 +171,7 @@
    "title": "Part C - Passed with minor revisions (the adviser confirms)",
    "steps": [
     {
-     "text": "Wait until the start time has passed and reload **Verdicts**. Nico's Proposal Defense is now under **Needs your verdict**, with the **Current-stage papers** (Proposal manuscript, Ethics Clearance) and the green panel **Submit panel chair verdict**. Open **Verdict result** and read the options: Passed; Passed with minor revisions; Provisional pass - revisions for panel approval; Provisional pass - re-defense required; Deferred; Failed. Choose **Passed with minor revisions**: the text under the field reads \"The student submits the revised manuscript; the research adviser confirms it and the stage completes.\" Type the **Remarks or conditions** \"Clarify the sampling frame in Chapter 3 and correct the citation format.\"",
+     "text": "With Skip date waits ON, open **Verdicts** right after booking; with it OFF, wait until the start time has passed and reload **Verdicts**. Nico's Proposal Defense is now under **Needs your verdict**, with the **Current-stage papers** (Proposal manuscript, Ethics Clearance) and the green panel **Submit panel chair verdict**. Open **Verdict result** and read the options: Passed; Passed with minor revisions; Provisional pass - revisions for panel approval; Provisional pass - re-defense required; Deferred; Failed. Choose **Passed with minor revisions**: the text under the field reads \"The student submits the revised manuscript; the research adviser confirms it and the stage completes.\" Type the **Remarks or conditions** \"Clarify the sampling frame in Chapter 3 and correct the citation format.\"",
      "shots": [
       {
        "id": "verdicts-08",
@@ -252,7 +252,7 @@
      ]
     },
     {
-     "text": "When the new start time has passed, Dr. Cruz opens **Verdicts**, chooses **Provisional pass - re-defense required** (\"Re-defense following the same protocol: the student resubmits, the adviser re-signs, the defense is scheduled again.\"), types the remarks \"Research questions need restating; the panel will hear the paper again after a full revision.\" and selects **Submit final verdict**.",
+     "text": "With Skip date waits OFF, Dr. Cruz waits until the new start time has passed; either way she opens **Verdicts**, chooses **Provisional pass - re-defense required** (\"Re-defense following the same protocol: the student resubmits, the adviser re-signs, the defense is scheduled again.\"), types the remarks \"Research questions need restating; the panel will hear the paper again after a full revision.\" and selects **Submit final verdict**.",
      "shots": [
       {
        "id": "verdicts-17",
