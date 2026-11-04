@@ -15,6 +15,16 @@
   the morning voice-overs in `videos/Archive/`. Rebuild: `build_narration.py --videos <videos>/Parts --full ../Full-Demo`
   (times use each part's real mp4 length). mp4s stay gitignored (`videos/**/*.mp4`).
 
+## 2026-11-04 ~14:50 — running packets (session "known-data")
+
+- `pkt/autopilot` (wt/kauto): Demo Guide autopilot slideshow, guides split per file, spec p115.
+- `pkt/edit-history` (wt/kedit, owns app.py): RecordEdit table + `/api/edits/<entity>/<id>`, Edit/Edited UI, spec p116.
+  Contract `.planning/edit-history/CONTRACT.md`. Needs `npm run seed` after merge.
+- `pkt/manual2` (wt/kmanual, frontend only): AY entry dropdown + other manual fields -> dropdown/auto/validated, spec p117;
+  its server-side checks follow after pkt/edit-history.
+- Inventory: side-session notes `edit-and-manual-inventory.md`. Merge notes for Natalie's branch: `.planning/MERGE-NOTES-v6.2.md`.
+- After all three: guides for the missing processes, full gate, push, Docker rebuild (`deploy/DOCKER.md`; restart tunnel if 1033).
+
 ## 2026-11-04 afternoon — known-data rule, process audit, Demo Guide (session "known-data"; pushed to v6.1-migui)
 
 **For Natalie (next session): start with `/continue_CAPSTONE-USLS-MVP`, then read this block.**
