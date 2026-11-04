@@ -22,8 +22,9 @@ import researchTitle from "./research-title.js";
 import panelMatching from "./panel-matching.js";
 import defenseScheduling from "./defense-scheduling.js";
 import verdicts from "./verdicts.js";
+import proposalFinal from "./proposal-final.js";
 
-export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, withdrawal, practicum, graduation, courseAdjustments, businessRules, policyAssistant, policyDocuments, studentHandoff, enrollment, dropping, residency, calendars, portals, bestFeatures, researchTitle, panelMatching, defenseScheduling, verdicts];
+export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, withdrawal, practicum, graduation, courseAdjustments, businessRules, policyAssistant, policyDocuments, studentHandoff, enrollment, dropping, residency, calendars, portals, bestFeatures, researchTitle, panelMatching, defenseScheduling, verdicts, proposalFinal];
 
 // The ready-made demo students that the existing reset (POST /api/auth/demo-students/<key>/reset) knows, by student number.
 export const RESET_KEYS = {

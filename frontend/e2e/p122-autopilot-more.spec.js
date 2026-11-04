@@ -1,4 +1,4 @@
-// e2e-writes: more-course-adjustments, more-enrollment, more-dropping, more-policy-assistant, more-handoff, more-business-rules, more-policy-documents, more-residency, more-calendars, more-portals, more-best-features, more-research-title, more-research-panel, more-research-scheduling, more-research-verdicts
+// e2e-writes: more-course-adjustments, more-enrollment, more-dropping, more-policy-assistant, more-handoff, more-business-rules, more-policy-documents, more-residency, more-calendars, more-portals, more-best-features, more-research-title, more-research-panel, more-research-scheduling, more-research-verdicts, more-research-proposal-final
 // The Demo Guide autopilot for the other processes (owner request 2026-11-04: "make sure all processes have a guide"): each guide
 // is started from the sign-in page ("Start a guided demo") and played with Next to the last step, as p115 does for the case
 // processes. These guides keep no case row, so the end state is the writes the steps did: each one must have answered 2xx
@@ -12,7 +12,7 @@
 //   policy-documents    one memo uploaded, tested and removed again
 //   residency           residency-nicolas: one residency recorded (reset before and after)
 //   research guides     one chain on Miguel Yu (research-miguel, student@usls.edu.ph), played in this order in one worker: Research Title and
-//                       Form 1 (reset first), Panel Matching, Defense Scheduling, Verdicts (reset last); each checks Miguel's card on the
+//                       Form 1 (reset first), Panel Matching, Defense Scheduling, Verdicts, Proposal and Final Defense (reset last); each checks Miguel's card on the
 //                       Research Gate board (GET /api/research-gate/overview) after its last step
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
@@ -39,7 +39,19 @@ const PLAN = {
   "research-title": { reset: ["research-miguel"], resetAfter: false, writes: ["POST /student-portal/research-evidence/upload", "POST /student-portal/requests/research-gate", "POST /transactions/research-gate", "POST /research-gate/form1-endorsements/*"], miguel: (row) => expect(row.waiting_on, "Form 1 endorsed: Research Coordinator is next").toBe("Research Coordinator") },
   "panel-matching": { reset: [], resetAfter: false, writes: ["POST /transactions/panel-matching"], miguel: (row) => expect(row.reason).toMatch(/Panel is in place/) },
   "defense-scheduling": { reset: [], resetAfter: false, writes: ["POST /transactions/defense-scheduling"], miguel: (row) => { expect(row.next_defense?.defense_type).toBe("Title Defense"); expect(row.can_record_verdict).toBe(true); } },
-  verdicts: { reset: [], resetAfter: true, resetKeys: ["research-miguel"], writes: ["POST /research-gate/*/verdict"], miguel: (row) => { expect(row.column, "Miguel moved to Proposal Defense").toBe(2); } },
+  verdicts: { reset: [], resetAfter: false, writes: ["POST /research-gate/*/verdict"], miguel: (row) => { expect(row.column, "Miguel moved to Proposal Defense").toBe(2); } },
+  "proposal-final": {
+    reset: [], resetAfter: true, resetKeys: ["research-miguel"],
+    writes: [["POST /student-portal/requests/research-gate", 3], ["POST /faculty-portal/adviser-approvals/*", 5], ["POST /transactions/research-gate", 5], "POST /transactions/panel-matching", ["POST /transactions/defense-scheduling", 2], ["POST /research-gate/*/verdict", 2]],
+    // Completed research leaves the Research Gate board: the student record says Completed.
+    miguel: async (row, playwright) => {
+      expect(row, "Miguel left the Research Gate board").toBeUndefined();
+      const staff = await apiAs(playwright, "staff@usls.edu.ph");
+      const students = await (await staff.get("/api/students?q=2260004")).json();
+      await staff.dispose();
+      expect(students.items[0].current_stage).toBe("Completed");
+    },
+  },
   "course-adjustments": { reset: ["course-adjustments-lianne"], writes: [["POST /course-adjustments/plan", 3], "POST /approvals/*/decide", "PATCH /course-offerings/bulk"] }, // draft, submit and publish all post the plan
 };
 
@@ -130,7 +142,7 @@ function guideTest(guide) {
         const [pattern, min] = Array.isArray(entry) ? entry : [entry, 1];
         expect(writes.filter((line) => matches(pattern, line)).length, `${guide.title}: ${pattern} answered 2xx`).toBeGreaterThanOrEqual(min);
       }
-      if (plan.miguel) plan.miguel(await miguelRow(playwright));
+      if (plan.miguel) await plan.miguel(await miguelRow(playwright), playwright);
     } finally {
       await context.close();
       if (!process.env.P122_KEEP && plan.resetAfter !== false) await resetStudents(playwright, ...(plan.resetKeys || plan.reset));
@@ -140,6 +152,6 @@ function guideTest(guide) {
 
 // The research guides share one student, so they play one after the other (serial: a failure skips the rest).
 test.describe.serial("research guides (one chain on Miguel Yu)", () => {
-  for (const id of ["research-title", "panel-matching", "defense-scheduling", "verdicts"]) guideTest(GUIDES.find((guide) => guide.id === id));
+  for (const id of ["research-title", "panel-matching", "defense-scheduling", "verdicts", "proposal-final"]) guideTest(GUIDES.find((guide) => guide.id === id));
 });
 for (const guide of GUIDES) if (PLAN[guide.id] && !PLAN[guide.id].miguel) guideTest(guide);

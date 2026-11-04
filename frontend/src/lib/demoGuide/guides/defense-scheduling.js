@@ -36,7 +36,10 @@ export default {
       do: "Select Earliest option, add the venue and select Set defense schedule. The date, time and room are checked for clashes; the student and every panelist are told at once.",
       actions: [
         ...PICK,
+        { wait: { text: "Best shared options" }, timeout: 30000 },
+        { pause: 2500 },
         { click: { text: "Earliest option" } },
+        { pause: 800 },
         { type: { label: "Venue / meeting link" }, text: "Graduate School Conference Room" },
         { type: { label: "Scheduling constraints" }, text: "Panel prefers a morning start." },
         { click: { role: "button", name: "Set defense schedule" } },
