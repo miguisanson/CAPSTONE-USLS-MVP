@@ -20,13 +20,12 @@ export default {
     {
       id: "ms-student", title: "Add a student", role: "staff", route: "/monitoring-sheet", page: "Monitoring Sheet",
       say: "monitoring-sheet-02",
-      do: "Select Add student, type the Student ID, the names and the school year, then add the student. A Student Portal login is created.",
+      do: "Select Add student, type the Student ID and the names (the school year is already set to this year), then add the student. A Student Portal login is created.",
       actions: [
         { click: { role: "button", name: "Add student" } },
         { type: { label: "Student ID", in: "dialog" }, text: "9{stamp}" },
         { type: { label: "First name", in: "dialog" }, text: "Dana" },
-        { type: { label: "Last name", in: "dialog" }, text: "Monitor{stamp}" },
-        { type: { label: "School year", in: "dialog" }, text: "26-27" },
+        { type: { label: "Last name", in: "dialog" }, text: "Monitor{stampLetters}" },
         { click: { role: "button", name: "Add student", exact: true, in: "dialog" } },
         { wait: { text: "was added to the" } },
       ],

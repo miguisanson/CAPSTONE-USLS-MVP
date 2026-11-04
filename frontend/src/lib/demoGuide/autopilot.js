@@ -305,7 +305,9 @@ function stampNow() {
     return new Date().toTimeString().slice(0, 8).replace(/:/g, "");
   }
 }
-const stamped = (text) => String(text).replace(/\{stamp\}/g, stampNow);
+// "{stampLetters}": the same stamp as letters (0 -> a ... 9 -> j), for fields that take letters only (names).
+const stampLetters = () => String(stampNow()).replace(/\d/g, (d) => "abcdefghij"[Number(d)]);
+const stamped = (text) => String(text).replace(/\{stampLetters\}/g, stampLetters).replace(/\{stamp\}/g, stampNow);
 
 async function typeInto(el, raw, signal) {
   const text = stamped(raw);

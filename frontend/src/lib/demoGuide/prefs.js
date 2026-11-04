@@ -22,7 +22,7 @@ export function setGuideEnabled(on) {
 
 export const SAVED_KEY = "usls-demo-guide"; // the panel's own memory (DemoGuide.jsx): chosen demo, open, collapsed, dock side, finished steps
 
-/** "Start a guided demo": switch the guide on, lock into the slideshow (autopilot bar), and have the panel open on `guideId` at its first step
+/** "Start a guided demo": switch the guide on, lock into the slideshow (autopilot bar; the side panel collapses by itself once the app starts a step, so it never covers the form), and have the panel open on `guideId` at its first step
  * (earlier marks of that demo are cleared). On a phone the panel starts collapsed so it does not sit on the bar. */
 export function startGuide(guideId) {
   setGuideEnabled(true);

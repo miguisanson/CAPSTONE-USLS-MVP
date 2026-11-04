@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Compass, Crosshair, EyeOff, ListChecks, PanelLeft, PanelRight, Play, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Compass, Crosshair, EyeOff, ListChecks, PanelLeft, PanelRight, X } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { Button, InlineNotice, ProgressBar, Select } from "./ui/index.js";
@@ -147,15 +147,18 @@ export default function DemoGuide() {
   useEffect(() => watchGuideEnabled(setEnabled), []);
 
   // Esc collapses the panel to the pill (a second Esc closes it), unless a dialog is open (the dialog takes the Esc).
-  // Alt+Right / Alt+Left: next / previous step.
+  // Right arrow (or Alt+Right) = Next: the app does the step itself; Left arrow = Back. Not while typing in a field.
+  const keyNext = useRef(null);
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open && !keyNext.current) return undefined;
     const onKey = (event) => {
       if (event.defaultPrevented || document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
+      const typing = event.target && event.target.closest && event.target.closest("input, textarea, select, [contenteditable='true']");
       if (event.key === "Escape") update(nav.current.collapsed ? { open: false } : { mini: true });
-      else if (event.altKey && (event.key === "ArrowRight" || event.key === "ArrowLeft") && nav.current.index >= 0) {
+      else if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && !typing && !event.ctrlKey && !event.metaKey && nav.current.index >= 0) {
         event.preventDefault(); // Alt+Left would otherwise be the browser's Back
-        setBrowse(Math.max(0, Math.min(nav.current.count - 1, nav.current.index + (event.key === "ArrowRight" ? 1 : -1))));
+        if (event.key === "ArrowRight" && keyNext.current) keyNext.current();
+        else setBrowse(Math.max(0, Math.min(nav.current.count - 1, nav.current.index + (event.key === "ArrowRight" ? 1 : -1))));
       }
     };
     document.addEventListener("keydown", onKey);
@@ -285,10 +288,13 @@ export default function DemoGuide() {
       return;
     }
     if (resolved.finished) return;
+    // a running guide is always the slideshow, and the panel steps aside so it never covers what the app is filling in
+    if (!slideshow || !collapsed) update({ slideshow: true, mini: true });
     setBrowse(null);
     setRefusal(null);
     autopilot.play(resolved.step);
   }
+  keyNext.current = guide ? slideNext : null;
 
   // The panel never covers the step's target (desktop): the preferred side wins unless the target sits under it and the other side is free.
   useEffect(() => {
@@ -344,7 +350,7 @@ export default function DemoGuide() {
     setNotice("");
     setData(null);
     setLoad("idle");
-    update({ guideId: id, open: true, slideshow: true });
+    update({ guideId: id, open: true, mini: false, slideshow: true }); // collapses by itself when the app starts a step
   }
   function toggle() {
     if (open) {
@@ -599,7 +605,7 @@ export default function DemoGuide() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="icon" icon={ChevronLeft} aria-label="Previous step" disabled={shownIndex <= 0} onClick={() => setBrowse(Math.max(0, shownIndex - 1))} />
-                <Button variant="icon" icon={ChevronRight} aria-label="Next step" disabled={shownIndex < 0 || shownIndex >= steps.length - 1} onClick={() => setBrowse(shownIndex + 1)} />
+                <Button variant="icon" icon={ChevronRight} aria-label="Next step: the app does it" disabled={!resolved || (resolved.finished && !behind) || load === "error" || autopilot.status === "running"} onClick={slideNext} />
                 <Button size="sm" variant="secondary" onClick={resume}>Continue from here</Button>
                 {shown.target && <Button size="sm" variant="secondary" icon={Crosshair} onClick={showTarget}>Show me</Button>}
                 {shown.doneWhen === "manual" && <Button size="sm" onClick={markDone}>Done, next step</Button>}
@@ -623,7 +629,6 @@ export default function DemoGuide() {
       {!collapsed && (
         <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-2.5">
           {guide && <Button size="sm" variant="secondary" onClick={() => update({ guideId: null, slideshow: false })}>Change demo</Button>}
-          {guide && !slideshow && <Button size="sm" variant="secondary" icon={Play} onClick={() => update({ slideshow: true })}>Play as a slideshow</Button>}
           <Button size="sm" variant="secondary" icon={EyeOff} className="ml-auto" onClick={stopGuide}>Stop the demo guide</Button>
         </div>
       )}
@@ -656,7 +661,7 @@ export default function DemoGuide() {
           }}
           onStop={() => {
             autopilot.stop();
-            update({ slideshow: false });
+            update({ open: false, guideId: null, slideshow: false });
           }}
         />
       )}

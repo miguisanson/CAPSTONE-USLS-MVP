@@ -246,6 +246,28 @@ test.describe("the slideshow bar", () => {
     }
   });
 
+  test("owner 2026-11-04: the guide panel starts collapsed and both the panel's > and the Right arrow key make the app do the step", async ({ browser }) => {
+    const { context, page } = await startDemo(browser, LOA);
+    try {
+      await page.keyboard.press("ArrowRight");
+      // the side panel steps aside while the app fills the form
+      await expect(page.getByRole("button", { name: "Expand" })).toBeVisible();
+      await expect(bar(page)).toHaveAttribute("data-status", "running");
+      await expect(page.getByTestId("demo-cursor")).toHaveCount(1);
+      await bar(page).getByRole("button", { name: "Take over" }).click();
+      await expect(bar(page)).toHaveAttribute("data-status", "paused");
+      await page.getByRole("button", { name: "Expand" }).click();
+      await page.getByRole("button", { name: "Next step: the app does it" }).click();
+      await expect(bar(page)).toHaveAttribute("data-status", "running");
+      await expect(page.getByRole("button", { name: "Play as a slideshow" })).toHaveCount(0);
+      await bar(page).getByRole("button", { name: "Take over" }).click();
+      await bar(page).getByRole("button", { name: "Stop" }).click();
+      await expect(bar(page)).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+
   test("Esc pauses a run like Take over", async ({ browser }) => {
     const { context, page } = await startDemo(browser, LOA);
     try {

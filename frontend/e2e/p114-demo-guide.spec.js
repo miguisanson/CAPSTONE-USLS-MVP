@@ -513,12 +513,12 @@ test.describe("screens", () => {
         const box = await panel.boundingBox();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "no sideways scroll").toBe(true);
         if (width < 640) {
-          // a bottom sheet: full width, on the bottom edge, never taller than 60% of the screen
-          // (p115: choosing a demo starts the slideshow, which lifts the panel above its bar; Stop gives the plain sheet back)
-          await page.getByTestId("autopilot-bar").getByRole("button", { name: "Stop" }).click();
+          // a bottom sheet: full width, sitting just above the slideshow bar (a running guide is always the slideshow,
+          // owner 2026-11-04), never taller than 60% of the screen
           const sheet = await panel.boundingBox();
+          const barBox = await page.getByTestId("autopilot-bar").boundingBox();
           expect(Math.round(sheet.width)).toBe(width);
-          expect(Math.round(sheet.y + sheet.height)).toBe(height);
+          expect(sheet.y + sheet.height).toBeLessThanOrEqual(barBox.y + 1);
           expect(sheet.height).toBeLessThanOrEqual(height * 0.6 + 1);
           await panel.getByRole("button", { name: "Collapse" }).click();
           expect((await panel.boundingBox()).height).toBeLessThan(90);
@@ -838,11 +838,9 @@ test.describe("show me, the step list and the keys", () => {
       await expect(panel).toContainText("The record is not that far yet");
       await panel.getByRole("button", { name: "Continue from here" }).click();
       await expect(step(panel, "Staff forward it to the Dean")).toBeVisible();
-      // keys: Alt+Right / Alt+Left, then Esc collapses and a second Esc closes
-      await page.keyboard.press("Alt+ArrowRight");
-      await expect(step(panel, "The Dean decides")).toBeVisible();
-      await page.keyboard.press("Alt+ArrowLeft");
-      await expect(step(panel, "Staff forward it to the Dean")).toBeVisible();
+      // keys: Left goes back one step (Right now makes the app do the step: p115), then Esc collapses and a second Esc closes
+      await page.keyboard.press("ArrowLeft");
+      await expect(step(panel, "Start the staff review")).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(panel.getByRole("button", { name: "Expand" })).toBeVisible();
       await page.keyboard.press("Escape");
