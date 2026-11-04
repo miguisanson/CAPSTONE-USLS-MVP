@@ -70,3 +70,29 @@ Returns `{demo_mode, role, skip_date_waits, process, student, case, candidates}`
 
 ## Not doing (now)
 Voice, auto-clicking, recording. The guide never clicks or types for the presenter.
+
+## Autopilot (owner 2026-11-04, supersedes "never clicks for the presenter")
+
+Owner: "the demo guide should be the one controlling the web app ... if thats active and the person clicks one
+process ... it should lock onto this kind of slideshow ... when click next arrow it will automatically do it on page
+(use smooth ui)". And: "make sure all processes have [a guide]".
+
+- **Slideshow mode.** Starting a demo locks the app into the guide: a bottom bar with Back / **Next** / step n of N /
+  Take over / Stop. Next performs the current step on the page by itself, then shows the next step's narration.
+- **Visible, smooth actions.** A fake cursor glides to each target (ease-out, ~400 ms), a soft ring pulses on it,
+  text is typed character by character (~25 ms/char, skippable), selects open and pick, buttons click; the page
+  scrolls the target into view first. `prefers-reduced-motion`: no glide/pulse, instant typing.
+- **Step actions (data, per step):** `actions: [{click}, {type, text}, {select, label}, {check}, {upload, fixture},
+  {wait}, {signInAs: role}, {go: route}]` with selectors taken from the tested click paths in
+  `scripts/docs/walkthrough/capture/case_*.py`. React inputs are set through the native value setter + `input`
+  event. Uploads use small fixture files bundled with the guide. Drag and drop is never used (use the step buttons).
+- **Role switch is part of Next:** when the next step belongs to another person, Next signs out and in as that
+  demo account (one-click demo sign-in) and opens the step's page.
+- **Take over:** stops autopilot; the presenter clicks and types freely (a panelist's different value, decision or
+  student). The guide keeps following the live record (`/api/demo/guide-state`) and **Next** resumes from the
+  step that matches the record. If an action cannot find its target or the server refuses, autopilot pauses on that
+  step with the reason and "Do it by hand" / "Try again".
+- **One file per guide** under `frontend/src/lib/demoGuide/guides/` so guides can be written in parallel.
+- **Every process has a guide**, one per walkthrough case in `scripts/docs/walkthrough/cases/`.
+- **Test:** each guide has an e2e spec that plays it end to end in autopilot on the seeded e2e database and checks
+  the final record status; this doubles as an end-to-end check of every process.
