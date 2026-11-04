@@ -29634,6 +29634,20 @@ def monitoring_portal_add_subject(student: Student, data: dict) -> CourseRecord:
     return record
 
 
+def _monitoring_refuse_if_enrolled_now(student: Student, record: CourseRecord, what: str) -> None:
+    """The sheet is not a back door around the workflows: a subject the student is enrolled in this term moves
+    only through Enrollment, the Subject Withdrawal request or the Academic Coordinator's Record dropped subject."""
+    term = get_active_term()
+    if term and SubjectEnrollment.query.filter_by(
+        student_id=student.id, course_id=record.course_id, term_id=term.id, status="Enrolled",
+    ).first():
+        raise MonitoringEntryError(
+            f"{record.course.code} is an enrolled subject this term, so it cannot be {what} here. Use Enrollment to add or "
+            "remove it, the student's Subject Withdrawal request to withdraw it, or Record dropped subject to drop it.",
+            409,
+        )
+
+
 def monitoring_portal_update_subject(student: Student, record: CourseRecord, data: dict) -> tuple[CourseRecord, list[dict]]:
     account, actor_name = _monitoring_actor()
     course = record.course
@@ -29663,6 +29677,9 @@ def monitoring_portal_update_subject(student: Student, record: CourseRecord, dat
                 changes.append((field, getattr(course, field), new))
     if not changes:
         return record, []
+    for field, _old, new in changes:
+        if field == "status" and new in {"Withdrawn", "Dropped", "Completed"}:
+            _monitoring_refuse_if_enrolled_now(student, record, f"set to {new}")
     if any(field == "status" and new == "Dropped" for field, _old, new in changes):
         reason = _monitoring_drop_reason(data, reason)
     if monitoring_record_source(record) in {"Imported", "System"} and not reason:
@@ -29701,6 +29718,7 @@ def monitoring_portal_remove_subject(student: Student, record: CourseRecord, dat
         raise MonitoringEntryError(f"{course.code} is already removed from this record.", 409)
     if (record.status or "") in MONITORING_NO_ROW_STATUSES:
         raise MonitoringEntryError(f"{course.code} has no entry to remove.", 409)
+    _monitoring_refuse_if_enrolled_now(student, record, "removed")
     if not reason:
         raise MonitoringEntryError("Enter a reason for removing this row; the row is kept in the change history.")
     old_status, old_term = record.status, record.term_label or ""

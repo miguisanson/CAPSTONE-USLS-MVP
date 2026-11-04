@@ -12,7 +12,7 @@ os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="pol
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 
 from app import (  # noqa: E402
-    AcademicTerm, AwolCase, LeaveCase, Course, Faculty, PanelAssignment, Program, Student, UserAccount,
+    AcademicTerm, AwolCase, CourseRecord, LeaveCase, SubjectEnrollment, Course, Faculty, PanelAssignment, Program, Student, UserAccount,
     Notification, app, db, generate_password_hash, notify_workflow_owner,
 )
 
@@ -173,6 +173,49 @@ class DailySweepTests(Audit2Base):
         case_id = self.make_scheduled_leave()
         self.client("staff").get("/api/auth/me")
         self.assertEqual(self.status(case_id), "Leave Scheduled")
+
+
+class MonitoringEnrolledRowTests(Audit2Base):
+    """I-275: an actively enrolled current-term subject cannot be withdrawn, dropped, completed or removed on the sheet."""
+
+    def setUp(self):
+        super().setUp()
+        with app.app_context():
+            term = AcademicTerm.query.filter_by(label="Running Term").one()
+            record = CourseRecord(student_id=self.student_id, course_id=self.course_id, status="Enrolled", term_label=term.label)
+            db.session.add(record)
+            db.session.add(SubjectEnrollment(student_id=self.student_id, course_id=self.course_id, term_id=term.id, status="Enrolled"))
+            db.session.commit()
+            self.record_id = record.id
+        self.url = f"/api/monitoring/students/{self.student_id}/subjects/{self.record_id}"
+
+    def record_status(self):
+        with app.app_context():
+            return db.session.get(CourseRecord, self.record_id).status
+
+    def test_status_changes_that_belong_to_workflows_are_refused(self):
+        staff = self.client("staff")
+        for status in ("Withdrawn", "Dropped", "Completed"):
+            response = staff.patch(self.url, json={"status": status, "reason": "typo", "drop_reason": "x"})
+            self.assertEqual(response.status_code, 409, status)
+            self.assertIn("Withdrawal", response.get_json()["error"])
+            self.assertEqual(self.record_status(), "Enrolled")
+
+    def test_removing_an_enrolled_row_is_refused(self):
+        response = self.client("staff").delete(self.url, json={"reason": "wrong row"})
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("Enrollment", response.get_json()["error"])
+        with app.app_context():
+            self.assertIsNone(db.session.get(CourseRecord, self.record_id).removed_at)
+
+    def test_remarks_still_editable_and_history_rows_still_change(self):
+        staff = self.client("staff")
+        self.assertEqual(staff.patch(self.url, json={"remarks": "note", "reason": "added note"}).status_code, 200)
+        with app.app_context():
+            enrollment = SubjectEnrollment.query.one()
+            enrollment.status = "Completed"  # no longer actively enrolled this term
+            db.session.commit()
+        self.assertEqual(staff.patch(self.url, json={"status": "Completed", "reason": "late grade"}).status_code, 200)
 
 
 if __name__ == "__main__":
