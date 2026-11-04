@@ -21,13 +21,16 @@ Branch: `v6.1-migui` until 13:3x, then `v6.2-migui`. Every item has its ISSUES r
 | PM | Demo Guide: `>` and the Right arrow make the app do the step; panel steps aside while it runs; Stop ends the demo | — | 9d01167 |
 | PM | Khloe's graduation + practicum batch UI back on today's API: batch overview with stage checks, requirement boxes, numbered stages, practicum cards; shared `components/process/` | I-359 | 9c242c4 |
 | PM | Live site: Docker always uses its own SQLite volume (a `.env` DATABASE_URL took it down); Start button restarts the tunnel when the public address does not answer | I-363, I-352 | 125ab29 |
+| PM | One 7-digit student ID everywhere (STUDENT_NUMBER_RE; 28 demo students renumbered 269xxxx; handoff/import/portal refuse other formats) + server checks behind the new dropdowns (school year, email, names, defense mode/slots, dates, hours, sections) | I-353 | d4ef350 |
+| PM | Khloe's layout on Leave of Absence, Readmission, AWOL, Withdrawal and Residency boards (numbered stage headers, shared case card with facts, ready mark, requirement boxes, newest message, View + Message); columns sized to their cards | I-360 | ef3de1a |
+| PM | Research Gate: staff and the Research Coordinator record, correct and confirm the panel verdict, Form 7 and title for the panel (stamped, with reason and history); board with 1 Title Defense / 2 Proposal Defense / 3 Completion columns | I-361, I-362 | b642a0f |
+| PM | Demo Guide: 11 more guides with autopilot (course adjustments, enrollment, dropping, policy assistant, handoff, business rules, policy documents, residency, calendars, portals, best features) | — | 9d3a4ac |
+| PM | Server follow-ups: newest message on every board card, AWOL residence years, enrollment window enforced on every enrollment save (409 with the dates) and seeded, By-year-started student lists endpoint | I-355..I-357 | b09de19 |
 
 ## In progress
-- One 7-digit student ID everywhere + server checks for the new dropdowns (`pkt/server-checks`). I-353.
-- Khloe's design on LOA, readmission, AWOL, withdrawal, residency (`pkt/khloe-standalone`). I-360.
+- Demo Guide guides for the research processes (title gate, panel matching, defense scheduling, verdicts, proposal/final) (`pkt/guides-research`).
+- Final full Python gate on the merged code.
 
 ## Next
-- Staff act for the panel in the research gate (I-361) + research gate stage columns (I-362).
-- Server follow-ups from the polish: refuse enrollment changes outside the window, real `enrollment_open`, seeded window, `/api/reports/cohorts/students`.
-- Guides (with autopilot) for the missing processes; the 64 open audit rows.
-- Full gate, full e2e, push, Docker rebuild, final report.
+- The open audit rows (I-264..I-352), highest first.
+- Full e2e, push, Docker rebuild + reseed, final report.
