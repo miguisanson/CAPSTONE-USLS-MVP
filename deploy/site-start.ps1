@@ -31,6 +31,21 @@ try {
     }
     if (-not $ok) { Done 'The site did not answer in 5 minutes. Check: docker compose logs app'; exit 1 }
 
+    # I-352: after a rebuild the Cloudflare tunnel can stay disconnected (public site shows error 1033); restart it once.
+    Write-Host 'Checking https://miguisanson.dev ...'
+    $public = $false
+    for ($i = 0; $i -lt 6 -and -not $public; $i++) {
+        try { $public = (Invoke-WebRequest https://miguisanson.dev/api/health -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop).StatusCode -eq 200 } catch { Start-Sleep 10 }
+    }
+    if (-not $public) {
+        Write-Host 'The public address does not answer yet: restarting the tunnel...'
+        docker compose --profile tunnel restart tunnel | Out-Null
+        for ($i = 0; $i -lt 12 -and -not $public; $i++) {
+            try { $public = (Invoke-WebRequest https://miguisanson.dev/api/health -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop).StatusCode -eq 200 } catch { Start-Sleep 10 }
+        }
+        if (-not $public) { Write-Host 'Still no answer from https://miguisanson.dev - check: docker compose logs tunnel' }
+    }
+
     $awake = Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object CommandLine -like '*keep-awake.ps1*'
     if (-not $awake) {
         Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'keep-awake.ps1')

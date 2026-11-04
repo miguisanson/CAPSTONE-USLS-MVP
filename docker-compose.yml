@@ -11,6 +11,12 @@ services:
       - path: .env              # optional: Gemini key, Google Calendar secrets, DEMO_PASSWORD, SECRET_KEY
         required: false
     environment:
+      # The site always uses its own SQLite file in the volume (IM3). Set here because a DATABASE_URL in .env
+      # (a local developer setting) would otherwise override the Dockerfile and point the site at another database.
+      DATABASE_URL: sqlite:////data/usls_gs_demo.sqlite3
+      USLS_UPLOAD_DIR: /data/uploads
+      SECRET_KEY_FILE: /data/secret_key
+      RAG_INDEX_DIR: /data/rag_index
       DEMO_MODE: "1"
       DEMO_SHOW_ACCOUNTS: "1"   # owner decision IM36: the sign-in page lists the demo accounts
       SESSION_COOKIE_SECURE: "1"
