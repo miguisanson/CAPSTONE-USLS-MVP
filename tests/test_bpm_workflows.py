@@ -3393,6 +3393,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             student.standing = "Active"
             student.enrollment_tag = "Enrolled"
             student.current_stage = "Comprehensive Exam"
+            term.is_active_planning_term = False  # residency now always uses the one active term
             term = AcademicTerm(
                 label="AY 2026-2027 1st Semester",
                 start_date=date(date.today().year, 1, 1),
@@ -3416,6 +3417,45 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(student.enrollment_tag, "Residency")
             report = self._staff_client().get(f"/api/residency/{residency.id}/registrar-report")
             self.assertEqual(report.status_code, 200)
+
+    def test_residency_uses_the_active_term_and_closing_it_restores_the_old_tag(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.entry_year = date.today().year
+            student.current_stage = "Comprehensive Exam"
+            student.standing = "Active"
+            student.enrollment_tag = "Not Enrolled"
+            active = AcademicTerm(
+                label="Residency Active Semester",
+                start_date=date(date.today().year, 1, 1),
+                end_date=date(date.today().year, 5, 31),
+                is_active_planning_term=True,
+            )
+            old = AcademicTerm(
+                label="Residency Old Semester",
+                start_date=date(date.today().year - 3, 1, 1),
+                end_date=date(date.today().year - 3, 5, 31),
+            )
+            db.session.add_all([active, old])
+            db.session.commit()
+            response = self._staff_client().post("/api/transactions/awol", json={
+                "student_id": self.student_id,
+                "workflow_action": "record_residency",
+                "term_id": old.id,
+                "residency_reason": "Comprehensive examination",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            residency = ResidencyEnrollment.query.filter_by(student_id=self.student_id, status="Active").one()
+            self.assertEqual(residency.term_id, active.id)
+            self.assertIsNone(TermEnrollment.query.filter_by(student_id=self.student_id, term_id=old.id).first())
+            response = self._staff_client().post("/api/transactions/awol", json={
+                "student_id": self.student_id,
+                "workflow_action": "end_residency",
+                "residency_id": residency.id,
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(student)
+            self.assertEqual(student.enrollment_tag, "Not Enrolled")
 
     def test_demo_backoffice_accounts_sign_in_as_distinct_roles(self):
         with app.app_context():

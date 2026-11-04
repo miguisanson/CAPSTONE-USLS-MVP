@@ -863,6 +863,7 @@ class ResidencyEnrollment(db.Model):
     policy_status = db.Column(db.String(80), nullable=False)
     status = db.Column(db.String(40), nullable=False, default="Active")
     staff_notes = db.Column(db.Text)
+    prior_enrollment_tag = db.Column(db.String(40))  # restored when the residency closes
     created_at = db.Column(db.DateTime, default=now_utc)
     ended_at = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
@@ -31969,7 +31970,7 @@ def handle_awol(data: MultiDict) -> int:
                 "The residency policy checker says this case needs human review, so residency cannot be recorded. "
                 "Fix the record the checker flagged (or choose the matching purpose), or use leave of absence instead."
             )
-        term = AcademicTerm.query.get(safe_int(data.get("term_id"))) if data.get("term_id") else get_active_term()
+        term = get_active_term()  # residency is registered within the current semester (Handbook p.48); no client term_id
         if not term:
             raise ValueError("No active semester is available for residency enrollment.")
         existing = ResidencyEnrollment.query.filter(
@@ -31986,6 +31987,7 @@ def handle_awol(data: MultiDict) -> int:
             policy_status=review["recommendation"],
             status="Active",
             staff_notes=staff_notes or None,
+            prior_enrollment_tag=student.enrollment_tag,
         )
         db.session.add(item)
         enrollment = TermEnrollment.query.filter_by(student_id=student.id, term_id=term.id).first()
@@ -32015,7 +32017,11 @@ def handle_awol(data: MultiDict) -> int:
         enrollment = TermEnrollment.query.filter_by(student_id=student.id, term_id=item.term_id).first()
         if enrollment and enrollment.status == "Residency":
             enrollment.status = "Completed"
-        student.enrollment_tag = "Enrolled"
+        still_active = ResidencyEnrollment.query.filter(
+            ResidencyEnrollment.student_id == student.id, ResidencyEnrollment.status == "Active",
+            ResidencyEnrollment.id != item.id).first()
+        if not still_active:
+            student.enrollment_tag = item.prior_enrollment_tag or "Enrolled"
         student.standing = "Active"
         result = "Residency enrollment closed"
         workflow_message_record("awol", student, account, "Student", result, f"Residency for {item.term.label if item.term else 'the semester'} was closed.", "notice", "Residency", "Active", status="Sent")
