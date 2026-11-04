@@ -504,6 +504,8 @@ export default function MonitoringGrid() {
           programs={meta?.programs || grid?.programs || []}
           defaultProgramId={programId}
           defaultAyEntry={ayEntryOf(currentTermLabel)}
+          termLabels={(grid?.terms || meta?.terms || []).map((term) => term.label)}
+          studentValues={(grid?.students || []).map((s) => s.academic_year_entry)}
           onClose={() => setAddOpen(false)}
           onCreated={(result, openNow) => {
             load(programId);
@@ -518,6 +520,7 @@ export default function MonitoringGrid() {
           studentId={recordPanel.studentId}
           focusCourseId={recordPanel.courseId}
           termLabels={(grid?.terms || meta?.terms || []).map((term) => term.label)}
+          studentValues={(grid?.students || []).map((s) => s.academic_year_entry)}
           currentTermLabel={currentTermLabel}
           onClose={() => setRecordPanel(null)}
           onChanged={() => load(programId)}

@@ -8,7 +8,8 @@ import { useConfirm } from "../confirm";
 import { formatDateTime } from "../../lib/format";
 import ProvenanceBadge from "./ProvenanceBadge";
 import ReasonDialog from "./ReasonDialog";
-import { facultyOptions, useActiveFaculty } from "./knownData";
+import AyEntrySelect from "./AyEntrySelect";
+import { emailProblem, nameProblem, facultyOptions, normalizeAyEntry, studentIdWarning, useActiveFaculty } from "./knownData";
 
 const TABS = [
   { id: "subjects", label: "Subjects", icon: ListChecks },
@@ -29,7 +30,7 @@ const ACTION_LABELS = {
 // Side panel for one student's monitoring record: subject rows (inline add / edit /
 // remove), header fields, and the change history. Read-only when permissions.can_edit
 // is false (research coordinator, dean).
-export default function StudentRecordPanel({ studentId, focusCourseId, termLabels = [], currentTermLabel = "", onClose, onChanged, onOpenProfile }) {
+export default function StudentRecordPanel({ studentId, focusCourseId, termLabels = [], studentValues = [], currentTermLabel = "", onClose, onChanged, onOpenProfile }) {
   const [tab, setTab] = useState("subjects");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -122,7 +123,7 @@ export default function StudentRecordPanel({ studentId, focusCourseId, termLabel
           ) : tab === "subjects" ? (
             <SubjectsTab data={data} canEdit={canEdit} focusCourseId={focusCourseId} termLabels={termLabels} currentTermLabel={currentTermLabel} onChanged={changed} />
           ) : tab === "details" ? (
-            <DetailsTab data={data} canEdit={canEdit} onChanged={changed} />
+            <DetailsTab data={data} canEdit={canEdit} termLabels={termLabels} studentValues={studentValues} onChanged={changed} />
           ) : (
             <HistoryTab studentId={studentId} refreshKey={data?.history_count} />
           )}
@@ -536,7 +537,7 @@ function RemoveDialog({ row, studentId, onCancel, onDone }) {
 
 /* ----------------------------------------------------------------- details */
 
-function DetailsTab({ data, canEdit, onChanged }) {
+function DetailsTab({ data, canEdit, termLabels, studentValues, onChanged }) {
   const student = data.student;
   const { faculty, loaded } = useActiveFaculty();
   const initial = {
@@ -544,7 +545,8 @@ function DetailsTab({ data, canEdit, onChanged }) {
     first_name: student.first_name || "",
     last_name: student.last_name || "",
     email: student.email || "",
-    academic_year_entry: student.academic_year_entry || "",
+    // a stored "2024-2025" shows as the pick "24-25", so opening the form is not a change
+    academic_year_entry: normalizeAyEntry(student.academic_year_entry) || student.academic_year_entry || "",
   };
   // The adviser is a faculty record. null = not touched; otherwise the picked faculty id ("" = no adviser).
   const [adviserPick, setAdviserPick] = useState(null);
@@ -558,14 +560,17 @@ function DetailsTab({ data, canEdit, onChanged }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const dirty = adviserChanged || Object.keys(initial).some((key) => form[key] !== initial[key]);
+  const idWarning = studentIdWarning(form.student_number);
+  const emailError = emailProblem(form.email) || nameProblem(form.first_name) || nameProblem(form.last_name);
+  const dirty = !emailError && (adviserChanged || Object.keys(initial).some((key) => form[key] !== initial[key]));
   const stopEditing = () => { setEditing(false); setForm(initial); setAdviserPick(null); };
 
   async function save(reason) {
     setBusy(true);
     setError("");
     try {
-      const result = await api.updateMonitoringStudent(student.id, { ...form, ...(adviserChanged ? { adviser_faculty_id: adviserPick ? Number(adviserPick) : null } : {}), reason });
+      const { academic_year_entry, ...rest } = form;
+      const result = await api.updateMonitoringStudent(student.id, { ...rest, ...(academic_year_entry !== initial.academic_year_entry ? { academic_year_entry } : {}), ...(adviserChanged ? { adviser_faculty_id: adviserPick ? Number(adviserPick) : null } : {}), reason });
       setConfirming(false);
       setAdviserPick(null);
       setEditing(false);
@@ -614,11 +619,11 @@ function DetailsTab({ data, canEdit, onChanged }) {
       className="space-y-4"
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Student ID" required><Input autoFocus value={form.student_number} onChange={set("student_number")} required maxLength={40} /></Field>
-        <Field label="School year / AY entry" required><Input value={form.academic_year_entry} onChange={set("academic_year_entry")} required maxLength={20} /></Field>
-        <Field label="First name" required><Input value={form.first_name} onChange={set("first_name")} required maxLength={80} /></Field>
-        <Field label="Last name" required><Input value={form.last_name} onChange={set("last_name")} required maxLength={80} /></Field>
-        <Field label="Email (student login)" required><Input type="email" value={form.email} onChange={set("email")} required maxLength={160} /></Field>
+        <Field label="Student ID" required hint={idWarning || undefined}><Input autoFocus value={form.student_number} onChange={set("student_number")} required maxLength={40} inputMode="numeric" autoComplete="off" /></Field>
+        <Field label="School year / AY entry" required><AyEntrySelect value={form.academic_year_entry} onChange={set("academic_year_entry")} termLabels={termLabels} studentValues={studentValues} required /></Field>
+        <Field label="First name" required error={nameProblem(form.first_name) || undefined}><Input value={form.first_name} onChange={set("first_name")} required maxLength={80} /></Field>
+        <Field label="Last name" required error={nameProblem(form.last_name) || undefined}><Input value={form.last_name} onChange={set("last_name")} required maxLength={80} /></Field>
+        <Field label="Email (student login)" required error={emailError || undefined}><Input type="email" value={form.email} onChange={set("email")} required maxLength={160} /></Field>
         <Field label="Adviser" hint={loaded && !matched && student.adviser_name ? `${student.adviser_name} is not a faculty record. Choose one, or leave it as it is.` : undefined}>
           <Select value={adviserPick ?? matchedId} onChange={(e) => setAdviserPick(e.target.value)} options={facultyOptions(faculty)} placeholder="No adviser yet" />
         </Field>
@@ -633,6 +638,7 @@ function DetailsTab({ data, canEdit, onChanged }) {
           title="Save this correction?"
           message={[
             ...Object.keys(initial).filter((key) => form[key] !== initial[key]).map((key) => `${key.replace(/_/g, " ")}: ${initial[key] || "(blank)"} → ${form[key] || "(blank)"}`),
+            ...(idWarning && form.student_number !== initial.student_number ? [`Check: ${idWarning}`] : []),
             ...(adviserChanged ? [`adviser: ${student.adviser_name || "(blank)"} → ${adviserLabel(adviserPick) || "(blank)"}`] : []),
           ].join("\n")}
           confirmLabel="Save correction"

@@ -48,6 +48,11 @@ export function todayISO(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
 
+/** The day after today (YYYY-MM-DD, Philippine time): the earliest date a request may ask for. */
+export function tomorrowISO(now = new Date()) {
+  return todayISO(new Date(now.getTime() + 86400000));
+}
+
 export function formatDateTime(value) {
   if (!value) return "—";
   const d = toDate(value);

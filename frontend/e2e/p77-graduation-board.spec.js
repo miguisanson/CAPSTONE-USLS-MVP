@@ -219,7 +219,7 @@ test.describe("P7.7 Graduation actions as staff", () => {
     });
     expect(highest).toBeGreaterThanOrEqual(1);
     await expect(dialog.getByLabel("Batch No.")).toHaveValue(String(highest + 1));
-    await expect(dialog.locator("select")).toHaveCount(1); // only the month
+    await expect(dialog.locator("select")).toHaveCount(2); // the month and the year (B-33: the year is a pick of the graduation school year)
     await expect(dialog.getByText("Completed subjects:")).toBeVisible(); // the cohort list lives here
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click(); // CHANGED BY p98 (I-152): the step dialog closes with Cancel, not "Close details"
     await expect(page.getByRole("dialog")).toHaveCount(0);

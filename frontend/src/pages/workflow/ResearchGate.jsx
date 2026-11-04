@@ -133,10 +133,10 @@ export function ResearchGateForm({ context, studentId, submit, submitting, resul
               <Field label="Clearance status">
                 <Select value={ethicsReview.status} onChange={(event) => setEthicsReview((current) => ({ ...current, status: event.target.value }))} placeholder="" options={["Cleared", "Returned", "Not cleared"]} />
               </Field>
-              <Field label="Clearance date">
-                <Input type="date" value={ethicsReview.date} onChange={(event) => setEthicsReview((current) => ({ ...current, date: event.target.value }))} />
+              <Field label="Clearance date" error={ethicsReview.date > todayISO() ? "The clearance date cannot be in the future." : undefined}>
+                <Input type="date" max={todayISO()} value={ethicsReview.date} onChange={(event) => setEthicsReview((current) => ({ ...current, date: event.target.value }))} />
               </Field>
-              <Button disabled={submitting} onClick={recordEthicsClearance} icon={CheckCircle2}>
+              <Button disabled={submitting || ethicsReview.date > todayISO()} onClick={recordEthicsClearance} icon={CheckCircle2}>
                 Record ethics clearance
               </Button>
             </div>

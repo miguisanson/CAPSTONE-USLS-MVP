@@ -179,6 +179,12 @@ export default function Faculty() {
 
 const OTHER_DEPARTMENT = "__other__";
 
+// 10 characters with no look-alikes (no 0/O, 1/l/I), from the browser's secure random source.
+const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+function makePassword() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(10)), (n) => PASSWORD_CHARS[n % PASSWORD_CHARS.length]).join("");
+}
+
 function FacultyFormModal({ faculty, departments = [], onClose, onSaved }) {
   const isNew = !faculty;
   const [form, setForm] = useState(() => ({
@@ -187,11 +193,13 @@ function FacultyFormModal({ faculty, departments = [], onClose, onSaved }) {
     specialization: faculty?.specialization || "",
     email: faculty?.email || "",
     status: faculty ? (faculty.active ? "Active" : "Inactive") : "Active",
-    password: "",
+    password: faculty ? "" : makePassword(), // a new person gets a made password; nobody has to invent one
     eligible_roles: faculty?.eligible_roles || ["Faculty Adviser", "Panel Member", "Panel Chair"],
   }));
   // Departments already on record are picked; a new one is typed only on request (or when none exist yet).
   const [typeDepartment, setTypeDepartment] = useState(() => !departments.length || Boolean(faculty?.college && !departments.includes(faculty.college)));
+  // The list can arrive after the dialog opens: once departments are known, a new person gets the pick, not the typing box.
+  useEffect(() => { if (departments.length && !faculty && !form.department) setTypeDepartment(false); }, [departments.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const set = (field, value) => setForm((current) => ({ ...current, [field]: value }));
@@ -274,8 +282,8 @@ function FacultyFormModal({ faculty, departments = [], onClose, onSaved }) {
           <Field label="Email (also the login)"><Input type="email" value={form.email} onChange={(event) => set("email", event.target.value)} /></Field>
           <Field label="Status"><Select placeholder="" value={form.status} onChange={(event) => set("status", event.target.value)} options={STATUS_OPTIONS} /></Field>
           <div className="sm:col-span-2">
-            <Field label={isNew ? "Temporary password (at least 8 characters)" : "New password (leave blank to keep the current one)"}>
-              <Input type="password" autoComplete="new-password" value={form.password} onChange={(event) => set("password", event.target.value)} />
+            <Field label={isNew ? "Temporary password (at least 8 characters)" : "New password (leave blank to keep the current one)"} hint={isNew ? "Made for this person. Give it to them; they change it after the first sign-in." : undefined}>
+              <Input type={isNew ? "text" : "password"} autoComplete="new-password" value={form.password} onChange={(event) => set("password", event.target.value)} />
             </Field>
           </div>
         </div>
@@ -481,7 +489,7 @@ function ExpertiseEditor({ faculty, onChanged }) {
             <form key={item.id} onSubmit={saveEdit} className="grid gap-2 rounded-lg border border-brand-200 bg-brand-50/40 p-3 sm:grid-cols-[170px_1fr_100px_auto]">
               <Select aria-label="Kind of record" placeholder="" value={editDraft.kind} onChange={(event) => setEditDraft({ ...editDraft, kind: event.target.value })} options={kindOptions} />
               <Textarea aria-label="Record text" rows={2} value={editDraft.text} onChange={(event) => setEditDraft({ ...editDraft, text: event.target.value })} />
-              <Input aria-label="Year" type="number" placeholder="Year" value={editDraft.year} onChange={(event) => setEditDraft({ ...editDraft, year: event.target.value })} />
+              <Input aria-label="Year" type="number" min="1950" max={new Date().getFullYear()} placeholder="Year" value={editDraft.year} onChange={(event) => setEditDraft({ ...editDraft, year: event.target.value })} />
               <div className="flex items-start gap-2"><Button type="submit" size="sm" icon={Save} disabled={busy}>Save</Button><Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>Cancel</Button></div>
             </form>
           ) : (
@@ -505,7 +513,7 @@ function ExpertiseEditor({ faculty, onChanged }) {
           <form onSubmit={add} className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[170px_1fr_100px_auto]">
             <Select aria-label="Kind of new record" placeholder="" value={draft.kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value })} options={kindOptions} />
             <Input aria-label="Text of new record" value={draft.text} onChange={(event) => setDraft({ ...draft, text: event.target.value })} placeholder={EXPERTISE_KIND_HINTS[draft.kind] || "Describe the expertise"} required minLength={5} maxLength={600} />
-            <Input aria-label="Year of new record" type="number" min="1950" value={draft.year} onChange={(event) => setDraft({ ...draft, year: event.target.value })} placeholder="Year" />
+            <Input aria-label="Year of new record" type="number" min="1950" max={new Date().getFullYear()} value={draft.year} onChange={(event) => setDraft({ ...draft, year: event.target.value })} placeholder="Year" />
             <Button type="submit" icon={Plus} disabled={busy || draft.text.trim().length < 5}>Add record</Button>
           </form>
         </div>

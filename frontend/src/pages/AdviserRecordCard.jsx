@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useApi } from "../hooks";
 import { Button, Card, Field, InlineNotice, Input, Select, Textarea } from "../components/ui/index.js";
 import StudentPicker from "../components/StudentPicker";
+import { todayISO } from "../lib/format";
 
 // Collapsible form for a student whose adviser was appointed outside the portal
 // (for example imported from the monitoring sheet). Staff, Research Coordinator and admin only.
@@ -19,10 +20,13 @@ export default function AdviserRecordCard({ onRecorded }) {
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
 
+  const today = todayISO();
+  const futureDate = Boolean(appointedOn) && appointedOn > today;
   const faculty = (meta?.faculty || []).map((person) => ({ value: String(person.id), label: person.college ? `${person.name} (${person.college})` : person.name }));
 
   async function submit(event) {
     event.preventDefault();
+    if (futureDate) return;
     if (!studentId || !facultyId) {
       setError("Choose the student and the adviser.");
       return;
@@ -86,8 +90,8 @@ export default function AdviserRecordCard({ onRecorded }) {
             <Field label="Research adviser" required>
               <Select value={facultyId} options={faculty} placeholder="Choose the adviser" onChange={(event) => setFacultyId(event.target.value)} />
             </Field>
-            <Field label="Appointment date" hint="Leave empty to use today.">
-              <Input type="date" value={appointedOn} onChange={(event) => setAppointedOn(event.target.value)} />
+            <Field label="Appointment date" hint="Leave empty to use today." error={futureDate ? "The appointment date cannot be in the future." : undefined}>
+              <Input type="date" max={today} value={appointedOn} onChange={(event) => setAppointedOn(event.target.value)} />
             </Field>
           </div>
           <Field label="Note (optional)">

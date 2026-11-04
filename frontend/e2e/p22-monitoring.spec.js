@@ -72,9 +72,9 @@ test.describe("P2.2 Monitoring Sheet dialogs", () => {
     await add.getByLabel("Student ID").fill("7700123");
     await add.getByLabel("First name").fill("Pia");
     await add.getByLabel("Last name").fill("Testwell");
-    await add.getByLabel("School year / AY entry").fill(""); // it starts filled with the current semester's year (I-262)
+    await add.getByLabel("School year / AY entry").selectOption(""); // it starts on the current semester's year (I-262); the empty choice is allowed
     await expect(addButton, "school-year still empty").toBeDisabled();
-    await add.getByLabel("School year / AY entry").fill("26-27");
+    await add.getByLabel("School year / AY entry").selectOption("26-27");
     await expect(addButton).toBeEnabled();
     await add.getByLabel("First name").fill("");
     await expect(addButton, "first name cleared").toBeDisabled();
@@ -100,7 +100,7 @@ test.describe("P2.2 Monitoring Sheet dialogs", () => {
     await add.getByLabel("Student ID").fill("7700123");
     await add.getByLabel("First name").fill("Pia");
     await add.getByLabel("Last name").fill("Testwell");
-    await add.getByLabel("School year / AY entry").fill("26-27");
+    await add.getByLabel("School year / AY entry").selectOption("26-27");
     await addButton.click();
     await expect(add.getByText("Student portal login:")).toBeVisible();
     await expect(add.getByText(/Initial password|first-login password/)).toBeVisible();
