@@ -838,7 +838,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
         </WorkflowCaseModal>
       )}
       {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { boardNotice.show("success", message || "Message sent."); setSelectedStudentId(null); await refetch(); }} />}
-      {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} accountRole={accountRole} reviewWindows={context.graduation_review_windows || []} defaultReviewWindow={context.graduation_default_review_window || ""} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { boardNotice.show("success", batchResult.message || "Saved."); setSelectedIds(new Set()); setStageGroupId(null); setSelectedStudentId(null); await refetch(); }} />}
+      {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} allRows={rows} accountRole={accountRole} reviewWindows={context.graduation_review_windows || []} defaultReviewWindow={context.graduation_default_review_window || ""} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { boardNotice.show("success", batchResult.message || "Saved."); setSelectedIds(new Set()); setStageGroupId(null); setSelectedStudentId(null); await refetch(); }} />}
       {exportNotice && (
         <ExportFollowUpModal
           id="graduation-export-follow-up"

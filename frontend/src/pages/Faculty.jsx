@@ -171,13 +171,15 @@ export default function Faculty() {
         </div>
       )}
 
-      {formFor && <FacultyFormModal faculty={formFor === "new" ? null : formFor} onClose={() => setFormFor(null)} onSaved={async (message) => { setFormFor(null); setNotice(message); await refetch(); }} />}
+      {formFor && <FacultyFormModal faculty={formFor === "new" ? null : formFor} departments={departments} onClose={() => setFormFor(null)} onSaved={async (message) => { setFormFor(null); setNotice(message); await refetch(); }} />}
       {selected && <FacultyProfileModal faculty={selected} courses={data?.courses || []} onSaved={refetch} onClose={closeFaculty} />}
     </div>
   );
 }
 
-function FacultyFormModal({ faculty, onClose, onSaved }) {
+const OTHER_DEPARTMENT = "__other__";
+
+function FacultyFormModal({ faculty, departments = [], onClose, onSaved }) {
   const isNew = !faculty;
   const [form, setForm] = useState(() => ({
     full_name: faculty?.name || "",
@@ -188,6 +190,8 @@ function FacultyFormModal({ faculty, onClose, onSaved }) {
     password: "",
     eligible_roles: faculty?.eligible_roles || ["Faculty Adviser", "Panel Member", "Panel Chair"],
   }));
+  // Departments already on record are picked; a new one is typed only on request (or when none exist yet).
+  const [typeDepartment, setTypeDepartment] = useState(() => !departments.length || Boolean(faculty?.college && !departments.includes(faculty.college)));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const set = (field, value) => setForm((current) => ({ ...current, [field]: value }));
@@ -249,7 +253,23 @@ function FacultyFormModal({ faculty, onClose, onSaved }) {
         {error && <InlineNotice tone="danger">{error}</InlineNotice>}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Full name"><Input value={form.full_name} onChange={(event) => set("full_name", event.target.value)} /></Field>
-          <Field label="Department"><Input value={form.department} onChange={(event) => set("department", event.target.value)} /></Field>
+          {departments.length ? (
+            <Field label="Department">
+              <Select
+                placeholder="Select a department…"
+                value={typeDepartment ? OTHER_DEPARTMENT : form.department}
+                onChange={(event) => {
+                  const other = event.target.value === OTHER_DEPARTMENT;
+                  setTypeDepartment(other);
+                  set("department", other ? "" : event.target.value);
+                }}
+                options={[...departments, { value: OTHER_DEPARTMENT, label: "Other (type a new one)" }]}
+              />
+            </Field>
+          ) : null}
+          {typeDepartment ? (
+            <Field label={departments.length ? "New department name" : "Department"}><Input value={form.department} onChange={(event) => set("department", event.target.value)} /></Field>
+          ) : null}
           <div className="sm:col-span-2"><Field label="Specialization"><Textarea rows={2} value={form.specialization} onChange={(event) => set("specialization", event.target.value)} /></Field></div>
           <Field label="Email (also the login)"><Input type="email" value={form.email} onChange={(event) => set("email", event.target.value)} /></Field>
           <Field label="Status"><Select placeholder="" value={form.status} onChange={(event) => set("status", event.target.value)} options={STATUS_OPTIONS} /></Field>

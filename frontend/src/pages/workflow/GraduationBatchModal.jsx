@@ -11,7 +11,7 @@ const GRADUATION_BATCH_MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-function defaultGraduationBatchForm(rows = []) {
+function defaultGraduationBatchForm(rows = [], allRows = rows) {
   const existingName = rows.find((row) => row.endorsement?.batch_name)?.endorsement?.batch_name || "";
   const match = existingName.match(/^Batch(?:\s+No\.)?\s+(\d+)\s+([A-Za-z]+)\s+(\d{4})$/);
   if (match) {
@@ -19,7 +19,8 @@ function defaultGraduationBatchForm(rows = []) {
   }
   const now = new Date();
   return {
-    batch_no: "1",
+    // one more than the highest batch number on the board (1 when there is no batch yet)
+    batch_no: String(1 + Math.max(0, ...allRows.map((row) => Number(/^Batch(?:\s+No\.)?\s+(\d+)/.exec(row.endorsement?.batch_name || "")?.[1]) || 0))),
     batch_month: GRADUATION_BATCH_MONTHS[now.getMonth()],
     batch_year: String(now.getFullYear()),
   };
@@ -36,10 +37,10 @@ function graduationSelectedActionLabel(action) {
   return action.label;
 }
 
-export function GraduationBatchModal({ rows, accountRole, reviewWindows, defaultReviewWindow, onClose, onSaved }) {
+export function GraduationBatchModal({ rows, allRows, accountRole, reviewWindows, defaultReviewWindow, onClose, onSaved }) {
   const selection = graduationStageSelection(rows, accountRole);
   const stageAction = selection.action;
-  const defaultBatch = defaultGraduationBatchForm(rows);
+  const defaultBatch = defaultGraduationBatchForm(rows, allRows);
   const activeReviewWindow = defaultReviewWindow || reviewWindows[0] || "";
   const selectedReviewWindow = activeReviewWindow;
   const reviewWindowOptions = reviewWindows.map((schoolYear) => ({
@@ -145,7 +146,11 @@ export function GraduationBatchModal({ rows, accountRole, reviewWindows, default
               <Field label="Batch No."><Input value={form.batch_no} onChange={update("batch_no")} inputMode="numeric" /></Field>
               <Field label="Month"><select value={form.batch_month} onChange={update("batch_month")} className="field-input cursor-pointer">{GRADUATION_BATCH_MONTHS.map((month) => <option key={month}>{month}</option>)}</select></Field>
               <Field label="Year"><Input value={form.batch_year} onChange={update("batch_year")} inputMode="numeric" /></Field>
-              <Field label="Graduation school year" hint={`Only ${activeReviewWindow || "the active school year"} can be selected.`}><Select value={form.review_window} onChange={update("review_window")} options={reviewWindowOptions} placeholder="" /></Field>
+              {activeReviewWindow ? (
+                <Field label="Graduation school year" hint="Only the current school year can be used."><p aria-label="Graduation school year" className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">{activeReviewWindow}</p></Field>
+              ) : (
+                <Field label="Graduation school year"><Select value={form.review_window} onChange={update("review_window")} options={reviewWindowOptions} placeholder="" /></Field>
+              )}
             </div>
             <p className="text-sm font-semibold text-brand-800">Batch label: {batchName}</p>
           </div>

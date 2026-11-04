@@ -284,7 +284,11 @@ test.describe("Faculty profiles (GS staff)", () => {
     await submit.click();
     await expect(add.getByText("Enter the name, department, specialization, and email.")).toBeVisible();
     await add.getByLabel("Full name").fill("Dr. Test Person");
-    await add.getByLabel("Department").fill("Education");
+    // I-261: Department is a pick from the departments on record, with "Other" to type a new one
+    await expect(add.getByLabel("New department name")).toHaveCount(0);
+    await expect(add.getByLabel("Department").locator("option", { hasText: "Business" })).toHaveCount(1);
+    await add.getByLabel("Department").selectOption({ label: "Other (type a new one)" });
+    await add.getByLabel("New department name").fill("Education");
     await add.getByLabel("Specialization").fill("Testing");
     await add.getByLabel("Email (also the login)").fill("test.person@usls.edu.ph");
     for (const role of ["Faculty Adviser", "Panel Member", "Panel Chair"]) await add.getByLabel(role, { exact: true }).uncheck();

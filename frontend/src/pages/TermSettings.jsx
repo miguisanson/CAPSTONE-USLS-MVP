@@ -2,13 +2,26 @@ import { useState } from "react";
 import { CalendarClock, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Button, DataTable, Field, InlineNotice, Input, Modal, PageHeader, Spinner, StatusChip } from "../components/ui/index.js";
+import { Button, DataTable, Field, InlineNotice, Input, Modal, PageHeader, Select, Spinner, StatusChip } from "../components/ui/index.js";
 import { useConfirm } from "../components/confirm";
 import { PAGE } from "../lib/labels.js";
 import { formatDate } from "../lib/format";
 
-const EMPTY_FORM = { label: "", start_date: "", end_date: "", planning_window_open: "", planning_window_close: "" };
+const EMPTY_FORM = { ay: "", sem: "", start_date: "", end_date: "", planning_window_open: "", planning_window_close: "" };
 const DATE_FIELDS = ["start_date", "end_date", "planning_window_open", "planning_window_close"];
+
+const SEMESTERS = ["1st Semester", "2nd Semester"]; // the only names the server accepts for a label
+
+/** Academic years already on record (start year of "AY 2026-2027") and the semester that follows the newest one. */
+function labelDefaults(items) {
+  const parsed = (items || []).map((t) => /(\d{4})-\d{4}\s*(1st|2nd)/i.exec(t.label || "")).filter(Boolean)
+    .map((m) => ({ year: Number(m[1]), second: m[2].toLowerCase() === "2nd" }));
+  if (!parsed.length) { const y = new Date().getFullYear(); return { years: [y, y + 1], year: y, sem: SEMESTERS[0] }; }
+  const last = parsed.reduce((a, b) => (b.year > a.year || (b.year === a.year && b.second && !a.second) ? b : a));
+  const next = last.second ? { year: last.year + 1, sem: SEMESTERS[0] } : { year: last.year, sem: SEMESTERS[1] };
+  const years = [...new Set([...parsed.map((p) => p.year), last.year + 1])].sort((a, b) => b - a);
+  return { years, ...next };
+}
 
 function DateFields({ form, onChange }) {
   return (
@@ -36,6 +49,9 @@ export default function TermSettings() {
   // The Academic Coordinator reads the semesters; only staff and admin change them (the server decides).
   const canManage = data?.permissions?.can_manage === true;
 
+  const defaults = labelDefaults(data?.items);
+  const label = form.ay && form.sem ? `AY ${form.ay}-${Number(form.ay) + 1} ${form.sem}` : "";
+
   const say = (text, tone = "success") => setNotice({ text, tone });
 
   async function addNext() {
@@ -48,7 +64,7 @@ export default function TermSettings() {
   }
 
   function openForm() {
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, ay: String(defaults.year), sem: defaults.sem });
     setFormError("");
     setShowForm(true);
   }
@@ -61,20 +77,20 @@ export default function TermSettings() {
 
   async function createSemester(event) {
     event.preventDefault();
-    if (!form.label.trim() || !form.start_date || !form.end_date) {
-      setFormError("Enter the semester name, start date, and end date.");
+    if (!label || !form.start_date || !form.end_date) {
+      setFormError("Enter the start date and end date.");
       return;
     }
     setSaving("create"); setFormError("");
     try {
       const res = await api.createTerm({
-        label: form.label.trim(),
+        label,
         start_date: form.start_date,
         end_date: form.end_date,
         planning_window_open: form.planning_window_open || null,
         planning_window_close: form.planning_window_close || null,
       });
-      say(res.message || `Added ${form.label.trim()}.`);
+      say(res.message || `Added ${label}.`);
       closeForm();
       await refetch();
     } catch (err) { setFormError(err.message); } finally { setSaving(""); }
@@ -250,7 +266,14 @@ export default function TermSettings() {
         >
           <form id="add-semester-form" onSubmit={createSemester} className="space-y-4">
             {formError && <InlineNotice tone="danger">{formError}</InlineNotice>}
-            <Field label="Semester name"><Input type="text" placeholder="AY 2026-2027 1st Semester" value={form.label} onChange={(e) => setField("label", e.target.value)} /></Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Academic year" hint="Continues from the newest semester on record.">
+                <Select aria-label="Academic year" placeholder={null} options={defaults.years.map((y) => ({ value: String(y), label: `AY ${y}-${y + 1}` }))} value={form.ay} onChange={(e) => setField("ay", e.target.value)} />
+              </Field>
+              <Field label="Semester">
+                <Select aria-label="Semester" placeholder={null} options={SEMESTERS} value={form.sem} onChange={(e) => setField("sem", e.target.value)} />
+              </Field>
+            </div>
             <DateFields form={form} onChange={setField} />
           </form>
         </Modal>

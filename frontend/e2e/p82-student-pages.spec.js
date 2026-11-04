@@ -422,7 +422,9 @@ test.describe("P82 student pages (pinned)", () => {
       await open(s.page, "/student/messages");
       await expect(main(s.page).getByText("Ask about an active request")).toBeVisible();
       await expect(main(s.page).getByLabel("Workflow").locator("option")).toHaveText(["Leave of Absence"]);
-      await expect(main(s.page).getByLabel("Recipient").locator("option")).toHaveText(["Graduate School Staff"]);
+      // I-260: with no other owner the only recipient is shown as text, not a one-option select
+      await expect(main(s.page).getByLabel("Recipient")).toHaveText("Graduate School Staff");
+      await expect(main(s.page).getByLabel("Recipient").locator("option")).toHaveCount(0);
       const send = main(s.page).getByRole("button", { name: "Send question" });
       await expect(send).toBeDisabled();
       await main(s.page).getByLabel("Question or clarification").fill("Spec question?");
@@ -443,6 +445,18 @@ test.describe("P82 student pages (pinned)", () => {
       await main(s.page).getByLabel("Filter messages").selectOption("all");
       await thread.getByRole("button", { name: /Open request/ }).click();
       await expect(s.page).toHaveURL(/\/student\/requests\/leave-of-absence$/);
+    } finally {
+      await s.finish();
+    }
+  });
+
+  test("Messages: the recipient defaults to the request's current owner (I-260)", async ({ browser }) => {
+    const s = await studentPage(browser, { mutate: (d) => { d.workflow_messages = THREAD; d.logs = [{ transaction_slug: "leave-of-absence", next_owner: "Dean" }]; } });
+    try {
+      await open(s.page, "/student/messages");
+      const recipient = main(s.page).getByLabel("Recipient");
+      await expect(recipient.locator("option")).toHaveText(["Dean", "Graduate School Staff"]);
+      await expect(recipient).toHaveValue("Dean");
     } finally {
       await s.finish();
     }

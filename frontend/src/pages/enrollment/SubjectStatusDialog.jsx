@@ -4,16 +4,15 @@
 // stay in the fields), not by greying the button out. The summary is the shared ErrorSummary of the student forms.
 import { useState } from "react";
 import { ClipboardCheck } from "lucide-react";
-import { Button, Field, InlineNotice, Input, Modal, Select, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Field, InlineNotice, Input, Modal, StatusChip, Textarea } from "../../components/ui/index.js";
 import PolicyRules from "../../components/PolicyRules";
 import { ErrorSummary } from "../student/shared";
 
-const FIELD_ORDER = ["status", "effectiveDate", "absence", "note"];
+const FIELD_ORDER = ["effectiveDate", "absence", "note"];
 
 /** The messages say what is wrong and how to fix it. Returns { field: message } (empty when the form is complete). */
 export function validateDrop(edit) {
   const errors = {};
-  if (!edit.status) errors.status = "Choose Dropped as the new status.";
   if (!edit.effectiveDate) errors.effectiveDate = "Enter the date the drop takes effect.";
   const absence = edit.unexcusedAbsencePercent;
   if (absence === "" || Number.isNaN(Number(absence))) {
@@ -52,7 +51,7 @@ export default function SubjectStatusDialog({ edit, setEdit, error, busy, onClos
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button onClick={submit} loading={busy}>
-            {busy ? "Saving…" : `Save ${edit.status || "status"}`}
+            {busy ? "Saving…" : "Save Dropped"}
           </Button>
         </>
       }
@@ -69,14 +68,8 @@ export default function SubjectStatusDialog({ edit, setEdit, error, busy, onClos
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="New status" required error={errors.status}>
-            <Select
-              id="drop-status"
-              placeholder="Choose status"
-              options={["Dropped"]}
-              value={edit.status}
-              onChange={set("status")}
-            />
+          <Field label="New status" hint="Dropped is the only status recorded here.">
+            <p id="drop-status" aria-label="New status" className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">Dropped</p>
           </Field>
           <Field label="Effective date" required error={errors.effectiveDate}>
             <Input id="drop-effectiveDate" type="date" value={edit.effectiveDate} onChange={set("effectiveDate")} />

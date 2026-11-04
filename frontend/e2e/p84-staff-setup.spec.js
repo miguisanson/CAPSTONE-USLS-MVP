@@ -258,11 +258,14 @@ test.describe("pins: the five set-up pages keep their behaviour (staff)", () => 
 
     // Add semester -> the form; saving it empty is refused on the page
     await page.getByRole("button", { name: "Add semester", exact: true }).click();
-    await expect(page.getByLabel("Semester name")).toBeVisible();
-    await page.getByRole("button", { name: "Save semester" }).click();
-    await expect(page.getByText("Enter the semester name, start date, and end date.")).toBeVisible();
-    await page.getByRole("button", { name: "Cancel" }).click();
+    // I-257: the name is built from two pickers, not typed
     await expect(page.getByLabel("Semester name")).toHaveCount(0);
+    await expect(page.getByLabel("Academic year")).toHaveValue(/^\d{4}$/);
+    await expect(page.getByLabel("Semester", { exact: true })).toHaveValue(/^(1st|2nd) Semester$/);
+    await page.getByRole("button", { name: "Save semester" }).click();
+    await expect(page.getByText("Enter the start date and end date.")).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByLabel("Academic year")).toHaveCount(0);
     expect(await noOverflow(page)).toBe(true);
   });
 
@@ -660,7 +663,7 @@ test.describe("P6.5: the library on the other pages", () => {
     const add = page.getByRole("dialog", { name: "Add semester" });
     await expect(add).toBeVisible();
     await add.getByRole("button", { name: "Save semester" }).click();
-    await expect(add.getByText("Enter the semester name, start date, and end date.")).toBeVisible(); // the message is IN the dialog
+    await expect(add.getByText("Enter the start date and end date.")).toBeVisible(); // the message is IN the dialog
     await page.keyboard.press("Escape");
     await expect(add).toHaveCount(0);
   });

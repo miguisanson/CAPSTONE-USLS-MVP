@@ -111,7 +111,6 @@ test.describe("I-001 Enrollment: Record dropped subject dialog", () => {
     expect(scrollInfo.length, "the dialog has its own scrolling area").toBeGreaterThan(0);
 
     // 3. Fill the form, then the Save button can be scrolled into view, is inside the viewport and works.
-    await dialog.getByLabel("New status").selectOption("Dropped");
     await dialog.getByLabel("Unexcused absences (% of class hours)").fill("25");
     await dialog.getByLabel("Coordinator note").fill("Registrar advice received: unexcused absences above the handbook limit.");
     const save = dialog.getByRole("button", { name: /^Save Dropped$/ });
