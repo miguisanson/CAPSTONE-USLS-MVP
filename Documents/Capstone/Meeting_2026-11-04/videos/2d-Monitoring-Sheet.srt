@@ -1,63 +1,55 @@
 1
-00:00:00,900 --> 00:00:22,900
-Next is the Monitoring Sheet, the curriculum grid the Graduate School used to keep in Excel: one row per student, one column per subject. In the portal, Graduate School staff keep it current on the screen, and every entry records its source.
-
-2
-00:00:23,100 --> 00:00:31,300
+00:00:01,300 --> 00:00:03,500
 Graduate School staff signs in.
 
+2
+00:00:06,099 --> 00:00:13,900
+The Monitoring Sheet, under Records: one row per student, one column per subject. Colours show completed, enrolled, or not yet taken.
+
 3
-00:00:34,600 --> 00:01:01,799
-This is the Monitoring Sheet, under Records. Graduate School staff picks the Master of Science in Nursing program. Each row is a student, each column a subject. The colour shows completed, enrolled, or not yet taken, and the legend explains every mark. Staff can still upload a workbook under Student Handoff instead.
+00:00:14,800 --> 00:00:23,699
+Graduate School staff adds a student missing from the imported sheet. The window warns: manual entry, recorded with the staff member's name and time.
 
 4
-00:01:02,799 --> 00:01:17,000
-Adding a student missing from the imported sheet. The window says up front: this is a manual entry, recorded with the staff member's name and time.
+00:00:26,000 --> 00:00:33,599
+Student ID, name and year of entry. The same required fields and duplicate checks as an import apply.
 
 5
-00:01:21,000 --> 00:01:39,399
-Graduate School staff types the student ID, name, and school year of entry. The import's required fields and duplicate checks apply here too, so manual entries are no sloppier than imports.
+00:00:33,799 --> 00:00:37,199
+The student is added, with a Student Portal login.
 
 6
-00:01:39,599 --> 00:01:51,599
-The student is added, with a Student Portal login, exactly like an import. Graduate School staff adds the subjects next.
+00:00:38,000 --> 00:00:43,299
+The record panel lists all eighteen subjects, none taken yet, with units counted automatically.
 
 7
-00:01:52,599 --> 00:02:03,700
-This is the student's record panel: all eighteen subjects of the curriculum, none taken yet, with the units counted automatically.
+00:00:45,700 --> 00:00:51,500
+Graduate School staff adds a subject: status Completed, the term, and a remark.
 
 8
-00:02:08,699 --> 00:02:19,600
-Graduate School staff adds a subject: status Completed, the term, and a remark, here 'credited from a transfer record'.
+00:00:54,899 --> 00:01:01,699
+Both rows say Manual entry in the Source column, so manual data is never mistaken for imported data.
 
 9
-00:02:25,699 --> 00:02:40,300
-After the second subject: two of eighteen completed, six units. In the Source column both rows say Manual entry, so nobody mistakes manual data for imported data.
+00:01:04,000 --> 00:01:08,000
+A remark is corrected with a simple edit.
 
 10
-00:02:45,000 --> 00:02:56,300
-To correct a remark, Graduate School staff edits the row. A portal entry needs only a simple edit.
+00:01:10,000 --> 00:01:17,500
+Removing a row needs a reason. The row returns to not taken and stays in the history.
 
 11
-00:03:00,099 --> 00:03:15,500
-Removing a row needs a reason. The row is not erased: it returns to not taken and stays in the history.
+00:01:20,700 --> 00:01:29,700
+The Change history tab shows every add, change and removal: old value, new value, who, when, source and reason. That is the audit trail.
 
 12
-00:03:15,699 --> 00:03:20,400
-One completed subject remains. The counts update.
+00:01:31,400 --> 00:01:38,099
+Back on the grid, the new student carries a Manual tag, and hand-entered cells show an orange dot.
 
 13
-00:03:22,300 --> 00:03:40,400
-This is the Change history tab. Every add, change and removal appears with old value, new value, who made it, when, source, and reason. That is the audit trail.
+00:01:39,099 --> 00:01:44,000
+Now an imported student. Every row says Imported: official workbook values.
 
 14
-00:03:42,199 --> 00:03:56,000
-Back on the grid, the new student carries a Manual tag. The hand-entered cell has a small orange dot, so manual data shows at a glance.
-
-15
-00:03:57,099 --> 00:04:06,500
-Now an imported student, Katrina Cabrera. Every row says Imported: official workbook values.
-
-16
-00:04:06,699 --> 00:04:28,100
-Changing an imported value requires a reason before the system saves it, and the history records the reason with the staff member's name. Official values are never overwritten silently. Grades are never entered here: AIMS is the official source.
+00:01:44,200 --> 00:01:53,299
+Changing an imported value requires a reason, recorded with the staff member's name. Grades are never entered here: AIMS is the official source.

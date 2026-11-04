@@ -1,0 +1,51 @@
+1
+00:00:01,199 --> 00:00:03,599
+Graduate School staff signs in.
+
+2
+00:00:05,299 --> 00:00:17,400
+First, rules with a source. Every rule the workflows follow sits in one register, with its Handbook or Protocol page and a label: enforced, only documented, or needs review.
+
+3
+00:00:17,600 --> 00:00:21,699
+Searching a topic lists the matching rules, each with its page.
+
+4
+00:00:27,699 --> 00:00:36,199
+Second, the Policy Assistant answers only from the Graduate School's own documents. Ask one question, and the answer names its source.
+
+5
+00:00:36,399 --> 00:00:43,899
+This site runs without the Gemini key, so this is the offline answer. The source opens to the exact passage.
+
+6
+00:00:48,399 --> 00:00:55,299
+Third, panel matching that explains itself. Each faculty member gets a score out of one hundred.
+
+7
+00:00:55,500 --> 00:01:03,000
+The breakdown is on screen: expertise, availability and workload, with the passage that matched. A person still chooses the panel.
+
+8
+00:01:10,900 --> 00:01:22,500
+Fourth, scheduling that checks before booking. It reads availability and suggests the best shared times.
+
+9
+00:01:22,700 --> 00:01:30,899
+Hard stops, such as a double-booked panelist or room, cannot be overridden. Warnings, such as the lead time, need a recorded reason.
+
+10
+00:01:33,700 --> 00:01:41,500
+Fifth, shared boards. Leave, readmission, AWOL, withdrawal, practicum and graduation run on the same staged boards, and every move is recorded.
+
+11
+00:01:47,000 --> 00:01:51,599
+Reports and Analytics are computed from those records, not typed in.
+
+12
+00:01:51,799 --> 00:02:01,899
+Each feature takes data the Graduate School already has, plus the governing policy, and turns it into a decision, a warning or a measurement.
+
+13
+00:02:02,099 --> 00:02:12,600
+The honest limits: the portal sends no e-mail, Google Calendar is optional, official data comes only from AIMS, and rules marked Needs review wait for validation. Thank you.

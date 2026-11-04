@@ -1,103 +1,83 @@
 1
-00:00:00,900 --> 00:00:15,100
-Last is the improper way out: a student who stopped enrolling without an approved leave. Nobody types 'AWOL'; the system flags it from the imported enrollment records.
+00:00:01,700 --> 00:00:04,000
+Graduate School staff signs in.
 
 2
-00:00:16,399 --> 00:00:23,600
-Graduate School staff signs in.
+00:00:04,900 --> 00:00:11,500
+The AWOL and Residency board flags cases from imported enrollment records. Nobody types AWOL.
 
 3
-00:00:25,199 --> 00:00:38,500
-The AWOL and Residency board flags cases from the source records. The line above counts the cases in each column.
+00:00:11,699 --> 00:00:19,100
+Maya Torres's card sits in AWOL, Waiting for: Student. Staff cannot move it; only the student can start a return.
 
 4
-00:00:38,700 --> 00:00:53,699
-Graduate School staff finds Maya Torres's card in AWOL, with the flag's start date and 'Waiting for: Student'. Staff cannot move it; only the student can start a return.
+00:00:20,100 --> 00:00:27,300
+Residence limits apply: master's, five years normal and seven absolute; doctorate, seven and nine. Leave time counts.
 
 5
-00:00:54,799 --> 00:01:17,700
-Residence limits apply: for a master's student, five years normal and seven absolute; for a doctorate, seven and nine. Time on leave counts toward residence. Each rule shows its Handbook page.
+00:00:28,399 --> 00:00:34,799
+The card shows the AWOL date, the flag's source and the last enrolled semester.
 
 6
-00:01:19,599 --> 00:01:32,399
-The card shows the AWOL date, the flag's source, and the last enrolled semester. Graduate School staff has no button yet.
+00:00:35,000 --> 00:00:37,299
+Maya signs in.
 
 7
-00:01:32,599 --> 00:01:40,399
-The student, Maya, signs in.
+00:00:38,299 --> 00:00:42,899
+The Return from AWOL page shows the flag. Registration stays restricted until review.
 
 8
-00:01:42,099 --> 00:01:52,700
-The Return from AWOL page shows the flag, and says registration stays restricted until review.
+00:00:46,299 --> 00:00:51,299
+Maya picks the return semester and last enrolled semester, and writes the reason.
 
 9
-00:02:01,599 --> 00:02:10,600
-Maya picks the return semester and last enrolled semester, then writes the intention and reason.
+00:00:54,100 --> 00:00:57,799
+Submitted. The system checks that Maya is within the maximum residence.
 
 10
-00:02:10,800 --> 00:02:17,000
-Maya checks the summary and sends.
+00:00:58,500 --> 00:01:04,399
+Graduate School staff signs in.
 
 11
-00:02:17,199 --> 00:02:28,300
-Submitted. The system finds Maya within the maximum residence. The student cannot cancel it, only contact the Graduate School office.
+00:01:04,599 --> 00:01:09,599
+On the staff board, the card moves itself to Return review.
 
 12
-00:02:29,400 --> 00:02:41,800
-Graduate School staff signs in.
-
-13
-00:02:42,000 --> 00:02:50,500
-On the staff board, the card has moved itself to Return review.
-
-14
-00:02:50,699 --> 00:02:59,600
+00:01:09,799 --> 00:01:13,799
 The request shows the intention and the residence limits.
 
-15
-00:03:08,099 --> 00:03:16,200
+13
+00:01:18,000 --> 00:01:23,700
 Graduate School staff forwards it to the Dean with a note.
 
+14
+00:01:25,900 --> 00:01:28,099
+The Dean signs in.
+
+15
+00:01:36,599 --> 00:01:43,299
+The Dean drags the card to Back in the program. Approval restores standing.
+
 16
-00:03:16,400 --> 00:03:20,200
-Forwarded and locked.
+00:01:43,500 --> 00:01:44,700
+Maya is active.
 
 17
-00:03:20,400 --> 00:03:26,900
-The Dean signs in to decide.
-
-18
-00:03:32,099 --> 00:03:44,800
-The Dean finds Maya's card in that column.
-
-19
-00:03:45,000 --> 00:03:56,200
-The Dean drags it to Back in the program; approval restores standing.
-
-20
-00:03:56,400 --> 00:04:02,300
-The card lands in Back in the program: Maya is active.
-
-21
-00:04:03,400 --> 00:04:15,700
+00:01:45,400 --> 00:01:51,799
 Graduate School staff signs in.
 
-22
-00:04:15,900 --> 00:04:25,800
-Staff board: the Academic Coordinator is next owner, since enrollment is a separate step.
+18
+00:01:52,000 --> 00:01:57,399
+The Academic Coordinator is next owner, since enrollment is a separate step.
 
-23
-00:04:26,000 --> 00:04:31,600
-All four tracker steps are complete.
+19
+00:02:00,200 --> 00:02:05,099
+The Registrar list holds one report per approved return, downloaded and sent officially.
 
-24
-00:04:31,800 --> 00:04:42,500
-The Registrar list here has one report per approved return. Graduate School staff downloads it and sends it officially.
+20
+00:02:06,099 --> 00:02:11,500
+Maya signs in.
 
-25
-00:04:43,800 --> 00:04:54,800
-The student, Maya, signs in.
-
-26
-00:04:55,000 --> 00:05:05,900
-Maya sees the approval. Leave, return and AWOL all ran on the same board, request window and Registrar list.
+21
+00:02:11,699 --> 00:02:18,100
+Maya sees the approval. Leave, return and AWOL all run on the same board, request window and Registrar list.

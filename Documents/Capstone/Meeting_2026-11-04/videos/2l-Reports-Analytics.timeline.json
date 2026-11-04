@@ -1,192 +1,186 @@
 [
  {
-  "t": 0.9,
-  "kind": "card",
-  "label": "Part 2l \u00b7 Reports & Analytics",
-  "role": ""
- },
- {
-  "t": 18.8,
+  "t": 2.2,
   "kind": "card",
   "label": "Signing in as Graduate School Staff",
   "role": "Graduate School Staff"
  },
  {
-  "t": 27.0,
+  "t": 4.7,
   "kind": "signin",
   "label": "signed in as Graduate School Staff (staff@usls.edu.ph)",
   "role": "Graduate School Staff"
  },
  {
-  "t": 27.0,
+  "t": 4.7,
   "kind": "step",
   "label": "open Reports & Analytics",
   "role": "Graduate School Staff"
  },
  {
-  "t": 30.6,
+  "t": 9.9,
   "kind": "hold",
   "label": "reports-tour-01",
   "role": "Graduate School Staff"
  },
  {
-  "t": 50.2,
+  "t": 18.3,
   "kind": "step",
   "label": "read the six numbers",
   "role": "Graduate School Staff"
  },
  {
-  "t": 50.4,
+  "t": 18.4,
   "kind": "hold",
   "label": "reports-tour-02",
   "role": "Graduate School Staff"
  },
  {
-  "t": 64.2,
+  "t": 23.6,
   "kind": "hold",
   "label": "reports-tour-03",
   "role": "Graduate School Staff"
  },
  {
-  "t": 78.2,
+  "t": 29.8,
   "kind": "step",
   "label": "Needs attention: the causes, the students behind a bar, the list",
   "role": "Graduate School Staff"
  },
  {
-  "t": 78.6,
+  "t": 30.2,
   "kind": "hold",
   "label": "reports-tour-04",
   "role": "Graduate School Staff"
  },
  {
-  "t": 91.8,
+  "t": 36.4,
   "kind": "hold",
   "label": "reports-tour-05",
   "role": "Graduate School Staff"
  },
  {
-  "t": 103.1,
+  "t": 41.4,
   "kind": "hold",
   "label": "reports-tour-06",
   "role": "Graduate School Staff"
  },
  {
-  "t": 121.8,
+  "t": 50.6,
   "kind": "step",
   "label": "Where students get stuck",
   "role": "Graduate School Staff"
  },
  {
-  "t": 123.7,
+  "t": 51.8,
   "kind": "hold",
   "label": "reports-tour-07",
   "role": "Graduate School Staff"
  },
  {
-  "t": 136.0,
+  "t": 57.9,
   "kind": "hold",
   "label": "reports-tour-07b",
   "role": "Graduate School Staff"
  },
  {
-  "t": 151.3,
+  "t": 63.3,
   "kind": "step",
   "label": "Office speed",
   "role": "Graduate School Staff"
  },
  {
-  "t": 153.1,
+  "t": 64.5,
   "kind": "hold",
   "label": "reports-tour-08",
   "role": "Graduate School Staff"
  },
  {
-  "t": 166.7,
+  "t": 71.8,
   "kind": "step",
   "label": "Records to fix",
   "role": "Graduate School Staff"
  },
  {
-  "t": 168.6,
+  "t": 73.0,
   "kind": "hold",
   "label": "reports-tour-09",
   "role": "Graduate School Staff"
  },
  {
-  "t": 180.3,
+  "t": 80.0,
   "kind": "step",
   "label": "report: Cohorts by stage",
   "role": "Graduate School Staff"
  },
  {
-  "t": 182.2,
+  "t": 81.2,
   "kind": "hold",
   "label": "reports-tour-10",
   "role": "Graduate School Staff"
  },
  {
-  "t": 193.1,
+  "t": 82.6,
   "kind": "step",
   "label": "report: Graduation candidates",
   "role": "Graduate School Staff"
  },
  {
-  "t": 195.0,
+  "t": 83.8,
   "kind": "hold",
   "label": "reports-tour-11",
   "role": "Graduate School Staff"
  },
  {
-  "t": 204.2,
+  "t": 87.4,
   "kind": "step",
   "label": "report: Overdue and pending",
   "role": "Graduate School Staff"
  },
  {
-  "t": 206.1,
+  "t": 88.5,
   "kind": "hold",
   "label": "reports-tour-12",
   "role": "Graduate School Staff"
  },
  {
-  "t": 215.2,
+  "t": 91.7,
   "kind": "step",
   "label": "report: Defenses",
   "role": "Graduate School Staff"
  },
  {
-  "t": 217.1,
+  "t": 92.9,
   "kind": "hold",
   "label": "reports-tour-13",
   "role": "Graduate School Staff"
  },
  {
-  "t": 223.7,
+  "t": 96.1,
   "kind": "step",
   "label": "Registrar changes",
   "role": "Graduate School Staff"
  },
  {
-  "t": 225.6,
+  "t": 97.3,
   "kind": "hold",
   "label": "reports-tour-14",
   "role": "Graduate School Staff"
  },
  {
-  "t": 236.9,
+  "t": 101.6,
   "kind": "step",
   "label": "filter by program: every number follows",
   "role": "Graduate School Staff"
  },
  {
-  "t": 241.2,
+  "t": 104.2,
   "kind": "hold",
   "label": "reports-tour-15",
   "role": "Graduate School Staff"
  },
  {
-  "t": 261.1,
+  "t": 110.3,
   "kind": "end",
   "label": "end of part",
   "role": "Graduate School Staff"

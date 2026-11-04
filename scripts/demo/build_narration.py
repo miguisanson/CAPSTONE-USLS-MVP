@@ -18,20 +18,9 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parents[1]
-OUT = ROOT / "Documents" / "Capstone" / "Meeting_2026-11-04"
 NARRATION = json.loads((HERE / "narration.json").read_text(encoding="utf-8"))
 GREEN = RGBColor(0x0F, 0x5C, 0x3F)
 SOFFICE = "E:/LibreOffice/program/soffice.exe"
-CLOSING = [
-    "Rules with a source. Every rule the workflows follow sits in one register, with its Handbook or Protocol page and a label: enforced, only documented, or needs review. Each rule also appears on the screen where it applies, and a refusal quotes the rule.",
-    "A policy library and an assistant that cites its source. The Policy Assistant answers only from the Graduate School's own documents, names the document and page, and says when the documents do not cover a question.",
-    "Panel matching that explains itself. Each faculty member gets a score out of one hundred, from the paper's similarity to the faculty member's expertise, availability and workload, with the breakdown on screen. A person still chooses the panel.",
-    "Scheduling that checks before booking. It reads availability, suggests the best shared times, and separates hard stops, such as a double-booked panelist, from overridable warnings that need a recorded reason.",
-    "Shared boards and reports computed from records. Leave, readmission, AWOL, withdrawal, practicum and graduation run on the same staged boards, every move is recorded, and Reports and Analytics are computed from those records.",
-    "What connects all five: each takes data the Graduate School already has, plus the governing policy, and turns it into a decision, a warning or a measurement, not just a stored record.",
-    "Now the honest limits: the portal sends no e-mail, Google Calendar is optional, official student, enrollment and grade data come only from AIMS, and rules marked Needs review wait for the Graduate School's validation. Thank you.",
-]
 
 
 def ts(sec: float, srt: bool = False) -> str:
@@ -50,16 +39,14 @@ def rows_for(key: str, events: list[dict]) -> list[tuple[float, float, str, str]
         if e["kind"] == "step":
             step = e["label"][:1].upper() + e["label"][1:]
             continue
-        if e["kind"] == "card" and e["label"].startswith("Part "):
-            line, screen = NARRATION.get(f"{key}:intro", ""), "Title card"
-        elif e["kind"] == "card":
+        if e["kind"] == "card":  # marks the moment the login starts; carries no line itself
             continue
         elif e["kind"] == "signin":
             role = e["role"] or "Student"
             seen[role] = seen.get(role, 0) + 1  # a role's second sign-in may have its own ':2' line
             line = NARRATION.get(f"{key}:signin:{role}:{seen[role]}") or NARRATION.get(f"{key}:signin:{role}", "")
             screen = e["label"][:1].upper() + e["label"][1:]
-            # the sign-in card came just before: start the line there
+            # the login began at the 'card' event just before: start the line there
             prev = events[i - 1] if i else e
             e = {**e, "t": prev["t"] if prev["kind"] == "card" else e["t"]}
         elif e["kind"] == "hold":
@@ -134,15 +121,10 @@ def main() -> None:
             srt.append(f"{n}\n{ts(start, True)} --> {ts(max(end - 0.2, start + 1), True)}\n{line}\n")
         (vids / f"{stem}.srt").write_text("\n".join(srt), encoding="utf-8")
 
-    doc.add_heading("2m Best Features (closing, no video — say it over the closing slide, about 2 minutes)", 1)
-    for line in CLOSING:
-        doc.add_paragraph(line, style="List Number")
-
-    OUT.mkdir(parents=True, exist_ok=True)
-    path = OUT / "NARRATION-SCRIPT.docx"
+    path = vids / "NARRATION-SCRIPT.docx"  # the script lives next to the videos it narrates
     doc.save(path)
     subprocess.run([SOFFICE, "--headless", "-env:UserInstallation=file:///E:/Temp/claude/lo-profile-narr", "--convert-to", "pdf",
-                    "--outdir", str(OUT), str(path)], check=False, capture_output=True)
+                    "--outdir", str(vids), str(path)], check=False, capture_output=True)
     print("saved", path)
 
 

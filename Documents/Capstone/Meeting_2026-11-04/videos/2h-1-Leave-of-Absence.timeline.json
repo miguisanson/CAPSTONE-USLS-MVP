@@ -1,306 +1,300 @@
 [
  {
-  "t": 0.9,
-  "kind": "card",
-  "label": "Part 2h-1 \u00b7 Leave of Absence",
-  "role": ""
- },
- {
-  "t": 16.7,
+  "t": 0.7,
   "kind": "step",
   "label": "reset Daniel",
   "role": ""
  },
  {
-  "t": 17.8,
+  "t": 1.8,
   "kind": "card",
   "label": "Signing in as Student",
   "role": "Student"
  },
  {
-  "t": 32.9,
+  "t": 5.8,
   "kind": "signin",
   "label": "signed in as Student (loa.daniel@usls.edu.ph)",
   "role": "Student"
  },
  {
-  "t": 32.9,
+  "t": 5.8,
   "kind": "step",
   "label": "student opens Leave of Absence",
   "role": "Student"
  },
  {
-  "t": 34.4,
+  "t": 6.5,
   "kind": "hold",
   "label": "leave-of-absence-01",
   "role": "Student"
  },
  {
-  "t": 49.2,
+  "t": 12.3,
   "kind": "step",
   "label": "student reads the rules panel",
   "role": "Student"
  },
  {
-  "t": 50.1,
+  "t": 13.1,
   "kind": "hold",
   "label": "leave-of-absence-02",
   "role": "Student"
  },
  {
-  "t": 71.2,
+  "t": 18.5,
   "kind": "step",
   "label": "student fills the form",
   "role": "Student"
  },
  {
-  "t": 79.4,
+  "t": 22.1,
   "kind": "hold",
   "label": "leave-of-absence-03",
   "role": "Student"
  },
  {
-  "t": 89.7,
+  "t": 25.2,
   "kind": "step",
   "label": "student sends the request",
   "role": "Student"
  },
  {
-  "t": 90.7,
+  "t": 26.2,
   "kind": "hold",
   "label": "leave-of-absence-04",
   "role": "Student"
  },
  {
-  "t": 100.6,
+  "t": 29.9,
   "kind": "hold",
   "label": "leave-of-absence-05",
   "role": "Student"
  },
  {
-  "t": 113.7,
+  "t": 33.1,
   "kind": "card",
   "label": "Signing in as Graduate School Staff",
   "role": "Graduate School Staff"
  },
  {
-  "t": 121.5,
+  "t": 35.4,
   "kind": "signin",
   "label": "signed in as Graduate School Staff (staff@usls.edu.ph)",
   "role": "Graduate School Staff"
  },
  {
-  "t": 121.5,
+  "t": 35.4,
   "kind": "step",
   "label": "staff opens the Leave of Absence board and finds Daniel",
   "role": "Graduate School Staff"
  },
  {
-  "t": 125.2,
+  "t": 37.5,
   "kind": "hold",
   "label": "leave-of-absence-06",
   "role": "Graduate School Staff"
  },
  {
-  "t": 139.6,
+  "t": 41.9,
   "kind": "step",
   "label": "staff drags the card to In staff review",
   "role": "Graduate School Staff"
  },
  {
-  "t": 142.6,
+  "t": 43.7,
   "kind": "hold",
   "label": "leave-of-absence-07",
   "role": "Graduate School Staff"
  },
  {
-  "t": 158.7,
+  "t": 49.5,
   "kind": "step",
   "label": "staff switches to Table and back to Board",
   "role": "Graduate School Staff"
  },
  {
-  "t": 160.2,
+  "t": 50.4,
   "kind": "hold",
   "label": "leave-of-absence-08",
   "role": "Graduate School Staff"
  },
  {
-  "t": 168.0,
+  "t": 52.3,
   "kind": "step",
   "label": "staff opens the request and reads the policy check",
   "role": "Graduate School Staff"
  },
  {
-  "t": 170.4,
+  "t": 53.7,
   "kind": "hold",
   "label": "leave-of-absence-09",
   "role": "Graduate School Staff"
  },
  {
-  "t": 178.8,
+  "t": 55.7,
   "kind": "hold",
   "label": "leave-of-absence-10",
   "role": "Graduate School Staff"
  },
  {
-  "t": 194.5,
+  "t": 61.5,
   "kind": "step",
   "label": "staff forwards to the Dean",
   "role": "Graduate School Staff"
  },
  {
-  "t": 204.3,
+  "t": 65.8,
   "kind": "hold",
   "label": "leave-of-absence-11",
   "role": "Graduate School Staff"
  },
  {
-  "t": 213.5,
+  "t": 71.0,
   "kind": "hold",
   "label": "leave-of-absence-12",
   "role": "Graduate School Staff"
  },
  {
-  "t": 225.3,
+  "t": 75.8,
   "kind": "card",
   "label": "Signing in as Dean",
   "role": "Dean"
  },
  {
-  "t": 233.5,
+  "t": 78.3,
   "kind": "signin",
   "label": "signed in as Dean (dean@usls.edu.ph)",
   "role": "Dean"
  },
  {
-  "t": 233.5,
+  "t": 78.3,
   "kind": "step",
   "label": "Dean drags the card to Leave scheduled and approves",
   "role": "Dean"
  },
  {
-  "t": 238.5,
+  "t": 81.1,
   "kind": "hold",
   "label": "leave-of-absence-13",
   "role": "Dean"
  },
  {
-  "t": 253.5,
+  "t": 86.5,
   "kind": "hold",
   "label": "leave-of-absence-14",
   "role": "Dean"
  },
  {
-  "t": 267.5,
+  "t": 91.6,
   "kind": "hold",
   "label": "leave-of-absence-15",
   "role": "Dean"
  },
  {
-  "t": 281.0,
+  "t": 95.9,
   "kind": "step",
   "label": "staff sees the approved request in Leave scheduled",
   "role": "Dean"
  },
  {
-  "t": 281.9,
+  "t": 96.4,
   "kind": "card",
   "label": "Signing in as Graduate School Staff",
   "role": "Graduate School Staff"
  },
  {
-  "t": 289.7,
+  "t": 98.8,
   "kind": "signin",
   "label": "signed in as Graduate School Staff (staff@usls.edu.ph)",
   "role": "Graduate School Staff"
  },
  {
-  "t": 295.0,
+  "t": 102.5,
   "kind": "hold",
   "label": "leave-of-absence-16",
   "role": "Graduate School Staff"
  },
  {
-  "t": 304.2,
+  "t": 103.9,
   "kind": "step",
   "label": "staff drags the card to On leave and starts the leave",
   "role": "Graduate School Staff"
  },
  {
-  "t": 307.3,
+  "t": 105.9,
   "kind": "hold",
   "label": "leave-of-absence-17",
   "role": "Graduate School Staff"
  },
  {
-  "t": 317.4,
+  "t": 111.8,
   "kind": "hold",
   "label": "leave-of-absence-18",
   "role": "Graduate School Staff"
  },
  {
-  "t": 324.8,
+  "t": 115.0,
   "kind": "step",
   "label": "staff sees the Registrar list",
   "role": "Graduate School Staff"
  },
  {
-  "t": 325.4,
+  "t": 115.7,
   "kind": "hold",
   "label": "leave-of-absence-19",
   "role": "Graduate School Staff"
  },
  {
-  "t": 338.5,
+  "t": 120.4,
   "kind": "step",
   "label": "staff downloads the Registrar list (CSV)",
   "role": "Graduate School Staff"
  },
  {
-  "t": 340.3,
+  "t": 122.0,
   "kind": "hold",
   "label": "leave-of-absence-20",
   "role": "Graduate School Staff"
  },
  {
-  "t": 348.1,
+  "t": 123.4,
   "kind": "step",
   "label": "staff marks the list as sent",
   "role": "Graduate School Staff"
  },
  {
-  "t": 351.5,
+  "t": 125.7,
   "kind": "hold",
   "label": "leave-of-absence-21",
   "role": "Graduate School Staff"
  },
  {
-  "t": 363.3,
+  "t": 129.6,
   "kind": "step",
   "label": "student sees the leave",
   "role": "Graduate School Staff"
  },
  {
-  "t": 364.2,
+  "t": 130.1,
   "kind": "card",
   "label": "Signing in as Student",
   "role": "Student"
  },
  {
-  "t": 379.3,
+  "t": 132.6,
   "kind": "signin",
   "label": "signed in as Student (loa.daniel@usls.edu.ph)",
   "role": "Student"
  },
  {
-  "t": 382.4,
+  "t": 135.2,
   "kind": "hold",
   "label": "leave-of-absence-22",
   "role": "Student"
  },
  {
-  "t": 392.0,
+  "t": 138.5,
   "kind": "end",
   "label": "end of part",
   "role": "Student"

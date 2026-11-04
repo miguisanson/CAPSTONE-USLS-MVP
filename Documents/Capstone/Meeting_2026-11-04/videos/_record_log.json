@@ -1,0 +1,117 @@
+[
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "note",
+  "message": "reset leave-of-absence-daniel: Reset Daniel Fernandez's Leave-Of-Absence demo. All prerequisite stages are complete and the student is ready to begin again."
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "reset Daniel"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "student opens Leave of Absence"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "student reads the rules panel"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "student fills the form"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "student sends the request"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "staff opens the Leave of Absence board and finds Daniel"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "staff drags the card to In staff review"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "staff switches to Table and back to Board"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "staff opens the request and reads the policy check"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "note",
+  "message": "forward dialog: Forward to Dean |  | Daniel Fernandez - Leave of Absence |  | In staff review | With the Dean |  | The request goes to the Dean, who decides. Nothing is decided yet. |  | Eligibility result | Use the policy check result (Needs Review) | Eligible | Eligible to Return | Needs Review | Not Eligible | Pending Requirements | Advice from the policy check: Needs Review. The Dean decides. | Note for the Dean | Optional. Staff and the Dean can see it. | Forward to Dean | Cancel |  | Your decision is recorded as your electronic approval (GS-P-03)."
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "staff forwards to the Dean"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "note",
+  "message": "dean dialog: Approve |  | Daniel Fernandez - Leave of Absence |  | With the Dean | Leave scheduled |  | Note (optional) | Kept with this step in the history. | Approve | Cancel |  | Your decision is recorded as your electronic approval (GS-P-03)."
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "Dean drags the card to Leave scheduled and approves"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "staff sees the approved request in Leave scheduled"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "note",
+  "message": "start dialog: Start the leave now |  | Daniel Fernandez - Leave of Absence |  | Leave scheduled | On leave |  | Note (optional) | Kept with this step in the history. | Start the leave now | Cancel |  | Your decision is recorded as your electronic approval (GS-P-03)."
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "staff drags the card to On leave and starts the leave"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "staff sees the Registrar list"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "note",
+  "message": "downloaded approved-leaves-of-absence-2026-11-04.csv"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "note",
+  "message": "export dialog: Registrar list downloaded |  | The file was downloaded successfully. No email was sent by the portal. |  | EXPORTED FILE |  | approved-leaves-of-absence-2026-11-04.csv |  | Email the leave of absence list to the Registrar |  | Graduate School staff must attach the downloaded file and send it through the official email channel. |  | Wait for Registrar acknowledgement |  | Keep the case at \u201cExported \u2014 Ready to Send\u201d until the Registrar acknowledges the email outside the portal. |  | Got it"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "staff downloads the Registrar list (CSV)"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "staff marks the list as sent"
+ },
+ {
+  "case": "capture.case_10_leave_of_absence",
+  "kind": "ok",
+  "message": "student sees the leave"
+ }
+]

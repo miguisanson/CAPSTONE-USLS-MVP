@@ -1,95 +1,75 @@
 1
-00:00:00,900 --> 00:00:08,200
-That was leaving properly. Readmission is the return from an approved leave.
+00:00:01,700 --> 00:00:05,799
+Therese, a student on approved leave, signs in to come back.
 
 2
-00:00:09,400 --> 00:00:20,800
-Therese Lacson, a student already on approved leave, signs in.
+00:00:06,799 --> 00:00:12,800
+The Readmission page: enrollment stays closed until readmission is approved. The leave being ended is pre-filled.
 
 3
-00:00:22,500 --> 00:00:35,399
-The Readmission page says Therese is on leave and enrollment stays closed until readmission is approved. The leave being ended is pre-filled.
-
-4
-00:00:36,399 --> 00:00:45,199
+00:00:13,699 --> 00:00:18,699
 The rule: a returning student writes an intent to enroll, Handbook page fifty-three.
 
+4
+00:00:22,600 --> 00:00:27,100
+Therese picks the return semester, gives a reason, and confirms the four checklist items.
+
 5
-00:00:54,500 --> 00:01:02,399
-Therese picks the return semester, gives a reason for returning, and confirms the four checklist items.
+00:00:30,899 --> 00:00:34,399
+Submitted, to Graduate School staff and then the Dean.
 
 6
-00:01:03,700 --> 00:01:09,899
-Again, a summary to check first.
+00:00:34,600 --> 00:00:37,000
+Graduate School staff signs in.
 
 7
-00:01:10,099 --> 00:01:19,099
-Submitted. The request goes to Graduate School staff, then to the Dean.
+00:00:39,299 --> 00:00:45,299
+The Readmission board has the same layout with its own columns. Therese's card is in Submitted.
 
 8
-00:01:19,299 --> 00:01:25,899
-Graduate School staff signs in.
-
-9
-00:01:29,900 --> 00:01:37,200
-The Readmission board: same layout, own columns. Therese's card is in Submitted.
-
-10
-00:01:40,299 --> 00:01:44,000
-Graduate School staff drags it to review.
-
-11
-00:01:46,000 --> 00:01:53,299
+00:00:49,600 --> 00:00:54,599
 The request shows the return semester, the intention, and the linked leave.
 
-12
-00:01:53,500 --> 00:02:07,299
-The checklist shows what the student ticked, not yet verified. Below, the history: one year in the program, two of four leave semesters already approved.
+9
+00:00:54,799 --> 00:01:00,500
+The checklist shows what the student ticked, not yet verified, and the leave history.
 
-13
-00:02:07,500 --> 00:02:20,000
-The policy check flags an early return, before the leave ends. Only the Dean can allow that, so it shows Needs review.
+10
+00:01:00,700 --> 00:01:07,500
+The policy check flags an early return. Only the Dean can allow that, so it shows Needs review.
 
-14
-00:02:27,900 --> 00:02:40,400
+11
+00:01:11,400 --> 00:01:19,000
 Forwarding, Graduate School staff ticks the items verified. Anything unticked reaches the Dean as Needs review.
 
-15
-00:02:40,599 --> 00:02:45,300
-Forwarded, locked, waiting for the Dean.
-
-16
-00:02:45,500 --> 00:02:52,000
+12
+00:01:21,200 --> 00:01:23,399
 The Dean signs in to decide.
 
-17
-00:02:57,300 --> 00:03:09,700
-The Dean finds Therese's request in With the Dean.
+13
+00:01:31,799 --> 00:01:36,700
+The Dean approves the return, with a note.
 
-18
-00:03:09,900 --> 00:03:19,400
-The Dean approves it, back in the program, with a note.
+14
+00:01:36,900 --> 00:01:43,599
+Therese is active again. Readmission restores standing but does not enroll subjects. The Academic Coordinator does that next.
 
-19
-00:03:19,599 --> 00:03:30,700
-Therese is active again. Readmission restores standing but does not enroll the student in subjects. The Academic Coordinator does that next.
-
-20
-00:03:31,800 --> 00:03:43,800
+15
+00:01:44,299 --> 00:01:50,299
 Graduate School staff signs in.
 
-21
-00:03:44,000 --> 00:03:54,900
+16
+00:01:50,500 --> 00:01:56,799
 The staff board now shows the Academic Coordinator as next owner, flagged for the Registrar.
 
-22
-00:03:55,099 --> 00:04:02,300
-Same Registrar list: Graduate School staff downloads, sends, marks sent, then acknowledged.
+17
+00:01:57,000 --> 00:02:00,700
+The same Registrar list: download, send, mark sent, then acknowledged.
 
-23
-00:04:03,400 --> 00:04:18,000
-Finally, Therese signs back in.
+18
+00:02:01,500 --> 00:02:06,799
+Therese signs back in.
 
-24
-00:04:18,199 --> 00:04:26,100
+19
+00:02:07,000 --> 00:02:10,700
 Therese sees the approval, with messages from staff and the Dean.
