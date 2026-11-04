@@ -4,7 +4,7 @@ import { BookPlus, BriefcaseBusiness, CalendarOff, CheckCircle2, ChevronDown, Ch
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { homePath } from "../lib/homePaths.js";
-import { GUIDES } from "../lib/demoGuide/guides.js";
+import { GUIDES } from "../lib/demoGuide/guides/index.js";
 import { firstStop, startDemoSession } from "../lib/demoGuide/session.js";
 import { guideEnabled, setGuideEnabled } from "../lib/demoGuide/prefs.js";
 import { Button, InlineNotice, Input, PageHeader } from "../components/ui/index.js";

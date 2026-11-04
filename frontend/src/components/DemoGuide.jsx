@@ -4,20 +4,24 @@
 //
 // The one rule: the guide follows the RECORD, not the clicks. It asks GET /api/demo/guide-state where the case really is
 // (after every write, on every page change, and on "Continue from here") and shows the step that matches.
-// The engine (lib/demoGuide/engine.js) decides which step; the content is lib/demoGuide/guides.js. The guide never clicks or
-// types for the presenter.
+// The engine (lib/demoGuide/engine.js) decides which step; the content is lib/demoGuide/guides/ (one file per guide).
+// Slideshow (autopilot, owner 2026-11-04): a started demo locks into a bottom bar whose Next plays the step on the page by itself
+// (lib/demoGuide/useAutopilot.js + autopilot.js); Take over hands the page back and the guide keeps following the record.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Compass, Crosshair, EyeOff, ListChecks, PanelLeft, PanelRight, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Compass, Crosshair, EyeOff, ListChecks, PanelLeft, PanelRight, Play, X } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { Button, InlineNotice, ProgressBar, Select } from "./ui/index.js";
-import { GUIDES, RESET_KEYS, guideById } from "../lib/demoGuide/guides.js";
+import DemoAutopilotBar from "./DemoAutopilotBar.jsx";
+import { GUIDES, RESET_KEYS, guideById } from "../lib/demoGuide/guides/index.js";
 import { switchToAccount } from "../lib/demoGuide/session.js";
 import { sayLine } from "../lib/demoGuide/narration.js";
 import { SAVED_KEY, guideEnabled, setGuideEnabled, watchGuideEnabled } from "../lib/demoGuide/prefs.js";
-import { ROLE_NAMES, caseStatus, isDone, offScript, resolveStep } from "../lib/demoGuide/engine.js";
+import { ROLE_NAMES, caseStatus, isDone, offScript, resolveStep, roleMatches } from "../lib/demoGuide/engine.js";
+import { takeResume, useAutopilot } from "../lib/demoGuide/useAutopilot.js";
+import * as player from "../lib/demoGuide/autopilot.js";
 
 const STORE = SAVED_KEY;
 
@@ -158,22 +162,34 @@ export default function DemoGuide() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open, update]);
 
+  const readState = useCallback(async () => {
+    const params = { process: guide.process };
+    if (followId) params.student_id = followId;
+    else if (guide.studentNumber) params.student_number = guide.studentNumber;
+    return api.demoGuideState(params);
+  }, [guide, followId]);
+
   const refresh = useCallback(async () => {
     if (!guide) return;
     const ticket = (asked.current += 1);
     setLoad("loading");
     try {
-      const params = { process: guide.process };
-      if (followId) params.student_id = followId;
-      else if (guide.studentNumber) params.student_number = guide.studentNumber;
-      const result = await api.demoGuideState(params);
+      const result = await readState();
       if (ticket !== asked.current) return; // an older answer arrives late: ignore it
       setData(result);
       setLoad("ok");
     } catch {
       if (ticket === asked.current) setLoad("error"); // no wrong jump: the last known step stays
     }
-  }, [guide, followId]);
+  }, [guide, readState]);
+
+  // The autopilot asks for a fresh answer itself and needs it back (it only calls a step done when the record says so).
+  const fetchState = useCallback(async () => {
+    const result = await readState();
+    setData(result);
+    setLoad("ok");
+    return result;
+  }, [readState]);
 
   // Read the record when the panel opens, the guide or followed student changes, the page changes or another role signs in.
   useEffect(() => {
@@ -227,6 +243,49 @@ export default function DemoGuide() {
   // Who takes part, in order of first appearance: the presenter is told how many accounts the demo uses.
   const people = guide ? [...new Set(steps.map((item) => item.role).filter(Boolean))].map((r) => (r === "student" ? "the student" : (guide.accounts[r] && guide.accounts[r].who) || ROLE_NAMES[r] || r)) : [];
   const resetKey = data && data.student ? RESET_KEYS[data.student.student_number] : null;
+
+  // Slideshow: Next plays the step the RECORD says is next (resolveStep), never a counter of its own.
+  const slideshow = enabled && Boolean(saved.slideshow) && Boolean(guide);
+  const markStepDone = useCallback(
+    (step) => {
+      setBrowse(null);
+      if (step.doneWhen === "manual" && guide) update((current) => ({ ...current, done: { ...(current.done || {}), [guide.id]: [...new Set([...((current.done || {})[guide.id] || []), step.id])] } }));
+    },
+    [guide, update],
+  );
+  const autopilot = useAutopilot({ guide, role: user && user.role, fetchState, writes, markDone: markStepDone, navigate });
+
+  // Demo mode only: the e2e specs drive the action player directly through this handle.
+  useEffect(() => {
+    if (!demoOn) return undefined;
+    window.__uslsDemoPlayer = player;
+    return () => {
+      delete window.__uslsDemoPlayer;
+    };
+  }, [demoOn]);
+
+  // Back from signing in as the step's person: play that step now.
+  useEffect(() => {
+    if (!slideshow || !data || load !== "ok" || autopilot.status === "running") return;
+    const wanted = takeResume();
+    if (!wanted || wanted.guideId !== guide.id) return;
+    const step = guide.steps.find((item) => item.id === wanted.stepId);
+    if (step && roleMatches(step, data.role)) autopilot.play(step);
+  }, [slideshow, data, load]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ahead = resolved && browse != null && shown && shown !== resolved.step;
+  const behind = Boolean(resolved && browse != null && resolved.index >= 0 && browse < resolved.index);
+  function slideNext() {
+    if (!resolved) return;
+    if (behind) {
+      setBrowse(browse + 1 >= resolved.index ? null : browse + 1); // looking back: Next only walks forward to where the record is
+      return;
+    }
+    if (resolved.finished) return;
+    setBrowse(null);
+    setRefusal(null);
+    autopilot.play(resolved.step);
+  }
 
   // The panel never covers the step's target (desktop): the preferred side wins unless the target sits under it and the other side is free.
   useEffect(() => {
@@ -282,7 +341,7 @@ export default function DemoGuide() {
     setNotice("");
     setData(null);
     setLoad("idle");
-    update({ guideId: id, open: true });
+    update({ guideId: id, open: true, slideshow: true });
   }
   function toggle() {
     if (open) {
@@ -299,7 +358,8 @@ export default function DemoGuide() {
     refresh();
   }
   function stopGuide() {
-    update({ open: false, guideId: null });
+    autopilot.stop();
+    update({ open: false, guideId: null, slideshow: false });
     setGuideEnabled(false);
   }
   async function resetStudent() {
@@ -345,7 +405,6 @@ export default function DemoGuide() {
       )}
     </p>
   );
-  const ahead = resolved && browse != null && shown && shown !== resolved.step;
 
   const dockClass = side === "left" ? "sm:left-4 sm:right-auto" : "sm:left-auto sm:right-4";
   const stepsDone = guide && resolved ? steps.filter((item, index) => liveDone.has(item.id) || index < resolved.index).length : 0;
@@ -359,8 +418,10 @@ export default function DemoGuide() {
       tabIndex={-1}
       className={`fixed z-drawer flex flex-col overflow-hidden border border-slate-200 bg-white shadow-lift focus:outline-none ${dockClass} ${
         collapsed
-          ? `bottom-3 max-w-[calc(100vw-1.5rem)] rounded-full ${side === "left" ? "max-sm:left-3 max-sm:right-auto" : "max-sm:right-3 max-sm:left-auto"}`
-          : "bottom-0 left-0 right-0 max-h-[60vh] rounded-t-2xl sm:bottom-4 sm:w-96 sm:max-h-[calc(100vh-6rem)] sm:rounded-2xl"
+          ? `${slideshow ? "bottom-52 sm:bottom-44" : "bottom-3"} max-w-[calc(100vw-1.5rem)] rounded-full ${side === "left" ? "max-sm:left-3 max-sm:right-auto" : "max-sm:right-3 max-sm:left-auto"}`
+          : slideshow
+            ? "bottom-52 left-0 right-0 max-h-[40vh] rounded-t-2xl sm:bottom-44 sm:w-96 sm:max-h-[calc(100vh-15rem)] sm:rounded-2xl"
+            : "bottom-0 left-0 right-0 max-h-[60vh] rounded-t-2xl sm:bottom-4 sm:w-96 sm:max-h-[calc(100vh-6rem)] sm:rounded-2xl"
       }`}
     >
       <div className={`flex items-center gap-2 ${collapsed ? "px-3 py-1.5" : "border-b border-slate-100 px-4 py-2.5"}`}>
@@ -558,7 +619,8 @@ export default function DemoGuide() {
       )}
       {!collapsed && (
         <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-2.5">
-          {guide && <Button size="sm" variant="secondary" onClick={() => update({ guideId: null })}>Change demo</Button>}
+          {guide && <Button size="sm" variant="secondary" onClick={() => update({ guideId: null, slideshow: false })}>Change demo</Button>}
+          {guide && !slideshow && <Button size="sm" variant="secondary" icon={Play} onClick={() => update({ slideshow: true })}>Play as a slideshow</Button>}
           <Button size="sm" variant="secondary" icon={EyeOff} className="ml-auto" onClick={stopGuide}>Stop the demo guide</Button>
         </div>
       )}
@@ -571,6 +633,30 @@ export default function DemoGuide() {
         <span className="max-sm:sr-only">{headLabel}</span>
       </Button>
       {panel && createPortal(panel, document.body)}
+      {slideshow && data && shown && (
+        <DemoAutopilotBar
+          title={shown.title}
+          index={shownIndex}
+          count={steps.length}
+          finished={Boolean(resolved && resolved.finished && browse == null)}
+          say={sayLine(shown.say) || shown.do}
+          status={autopilot.status}
+          caption={autopilot.caption}
+          error={autopilot.error}
+          canBack={shownIndex > 0}
+          canNext={Boolean(resolved) && (behind || !resolved.finished) && load !== "error"}
+          onBack={() => setBrowse(Math.max(0, shownIndex - 1))}
+          onNext={slideNext}
+          onTakeOver={autopilot.takeOver}
+          onRetry={() => {
+            if (resolved) autopilot.play(resolved.step);
+          }}
+          onStop={() => {
+            autopilot.stop();
+            update({ slideshow: false });
+          }}
+        />
+      )}
       {open && !collapsed && shown && <TargetRing selector={shown.target} strong={showMe === "flash"} />}
     </>
   );
