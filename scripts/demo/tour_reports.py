@@ -1,5 +1,5 @@
 """Demo part 2l - Reports & Analytics as redesigned on v6.1 (AD10): six-number strip, Needs attention, Where students
-get stuck, Office speed, Records to fix, the older lists and Registrar changes. Same ``run(rt)`` contract as the
+get stuck, Office speed, Records to fix, By year started (with More detail), Overdue and pending and Registrar changes. Same ``run(rt)`` contract as the
 walkthrough capture cases; read-only (nothing is changed)."""
 from __future__ import annotations
 
@@ -75,11 +75,25 @@ def run(rt: Runtime) -> None:
         rt.shot(staff, s(9))
     rt.step("Records to fix", fix)
 
-    for n, name in ((10, "By year started"), (11, "Graduation candidates"), (12, "Overdue and pending"), (13, "Defenses")):
-        def older(name=name, n=n):
-            tab(name)
+    def year_started():
+        tab("By year started")
+        rt.shot(staff, s(10))
+    rt.step("report: By year started", year_started)
+
+    # Graduation candidates and Defenses are buttons under "More detail" on the By year started tab.
+    for n, name in ((11, "Graduation candidates"), (12, "Defenses")):
+        def detail(name=name, n=n):
+            button = staff.get_by_role("group", name="More detail").get_by_role("button", name=name)
+            button.click()
+            Runtime.settle(staff, 1200)
+            scroll_to(button, 120)
             rt.shot(staff, s(n))
-        rt.step(f"report: {name}", older)
+        rt.step(f"report: More detail, {name}", detail)
+
+    def overdue():
+        tab("Overdue and pending")
+        rt.shot(staff, s(13))
+    rt.step("report: Overdue and pending", overdue)
 
     def registrar():
         tab("Registrar changes")

@@ -1,8 +1,8 @@
-"""Case 21 - Reports & Analytics (staff), as rebuilt in v5.2 (IM20): five reports, the Registrar list and the Analytics tab.
+"""Case 21 - Reports & Analytics (staff), as redesigned on 2026-11-04 (I-141, I-357): seven tabs, each answering one question.
 
-The Reports page is being redesigned again, so this module captures it as it is on 2026-11-02 and keeps the steps close to what
-is on screen: one tab per report, the Program / Stage / Risk style filters, Download Excel / Download PDF, the Registrar changes
-list and the Analytics charts with their drill-down window.
+Needs attention (causes chart, then the list), Where students get stuck, Office speed, Records to fix, By year started (with its
+"More detail" buttons), Overdue and pending, Registrar changes; the students behind a figure open from a count. Follows
+scripts/docs/walkthrough/cases/20_reports.json; shot ids reports-01 .. reports-11.
 """
 from __future__ import annotations
 
@@ -34,50 +34,69 @@ def run(rt: Runtime) -> None:
     def home():
         rt.go(staff, "/")
         staff.get_by_role("link", name=re.compile("Reports & Analytics")).first.click()
-        staff.get_by_role("tab", name="Students at risk").wait_for()
-        staff.get_by_text(re.compile(r"\d+ rows?")).first.wait_for()
-        rt.note("REPORTS PAGE: " + staff.locator("main").inner_text()[:700].replace(chr(10), " | "))
+        staff.get_by_role("tab", name="Needs attention").wait_for()
+        staff.get_by_text("What is holding students back?").first.wait_for()
+        Runtime.settle(staff, 1200)
+        rt.note("REPORTS PAGE: " + staff.locator("main").inner_text()[:900].replace(chr(10), " | "))
         scroll_top(staff)
         rt.shot(staff, s(1))
     rt.step("open Reports & Analytics from the sidebar", home)
 
-    def risk_filter():
-        _frame(staff)
-        staff.locator("main select").nth(2).select_option(label="Delayed")
+    def cause():
+        # A cause chip narrows the list below to that cause; "Show all causes" undoes it.
+        scroll_to(staff.get_by_text("What is holding students back?").first, 110)
+        staff.get_by_role("group", name="Causes").get_by_role("button").first.click()
         Runtime.settle(staff, 1200)
-        rt.note("AT-RISK DELAYED: " + staff.locator("main").inner_text()[:500].replace(chr(10), " | "))
-        _frame(staff)
+        staff.get_by_role("button", name="Show all causes").first.wait_for()
+        rt.note("ONE CAUSE: " + staff.locator("main").inner_text()[:700].replace(chr(10), " | "))
+        scroll_to(staff.get_by_text("Students who need attention", exact=True).first, 110)
         rt.shot(staff, s(2))
-    rt.step("Students at risk: filter Risk = Delayed", risk_filter)
+    rt.step("Needs attention: pick one cause", cause)
 
     def downloads():
         # The two download buttons are plain links to the same address plus the format: check they answer, without saving a file.
         out = []
         for label in ("Download Excel", "Download PDF"):
-            href = staff.get_by_role("link", name=label).get_attribute("href")
+            href = staff.get_by_role("link", name=label).first.get_attribute("href")
             status = staff.evaluate("async (u) => { const r = await fetch(u); return r.status + ' ' + r.headers.get('content-type'); }", href)
             out.append(f"{label}: {status}")
         rt.note("DOWNLOADS: " + " | ".join(out))
     rt.step("check the Excel and PDF download links answer", downloads)
 
     def next_page():
-        staff.locator("main select").nth(2).select_option(index=0)
-        Runtime.settle(staff, 900)
-        staff.get_by_role("button", name="Next", exact=True).scroll_into_view_if_needed()
-        staff.get_by_role("button", name="Next", exact=True).click()
+        staff.get_by_role("button", name="Show all causes").first.click()
+        Runtime.settle(staff, 1000)
+        nxt = staff.get_by_role("button", name="Next", exact=True).first
+        nxt.scroll_into_view_if_needed()
+        nxt.click()
         staff.wait_for_timeout(600)
         rt.note("PAGER: " + staff.get_by_text(re.compile(r"Showing \d+")).first.inner_text() + " | " + staff.get_by_text(re.compile(r"Page \d+ of \d+")).first.inner_text())
         staff.get_by_text(re.compile(r"Showing \d+")).first.scroll_into_view_if_needed()
         rt.shot(staff, s(3))
-    rt.step("clear the filter, go to the next page of the table", next_page)
+    rt.step("Show all causes, go to the next page of the table", next_page)
 
-    for chip, shot in [("By year started", 4), ("Overdue and pending", 5), ("Defenses", 6), ("Graduation candidates", 7)]:
-        def tab(chip=chip, shot=shot):
-            _tab(staff, chip)
+    for tab, shot in [("Where students get stuck", 4), ("Office speed", 5), ("Records to fix", 6), ("By year started", 7)]:
+        def show(tab=tab, shot=shot):
+            _tab(staff, tab)
             _frame(staff)
-            rt.note(f"{chip.upper()}: " + staff.locator("main").inner_text()[:900].replace(chr(10), " | "))
+            rt.note(f"{tab.upper()}: " + staff.locator("main").inner_text()[:900].replace(chr(10), " | "))
             rt.shot(staff, s(shot))
-        rt.step(f"report tab: {chip}", tab)
+        rt.step(f"report tab: {tab}", show)
+
+    def more_detail():
+        staff.get_by_role("group", name="More detail").get_by_role("button", name="Graduation candidates").click()
+        Runtime.settle(staff, 1200)
+        scroll_to(staff.get_by_text("More detail", exact=True).first, 90)
+        rt.note("MORE DETAIL: " + staff.locator("main").inner_text()[:900].replace(chr(10), " | "))
+        rt.shot(staff, s(8))
+    rt.step("By year started: More detail, Graduation candidates", more_detail)
+
+    def overdue():
+        _tab(staff, "Overdue and pending")
+        _frame(staff)
+        rt.note("OVERDUE: " + staff.locator("main").inner_text()[:900].replace(chr(10), " | "))
+        rt.shot(staff, s(9))
+    rt.step("report tab: Overdue and pending", overdue)
 
     def registrar():
         _tab(staff, "Registrar changes")
@@ -85,29 +104,17 @@ def run(rt: Runtime) -> None:
         Runtime.settle(staff, 1200)
         _frame(staff)
         rt.note("REGISTRAR: " + staff.locator("main").inner_text()[:900].replace(chr(10), " | "))
-        rt.shot(staff, s(8))
+        rt.shot(staff, s(10))
     rt.step("report tab: Registrar changes", registrar)
 
-    def analytics():
-        _tab(staff, "Analytics")
-        staff.get_by_text("Lifecycle stage distribution").first.wait_for()
-        staff.wait_for_timeout(800)
-        _frame(staff)
-        rt.note("ANALYTICS: " + staff.locator("main").inner_text()[:1500].replace(chr(10), " | "))
-        rt.shot(staff, s(9))
-        scroll_to(staff.get_by_text("Students by college", exact=True).first, 90)
-        staff.mouse.move(1000, 20)
-        staff.wait_for_timeout(500)
-        rt.shot(staff, s(10))
-    rt.step("report tab: Analytics, the four charts", analytics)
-
     def drill():
-        scroll_to(staff.get_by_text("Lifecycle stage distribution", exact=True).first, 90)
-        chip = staff.get_by_role("button", name=re.compile(r"^Show Coursework: \d+ records"))
-        chip.first.click()
+        # The strip of six numbers sits above the tabs (not on Registrar changes): open the students behind Active students.
+        _tab(staff, "Needs attention")
+        scroll_top(staff)
+        staff.get_by_role("group", name="Summary numbers").get_by_role("button", name=re.compile("Active students")).first.click()
         staff.get_by_role("dialog").first.wait_for()
         Runtime.settle(staff, 1200)
         rt.note("DRILL: " + staff.get_by_role("dialog").first.inner_text()[:600].replace(chr(10), " | "))
         rt.shot(staff, s(11))
-    rt.step("Analytics: open the students behind a stage", drill)
+    rt.step("open the students behind a figure", drill)
     staff.context.close()
