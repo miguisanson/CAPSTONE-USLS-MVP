@@ -270,8 +270,8 @@ Found by driving the live app for the new walkthrough (reproduction steps are in
 test first.
 
 - [x] J1. Enrollment "Record dropped subject" dialog is taller than the screen at 1366×768 — Save unreachable.
-- [ ] J2. Demo reset sets subjects to "Not Started", which blocks single-student enrollment.
-- [ ] J3. Withdrawal report re-judges the window at report time ("window closed / Fee 100%") instead of using the window recorded at submission.
+- [x] J2. Demo reset sets subjects to "Not Started", which blocks single-student enrollment. (fixed on v5.3; ISSUES I-002)
+- [x] J3. Withdrawal report re-judges the window at report time ("window closed / Fee 100%") instead of using the window recorded at submission. (fixed; ISSUES I-003)
 - [x] J4. After "Endorse and sign Form 1" a "Cannot read properties of null (reading 'getContext')" banner appears (the endorsement saves).
 - [ ] J5. Research Coordinator's student search in Research Gate always says "No students match" (opening with `?student_id=` works).
 - [ ] J6. Defense Scheduling "Change panel" shows existing members under the wrong role labels.
@@ -279,7 +279,7 @@ test first.
 - [x] J8. Practicum: the Dean's "Mark reviewed" window is titled "Approve current stage".
 - [ ] J9. A signed-in Dean does not see a new practicum report until reload.
 - [ ] J10. Graduation: after the Dean's CSV export the batch stays "Dean Approved" instead of "Exported - Ready to Send".
-- [ ] J11. After a monitoring-sheet import the Onboarding report panel still says "No import batches yet".
+- [x] J11. After a monitoring-sheet import the Onboarding report panel still says "No import batches yet". (fixed on v6.1; ISSUES I-011)
 - [ ] J12. Residency can be recorded when the checker says "Needs Human Review".
 - [ ] J13. Policy Assistant still returns loosely related passages for some questions the library does not cover.
 - [ ] J14. Walkthrough cases 9 and 18 not fully re-captured on the final build; re-run `capture_walkthrough.py --only 09 18` on a weekday 08:00–16:00 with a fresh database, then `build_walkthrough.py`.
