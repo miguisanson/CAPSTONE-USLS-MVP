@@ -18,7 +18,6 @@ export default {
   steps: [
     {
       id: "ca-draft", title: "Plan the offerings from the demand", role: "academic_coordinator", route: "/course-adjustments", page: "Course Adjustments",
-      say: "course-adjustments-08",
       do: "Choose the program and next semester. Every subject shows how many students need it; set two sections for the busiest one, offer one more subject by hand, and save the draft.",
       actions: [
         ...PICK,
@@ -37,7 +36,6 @@ export default {
     },
     {
       id: "ca-submit", title: "Send the plan to the Dean", role: "academic_coordinator", route: "/course-adjustments", page: "Course Adjustments",
-      say: "course-adjustments-14",
       do: "Select Submit for approval and confirm with Submit plan. The plan becomes read-only while it is with the Dean.",
       actions: [
         ...PICK,
@@ -50,7 +48,6 @@ export default {
     },
     {
       id: "ca-approve", title: "The Dean approves the plan", role: "dean", route: "/dean/approvals/course-adjustments", page: "Course Adjustments (Dean)",
-      say: "course-adjustments-15",
       do: "Read the MAED card, then select Approve and confirm. The note to the Academic Coordinator is optional when approving.",
       actions: [
         { click: { role: "button", name: "Approve", exact: true, in: "course-plan-MAED" } },
@@ -64,7 +61,6 @@ export default {
     },
     {
       id: "ca-publish", title: "Publish the approved plan", role: "academic_coordinator", route: "/course-adjustments", page: "Course Adjustments",
-      say: "course-adjustments-17",
       do: "Select Publish and confirm with Publish plan. The published plan is the official offering list that Enrollment uses.",
       actions: [
         ...PICK,
@@ -77,7 +73,6 @@ export default {
     },
     {
       id: "ca-setup", title: "Give a subject its schedule and section", role: "academic_coordinator", route: "/course-adjustments", page: "Course Adjustments",
-      say: "course-adjustments-19",
       do: "Open Offering setup, choose the program and semester, pick a class schedule and a section for MAED-MAJ1 and save.",
       actions: [
         { click: { role: "button", name: "Offering setup", exact: true } },
@@ -92,7 +87,6 @@ export default {
     },
     {
       id: "ca-semesters", title: "Staff keep the semester calendar", role: "staff", route: "/term-settings", page: "Academic Semesters",
-      say: "course-adjustments-01",
       do: "Open Academic Semesters under Overview. The semester marked Current carries the dates that every handbook window is counted from.",
       actions: [{ pause: 1500, caption: "Showing Academic Semesters" }],
       doneWhen: { route: "/term-settings", roleIs: "staff" },
