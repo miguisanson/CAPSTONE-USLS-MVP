@@ -3421,6 +3421,22 @@ def workflow_messages_for(
     return [workflow_message_dict(item) for item in messages]
 
 
+def latest_message_brief(query, student_visible_only: bool = False) -> dict | None:
+    """The newest unresolved message in `query`, else the newest, for the card's message note."""
+    if student_visible_only:
+        query = query.filter(WorkflowMessage.visibility == "student_visible")
+    ordered = query.order_by(WorkflowMessage.created_at.desc(), WorkflowMessage.id.desc())
+    item = ordered.filter(WorkflowMessage.status == "Open").first() or ordered.first()
+    if item is None:
+        return None
+    return {"comment": item.comment, "sender_role": item.sender_role, "sender_name": item.sender_name,
+            "created_at": iso(item.created_at)}
+
+
+def awol_latest_message(student_id: int) -> dict | None:
+    return latest_message_brief(WorkflowMessage.query.filter_by(transaction_slug="awol", student_id=student_id))
+
+
 def workflow_case_meta(slug: str, student_id: int) -> dict:
     if slug in LEAVE_SLUGS:
         return leave_case_meta(latest_leave_case(student_id, slug))
@@ -3438,24 +3454,21 @@ def workflow_case_meta(slug: str, student_id: int) -> dict:
         TransactionLog.created_at.desc(),
         TransactionLog.id.desc(),
     ).first()
-    open_query = WorkflowMessage.query.filter_by(
-        transaction_slug=slug,
-        student_id=student_id,
-        status="Open",
-    )
+    message_query = WorkflowMessage.query.filter_by(transaction_slug=slug, student_id=student_id)
     if request_id is not None:
-        open_query = open_query.filter(
+        message_query = message_query.filter(
             or_(
                 WorkflowMessage.workflow_request_id == request_id,
                 WorkflowMessage.workflow_request_id.is_(None),
             )
         )
-    open_messages = open_query.count()
+    open_messages = message_query.filter(WorkflowMessage.status == "Open").count()
     return {
         "request_id": request_id,
         "next_action_owner": latest_log.next_owner if latest_log else None,
         "last_activity_at": iso(latest_log.created_at) if latest_log else None,
         "unresolved_messages": open_messages,
+        "latest_message": latest_message_brief(message_query),
         "messages": workflow_messages_for(slug, student_id, request_id=request_id),
         "history": [
             log_dict(item)
@@ -8136,7 +8149,7 @@ def leave_case_brief(case: LeaveCase) -> dict:
     }
 
 
-def leave_case_messages(case: LeaveCase, student_visible_only: bool = False) -> list[dict]:
+def leave_case_message_query(case: LeaveCase):
     slug = SLUG_FOR_KIND[case.kind]
     latest = latest_leave_case(case.student_id, slug)
     query = WorkflowMessage.query.filter(
@@ -8147,6 +8160,11 @@ def leave_case_messages(case: LeaveCase, student_visible_only: bool = False) -> 
         query = query.filter(or_(WorkflowMessage.workflow_request_id == case.id, WorkflowMessage.workflow_request_id.is_(None)))
     else:
         query = query.filter(WorkflowMessage.workflow_request_id == case.id)
+    return query
+
+
+def leave_case_messages(case: LeaveCase, student_visible_only: bool = False) -> list[dict]:
+    query = leave_case_message_query(case)
     if student_visible_only:
         query = query.filter(WorkflowMessage.visibility == "student_visible")
     return [
@@ -8181,6 +8199,7 @@ def leave_case_meta(case: LeaveCase | None) -> dict:
         "next_action_owner": _lw.next_owner(case.kind, case.status) or None,
         "last_activity_at": history[0]["created_at"] if history else iso(case.updated_at),
         "unresolved_messages": sum(1 for item in messages if item["status"] == "Open"),
+        "latest_message": latest_message_brief(leave_case_message_query(case)),
         "messages": messages,
         "history": history,
     }
@@ -8261,6 +8280,7 @@ def leave_case_dict(case: LeaveCase, role: str = "staff", detail: bool = False) 
             WorkflowMessage.workflow_request_id == case.id,
             WorkflowMessage.status == "Open",
         ).count(),
+        "latest_message": latest_message_brief(leave_case_message_query(case), student_visible_only=_lw.role_key(role) == "student"),
     }
     if not detail:
         return payload
@@ -8962,6 +8982,12 @@ def residence_limits(student: Student) -> dict:
     }
 
 
+def residence_figures(student: Student) -> dict:
+    """The three numbers the AWOL card's residence box shows: years used, normal limit, absolute limit."""
+    limits = residence_limits(student)
+    return {key: limits[key] for key in ("years_in_program", "normal_years", "absolute_years")}
+
+
 def student_standing_summary(student: Student) -> dict | None:
     """I-204: in plain words, whether the student is still a student, since when, and how long they have.
 
@@ -9398,6 +9424,11 @@ def withdrawal_process_case(application: WithdrawalApplication, role: str = "sta
         "timeline": _sp.timeline_steps("withdrawal", _sp.KIND_WITHDRAWAL, application.status,
                                        {item["new_status"] for item in logs if item.get("new_status")}),
         "unresolved_messages": open_messages,
+        "latest_message": latest_message_brief(WorkflowMessage.query.filter(
+            WorkflowMessage.transaction_slug == "withdrawal",
+            WorkflowMessage.student_id == application.student_id,
+            or_(WorkflowMessage.workflow_request_id == application.id, WorkflowMessage.workflow_request_id.is_(None)),
+        )),
         "submitted_at": iso(application.created_at),
         "decided_at": iso(application.decided_at),
         "last_activity_at": logs[0]["created_at"] if logs else iso(application.updated_at),
@@ -9521,6 +9552,8 @@ def awol_process_case(item: AwolCase, role: str = "staff", detail: bool = False)
         "actions": process_actions_for("awol", _sp.KIND_AWOL, item.status, role, item),
         "timeline": _sp.timeline_steps("awol", _sp.KIND_AWOL, item.status, {row["new_status"] for row in logs if row.get("new_status")}),
         "unresolved_messages": open_messages,
+        "latest_message": awol_latest_message(item.student_id),
+        "residence": residence_figures(student),
         "submitted_at": iso(item.return_requested_at or item.created_at),
         "decided_at": iso(item.decided_at),
         "last_activity_at": logs[0]["created_at"] if logs else iso(item.updated_at),
@@ -9626,6 +9659,8 @@ def residency_process_case(item: ResidencyEnrollment, role: str = "staff", detai
         "actions": process_actions_for("awol", _sp.KIND_RESIDENCY, status, role, item) if item.status == "Active" else [],
         "timeline": _sp.timeline_steps("awol", _sp.KIND_RESIDENCY, status),
         "unresolved_messages": 0,
+        "latest_message": awol_latest_message(item.student_id),
+        "residence": residence_figures(student),
         "submitted_at": iso(item.created_at),
         "decided_at": None,
         "last_activity_at": iso(item.updated_at),
@@ -9699,6 +9734,8 @@ def legacy_awol_process_case(student: Student, role: str = "staff", detail: bool
         "actions": [],
         "timeline": _sp.timeline_steps("awol", _sp.KIND_AWOL, "AWOL Declared"),
         "unresolved_messages": 0,
+        "latest_message": awol_latest_message(student.id),
+        "residence": residence_figures(student),
         "submitted_at": None, "decided_at": None, "last_activity_at": None, "created_at": None, "updated_at": None,
     }
     if detail:

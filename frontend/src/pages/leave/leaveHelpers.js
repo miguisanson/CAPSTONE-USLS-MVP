@@ -99,7 +99,11 @@ export function caseRequirements(item) {
   if (item.kind === "READMISSION") {
     return (item.checklist || []).map((row) => ({ label: (CHECK_NAMES.find(([pattern]) => pattern.test(row.item)) || [null, row.item])[1], met: Boolean(row.confirmed) }));
   }
-  if (item.kind === "AWOL") return [{ label: "Within the residence limits", met: !flagged("residence") }];
+  if (item.kind === "AWOL") {
+    const used = item.residence;
+    const label = used ? `Within the residence limits: ${used.years_in_program} of ${used.absolute_years} years used` : "Within the residence limits";
+    return [{ label, met: !flagged("residence") }];
+  }
   if (item.kind === "WITHDRAWAL") return [{ label: "Within the withdrawal window", met: !flagged("window") }];
   return [];
 }
