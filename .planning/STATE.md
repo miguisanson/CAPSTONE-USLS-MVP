@@ -1,5 +1,22 @@
 # State
 
+## Known-data rule sweep — 2026-11-04 (IN PROGRESS, session "known-data", NOT committed)
+
+- Owner rule: "never make a user type, pick or tick something the system already knows or can check."
+- Findings: I-242..I-263 in ISSUES.md (sweep notes: side-session notes `known-data-sweep.md`); R-028/R-029.
+- Packet A (I-242/243/244, readmission + AWOL): failing tests written in `tests/test_loa_readmission.py`
+  (main checkout, uncommitted); Sonnet helper implementing in worktree `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/kreadm`
+  (branch `pkt/known-readm`). Readmission items are now the Handbook p. 45 list: system = "Written intention to
+  enroll", "Evaluation of subject/grade requirements"; staff = "Clearance from Business Office", "Interview (reason
+  for delay, residency requirements)". Forms Q23 answered that way; owner to confirm.
+- Landed on v6.1-migui (local, not pushed yet): merge pkt/known-readm (A), merge pkt/known-ui (C: I-255..261),
+  a9c18b5 (B server: I-245/246/247/249/251 + tests + narration/walkthrough/capture scripts). Targeted 167 OK.
+- Running: pkt/known-forms (B frontend, worktree wt/kforms); full Python gate (log in session scratchpad gate.txt).
+- Owner 2026-11-04 (meeting moved): commit + push + restart miguisanson.dev (`docker compose --profile tunnel up -d --build`),
+  then a multi-agent audit of every process (workflow `process-audit`, read-only, 6 groups + verifiers), fix
+  findings, and build the **Demo Guide** tutorial: design + contract `.planning/demo-guide/DESIGN.md`, failing
+  server test `tests/test_demo_guide.py` (route `/api/demo/guide-state` not built yet).
+
 ## Demo-day date waits skipped — 2026-11-04 (NOT committed)
 
 - New switch `demo_skip_date_waits()` (`app.py`, `DEMO_SKIP_DATE_WAITS`, default ON, needs DEMO_MODE). While on:

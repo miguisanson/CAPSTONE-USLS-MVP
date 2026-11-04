@@ -166,6 +166,10 @@ class MonitoringPortalCrudTests(unittest.TestCase):
         self.assertEqual(bad.status_code, 400, bad.get_json())
         with app.app_context():
             self.assertEqual(Student.query.get(by_id["student"]["id"]).adviser_name, "Dr. Reyes")
+        cleared = self._client("staff").patch(url, json={"adviser_faculty_id": None, "reason": "Adviser left"})
+        self.assertEqual(cleared.status_code, 200, cleared.get_json())
+        with app.app_context():
+            self.assertIsNone(Student.query.get(by_id["student"]["id"]).adviser_name)
 
     def test_term_taken_must_be_a_real_semester_label(self):
         student_id = self._create_student()["student"]["id"]

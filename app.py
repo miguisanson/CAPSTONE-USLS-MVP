@@ -28269,8 +28269,12 @@ def _monitoring_adviser_from(data: dict, current: str | None = None) -> dict:
     if "adviser_faculty_id" not in data and "adviser_name" not in data:
         return data
     data = dict(data)
+    clear = "adviser_faculty_id" in data and data["adviser_faculty_id"] in (None, "")
     faculty_id = safe_int(data.pop("adviser_faculty_id", None))
     name = _monitoring_clean(data.get("adviser_name"), 120)
+    if clear:
+        data["adviser_name"] = ""  # "No adviser yet" chosen
+        return data
     if faculty_id:
         faculty = db.session.get(Faculty, faculty_id)
     elif name and name != (current or ""):
