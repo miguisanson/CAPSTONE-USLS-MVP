@@ -20,6 +20,21 @@ export function setGuideEnabled(on) {
   window.dispatchEvent(new CustomEvent(EVENT, { detail: Boolean(on) }));
 }
 
+export const SAVED_KEY = "usls-demo-guide"; // the panel's own memory (DemoGuide.jsx): chosen demo, open, collapsed, dock side, finished steps
+
+/** "Start a guided demo": switch the guide on and have the panel open on `guideId` at its first step (earlier marks of that demo are cleared). */
+export function startGuide(guideId) {
+  setGuideEnabled(true);
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(SAVED_KEY) || "{}") || {};
+    const done = { ...(saved.done || {}) };
+    delete done[guideId];
+    window.localStorage.setItem(SAVED_KEY, JSON.stringify({ ...saved, guideId, open: true, mini: false, done }));
+  } catch {
+    /* the guide still turns on; the panel then asks which demo */
+  }
+}
+
 /** Calls `fn(on)` when the switch changes here or in another tab. Returns the cleanup. */
 export function watchGuideEnabled(fn) {
   const onEvent = (event) => fn(Boolean(event.detail));

@@ -112,7 +112,7 @@ export function offScript(guide, step, state, route) {
       issues.push({
         kind: "role",
         message: `This step is for ${account.who}. You are signed in as ${ROLE_NAMES[state.role] || "another role"}.`,
-        fix: { type: "signIn", label: `Sign in as ${account.label}`, email: account.email },
+        fix: { type: "signIn", label: `Switch to ${account.who}`, email: account.email, to: asList(step.route)[0] },
       });
     }
   } else if (!routeMatches(step, route)) {
