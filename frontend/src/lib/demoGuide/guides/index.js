@@ -10,8 +10,10 @@ import graduation from "./graduation.js";
 import courseAdjustments from "./course-adjustments.js";
 import businessRules from "./business-rules.js";
 import policyAssistant from "./policy-assistant.js";
+import policyDocuments from "./policy-documents.js";
+import studentHandoff from "./student-handoff.js";
 
-export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, withdrawal, practicum, graduation, courseAdjustments, businessRules, policyAssistant];
+export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, withdrawal, practicum, graduation, courseAdjustments, businessRules, policyAssistant, policyDocuments, studentHandoff];
 
 // The ready-made demo students that the existing reset (POST /api/auth/demo-students/<key>/reset) knows, by student number.
 export const RESET_KEYS = {

@@ -23,6 +23,8 @@ mkdirSync(SHOTS, { recursive: true });
 
 // Per guide: the demo students to reset around the run, and the writes (METHOD path, without /api) that must have answered 2xx.
 const PLAN = {
+  "policy-documents": { reset: [], writes: ["POST /policy-documents", "DELETE /policy-documents/*"] },
+  "student-handoff": { reset: [], writes: [["POST /transactions/student-handoff/import", 2]] },
   "business-rules": { reset: [], writes: [] },
   "policy-assistant": { reset: [], writes: [["POST /assistant", 4], ["POST /student-portal/assistant", 1]] },
   "course-adjustments": { reset: ["course-adjustments-lianne"], writes: [["POST /course-adjustments/plan", 3], "POST /approvals/*/decide", "PATCH /course-offerings/bulk"] }, // draft, submit and publish all post the plan
