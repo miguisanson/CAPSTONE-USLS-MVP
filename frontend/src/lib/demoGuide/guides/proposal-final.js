@@ -163,24 +163,28 @@ export default {
         ...SUBMIT("Submit Final Defense"),
       ],
       doneWhen: "manual",
+      ifAsked: [{ q: "Is the final manuscript signed too?", a: "Yes. The adviser signs the final manuscript and its endorsement, as for the proposal." }],
     },
     {
       id: "pf-final-sign", title: "The adviser signs the final documents", role: "faculty", route: "/faculty-portal/signatures", page: "Signatures & Endorsements",
       do: "The adviser signs the final manuscript and the endorsement the same way.",
       actions: [...times(2, SIGN), { pause: 1500, caption: "Both final documents are signed" }],
       doneWhen: "manual",
+      ifAsked: [{ q: "Can the student submit again after a signature?", a: "Replacing a file removes its signature, so the adviser signs the new file." }],
     },
     {
       id: "pf-final-verify", title: "Staff verify the final defense requirements", role: "staff", route: "/workflow/research-gate", page: "Research Gate",
       do: "Verify submitted requirements again for the Final Defense.",
       actions: VERIFY,
       doneWhen: "manual",
+      ifAsked: [{ q: "What is checked?", a: "That each file is stored and that the adviser signatures and the ethics clearance are on record." }],
     },
     {
       id: "pf-final-book", title: "Book the Final Defense", role: "staff", route: "/workflow/defense-scheduling", page: "Defense Scheduling",
       do: "The proposal panel carries over. Choose the earliest shared option, add the venue and select Set defense schedule.",
       actions: BOOK,
       doneWhen: "manual",
+      ifAsked: [{ q: "Why is the panel not matched again?", a: "The final defense keeps the proposal panel unless staff change a seat with a reason." }],
     },
     {
       id: "pf-final-verdict", title: "Record the Final Defense verdict with the score", role: "staff", route: "/workflow/research-gate", page: "Research Gate",
@@ -202,6 +206,7 @@ export default {
         ...SUBMIT("Submit Completion"),
       ],
       doneWhen: "manual",
+      ifAsked: [{ q: "What is the 15% in the similarity certificate?", a: "The similarity index of the final manuscript may be at most 15%, as the Research Protocol requires." }],
     },
     {
       id: "pf-complete", title: "Staff verify: research is complete", role: "staff", route: "/workflow/research-gate", page: "Research Gate",

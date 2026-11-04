@@ -29,7 +29,7 @@ export default {
       actions: [...PICK, { click: { text: "Best shared options" }, optional: true }, { pause: 3000, caption: "The shared slots" }],
       doneWhen: "manual",
       rule: "Nobody is assumed free: a person who has not entered availability is shown as unchecked.",
-      ifAsked: [{ q: "Where does availability come from?", a: "From the hours each person entered, or their connected Google Calendar. Staff can ask the panel to enter dates with Ask for availability." }],
+      ifAsked: [{ q: "Where does availability come from?", a: "From the hours each person entered, or the connected Google Calendar. Staff can ask the panel to enter dates with Ask for availability." }],
     },
     {
       id: "ds-book", title: "Book the earliest shared slot", role: "staff", route: "/workflow/defense-scheduling", page: "Defense Scheduling",
