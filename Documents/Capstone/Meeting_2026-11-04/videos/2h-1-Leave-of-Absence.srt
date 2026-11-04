@@ -1,87 +1,87 @@
 1
-00:00:01,800 --> 00:00:05,599
-Daniel, a Master of Arts in Education student, signs in.
+00:00:01,399 --> 00:00:07,399
+Next, we have the Leave of Absence. Meet Daniel, a Master of Arts in Education student.
 
 2
-00:00:06,500 --> 00:00:12,100
-Under Requests, Leave of Absence. The form shows the limits: two semesters at a time.
+00:00:08,300 --> 00:00:15,400
+Under Requests, Daniel opens Leave of Absence. Right away, the form shows the limit: two semesters at a time.
 
 3
-00:00:13,099 --> 00:00:18,300
-Rules applied on this screen lists each rule with its Handbook page.
+00:00:16,399 --> 00:00:24,199
+Here we have a panel that lists every rule the screen follows, each with its page in the Handbook.
 
 4
-00:00:22,100 --> 00:00:25,000
-Daniel picks the dates, a reason, and a short explanation.
+00:00:27,699 --> 00:00:31,800
+Now Daniel picks the dates, chooses a reason, and adds a short explanation.
 
 5
-00:00:26,199 --> 00:00:29,699
-A summary to check before sending.
+00:00:32,899 --> 00:00:37,099
+Before sending, Daniel gets a summary to check.
 
 6
-00:00:29,899 --> 00:00:32,899
-Submitted. The request waits for Graduate School staff.
+00:00:37,299 --> 00:00:41,799
+The request is sent, and now it waits for Graduate School staff.
 
 7
-00:00:33,100 --> 00:00:35,199
-Graduate School staff signs in.
+00:00:42,000 --> 00:00:45,399
+So let's switch over. Graduate School staff signs in.
 
 8
-00:00:37,500 --> 00:00:41,699
-The Leave of Absence board: stages are columns, requests are cards.
+00:00:47,700 --> 00:00:54,799
+Here we have the Leave of Absence board. Each column is a stage, and each card is a request.
 
 9
-00:00:43,700 --> 00:00:49,299
-Graduate School staff drags the card to In staff review. The server checks every move.
+00:00:56,700 --> 00:01:03,500
+Graduate School staff drags the card to In staff review. The server checks every move before it counts.
 
 10
-00:00:55,700 --> 00:01:01,299
-The policy check advises with Pass or Needs review. It never decides. The Dean does.
+00:01:09,799 --> 00:01:18,000
+Next is the policy check. It gives advice, either Pass or Needs review. But it never makes the decision. The Dean does.
 
 11
-00:01:05,799 --> 00:01:10,799
-Graduate School staff forwards the request to the Dean.
+00:01:22,299 --> 00:01:27,700
+So Graduate School staff forwards the request to the Dean.
 
 12
-00:01:11,000 --> 00:01:15,599
-The card moves to With the Dean and locks for staff.
+00:01:27,900 --> 00:01:33,700
+The card moves to With the Dean, and staff can no longer change it.
 
 13
-00:01:15,799 --> 00:01:18,099
-The Dean signs in.
+00:01:33,900 --> 00:01:37,299
+Now it's the Dean's turn. The Dean signs in.
 
 14
-00:01:26,500 --> 00:01:31,399
+00:01:45,299 --> 00:01:50,099
 The Dean drags the card to Leave scheduled.
 
 15
-00:01:31,599 --> 00:01:35,700
-Approved, flagged for the Registrar. The Dean could also deny it.
+00:01:50,299 --> 00:01:56,700
+And the leave is approved and flagged for the Registrar. The Dean could also have denied it.
 
 16
-00:01:36,400 --> 00:01:42,299
-Graduate School staff signs in.
+00:01:57,400 --> 00:02:05,399
+Back to the office side. Graduate School staff signs in again.
 
 17
-00:01:45,900 --> 00:01:51,599
-For the demo, Graduate School staff starts the leave by hand.
+00:02:09,099 --> 00:02:14,800
+For this demo, Graduate School staff starts the leave by hand.
 
 18
-00:01:51,799 --> 00:01:54,799
-Daniel is on leave, and enrollment is closed.
+00:02:15,000 --> 00:02:18,400
+Daniel is now on leave, and enrollment is closed.
 
 19
-00:01:55,700 --> 00:02:00,200
-The Registrar list. The portal sends no e-mail: staff sends it officially.
+00:02:19,199 --> 00:02:26,300
+Next, we have the Registrar list. The portal doesn't send e-mail. Graduate School staff sends it the official way.
 
 20
-00:02:05,700 --> 00:02:09,400
-Graduate School staff marks the list sent to the Registrar.
+00:02:31,800 --> 00:02:36,300
+Then Graduate School staff marks the list as sent to the Registrar.
 
 21
-00:02:10,099 --> 00:02:15,000
-Daniel signs in again.
+00:02:37,099 --> 00:02:43,600
+Finally, let's check on Daniel. Daniel signs in one more time.
 
 22
-00:02:15,199 --> 00:02:18,300
-The student's page shows the status On leave.
+00:02:43,800 --> 00:02:47,200
+And Daniel's page now shows the status On leave.

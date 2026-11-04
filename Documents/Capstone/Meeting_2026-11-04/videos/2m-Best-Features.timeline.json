@@ -1,126 +1,126 @@
 [
  {
-  "t": 1.2,
+  "t": 1.1,
   "kind": "card",
   "label": "Signing in as Graduate School Staff",
   "role": "Graduate School Staff"
  },
  {
-  "t": 3.8,
+  "t": 7.3,
   "kind": "signin",
   "label": "signed in as Graduate School Staff (staff@usls.edu.ph)",
   "role": "Graduate School Staff"
  },
  {
-  "t": 3.8,
+  "t": 7.3,
   "kind": "step",
   "label": "1 Business Rules: every rule with its page and a label",
   "role": "Graduate School Staff"
  },
  {
-  "t": 5.3,
+  "t": 8.7,
   "kind": "hold",
   "label": "best-features-01",
   "role": "Graduate School Staff"
  },
  {
-  "t": 17.6,
+  "t": 25.4,
   "kind": "hold",
   "label": "best-features-02",
   "role": "Graduate School Staff"
  },
  {
-  "t": 21.9,
+  "t": 30.9,
   "kind": "step",
   "label": "2 Policy Assistant: question, cited answer, the exact passage",
   "role": "Graduate School Staff"
  },
  {
-  "t": 27.7,
+  "t": 35.9,
   "kind": "hold",
   "label": "best-features-03",
   "role": "Graduate School Staff"
  },
  {
-  "t": 36.4,
+  "t": 45.6,
   "kind": "hold",
   "label": "best-features-04",
   "role": "Graduate School Staff"
  },
  {
-  "t": 44.1,
+  "t": 53.3,
   "kind": "step",
   "label": "3 Panel Matching: ranked candidates and how the score was built",
   "role": "Graduate School Staff"
  },
  {
-  "t": 48.4,
+  "t": 58.3,
   "kind": "hold",
   "label": "best-features-05",
   "role": "Graduate School Staff"
  },
  {
-  "t": 55.5,
+  "t": 66.1,
   "kind": "hold",
   "label": "best-features-06",
   "role": "Graduate School Staff"
  },
  {
-  "t": 63.2,
+  "t": 74.5,
   "kind": "step",
   "label": "4 Defense Scheduling: best shared options, hard stop versus warning",
   "role": "Graduate School Staff"
  },
  {
-  "t": 70.9,
+  "t": 80.2,
   "kind": "hold",
   "label": "best-features-07",
   "role": "Graduate School Staff"
  },
  {
-  "t": 82.7,
+  "t": 92.5,
   "kind": "hold",
   "label": "best-features-08",
   "role": "Graduate School Staff"
  },
  {
-  "t": 91.1,
+  "t": 101.6,
   "kind": "step",
   "label": "5 a staged board: stages as columns, requests as cards",
   "role": "Graduate School Staff"
  },
  {
-  "t": 93.7,
+  "t": 104.0,
   "kind": "hold",
   "label": "best-features-09",
   "role": "Graduate School Staff"
  },
  {
-  "t": 101.7,
+  "t": 113.5,
   "kind": "step",
   "label": "5 Reports and Analytics computed from the records",
   "role": "Graduate School Staff"
  },
  {
-  "t": 107.0,
+  "t": 117.2,
   "kind": "hold",
   "label": "best-features-10",
   "role": "Graduate School Staff"
  },
  {
-  "t": 111.8,
+  "t": 123.5,
   "kind": "hold",
   "label": "best-features-11",
   "role": "Graduate School Staff"
  },
  {
-  "t": 122.1,
+  "t": 136.0,
   "kind": "hold",
   "label": "best-features-12",
   "role": "Graduate School Staff"
  },
  {
-  "t": 132.8,
+  "t": 148.1,
   "kind": "end",
   "label": "end of part",
   "role": "Graduate School Staff"

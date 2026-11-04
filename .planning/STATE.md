@@ -1,5 +1,14 @@
 # State
 
+## 2026-11-04 13:25 — demo videos re-recorded (session "redo videos"; not committed)
+
+- `scripts/demo/narration.json`: every line rewritten as plain spoken English with linking phrases ("Here we have…",
+  "Next, we have…", an opener per video); no "cohort". The Demo Guide reads the same file.
+- All six videos re-recorded on the current code (0 failed steps) into `Documents/Capstone/Meeting_2026-11-04/videos/`;
+  `.srt`, `.timeline.json`, `NARRATION-SCRIPT.docx/.pdf` rebuilt. The `-FINAL.mp4` files are the owner's OLD voice-overs
+  and are stale; the owner records new audio from the new `.srt`.
+- Recording needs `PYTHONIOENCODING=utf-8` when output goes to a file (capture cases print arrows; cp1252 crashes).
+
 ## 2026-11-04 afternoon — known-data rule, process audit, Demo Guide (session "known-data"; pushed to v6.1-migui)
 
 **For Natalie (next session): start with `/continue_CAPSTONE-USLS-MVP`, then read this block.**

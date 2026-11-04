@@ -1,67 +1,67 @@
 1
-00:00:02,200 --> 00:00:04,500
-Graduate School staff signs in.
+00:00:01,199 --> 00:00:05,299
+Next, we have Reports and Analytics. Graduate School staff signs in.
 
 2
-00:00:09,900 --> 00:00:18,100
-Reports and Analytics, under Overview. Filters on top: program, entry cohort and period. Below, the six numbers the office asks about most.
+00:00:08,400 --> 00:00:19,500
+Here we have Reports and Analytics, under Overview. At the top are the filters: program, year started, and period. Below them are the six numbers the office asks about most.
 
 3
-00:00:18,399 --> 00:00:23,400
-Behind schedule: the share of active students who are behind, against a target.
+00:00:19,800 --> 00:00:26,300
+First, Behind schedule. It's the share of active students who are running late, compared to a target.
 
 4
-00:00:23,600 --> 00:00:29,600
-Median days to decide, against the twelve months before. Every number is computed from recorded events.
+00:00:26,500 --> 00:00:33,199
+Then Median days to decide, compared to the twelve months before. Every number here comes from recorded events.
 
 5
-00:00:30,199 --> 00:00:36,199
-Needs attention. Each bar is a cause; the longest affects the most students.
+00:00:33,899 --> 00:00:41,699
+Next, we have Needs attention. It shows one bar per cause. The longest bar affects the most students.
 
 6
-00:00:36,399 --> 00:00:41,199
-Selecting a cause narrows the list to the students affected.
+00:00:41,899 --> 00:00:47,500
+Clicking a cause narrows the list to just the students it affects.
 
 7
-00:00:41,399 --> 00:00:50,399
-Show all causes restores the list, most delayed first, with the office that can move each student on. Download it as Excel or PDF.
+00:00:47,700 --> 00:00:57,399
+Show all causes brings the full list back, most delayed first, with the office that can move each student forward. It downloads as Excel or PDF.
 
 8
-00:00:51,799 --> 00:00:57,699
-Where students get stuck counts students per stage as on time, slow or stuck.
+00:00:58,700 --> 00:01:06,799
+Next, we have Where students get stuck. It counts the students at each stage, as on time, slow, or stuck.
 
 9
-00:00:57,899 --> 00:01:03,099
-Every count is a button that opens the real students behind it.
+00:01:07,000 --> 00:01:13,299
+Every count is a button. Click it to see the actual students behind the number.
 
 10
-00:01:04,500 --> 00:01:11,599
-Office speed: which offices take longest to close requests. The longest red bar marks the office to ask first.
+00:01:14,700 --> 00:01:22,899
+Then Office speed. It shows which offices take longest to close requests. The longest red bar is the office to ask first.
 
 11
-00:01:13,000 --> 00:01:19,799
-Records to fix lists research students with missing records, such as no adviser. A fixed record drops off.
+00:01:24,200 --> 00:01:34,299
+Next, we have Records to fix. It lists research students with missing details, such as no adviser. Once a record is fixed, it drops off the list.
 
 12
-00:01:21,200 --> 00:01:22,399
-Cohorts by stage.
+00:01:35,599 --> 00:01:39,799
+This next tab shows students by year started and by stage.
 
 13
-00:01:23,799 --> 00:01:27,200
-Graduation candidates: who can graduate and what is missing.
+00:01:41,099 --> 00:01:46,000
+Then Graduation candidates. It shows who can graduate, and what is still missing.
 
 14
-00:01:28,500 --> 00:01:31,500
-Overdue and pending: each waiting task, longest first.
+00:01:47,299 --> 00:01:50,700
+Overdue and pending lists every waiting task, longest first.
 
 15
-00:01:32,900 --> 00:01:35,899
-Defenses held and upcoming, with panel and verdict.
+00:01:52,099 --> 00:01:58,399
+Defenses shows the ones already held and the ones coming up, with the panel and the verdict.
 
 16
-00:01:37,299 --> 00:01:41,399
-Registrar changes: the daily list the Registrar must apply in AIMS.
+00:01:59,799 --> 00:02:05,000
+And Registrar changes is the daily list the Registrar needs to apply in AIMS.
 
 17
-00:01:44,200 --> 00:01:50,099
-Every filter covers the whole page. One program picked, and all the numbers follow.
+00:02:07,900 --> 00:02:15,200
+One last thing. Every filter applies to the whole page. Pick one program, and all the numbers follow.

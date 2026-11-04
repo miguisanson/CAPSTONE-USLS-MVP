@@ -1,5 +1,105 @@
 [
  {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "note",
+  "message": "new student: Dana Monitor130537, IDNO 9130537, program MSN"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "note",
+  "message": "sheet: Monitoring Sheet |  | Curriculum progress for each student. Add students and edit subject rows here, or upload a workbook under Student Handoff. |  | Export workbook | Add student | DPSY ? Doctor of Philosophy in Psychology | MAPSY ? Master of Arts in Psychology | MASS ? Master of Arts in Social Sciences | DBA ? Doct"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "open Monitoring Sheet, choose MSN"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "open Add student"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "note",
+  "message": "added: Add student |  | Recorded as a manual entry with your name and the time. A student login is created, like the sheet import does. |  | Dana Monitor130537 was added to the MSN monitoring sheet. |  | Student portal login: dana.monitor130537@student.usls.edu.ph. |  | The first-login password is the shared demo password, the same one the sheet import gives new students. |  | Done | Add subjects now"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "fill and submit the new student"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "Add subjects now: the record panel"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "add subject row MSN-FED"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "add subject row MSN-MOR"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "note",
+  "message": "rows: Monitor130537, Dana |  | IDNO 9130537 | ? | MSN | ? | AY entry 26-27 | Manual entry |  | Full profile | Subjects | Student details | Change history | 7 | MSN-MOR added to Dana Monitor130537's monitoring sheet. |  | 2 of 18 curriculum subjects completed ? 6/54 units ? 2 manual row(s) |  | Filter subjects | Add other subject | Add remaining curriculum subjects (16) | Subject rows for this student | SUBJECT\tSTATUS | \tTERM TAKEN | \tSOURCE | \tACTIONS |  |  | MSN-FED |  | Foundations of Advanced Nursing Practice ? 3u |  | Credited from a transfer record |  | \tCompleted\tAY 2025-2026 2nd Semester\t | Manual entry\t | Edit |  |  |  | MSN-MOR |  | Nursing Research Methods ? 3u |  | Credited from a transfer record |  | \tCompleted\tAY 2025-2026 2nd Semester\t | Manual entry\t | Edit |  |  |  | MSN-STAT |  | Biostatistics ? 3u |  | \tNot taken\t?\t\t | Add |  |  |  | MSN-COG1 |  | Health Informatics ? 3u |  | \tNot taken\t?\t\t | Add |  |  |  | MSN-COG10 |  | Critical Care Nursing ? 3u |  | \tNot taken\t?\t\t | Add |  |  |  | MSN-COG2 |  | Gerontological Nursing ? 3u |  | \tNot ta"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "two manual rows with provenance"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "edit the remarks of MSN-FED"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "note",
+  "message": "after remove: Monitor130537, Dana |  | IDNO 9130537 | ? | MSN | ? | AY entry 26-27 | Manual entry |  | Full profile | Subjects | Student details | Change history | 10 | MSN-MOR was removed; the row stays in the change history. |  | 1 of 18 curriculum subjects completed ? 3/54 units ? 1 manual row(s) |  | Filter subjects | Add other subject | Add remaining curriculum subjects (16) | Subject rows for this student | SUBJECT\tSTATUS | \tTERM TAKEN | \tSOURCE | \tACTIONS |  |  | MSN-FED |  | Foundations of Advanced Nursing Practice ? 3u |  | Credited from a transfer record; verifi"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "remove the MSN-MOR row with a reason"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "note",
+  "message": "history: Monitor130537, Dana |  | IDNO 9130537 | ? | MSN | ? | AY entry 26-27 | Manual entry |  | Full profile | Subjects | Student details | Change history | 10 | MSN-MOR was removed; the row stays in the change history. |  | Subject row removed ? MSN-MOR |  | Nov 4, 2026, 1:07 PM |  | term label: AY 2025-2026 2nd Semester ? (blank) |  | Manual entry | by Grace Fernandez | ? Reason: Entered by mistake: the subject was not credited |  | Subject row removed ? MSN-MOR |  | Nov 4, 2026, 1:07 PM |  | status: Completed ? Removed |  | Manual entry | by Grace Fernandez | ? Reason: Entered by mistake: the subject was not credited |  | Subject row changed ? MSN-FED |  | Nov 4, 2026, 1:07 PM |  | remarks: Credited from a transfer record ? Credited from a transfer record; verified against the transcript |  | Manual entry | by Grace Fernandez |  | Subject row added ? MSN-MOR |  | Nov 4, 2026, 1:06 PM |  | remarks: (blank) ? Credited from a transfer record |  | Manual entry | by Grace Fernandez |  | Subject row added ? MSN-MOR |  | Nov 4, 2026, 1:06 PM |  | term label: (blank) ? AY 2025-2026 2nd Semester |  | Manual entry | by Grace Fernandez |  | Subject row added ? MSN-MOR |  | Nov 4, 2026, 1:06 PM |  | status: Missing ? Completed |  | Manual entry | by Grace Fernandez |  | Subject row added ? MSN-FED |  | Nov 4, 2026, 1:06 PM |  | remarks: (blank) ? Credited from a transfer record |  | Manual entry | by Grace Fernandez |  | Subject row added ? MSN-FED |  | Nov 4, 2026, 1:06 PM |  | term label: (blank) ? AY 2025-2026 2nd Semester |  | Manual entry | by Grace Fernandez |  | Subject row added ? MSN-FED |  | Nov 4, 2026, 1:06 PM |  | status: Missing ? Completed |  | Manual entry | by Grac"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "Change history tab"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "new student appears in the grid, marked Manual"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "note",
+  "message": "imported record: Cabrera, Katrina |  | IDNO 2260073 | ? | MSN | ? | AY entry 22-23 | Imported |  | Full profile | Subjects | Student details | Change history |  | 18 of 18 curriculum subjects completed ? 54/54 units |  | Filter subjects | Add other subject | Add remaining curriculum subjects (0) | Subject rows for this student | SUBJECT\tSTATUS | \tTERM TAKEN | \tSOURCE | \tACTIONS |  |  | MSN-FED |  | Foundations of Advanced Nursing Practice ? 3u |  | \tCompleted\t?\t | Imported\t | Edit |  |  |  | MSN-MOR |  | Nursing Research Methods ? 3u |  | \tCompleted\t?\t | Imported\t | Edit |  |  |  | MSN-STAT |  | Biostatistics ? 3u |  | \tCompleted\t?\t | Imported\t | Edit |  |  |  | MSN-COG1 |  | Health Informatics ? 3u |  | \tCompleted\t?\t | Imported\t | Edit |  |  |  | MSN-COG10 |  | Critical Care Nursing ? 3u |  | \tCompleted\t?\t | Imported\t | Edit |  |  |  | MSN-COG2 |  | Gerontolog"
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "note",
+  "message": "imported edit form: Cabrera, Katrina |  | IDNO 2260073 | ? | MSN | ? | AY entry 22-23 | Imported |  | Full profile | Subjects | Student details | Change history |  | 18 of 18 curriculum subjects completed ? 54/54 units |  | Filter subjects | Add other subject | Add remaining curriculum subjects (0) |  | Edit MSN-FED ? Foundations of Advanced Nursing Practice |  | Status | Planned | Enrolled | Completed | Withdrawn | Dropped | INC | Term taken | Not recorded | AY 2026-2027 2nd Semester | AY 2026-2027 1st Semester | AY 2025-2026 2nd Semester | Remarks | Reason for changing this imported value * | Kept in the change history with your name. | Enter to save ? Esc to cancel | Cancel | Save changes | Subject rows for this student | SUBJECT\tSTATUS | \tTERM TAKEN | \tSOURCE | \tACTIONS |  |  | MSN-FED |  | Foundations of Advanced Nursing Practice ? 3u |  | \tCompleted\t?\t | Imported\t | Edit |  |  |  | MSN-MOR |  | Nursing Research Methods ? 3u |  | \tCompleted\t?\t | Imported\t | Edit |  |  |  | MSN-STAT |  | Biostatistics ? 3u |  | \tCompleted\t?\t | Imported\t | Edit |  |  | "
+ },
+ {
+  "case": "capture.case_05_monitoring_sheet",
+  "kind": "ok",
+  "message": "imported student: provenance and reason required to change an imported value"
+ },
+ {
   "case": "capture.case_10_leave_of_absence",
   "kind": "note",
   "message": "reset leave-of-absence-daniel: Reset Daniel Fernandez's Leave-Of-Absence demo. All prerequisite stages are complete and the student is ready to begin again."
@@ -97,7 +197,7 @@
  {
   "case": "capture.case_10_leave_of_absence",
   "kind": "note",
-  "message": "export dialog: Registrar list downloaded |  | The file was downloaded successfully. No email was sent by the portal. |  | EXPORTED FILE |  | approved-leaves-of-absence-2026-11-04.csv |  | Email the leave of absence list to the Registrar |  | Graduate School staff must attach the downloaded file and send it through the official email channel. |  | Wait for Registrar acknowledgement |  | Keep the case at \u201cExported \u2014 Ready to Send\u201d until the Registrar acknowledges the email outside the portal. |  | Got it"
+  "message": "export dialog: Registrar list downloaded |  | The file was downloaded successfully. No email was sent by the portal. |  | EXPORTED FILE |  | approved-leaves-of-absence-2026-11-04.csv |  | Email the leave of absence list to the Registrar |  | Graduate School staff must attach the downloaded file and send it through the official email channel. |  | Wait for Registrar acknowledgement |  | Keep the case at ?Exported ? Ready to Send? until the Registrar acknowledges the email outside the portal. |  | Got it"
  },
  {
   "case": "capture.case_10_leave_of_absence",
@@ -113,5 +213,260 @@
   "case": "capture.case_10_leave_of_absence",
   "kind": "ok",
   "message": "student sees the leave"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "note",
+  "message": "reset readmission-therese: Reset Therese Lacson's Readmission demo. All prerequisite stages are complete and the student is ready to begin again."
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "reset Therese"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "student opens Readmission"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "student reads the rules panel"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "student fills the request (no ticks)"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "student sends the request"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "staff opens the Readmission board and finds Therese"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "staff drags the card to In staff review"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "staff opens the request, reads the checklist and the policy check"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "note",
+  "message": "dialog: Forward to Dean |  | Therese Lacson - Readmission |  | In staff review | With the Dean |  | The request goes to the Dean, who decides. Nothing is decided yet. |  | Eligibility result | Use the policy check result (Eligible to Return) | Eligible | Eligible to Return | Needs Review | Not Eligible | Pending Requirements | Advice from the policy check: Eligible to Return. The Dean decides. | Return checklist |  | Tick each office check you have confirmed. Anything left unticked reaches the Dean as Needs Review. |  | Written intention to enroll | Checked by the system: The reason written in this request is the written intention to enroll. | Evaluation of subject/grade requirements | Checked by the system: 3 of 18 subjects completed; 15 still to take. Adviser on record: Dr. Liwayway Bautista. | Clearance from Business Office | Graduate School staff confirm this during review. Tick to mark it v"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "staff ticks the two office checks and forwards to the Dean"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "note",
+  "message": "dean dialog: Approve |  | Therese Lacson - Readmission |  | With the Dean | Approved |  | Note (optional) | Kept with this step in the history. | Approve | Cancel |  | Your decision is recorded as your electronic approval (GS-P-03)."
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "Dean drags the card to Approved and approves"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "staff sees the approved request and the Registrar list"
+ },
+ {
+  "case": "capture.case_11_readmission",
+  "kind": "ok",
+  "message": "student sees the result"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "note",
+  "message": "reset awol-maya: Reset Maya Torres's Awol demo. All prerequisite stages are complete and the student is ready to begin again."
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "reset Maya"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "staff opens AWOL & Residency and finds Maya (flagged by the system)"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "staff reads the rules panel"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "staff opens Maya's AWOL card"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "student opens Return from AWOL"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "student fills and sends the return declaration"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "note",
+  "message": "details: Maya Torres | Return filed |  | Return from AWOL ? GS-2026-AWOL-01 ? MAED |  | WHERE THIS REQUEST IS |  | Complete: | AWOL flagged | 2 | Current: | Return filed | 3 | Upcoming: | Dean decision | 4 | Upcoming: | Back in the program | THE REQUEST | STUDENT | Maya Torres | GS-2026-AWOL-01 ? Master of Arts in Education | TYPE | Return from AWOL | AWOL EFFECTIVE DATE | Jul 7, 2026 | DETECTION SOURCE | Demo imported AWOL standing | LAST ENROLLED SEMESTER | AY 2025-2026 2nd Semester | RETURNING IN | AY 2026-2027 2nd Semester | POLICY CLASSIFICATION | Within Maximum Residence | YEARS IN THE PROGRAM | 1 | RESIDENCE LIMITS | 5 normal / 7 absolute (Master's) | STUDENT'S WRITTEN INTENTION | I intend to resume my enrollment and complete my thesis. | REASON FOR RETURN | I have resolved the family matter that kept me away and I am ready to continue. | DEAN DECISION | Not Submitted | DEAN DECIDED | ? | STAFF NOTES | None | POLICY CHECK |  | Advice for staff - the Dean decides. |  | Eligible for Dean Review | Suggested for the Dean: Forward to Dean |  | Return classification: Within Maximum Residence. The Dean must endorse the written intent before registration privileges are restored. |  | Current AWOL status |  | Student is currently recorded AWOL. |  | Pass |  | Written intent to enroll |  | Structured portal return declaration |  | Present |  | Maximum residence |  | 1 year(s) in program; normal Master's limit is 5 years. |  | Pass | THE STUDENT SO FAR |  | 1 year in the program |  | Normal length 5 years. The most allowed is 7 years. |  | EARLIER REQUESTS BY THIS STUDENT |  | No earlie"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "staff opens Maya's submitted return case"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "note",
+  "message": "forward dialog: Forward to Dean |  | Maya Torres - Return from AWOL |  | Return filed | With the Dean |  | The request goes to the Dean, who decides. Nothing is decided yet. |  | Note for the Dean | Optional. Staff and the Dean can see it. | Forward to Dean | Cancel |  | Your decision is recorded as your electronic approval (GS-P-03)."
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "staff drags the card to With the Dean and forwards"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "note",
+  "message": "dean dialog: Approve the return |  | Maya Torres - Return from AWOL |  | With the Dean | Return approved |  | The Dean's approval restores the student's standing (or sends it on for full re-enrollment). |  | Note (optional) | Kept with this step in the history. | Approve the return | Cancel |  | Your decision is recorded as your electronic approval (GS-P-03)."
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "Dean drags the card to Back in the program and approves"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "staff sees the outcome and the Registrar list"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "note",
+  "message": "downloaded awol-return-registrar-GS-2026-AWOL-01.csv"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "staff downloads the Registrar report"
+ },
+ {
+  "case": "capture.case_12_awol",
+  "kind": "ok",
+  "message": "student sees the outcome"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "open Reports & Analytics"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "read the six numbers"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "Needs attention: the causes, the students behind a bar, the list"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "Where students get stuck"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "Office speed"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "Records to fix"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "report: By year started"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "report: Graduation candidates"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "report: Overdue and pending"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "report: Defenses"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "Registrar changes"
+ },
+ {
+  "case": "tour_reports",
+  "kind": "ok",
+  "message": "filter by program: every number follows"
+ },
+ {
+  "case": "tour_best_features",
+  "kind": "ok",
+  "message": "1 Business Rules: every rule with its page and a label"
+ },
+ {
+  "case": "tour_best_features",
+  "kind": "note",
+  "message": "ANSWER to 'Can a student withdraw a subject on Day 1, and how much is the fee?': Day 1 is inside the first week, so a student may withdraw a subject on Day 1 with the Dean's approval, but it is not free: 10% of the total amount due for the term is charged in the first week and 20% in the second week. | Source: USLS GS Operations Manual DRAFT for Validation (4.4 Withdrawal of subject) | Offline answer | Found by keyword search; Gemini was not used |  | SOURCES (1) |  | USLS GS Operations Manual DRAFT for Validation | 4.4 Withdrawal of subject"
+ },
+ {
+  "case": "tour_best_features",
+  "kind": "ok",
+  "message": "2 Policy Assistant: question, cited answer, the exact passage"
+ },
+ {
+  "case": "tour_best_features",
+  "kind": "ok",
+  "message": "3 Panel Matching: ranked candidates and how the score was built"
+ },
+ {
+  "case": "tour_best_features",
+  "kind": "ok",
+  "message": "4 Defense Scheduling: best shared options, hard stop versus warning"
+ },
+ {
+  "case": "tour_best_features",
+  "kind": "ok",
+  "message": "5 a staged board: stages as columns, requests as cards"
+ },
+ {
+  "case": "tour_best_features",
+  "kind": "ok",
+  "message": "5 Reports and Analytics computed from the records"
  }
 ]

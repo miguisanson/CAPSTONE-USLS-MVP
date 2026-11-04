@@ -6,259 +6,259 @@
   "role": ""
  },
  {
-  "t": 1.7,
+  "t": 1.3,
   "kind": "card",
   "label": "Signing in as Graduate School Staff",
   "role": "Graduate School Staff"
  },
  {
-  "t": 4.2,
+  "t": 9.4,
   "kind": "signin",
   "label": "signed in as Graduate School Staff (staff@usls.edu.ph)",
   "role": "Graduate School Staff"
  },
  {
-  "t": 4.2,
+  "t": 9.4,
   "kind": "step",
   "label": "staff opens AWOL & Residency and finds Maya (flagged by the system)",
   "role": "Graduate School Staff"
  },
  {
-  "t": 4.9,
+  "t": 10.1,
   "kind": "hold",
   "label": "awol-01",
   "role": "Graduate School Staff"
  },
  {
-  "t": 11.7,
+  "t": 20.6,
   "kind": "hold",
   "label": "awol-02",
   "role": "Graduate School Staff"
  },
  {
-  "t": 19.3,
+  "t": 30.1,
   "kind": "step",
   "label": "staff reads the rules panel",
   "role": "Graduate School Staff"
  },
  {
-  "t": 20.1,
+  "t": 30.8,
   "kind": "hold",
   "label": "awol-03",
   "role": "Graduate School Staff"
  },
  {
-  "t": 27.5,
+  "t": 42.7,
   "kind": "step",
   "label": "staff opens Maya's AWOL card",
   "role": "Graduate School Staff"
  },
  {
-  "t": 28.4,
+  "t": 43.6,
   "kind": "hold",
   "label": "awol-04",
   "role": "Graduate School Staff"
  },
  {
-  "t": 35.0,
+  "t": 51.6,
   "kind": "card",
   "label": "Signing in as Student",
   "role": "Student"
  },
  {
-  "t": 37.5,
+  "t": 55.2,
   "kind": "signin",
   "label": "signed in as Student (awol.maya@usls.edu.ph)",
   "role": "Student"
  },
  {
-  "t": 37.5,
+  "t": 55.2,
   "kind": "step",
   "label": "student opens Return from AWOL",
   "role": "Student"
  },
  {
-  "t": 38.3,
+  "t": 56.0,
   "kind": "hold",
   "label": "awol-05",
   "role": "Student"
  },
  {
-  "t": 43.1,
+  "t": 63.4,
   "kind": "step",
   "label": "student fills and sends the return declaration",
   "role": "Student"
  },
  {
-  "t": 46.3,
+  "t": 66.6,
   "kind": "hold",
   "label": "awol-06",
   "role": "Student"
  },
  {
-  "t": 51.5,
+  "t": 76.3,
   "kind": "hold",
   "label": "awol-07",
   "role": "Student"
  },
  {
-  "t": 54.1,
+  "t": 78.9,
   "kind": "hold",
   "label": "awol-08",
   "role": "Student"
  },
  {
-  "t": 58.0,
+  "t": 84.2,
   "kind": "step",
   "label": "staff opens Maya's submitted return case",
   "role": "Student"
  },
  {
-  "t": 58.5,
+  "t": 84.7,
   "kind": "card",
   "label": "Signing in as Graduate School Staff",
   "role": "Graduate School Staff"
  },
  {
-  "t": 61.0,
+  "t": 89.1,
   "kind": "signin",
   "label": "signed in as Graduate School Staff (staff@usls.edu.ph)",
   "role": "Graduate School Staff"
  },
  {
-  "t": 64.6,
+  "t": 92.5,
   "kind": "hold",
   "label": "awol-09",
   "role": "Graduate School Staff"
  },
  {
-  "t": 69.8,
+  "t": 98.8,
   "kind": "hold",
   "label": "awol-10",
   "role": "Graduate School Staff"
  },
  {
-  "t": 74.0,
+  "t": 103.8,
   "kind": "step",
   "label": "staff drags the card to With the Dean and forwards",
   "role": "Graduate School Staff"
  },
  {
-  "t": 78.0,
+  "t": 107.4,
   "kind": "hold",
   "label": "awol-11",
   "role": "Graduate School Staff"
  },
  {
-  "t": 83.9,
+  "t": 113.4,
   "kind": "hold",
   "label": "awol-12",
   "role": "Graduate School Staff"
  },
  {
-  "t": 85.9,
+  "t": 115.3,
   "kind": "card",
   "label": "Signing in as Dean",
   "role": "Dean"
  },
  {
-  "t": 88.3,
+  "t": 118.9,
   "kind": "signin",
   "label": "signed in as Dean (dean@usls.edu.ph)",
   "role": "Dean"
  },
  {
-  "t": 88.3,
+  "t": 118.9,
   "kind": "step",
   "label": "Dean drags the card to Back in the program and approves",
   "role": "Dean"
  },
  {
-  "t": 91.1,
+  "t": 121.6,
   "kind": "hold",
   "label": "awol-13",
   "role": "Dean"
  },
  {
-  "t": 96.6,
+  "t": 126.6,
   "kind": "hold",
   "label": "awol-14",
   "role": "Dean"
  },
  {
-  "t": 103.5,
+  "t": 134.6,
   "kind": "hold",
   "label": "awol-15",
   "role": "Dean"
  },
  {
-  "t": 104.9,
+  "t": 136.7,
   "kind": "step",
   "label": "staff sees the outcome and the Registrar list",
   "role": "Dean"
  },
  {
-  "t": 105.4,
+  "t": 137.2,
   "kind": "card",
   "label": "Signing in as Graduate School Staff",
   "role": "Graduate School Staff"
  },
  {
-  "t": 108.0,
+  "t": 140.4,
   "kind": "signin",
   "label": "signed in as Graduate School Staff (staff@usls.edu.ph)",
   "role": "Graduate School Staff"
  },
  {
-  "t": 112.0,
+  "t": 143.9,
   "kind": "hold",
   "label": "awol-16",
   "role": "Graduate School Staff"
  },
  {
-  "t": 117.6,
+  "t": 150.2,
   "kind": "hold",
   "label": "awol-17",
   "role": "Graduate School Staff"
  },
  {
-  "t": 120.2,
+  "t": 152.8,
   "kind": "hold",
   "label": "awol-18",
   "role": "Graduate School Staff"
  },
  {
-  "t": 125.3,
+  "t": 161.2,
   "kind": "step",
   "label": "staff downloads the Registrar report",
   "role": "Graduate School Staff"
  },
  {
-  "t": 125.5,
+  "t": 161.3,
   "kind": "step",
   "label": "student sees the outcome",
   "role": "Graduate School Staff"
  },
  {
-  "t": 126.1,
+  "t": 161.9,
   "kind": "card",
   "label": "Signing in as Student",
   "role": "Student"
  },
  {
-  "t": 129.1,
+  "t": 164.2,
   "kind": "signin",
   "label": "signed in as Student (awol.maya@usls.edu.ph)",
   "role": "Student"
  },
  {
-  "t": 131.7,
+  "t": 166.4,
   "kind": "hold",
   "label": "awol-19",
   "role": "Student"
  },
  {
-  "t": 138.3,
+  "t": 175.3,
   "kind": "end",
   "label": "end of part",
   "role": "Student"
