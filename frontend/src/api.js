@@ -12,6 +12,24 @@ function announce(method, path, status, message = "") {
   window.dispatchEvent(new CustomEvent("demo-guide:api", { detail: { method, path, status, message } }));
 }
 
+// fetch for the upload and download calls that do not go through request(): same announcement for the Demo Guide, so a refused
+// upload shows its reason there. The caller still gets the untouched response.
+async function announced(url, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const path = String(url).slice(BASE.length);
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch (error) {
+    announce(method, path, 0, NOT_REACHABLE);
+    throw error;
+  }
+  let message = "";
+  if (!res.ok && method !== "GET") message = await res.clone().json().then((body) => (body && body.error) || "", () => "");
+  announce(method, path, res.status, message || (res.ok ? "" : `Request failed (${res.status})`));
+  return res;
+}
+
 async function request(path, options = {}) {
   if (path === "/auth/logout") signingOut = true; // a poll still in flight must not look like an expired session
   if (path === "/auth/login") signingOut = false;
@@ -164,7 +182,7 @@ export const api = {
       body: JSON.stringify({ reflected }),
     }),
   exportGraduationCsv: async (reviewWindow = "", endorsementIds = []) => {
-    const res = await fetch(`${BASE}/graduation/endorsed.csv`, {
+    const res = await announced(`${BASE}/graduation/endorsed.csv`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
@@ -186,7 +204,7 @@ export const api = {
     return { count: Number(res.headers.get("X-Exported-Count") || 0), filename };
   },
   exportWithdrawalXlsx: async (applicationIds = []) => {
-    const res = await fetch(`${BASE}/withdrawal/approved.xlsx`, {
+    const res = await announced(`${BASE}/withdrawal/approved.xlsx`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
@@ -231,7 +249,7 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     // No Content-Type header: the browser sets the multipart boundary itself.
-    const res = await fetch(`${BASE}/transactions/student-handoff/import`, { method: "POST", body: form, credentials: "same-origin" });
+    const res = await announced(`${BASE}/transactions/student-handoff/import`, { method: "POST", body: form, credentials: "same-origin" });
     let body = null;
     try {
       body = await res.json();
@@ -276,7 +294,7 @@ export const api = {
     const form = new FormData();
     form.append("issue_ids", JSON.stringify(issueIds));
     form.append("file", file);
-    const res = await fetch(`${BASE}/monitoring/issues/resolve-upload`, {
+    const res = await announced(`${BASE}/monitoring/issues/resolve-upload`, {
       method: "POST",
       body: form,
       credentials: "same-origin",
@@ -312,7 +330,7 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     if (termId) form.append("term_id", termId);
-    const res = await fetch(`${BASE}/enrollment/class-list-preview`, { method: "POST", body: form, credentials: "same-origin" });
+    const res = await announced(`${BASE}/enrollment/class-list-preview`, { method: "POST", body: form, credentials: "same-origin" });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || `Class list preview failed (${res.status})`);
     return body;
@@ -321,7 +339,7 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     if (termId) form.append("term_id", termId);
-    const res = await fetch(`${BASE}/enrollment/class-list-import`, { method: "POST", body: form, credentials: "same-origin" });
+    const res = await announced(`${BASE}/enrollment/class-list-import`, { method: "POST", body: form, credentials: "same-origin" });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || `Class list import failed (${res.status})`);
     return body;
@@ -366,7 +384,7 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     Object.entries(fields).forEach(([key, value]) => form.append(key, value ?? ""));
-    const res = await fetch(`${BASE}/policy-documents`, { method: "POST", body: form, credentials: "same-origin" });
+    const res = await announced(`${BASE}/policy-documents`, { method: "POST", body: form, credentials: "same-origin" });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || `Upload failed (${res.status})`);
     return body;
@@ -377,7 +395,7 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     Object.entries(fields).forEach(([key, value]) => form.append(key, value ?? ""));
-    const res = await fetch(`${BASE}/policy-documents/${id}/file`, { method: "PUT", body: form, credentials: "same-origin" });
+    const res = await announced(`${BASE}/policy-documents/${id}/file`, { method: "PUT", body: form, credentials: "same-origin" });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || `Replacement failed (${res.status})`);
     return body;
@@ -420,7 +438,7 @@ export const api = {
     const form = new FormData();
     if (note) form.append("note", note);
     if (file) form.append("file", file);
-    const res = await fetch(`${BASE}/student-portal/defense-verdicts/${verdictId}/revisions`, {
+    const res = await announced(`${BASE}/student-portal/defense-verdicts/${verdictId}/revisions`, {
       method: "POST",
       body: form,
       credentials: "same-origin",
@@ -458,7 +476,7 @@ export const api = {
   leaveHandoff: (caseIds, status) =>
     request("/leave-cases/handoff", { method: "POST", body: JSON.stringify({ case_ids: caseIds, status }) }),
   exportLeaveRegistrarList: async (slug, format = "csv", caseIds = []) => {
-    const res = await fetch(`${BASE}/leave-cases/registrar-export`, {
+    const res = await announced(`${BASE}/leave-cases/registrar-export`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
@@ -484,7 +502,7 @@ export const api = {
     form.append("gate", gate);
     form.append("item_name", itemName);
     form.append("file", file);
-    const res = await fetch(`${BASE}/student-portal/research-evidence/upload`, {
+    const res = await announced(`${BASE}/student-portal/research-evidence/upload`, {
       method: "POST",
       body: form,
       credentials: "same-origin",
@@ -508,7 +526,7 @@ export const api = {
     const form = new FormData();
     form.append("request_type", requestType);
     form.append("file", file);
-    const res = await fetch(`${BASE}/student-portal/request-attachments/upload`, {
+    const res = await announced(`${BASE}/student-portal/request-attachments/upload`, {
       method: "POST",
       body: form,
       credentials: "same-origin",
@@ -586,7 +604,7 @@ export const api = {
   submitStudentDocument: async (documentId, file) => {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${BASE}/student-portal/documents/${documentId}/upload`, {
+    const res = await announced(`${BASE}/student-portal/documents/${documentId}/upload`, {
       method: "POST",
       body: form,
       credentials: "same-origin",

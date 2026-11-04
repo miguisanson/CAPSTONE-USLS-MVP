@@ -5,6 +5,7 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { homePath } from "../lib/homePaths.js";
 import { GUIDES } from "../lib/demoGuide/guides.js";
+import { guideEnabled, setGuideEnabled } from "../lib/demoGuide/prefs.js";
 import { Button, InlineNotice, Input, PageHeader } from "../components/ui/index.js";
 
 
@@ -91,6 +92,7 @@ export default function Login() {
   const [skipDateWaits, setSkipDateWaits] = useState(null);
   const [demoOpen, setDemoOpen] = useState(Boolean(asEmail));
   const [guideOpen, setGuideOpen] = useState(false);
+  const [guideOn, setGuideOn] = useState(guideEnabled); // per browser; off unless the presenter turns it on
   const [guidePick, setGuidePick] = useState("");
   const [demoAccounts, setDemoAccounts] = useState([]);
   const [demoStudents, setDemoStudents] = useState([]);
@@ -279,6 +281,29 @@ export default function Login() {
             </label>
           )}
 
+          {(demoMode || skipDateWaits !== null) && (
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-amber-600"
+                checked={guideOn}
+                onChange={(event) => {
+                  setGuideEnabled(event.target.checked);
+                  setGuideOn(event.target.checked);
+                }}
+              />
+              <span className="min-w-0">
+                <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-900">
+                  <Compass className="h-4 w-4" aria-hidden="true" /> Show the Demo guide
+                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">Demo mode</span>
+                </span>
+                <span className="mt-0.5 block text-xs text-amber-800">
+                  On: after signing in, the top bar has a Demo guide button that walks through a demo. Off: the app looks as usual. Applies to this browser only.
+                </span>
+              </span>
+            </label>
+          )}
+
           {demoMode && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50/60">
               <button
@@ -415,12 +440,18 @@ export default function Login() {
                     <Compass className="h-4 w-4" aria-hidden="true" /> Demo guide
                     <span className="rounded-full bg-amber-200 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">Demo mode</span>
                   </span>
-                  <span className="mt-0.5 block text-xs text-amber-800">Which account to use for each demo. After signing in, open Demo guide in the top bar.</span>
+                  <span className="mt-0.5 block text-xs text-amber-800">{guideOn ? "Which account to use for each demo. After signing in, open Demo guide in the top bar." : "Turned off in this browser."}</span>
                 </span>
                 <ChevronDown className={`h-4 w-4 shrink-0 text-amber-800 transition-transform ${guideOpen ? "rotate-180" : ""}`} aria-hidden="true" />
               </button>
               {guideOpen && (
                 <div id="demo-guide-panel" className="space-y-3 border-t border-amber-200 px-4 pb-4 pt-3">
+                  {!guideOn && (
+                    <p className="text-xs text-amber-900">
+                      The Demo guide is hidden. Turn on Show the Demo guide above to use it after signing in.{" "}
+                      <button type="button" className="cursor-pointer font-semibold underline" onClick={() => { setGuideEnabled(true); setGuideOn(true); }}>Turn it on</button>
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-2" role="group" aria-label="Choose a demo">
                     {GUIDES.map((guide) => (
                       <Button key={guide.id} size="sm" variant={guidePick === guide.id ? "primary" : "secondary"} aria-pressed={guidePick === guide.id} onClick={() => setGuidePick(guide.id)}>
@@ -432,7 +463,7 @@ export default function Login() {
                     <div key={guide.id} className="space-y-2">
                       <p className="text-xs text-slate-600">{guide.summary}</p>
                       <ol className="divide-y divide-amber-100 overflow-hidden rounded-xl border border-amber-100 bg-white">
-                        {["student", "staff", "dean"].filter((role) => guide.accounts[role]).map((role) => (
+                        {["student", "staff", "academic_coordinator", "research_coordinator", "dean"].filter((role) => guide.accounts[role]).map((role) => (
                           <li key={role} className="flex items-center gap-2 p-2">
                             <span className="min-w-0 flex-1 px-1">
                               <span className="block truncate text-sm font-semibold text-ink">{guide.accounts[role].label.charAt(0).toUpperCase() + guide.accounts[role].label.slice(1)}</span>

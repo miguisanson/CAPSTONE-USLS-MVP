@@ -40,8 +40,13 @@ async function apiAs(playwright, email) {
 }
 
 /** A browser signed in through the API, with its own session. */
-async function openAs(browser, email, { width = 1366, height = 768 } = {}) {
+const GUIDE_ON = "usls-demo-guide-on"; // the per-browser switch from the sign-in page (src/lib/demoGuide/prefs.js)
+/** Before the first page script: turn the switch on, unless this browser already has an answer (so "off" survives a reload). */
+const switchOn = (context) => context.addInitScript((key) => { try { if (window.localStorage.getItem(key) === null) window.localStorage.setItem(key, "1"); } catch { /* none */ } }, GUIDE_ON);
+
+async function openAs(browser, email, { width = 1366, height = 768, guideOn = true } = {}) {
   const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width, height } });
+  if (guideOn) await switchOn(context);
   expect((await context.request.post("/api/auth/login", { data: { email, password: PASSWORD } })).ok(), `sign in as ${email}`).toBeTruthy();
   await expect.poll(async () => (await (await context.request.get("/api/auth/me")).json()).user?.email).toBe(email);
   const page = await context.newPage();
@@ -124,12 +129,12 @@ test.describe("engine and content (pure)", () => {
   test("every guide is complete: narration key exists, 1-3 questions, a branch target exists, no pronouns for people", () => {
     const narration = JSON.parse(readFileSync(join(REPO_ROOT, "scripts", "demo", "narration.json"), "utf8"));
     const pronoun = /\b(he|she|they|them|their|his|her|hers|him|himself|herself|themselves)\b/i;
-    expect(GUIDES.map((g) => g.id)).toEqual(["leave-of-absence", "readmission", "awol", "monitoring", "reports"]);
+    expect(GUIDES.map((g) => g.id)).toEqual(["leave-of-absence", "readmission", "awol", "monitoring", "reports", "withdrawal", "practicum", "graduation"]);
     for (const guide of GUIDES) {
       const ids = new Set(guide.steps.map((s) => s.id));
       for (const s of guide.steps) {
         const where = `${guide.id}/${s.id}`;
-        expect(s.say in narration, `${where} narration key ${s.say}`).toBe(true);
+        if (s.say) expect(s.say in narration, `${where} narration key ${s.say}`).toBe(true); // the new guides have no recorded line, so no key
         expect(s.ifAsked.length, `${where} questions`).toBeGreaterThanOrEqual(1);
         expect(s.ifAsked.length, `${where} questions`).toBeLessThanOrEqual(3);
         expect(s.do.length, `${where} one sentence`).toBeGreaterThan(10);
@@ -417,6 +422,8 @@ test.describe("off script (the record is answered by page.route)", () => {
       await expect(page.getByRole("region", { name: "Readmission board" })).toBeVisible();
       await launcher(page).click();
       await expect(panelOf(page)).toBeVisible();
+      await page.keyboard.press("Escape"); // changed 2026-11-04 (owner): the first Esc collapses to the pill, the second closes
+      await expect(panelOf(page).getByRole("button", { name: "Expand" })).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(panelOf(page)).toHaveCount(0);
       await page.route("**/api/auth/config", (route) => route.fulfill({ json: { demo_mode: false, show_accounts: false, skip_date_waits: false } }));
@@ -525,6 +532,7 @@ test.describe("screens", () => {
 
   test("the sign-in page names the account to use for each demo", async ({ browser }) => {
     const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width: 1366, height: 900 } });
+    await switchOn(context); // as a presenter has it: the Demo guide switched on
     const page = await context.newPage();
     try {
       await page.goto("/login");
@@ -538,6 +546,293 @@ test.describe("screens", () => {
       await entry.getByRole("button", { name: "Fill form for the Dean" }).click();
       await expect(page.locator("#login-email")).toHaveValue("dean@usls.edu.ph");
       await page.screenshot({ path: join(SHOTS, "login-entry-1366.png") });
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+// ------------------------------------------------------------------------------------------------ the owner's changes of 2026-11-04
+const SAVED = "usls-demo-guide";
+/** Open panel on the Readmission guide, with a chosen dock side, before the page loads. */
+const presetPanel = (context, saved) => context.addInitScript(([key, value]) => { try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* none */ } }, [SAVED, { open: true, guideId: "readmission", ...saved }]);
+/** A small target of the step ("main form button[type=submit]") fixed to a corner, so the test knows where the panel must not be. */
+const addProbe = (page, corner) => page.evaluate((where) => {
+  document.querySelectorAll("#probe-form").forEach((node) => node.remove());
+  const form = document.createElement("form");
+  form.id = "probe-form";
+  form.style.cssText = `position:fixed;bottom:40px;${where}:40px;width:120px;height:44px;z-index:1`;
+  form.innerHTML = '<button type="submit" style="width:120px;height:44px">Probe</button>';
+  document.querySelector("main").prepend(form);
+}, corner);
+const overlap = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+
+test.describe("the switch on the sign-in page", () => {
+  test("off by default: no button and no panel; on shows them; off from the panel hides them; survives a reload", async ({ browser }) => {
+    const { context, page } = await openAs(browser, "staff@usls.edu.ph", { guideOn: false });
+    try {
+      await mockState(page, stateBody({ case: caseOf("Submitted") }));
+      await page.goto("/workflow/readmission");
+      await expect(page.getByRole("region", { name: "Readmission board" })).toBeVisible();
+      await expect(launcher(page)).toHaveCount(0);
+      await expect(panelOf(page)).toHaveCount(0);
+      // what the sign-in page's switch does (its own test is below): this browser's answer becomes "on"
+      await page.evaluate((key) => window.localStorage.setItem(key, "1"), GUIDE_ON);
+      await page.reload();
+      await expect(launcher(page)).toBeVisible();
+      const panel = await openGuide(page);
+      await expect(step(panel, "Start the staff review")).toBeVisible();
+      await panel.getByRole("button", { name: "Hide the Demo guide" }).click();
+      await expect(launcher(page)).toHaveCount(0);
+      await expect(panelOf(page)).toHaveCount(0);
+      await page.reload();
+      await expect(page.getByRole("region", { name: "Readmission board" })).toBeVisible();
+      await expect(launcher(page)).toHaveCount(0);
+      expect(await page.evaluate((key) => window.localStorage.getItem(key), GUIDE_ON)).toBe("0");
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("the sign-in switch: unchecked by default, remembered on reload, and the entry says how to turn it on", async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width: 1366, height: 900 } });
+    const page = await context.newPage();
+    try {
+      await page.goto("/login");
+      const toggle = page.getByRole("checkbox", { name: /Show the Demo guide/ });
+      await expect(toggle).not.toBeChecked();
+      await page.getByRole("button", { name: /^Demo guide/ }).click();
+      await expect(page.locator("#demo-guide-panel")).toContainText("Turn on Show the Demo guide");
+      await page.screenshot({ path: join(SHOTS, "login-toggle-off-1366.png") });
+      await toggle.check();
+      await expect(page.locator("#demo-guide-panel")).not.toContainText("The Demo guide is hidden");
+      await page.reload();
+      await expect(page.getByRole("checkbox", { name: /Show the Demo guide/ })).toBeChecked();
+      await page.screenshot({ path: join(SHOTS, "login-toggle-on-1366.png") });
+      await page.setViewportSize({ width: 390, height: 844 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "no sideways scroll").toBe(true);
+      await page.screenshot({ path: join(SHOTS, "login-toggle-390.png"), fullPage: true });
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+test.describe("the panel does not cover the app", () => {
+  for (const preferred of ["right", "left"]) {
+    test(`docked ${preferred}: when the target sits under the panel, the panel switches side and the boxes do not overlap`, async ({ browser }) => {
+      const { context, page } = await openAs(browser, "staff@usls.edu.ph");
+      try {
+        await presetPanel(context, { dock: preferred });
+        await mockState(page, stateBody({ case: null }));
+        await page.goto("/workflow/readmission");
+        await expect(panelOf(page)).toBeVisible();
+        await addProbe(page, preferred); // the target is in the corner where the panel wants to be
+        const other = preferred === "right" ? "left" : "right";
+        await expect(panelOf(page)).toHaveAttribute("data-dock", other);
+        const panelBox = await panelOf(page).boundingBox();
+        const targetBox = await page.locator('main form button[type="submit"]').first().boundingBox();
+        expect(overlap(panelBox, targetBox), `panel ${JSON.stringify(panelBox)} target ${JSON.stringify(targetBox)}`).toBe(false);
+        await page.screenshot({ path: join(SHOTS, `auto-switch-${other}-1366.png`) });
+        // with the target out of the way again the saved side comes back
+        await page.evaluate(() => document.querySelector("#probe-form").remove());
+        await expect(panelOf(page)).toHaveAttribute("data-dock", preferred);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  test("dock left and right by button, collapse to a pill; all remembered after a reload", async ({ browser }) => {
+    const { context, page } = await openAs(browser, "staff@usls.edu.ph");
+    try {
+      await mockState(page, stateBody({ case: caseOf("Staff Review", "In staff review") })); // a step without a target: nothing forces the side
+      await page.goto("/workflow/readmission");
+      const panel = await openGuide(page);
+      await expect(step(panel, "Staff forward it to the Dean")).toBeVisible();
+      expect((await panel.boundingBox()).x).toBeGreaterThan(683); // docked right by default
+      await panel.getByRole("button", { name: "Dock to the left" }).click();
+      await expect(panel).toHaveAttribute("data-dock", "left");
+      expect((await panel.boundingBox()).x).toBeLessThan(40);
+      await page.screenshot({ path: join(SHOTS, "docked-left-1366.png") });
+      await page.reload();
+      await expect(panelOf(page)).toHaveAttribute("data-dock", "left");
+      await panelOf(page).getByRole("button", { name: "Collapse" }).click();
+      const pill = await panelOf(page).boundingBox();
+      expect(pill.width).toBeLessThan(320);
+      expect(pill.height).toBeLessThan(64);
+      await page.screenshot({ path: join(SHOTS, "collapsed-left-1366.png") });
+      await page.reload();
+      await expect(panelOf(page).getByRole("button", { name: "Expand" })).toBeVisible(); // still a pill
+      await panelOf(page).getByRole("button", { name: "Expand" }).click();
+      await panelOf(page).getByRole("button", { name: "Dock to the right" }).click();
+      await expect(panelOf(page)).toHaveAttribute("data-dock", "right");
+      await page.screenshot({ path: join(SHOTS, "docked-right-1366.png") });
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+test.describe("show me, the step list and the keys", () => {
+  test("Show me scrolls to the target and rings it for about 3 seconds; off the page it says so and offers Go to", async ({ browser }) => {
+    const { context, page } = await openAs(browser, "staff@usls.edu.ph");
+    try {
+      await mockState(page, stateBody({ case: caseOf("Submitted") }));
+      await page.goto("/workflow/readmission");
+      const panel = await openGuide(page);
+      await expect(step(panel, "Start the staff review")).toBeVisible();
+      const flash = page.locator('[data-testid="demo-guide-ring"][data-flash="true"]');
+      await expect(flash).toHaveCount(0);
+      await panel.getByRole("button", { name: "Show me" }).click();
+      await expect(flash).toBeVisible();
+      await expect(flash).toHaveCount(0, { timeout: 6000 }); // gone after ~3 s
+      await expect(panel).not.toContainText("not on this page");
+      // another page: the control is not there
+      await page.goto("/reports");
+      const again = panelOf(page);
+      await again.getByRole("button", { name: "Show me" }).click();
+      await expect(again).toContainText("That control is not on this page.");
+      await again.getByRole("button", { name: "Go to Readmission" }).last().click();
+      await expect(page).toHaveURL(/\/workflow\/readmission/);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Show me with reduced motion: the ring still shows, without the pulse", async ({ browser }) => {
+    const { context, page } = await openAs(browser, "staff@usls.edu.ph");
+    try {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await mockState(page, stateBody({ case: caseOf("Submitted") }));
+      await page.goto("/workflow/readmission");
+      const panel = await openGuide(page);
+      await panel.getByRole("button", { name: "Show me" }).click();
+      const flash = page.locator('[data-testid="demo-guide-ring"][data-flash="true"]');
+      await expect(flash).toBeVisible();
+      expect(await flash.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("All steps: done, current and to-do marks, a progress bar, a click jumps there, Continue from here comes back; Alt+arrows and Esc", async ({ browser }) => {
+    const { context, page } = await openAs(browser, "staff@usls.edu.ph");
+    try {
+      await mockState(page, stateBody({ case: caseOf("Staff Review", "In staff review") }));
+      await page.goto("/workflow/readmission");
+      const panel = await openGuide(page);
+      await expect(step(panel, "Staff forward it to the Dean")).toBeVisible();
+      await expect(panel.getByRole("progressbar", { name: "Steps done" })).toHaveAttribute("aria-valuenow", "2");
+      await expect(panel).toContainText("2 of 5 done");
+      await panel.getByRole("button", { name: /^All steps/ }).click();
+      const items = panel.getByRole("list", { name: "All steps" }).getByRole("listitem");
+      await expect(items).toHaveCount(5);
+      await expect(items.nth(0)).toContainText("Done");
+      await expect(items.nth(1)).toContainText("Done");
+      await expect(items.nth(2)).toContainText("Current");
+      await expect(items.nth(3)).toContainText("To do");
+      await expect(items.nth(4)).toContainText("To do");
+      await page.screenshot({ path: join(SHOTS, "steps-list-1366.png") });
+      await items.nth(4).getByRole("button").click();
+      await expect(step(panel, "The student is back")).toBeVisible();
+      await expect(panel).toContainText("The record is not that far yet");
+      await panel.getByRole("button", { name: "Continue from here" }).click();
+      await expect(step(panel, "Staff forward it to the Dean")).toBeVisible();
+      // keys: Alt+Right / Alt+Left, then Esc collapses and a second Esc closes
+      await page.keyboard.press("Alt+ArrowRight");
+      await expect(step(panel, "The Dean decides")).toBeVisible();
+      await page.keyboard.press("Alt+ArrowLeft");
+      await expect(step(panel, "Staff forward it to the Dean")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(panel.getByRole("button", { name: "Expand" })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(panelOf(page)).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+test.describe("more guides", () => {
+  const cases = [
+    { id: "withdrawal", title: "Subject Withdrawal", student: { id: 9101, name: "Elena Navarro", student_number: "GS-2026-WD-01" }, route: "/workflow/withdrawal", first: "The student asks to withdraw from a subject",
+      mid: [["Dean Review", "The Dean decides"], ["Exported - Ready to Send", "The student sees the result"], ["Returned", "Correct it and send it again"], ["Denied", "Not approved"]] },
+    { id: "practicum", title: "Practicum", student: { id: 9102, name: "Paolo Ramirez", student_number: "GS-2026-PRAC-02" }, route: "/workflow/practicum", first: "The student sends the MOA",
+      mid: [["Documents Under Review", "The Coordinator checks the hours"], ["Additional Certificates Requested", "The student sends the missing documents again"], ["Report Sent to Dean", "The Dean reviews the report"]] },
+    { id: "graduation", title: "Graduation", student: { id: 9103, name: "Carlo Mendoza", student_number: "GS-2026-GRAD-02" }, route: "/workflow/graduation", first: "The student sends the graduation application",
+      mid: [["Coursework Review", "The Academic Coordinator checks coursework"], ["Returned for Clarification", "Send a corrected application"], ["Returned for Revision", "Staff correct the list and send it again"], ["Ready for Dean Review", "The Dean approves and exports"]] },
+  ];
+  for (const c of cases) {
+    test(`${c.title}: opens, and the first step and the branches come from the live state`, async ({ browser }) => {
+      const { context, page } = await openAs(browser, "staff@usls.edu.ph");
+      try {
+        let current = stateBody({ process: c.id, student: c.student, case: null });
+        await mockState(page, (url) => {
+          expect(url.searchParams.get("process")).toBe(c.id);
+          return current;
+        });
+        await page.goto(c.route);
+        const panel = await openGuide(page, c.title);
+        await expect(step(panel, c.first)).toBeVisible();
+        await expect(panel).toContainText(c.student.name);
+        for (const [status, title] of c.mid) {
+          current = stateBody({ process: c.id, student: c.student, case: { id: 7, kind: c.id.toUpperCase(), status, status_label: status, owner: "" } });
+          await panel.getByRole("button", { name: "Continue from here" }).click();
+          await expect(step(panel, title), `${status} -> ${title}`).toBeVisible();
+        }
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  test("the sign-in page lists the accounts of the new guides (the coordinators too)", async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width: 1366, height: 900 } });
+    await switchOn(context);
+    const page = await context.newPage();
+    try {
+      await page.goto("/login");
+      await page.getByRole("button", { name: /^Demo guide/ }).click();
+      const entry = page.locator("#demo-guide-panel");
+      await entry.getByRole("button", { name: /^Practicum/ }).click();
+      await expect(entry).toContainText("practicum.paolo@usls.edu.ph");
+      await expect(entry).toContainText("academic@usls.edu.ph");
+      await entry.getByRole("button", { name: /^Graduation/ }).click();
+      await expect(entry).toContainText("research@usls.edu.ph");
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+test.describe("uploads tell the guide too", () => {
+  test("a refused upload emits demo-guide:api with the reason, and the guide shows it", async ({ browser }) => {
+    // the emitter (api.js), run in Node with a stub window and fetch
+    const events = [];
+    const target = new EventTarget();
+    target.addEventListener("demo-guide:api", (event) => events.push(event.detail));
+    globalThis.window = target;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: "The file is too large." }), { status: 400, headers: { "Content-Type": "application/json" } });
+    try {
+      const { api } = await import("../src/api.js");
+      await expect(api.uploadStudentRequestAttachment("readmission", new Blob(["x"]))).rejects.toThrow("The file is too large.");
+    } finally {
+      globalThis.fetch = realFetch;
+      delete globalThis.window;
+    }
+    expect(events).toEqual([{ method: "POST", path: "/student-portal/request-attachments/upload", status: 400, message: "The file is too large." }]);
+
+    // the guide shows the reason it is given
+    const { context, page } = await openAs(browser, "staff@usls.edu.ph");
+    try {
+      await mockState(page, stateBody({ case: caseOf("Submitted") }));
+      await page.goto("/workflow/readmission");
+      const panel = await openGuide(page);
+      await expect(step(panel, "Start the staff review")).toBeVisible();
+      await page.evaluate((detail) => window.dispatchEvent(new CustomEvent("demo-guide:api", { detail })), events[0]);
+      await expect(panel.getByRole("alert")).toContainText("The file is too large.");
     } finally {
       await context.close();
     }
