@@ -13452,6 +13452,14 @@ def register_routes(app: Flask) -> None:
         if process not in DEMO_GUIDE_PROCESSES:
             return jsonify({"error": "Unknown demo process."}), 400
         is_student = account.role == "student"
+        if not is_student and account.role not in BACKOFFICE_ROLES | {"dean", "faculty"}:
+            return jsonify({"error": "Not allowed."}), 403
+        visible_ids = None  # faculty see only the students they advise or sit on the panel of
+        if account.role == "faculty":
+            faculty = db.session.get(Faculty, account.faculty_id) if account.faculty_id else None
+            visible_ids = set() if faculty is None else advisee_student_ids(faculty) | {
+                sid for (sid,) in db.session.query(PanelAssignment.student_id).filter_by(faculty_id=faculty.id)
+            }
         models = {
             "awol": (AwolCase, "status"), "withdrawal": (WithdrawalApplication, "status"),
             "practicum": (PracticumRecord, "status"), "graduation": (GraduationEndorsement, "endorsement_status"),
@@ -13475,9 +13483,11 @@ def register_routes(app: Flask) -> None:
             student = db.session.get(Student, safe_int(request.args.get("student_id"))) if request.args.get("student_id") else None
             if not student and request.args.get("student_number"):  # the guide's own demo student, by number
                 student = Student.query.filter_by(student_number=request.args["student_number"].strip()).first()
-            if not student:
+            if not student and visible_ids is None:
                 demo = next((c for c in WORKFLOW_DEMO_STUDENTS.values() if c["workflow"] == process), None)
                 student = Student.query.filter_by(student_number=demo["student_number"]).first() if demo else None
+            if student and visible_ids is not None and student.id not in visible_ids:
+                student = None
         record = newest.get(student.id) if student else None
         case = None
         if record is not None and process in LEAVE_SLUGS:
@@ -13494,7 +13504,8 @@ def register_routes(app: Flask) -> None:
                     "last_change": iso(last.created_at) if last else None}
         candidates = []
         if not is_student:
-            for student_id, row in sorted(newest.items(), key=lambda item: -item[1].id)[:20]:
+            for student_id, row in [item for item in sorted(newest.items(), key=lambda item: -item[1].id)
+                                    if visible_ids is None or item[0] in visible_ids][:20]:
                 other = db.session.get(Student, student_id)
                 if other:
                     candidates.append({"student_id": other.id, "name": other.name, "status_label": status_of(row)})
