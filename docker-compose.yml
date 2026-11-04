@@ -1,10 +1,10 @@
 # USLS Graduate School demo: `docker compose up -d --build` (see deploy/DOCKER.md).
 # `app` is the website; `tunnel` publishes it at https://miguisanson.dev through Cloudflare
-# and only starts when you ask for it with `--profile tunnel` (it needs deploy/tunnel.env).
+# and only starts when you ask for it with `--profile tunnel` (token in deploy/tunnel.env or .env).
 services:
   app:
     build: .
-    restart: unless-stopped
+    restart: "no"              # runs only when started (deploy/site-start.ps1); never comes back on its own
     ports:
       - "127.0.0.1:8080:5000"   # this PC only; the public door is the tunnel
     env_file:
@@ -27,13 +27,16 @@ services:
   tunnel:
     image: cloudflare/cloudflared:2026.10.7
     profiles: ["tunnel"]
-    restart: unless-stopped
+    restart: "no"
     command: tunnel --no-autoupdate run
     # Shares the app container's network, so the Cloudflare route "http://localhost:5000" is the same
     # whether the site runs in Docker or natively (deploy/START-SITE.cmd).
     network_mode: "service:app"
-    env_file:
-      - deploy/tunnel.env       # TUNNEL_TOKEN=...
+    env_file:                   # TUNNEL_TOKEN=... in either file
+      - path: deploy/tunnel.env
+        required: false
+      - path: .env
+        required: false
     depends_on:
       - app
 

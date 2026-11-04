@@ -50,6 +50,11 @@ Not using Cloudflare Access: the demo logins are open on purpose (decision IM36:
 
 ## D. Every day
 
+The site runs only when you start it (it never comes back on its own after a restart). Two desktop
+buttons do it: **USLS site - Start** (`deploy\site-start.ps1`: starts Docker Desktop if needed, the site
+and the tunnel, and keeps the PC awake while the site runs) and **USLS site - Stop** (`deploy\site-stop.ps1`).
+Keep-awake does not change any power setting; on a laptop, closing the lid can still put it to sleep.
+
 | Do this | Command |
 |---|---|
 | Start everything | `docker compose --profile tunnel up -d` |
