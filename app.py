@@ -8892,7 +8892,6 @@ def resolve_source_flags_after_monitoring_upload(
     return len(rows)
 
 
-def automatic_awol_evidence(student: Student) -> tuple[str, str, date | None] | None:
 def awol_withdrawal_is_after_return(case: AwolCase, withdrawn: TermEnrollment) -> bool:
     """True when the withdrawn semester is a new one, not the withdrawal that caused the AWOL the student already returned from (I-295).
     New = it starts on or after the approved return semester; with no return semester on the case, it was recorded after the decision."""
@@ -8902,6 +8901,7 @@ def awol_withdrawal_is_after_return(case: AwolCase, withdrawn: TermEnrollment) -
     return bool(case.decided_at and withdrawn.confirmed_at and withdrawn.confirmed_at > case.decided_at)
 
 
+def automatic_awol_evidence(student: Student) -> tuple[str, str, date | None] | None:
     """Return explicit handbook-backed evidence; never infer AWOL from mere absence."""
     if student.enrollment_tag == "AWOL" or student.standing == "AWOL":
         latest_term = (
@@ -8966,8 +8966,8 @@ def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
             latest = AwolCase(student_id=student.id)
             db.session.add(latest)
         newly_detected = not latest.automatically_flagged_at
-        latest.status = latest.status if latest.status in {
         latest.last_enrolled_term = latest.last_enrolled_term or awol_last_enrolled_term(student)
+        latest.status = latest.status if latest.status in {
             "Return Submitted", "Returned for Revision", "Dean Review", "Re-enrollment Required"
         } else "AWOL Declared"
         latest.awol_effective_date = latest.awol_effective_date or effective_date or ph_today()
@@ -17276,6 +17276,10 @@ def register_routes(app: Flask) -> None:
     def correct_defense_verdict(verdict: DefenseVerdict, faculty: Faculty | None, recorder=None):
         """Correct a verdict until it is acted on, with a reason. Same rules for the chair and for staff
         acting for the panel (`recorder` is then the staff account)."""
+        try:
+            require_open_standing(verdict.student, "correcting a defense verdict")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 409
         data = request_payload()
         reason = (data.get("reason") or "").strip()
         if len(reason) < 5:
@@ -17346,6 +17350,10 @@ def register_routes(app: Flask) -> None:
         return correct_defense_verdict(verdict, verdict.faculty, recorder=current_account())
 
     def confirm_defense_revisions(verdict: DefenseVerdict, confirmed_by: str, note: str, actor: str):
+        try:
+            require_open_standing(verdict.student, "confirming the revisions")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 409
         verdict.revision_status = REVISION_CONFIRMED
         verdict.revisions_confirmed_by = confirmed_by
         verdict.revisions_confirmed_at = now_utc()
@@ -22417,6 +22425,8 @@ def register_routes(app: Flask) -> None:
                 elif action == "approve":
                     if not endorsement or endorsement.endorsement_status != "Ready for Dean Review":
                         raise ValueError("Candidate is not ready for Dean review")
+                    if not eligibility["eligible"]:  # same check as the single decision (I-322)
+                        raise ValueError("Student is no longer eligible for graduation")
                     endorsement.endorsement_status = "Dean Approved"
                     endorsement.dean_remarks = comment or endorsement.dean_remarks
                     endorsement.dean_decision_at = now_utc()
@@ -22425,8 +22435,6 @@ def register_routes(app: Flask) -> None:
                     result = "Graduation candidate approved in Dean batch"
                     add_task(student.id, "Export endorsed list for manual Registrar email", "Dean", 3, 40)
                     sync_research_progress(student)  # approved: the student is Completed now, not at the next page view
-                    if not eligibility["eligible"]:  # same check as the single decision (I-322)
-                        raise ValueError("Student is no longer eligible for graduation")
                 elif action == "return":
                     if account.role == "dean" and (
                         not endorsement or endorsement.endorsement_status != "Ready for Dean Review"
@@ -37238,6 +37246,15 @@ def student_earliest_defense_date(
     return max(today, earliest_defense_date(defense_type, reference)), reference, label
 
 
+def student_defense_earliest(student: Student, gate: str) -> dict | None:
+    """What the student is told about the defense lead time (the stage's defense, its earliest date, the reason); None when no defense is left."""
+    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
+    if not defense_type:
+        return None
+    earliest, _reference, label = student_earliest_defense_date(student, defense_type)
+    return {"defense_type": defense_type, "date": earliest.isoformat(), "days": defense_lead_days(defense_type), "label": label}
+
+
 def onboarding_requirements() -> list[str]:
     # Intake checklist for creating a complete Graduate School monitoring record.
     return [
@@ -37260,15 +37277,6 @@ def readmission_requirements() -> list[str]:
 
 
 def readmission_system_checks(student: Student, case: LeaveCase | None = None) -> list[dict]:
-def student_defense_earliest(student: Student, gate: str) -> dict | None:
-    """What the student is told about the defense lead time (the stage's defense, its earliest date, the reason); None when no defense is left."""
-    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
-    if not defense_type:
-        return None
-    earliest, _reference, label = student_earliest_defense_date(student, defense_type)
-    return {"defense_type": defense_type, "date": earliest.isoformat(), "days": defense_lead_days(defense_type), "label": label}
-
-
     """What the records already show for a returning student; the student ticks nothing."""
     if case is not None:
         written = bool((case.return_intent or "").strip())

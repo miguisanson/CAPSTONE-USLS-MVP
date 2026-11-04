@@ -84,5 +84,50 @@ class Form1GateOnlyTests(ResearchCoreBase):
             self.assertEqual(Form1Endorsement.query.filter_by(student_id=self.student_id).one().endorsed_at, endorsed_at)
 
 
+class VerdictStandingCheckTests(ResearchCoreBase):
+    """I-325: correcting a verdict and confirming revisions need an open student standing, as recording a verdict does."""
+
+    NAMES = ["Chair Person", "Content Person", "Method Person", "External Person"]
+
+    def verdict_recorded(self, result):
+        with app.app_context():
+            self.pass_gate(self.student_id, TITLE, "Title Defense")
+            self.fill_uploads(self.student_id, PROPOSAL)
+            self.panel(self.student_id, PROPOSAL, self.NAMES)
+            schedule = self.schedule(self.student_id, "Proposal Defense", names=self.NAMES)
+            db.session.commit()
+            schedule_id = schedule.id
+        response = self.faculty_client("Chair Person").post(
+            f"/api/faculty-portal/defense-verdicts/{schedule_id}", json={"result": result, "remarks": "see notes"})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        return response.get_json()["verdict"]["id"]
+
+    def go_awol(self):
+        with app.app_context():
+            self.student_obj().standing = "AWOL"
+            db.session.commit()
+
+    def test_a_correction_is_refused_for_an_awol_student(self):
+        verdict_id = self.verdict_recorded("Failed")
+        self.go_awol()
+        response = self.faculty_client("Chair Person").post(
+            f"/api/faculty-portal/defense-verdicts/{verdict_id}/correction",
+            json={"result": "Passed", "reason": "Entered Failed by mistake"})
+        self.assertEqual(response.status_code, 409, response.get_json())
+        self.assertIn("AWOL", response.get_json()["error"])
+        with app.app_context():
+            self.assertEqual(db.session.get(DefenseVerdict, verdict_id).result, "Failed")
+
+    def test_revision_confirmation_is_refused_for_an_awol_student(self):
+        verdict_id = self.verdict_recorded("Passed with minor revisions")
+        sent = self.student().post(f"/api/student-portal/defense-verdicts/{verdict_id}/revisions", json={"note": "Chapter 2"})
+        self.assertEqual(sent.status_code, 200, sent.get_json())
+        self.go_awol()
+        response = self.faculty_client("Adviser Person").post(
+            f"/api/faculty-portal/defense-verdicts/{verdict_id}/confirm-revisions", json={"note": "Checked"})
+        self.assertEqual(response.status_code, 409, response.get_json())
+        self.assertIn("AWOL", response.get_json()["error"])
+
+
 if __name__ == "__main__":
     unittest.main()
