@@ -12,7 +12,7 @@ os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="pol
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 
 from app import (  # noqa: E402
-    AcademicTerm, DocumentCheck, AwolCase, CourseRecord, LeaveCase, SubjectEnrollment, leave_policy_review, Course, Faculty, PanelAssignment, PracticumRecord, Program, Student, UserAccount,
+    AcademicTerm, DocumentCheck, AwolCase, CourseRecord, LeaveCase, SubjectEnrollment, leave_policy_review, Course, Faculty, PanelAssignment, PracticumRecord, Program, ScheduleRequest, Task, Student, UserAccount,
     Notification, app, db, generate_password_hash, notify_workflow_owner,
 )
 
@@ -325,6 +325,27 @@ class GenericDocumentUploadTests(Audit2Base):
             self.assertIn("Research Gate", response.get_json()["error"])
             with app.app_context():
                 self.assertEqual(db.session.get(DocumentCheck, doc_id).status, "Missing")
+
+
+class CoordinatorHomeScopeTests(Audit2Base):
+    """I-339: the risk and defense numbers of a coordinator's home count the same students the list pages show."""
+
+    def test_risk_and_defense_numbers_are_school_wide_for_a_coordinator(self):
+        with app.app_context():
+            db.session.add(Task(student_id=self.student_id, title="Own task", owner_role="Academic Coordinator", due_at=date.today()))
+            other = db.session.get(Student, self.other_id)
+            other.risk_level = "At Risk of Delay"
+            db.session.add(ScheduleRequest(
+                student_id=self.other_id, preferred_date=date.today() + timedelta(days=9), defense_type="Proposal Defense",
+                mode="Online", venue="Zoom", status="Scheduled",
+            ))
+            db.session.commit()
+        for role in ("academic_coordinator", "research_coordinator"):
+            kpis = self.client(role).get("/api/dashboard").get_json()["kpis"]
+            self.assertEqual((kpis["at_risk"], kpis["confirmed_schedules"]), (1, 1), role)
+        # the caseload number stays the caseload
+        kpis = self.client("academic_coordinator").get("/api/dashboard").get_json()["kpis"]
+        self.assertEqual(kpis["total_students"], 1)
 
 
 if __name__ == "__main__":

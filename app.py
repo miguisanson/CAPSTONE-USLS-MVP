@@ -22577,13 +22577,22 @@ def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
     active_students = students_scope().filter(active_student_clause()).count()  # the same students Reports counts (I-193)
     on_leave = students_scope().filter(on_leave_clause()).count()
     completed = students_scope().filter(Student.current_stage == "Completed").count()
-    at_risk = students_scope().filter(at_risk_clause()).count()
-    high_risk = students_scope().filter(Student.risk_level == "Delayed").count()
+    # A coordinator's home counts the students with open work for their role, but the risk and defense numbers link to
+    # school-wide lists, so they count the same school-wide students as those lists (I-339).
+    wide_ids = student_ids
+    if locked_owner:
+        wide_filters = MultiDict(filters)
+        wide_filters.pop("owner", None)
+        wide_ids = [sid for (sid,) in filtered_students_query(wide_filters).with_entities(Student.id).all()]
+    wide = Student.query.filter(Student.id.in_(wide_ids)) if wide_ids else Student.query.filter(False)
+    at_risk = wide.filter(at_risk_clause()).count()
+    high_risk = wide.filter(Student.risk_level == "Delayed").count()
     withdrawn = students_scope().filter(Student.standing == "Withdrawn").count()
     pending_tasks = task_query.count()
     overdue_tasks = task_query.filter(Task.due_at < ph_today(), Task.status != "Done").count()
-    confirmed_schedules = scoped(ScheduleRequest).filter(ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES)).count()
-    needs_availability = scoped(ScheduleRequest).filter(ScheduleRequest.status.in_(PENDING_DEFENSE_STATUSES)).count()
+    wide_schedules = ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(wide_ids)) if wide_ids else ScheduleRequest.query.filter(False)
+    confirmed_schedules = wide_schedules.filter(ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES)).count()
+    needs_availability = wide_schedules.filter(ScheduleRequest.status.in_(PENDING_DEFENSE_STATUSES)).count()
     practicum_records = (
         scoped_practicum_records_query()
         .filter(PracticumRecord.student_id.in_(student_ids))
@@ -32322,15 +32331,6 @@ def notify_schedule_people(schedule: ScheduleRequest, kind: str, title: str, bod
         )
 
 
-def notify_defense_booked(schedule: ScheduleRequest, replaced: ScheduleRequest | None, reason: str, requested_by: str | None) -> None:
-    slot = defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)
-    where = f"{schedule.venue} ({schedule.mode})" if schedule.venue else schedule.mode
-    student = schedule.student
-    if replaced:
-        old = defense_slot_text(replaced.preferred_date, replaced.start_time, replaced.end_time)
-        notify_schedule_people(
-            schedule, "defense_rescheduled", f"{schedule.defense_type} of {student.name} was rescheduled",
-            f"Moved from {old} to {slot}. Venue: {where}. Reason: {reason or 'not recorded'}"
 def notify_verdict_people(verdict: DefenseVerdict, *, include_student: bool = True) -> None:
     """A recorded verdict reaches the student and the adviser (Protocol: the result is sent on the first working day)."""
     student = verdict.student
@@ -32365,6 +32365,15 @@ def notify_revisions_submitted(verdict: DefenseVerdict) -> None:
             )
 
 
+def notify_defense_booked(schedule: ScheduleRequest, replaced: ScheduleRequest | None, reason: str, requested_by: str | None) -> None:
+    slot = defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)
+    where = f"{schedule.venue} ({schedule.mode})" if schedule.venue else schedule.mode
+    student = schedule.student
+    if replaced:
+        old = defense_slot_text(replaced.preferred_date, replaced.start_time, replaced.end_time)
+        notify_schedule_people(
+            schedule, "defense_rescheduled", f"{schedule.defense_type} of {student.name} was rescheduled",
+            f"Moved from {old} to {slot}. Venue: {where}. Reason: {reason or 'not recorded'}"
             + (f" (asked by {requested_by})." if requested_by else "."),
             "defense_rescheduled",
         )

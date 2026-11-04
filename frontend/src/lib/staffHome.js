@@ -212,8 +212,8 @@ export function officeWaiting(tasks, role) {
 
 /**
  * The key numbers (3-4, each once). The Graduate School office and the administrator have the school-wide dashboard
- * figures; a coordinator has the figures of their own caseload (the students with open work owned by their role,
- * which is what /api/dashboard answers them) - and every number links to a list page that role can open.
+ * figures; a coordinator has the same, except "Students with open work" (their own caseload, which links to their work queue); every
+ * number links to a list page that role can open and counts the students that list shows (I-339).
  * Without `kpis` the numbers come from the work queue alone.
  * @param own      officeActions() result
  * @param waiting  { total } of officeWaiting()
@@ -238,7 +238,7 @@ export function officeStats({ role, own, waiting, kpis }) {
       value: kpis.total_students,
       sub: "Your tasks are about them",
       tone: "success",
-      to: canOpen("/students", role) ? "/students" : "/monitoring-sheet",
+      to: queue, // the caseload is the students behind the work queue; the school-wide lists would show other numbers
     };
     // the Academic Coordinator watches risk; the Research Coordinator watches the defenses it schedules
     const focus = canOpen("/students", role)
