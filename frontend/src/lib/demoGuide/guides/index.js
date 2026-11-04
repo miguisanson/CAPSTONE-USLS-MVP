@@ -15,8 +15,11 @@ import studentHandoff from "./student-handoff.js";
 import enrollment from "./enrollment.js";
 import dropping from "./dropping.js";
 import residency from "./residency.js";
+import calendars from "./calendars.js";
+import portals from "./portals.js";
+import bestFeatures from "./best-features.js";
 
-export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, withdrawal, practicum, graduation, courseAdjustments, businessRules, policyAssistant, policyDocuments, studentHandoff, enrollment, dropping, residency];
+export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, withdrawal, practicum, graduation, courseAdjustments, businessRules, policyAssistant, policyDocuments, studentHandoff, enrollment, dropping, residency, calendars, portals, bestFeatures];
 
 // The ready-made demo students that the existing reset (POST /api/auth/demo-students/<key>/reset) knows, by student number.
 export const RESET_KEYS = {

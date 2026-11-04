@@ -23,6 +23,9 @@ mkdirSync(SHOTS, { recursive: true });
 
 // Per guide: the demo students to reset around the run, and the writes (METHOD path, without /api) that must have answered 2xx.
 const PLAN = {
+  calendars: { reset: [], writes: [] },
+  portals: { reset: [], writes: [] },
+  "best-features": { reset: [], writes: [["POST /assistant", 1]] },
   residency: { reset: ["residency-nicolas"], writes: ["POST /transactions/awol"] },
   enrollment: { reset: ["enrollment-clarissa", "enrollment-martin"], writes: ["POST /enrollment/class-list-import", "POST /enrollment"] },
   dropping: { reset: ["withdrawal-joshua"], writes: ["PATCH /enrollment/subject-status"] },

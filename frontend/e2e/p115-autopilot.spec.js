@@ -341,4 +341,5 @@ test.describe("the slideshow bar", () => {
 });
 
 // Leave of Absence plays inside the slideshow group above (same demo student, so never at the same time); every other guide has its own student.
-for (const guide of GUIDES) if (guide.id !== LOA.id) guideTest(guide);
+// (the guides of the other processes are played by p122-autopilot-more.spec.js)
+for (const guide of GUIDES) if (guide.id !== LOA.id && PLAN[guide.id]) guideTest(guide);
