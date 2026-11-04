@@ -11910,6 +11910,25 @@ def student_record_answer(record: dict) -> str:
     return " ".join(parts)
 
 
+def dean_waiting_decisions() -> list[dict]:
+    """What waits for the Dean's decision, as the Dean home counts it: offering plans, workflow cases, adviser appointments."""
+    items = [
+        {"title": f"Decide the course offering plan for {plan.program.code if plan.program else 'a program'} ({plan.term_label})",
+         "due": None, "overdue": False, "owner": ROLE_LABELS["dean"]}
+        for plan in CourseOfferingPlan.query.filter_by(status="Submitted").order_by(CourseOfferingPlan.submitted_at.asc()).all()
+    ]
+    items.extend(
+        {"title": f"Decide: {case['title']}", "due": None, "overdue": False, "owner": ROLE_LABELS["dean"]}
+        for case in workflow_approvals_payload()["pending"]
+    )
+    items.extend(
+        {"title": f"Decide the adviser appointment of {row.student.name}", "due": None, "overdue": False, "owner": ROLE_LABELS["dean"]}
+        for row in AdviserAppointment.query.filter_by(status=ADVISER_STATUS_DELIBERATION).order_by(AdviserAppointment.id).all()
+        if row.student
+    )
+    return items
+
+
 def account_assistant_queue(account: UserAccount) -> dict:
     """What is waiting on the signed-in staff member, coordinator, dean or faculty member."""
     role = account.role
@@ -11944,13 +11963,10 @@ def account_assistant_queue(account: UserAccount) -> dict:
                 "title": task.title + (f" - {student_name}" if student_name else ""),
                 "due": task.due_at, "overdue": task.due_at < today, "owner": owner,
             })
-        if role == "dean":
-            review = LeaveCase.query.filter(LeaveCase.status == "Dean Review").count()
-            plans = CourseOfferingPlan.query.filter_by(status="Submitted").count()
-            if review:
-                extras.append(f"{review} leave or readmission request(s) are waiting for your decision.")
-            if plans:
-                extras.append(f"{plans} course offering plan(s) are waiting for your approval.")
+        if role == "dean":  # I-340: the same things, counted the way the Dean home counts them
+            items = dean_waiting_decisions()
+            total, overdue = len(items), 0
+            items = items[:8]
     return {"role_label": label, "items": items, "total": total, "overdue": overdue, "extras": extras}
 
 
@@ -16729,6 +16745,8 @@ def register_routes(app: Flask) -> None:
                 "gate": assignment.gate,
                 "documents": documents,
                 "defense": schedule_request_dict(schedule) if schedule else None,
+                "can_set_venue": bool(schedule and is_chair and schedule.status in SLOT_HOLDING_DEFENSE_STATUSES),
+                "venue_history": defense_venue_history(schedule) if schedule and is_chair else [],
                 "can_submit_verdict": can_submit,
                 "verdict_options": verdict_options_for_gate(assignment.gate),
                 "verdict_blocked_reason": (
@@ -21107,6 +21125,15 @@ def register_routes(app: Flask) -> None:
         if slug in {"leave-of-absence", "readmission"}:
             message = "Forwarded to the Dean. The student's standing changes only after the Dean approves and the leave begins."
         created_login = None
+        if slug == "defense-scheduling" and student_id:
+            booked_student = db.session.get(Student, student_id)
+            booked_gate = current_panel_gate(booked_student) if booked_student else None
+            waiting = unanswered_panel_invitations(booked_student, booked_gate) if booked_gate and active_schedule_for_gate(booked_student, booked_gate) else []
+            if waiting:
+                message += (
+                    f" Warning: {', '.join(waiting)} not yet answered the panel invitation. "
+                    "The panel acceptance task stays open until each panelist accepts."
+                )
         if slug == "student-handoff" and student_id:
             account = UserAccount.query.filter_by(student_id=student_id, role="student", active=True).first()
             if account:
@@ -21973,6 +22000,9 @@ def register_routes(app: Flask) -> None:
         if response == "accept":
             row.status, row.reason, row.responded_at = "Accepted", None, now_utc()
             close_research_tasks(row.student_id, prefix=f"Replace declined panelist: {faculty.name}")
+            db.session.flush()
+            if not unanswered_panel_invitations(student, row.gate) and active_schedule_for_gate(student, row.gate):
+                close_research_tasks(student.id, f"Confirm assigned panel acceptance ({defense_type})", "Confirm assigned panel acceptance")
             add_log("defense-scheduling", student.id, f"{faculty.name} (Faculty Member)", row.gate,
                     f"Panel invitation accepted ({row.panel_role})", "Research Coordinator", f"{faculty.name} accepted the {defense_type} panel seat.")
         elif response == "decline":
@@ -21992,6 +22022,37 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Choose accept or decline."}), 400
         db.session.commit()
         return jsonify({"ok": True, "invitation": panel_invitation_dict(row, include_schedule=True)})
+
+    @app.route("/api/faculty-portal/defense-schedules/<int:schedule_id>/venue", methods=["POST"])
+    @require_api_login("faculty")
+    def faculty_set_defense_venue(schedule_id: int):
+        """The panel chair sets or corrects the room or meeting link of a booked defense (Research Protocol: the chair prepares the online details)."""
+        account, faculty = signed_in_faculty()
+        if not faculty:
+            return jsonify(NO_FACULTY_RECORD[0]), NO_FACULTY_RECORD[1]
+        schedule = db.session.get(ScheduleRequest, schedule_id)
+        if not schedule or faculty.id not in schedule_panel_ids(schedule):
+            return jsonify({"error": "We could not find that defense."}), 404
+        if (defense_seat_role(schedule, faculty.id) or "").lower() not in {"panel chair", "panel lead"}:
+            return jsonify({"error": "Only the panel chair sets the venue or meeting link."}), 403
+        if schedule.status not in SLOT_HOLDING_DEFENSE_STATUSES:
+            return jsonify({"error": "That defense is not booked any more."}), 409
+        venue = re.sub(r"\s+", " ", str(json_body().get("venue") or "")).strip()
+        if len(venue) < 2 or len(venue) > 160:
+            return jsonify({"error": "Enter the room or the meeting link (up to 160 characters)."}), 400
+        old = schedule.venue or ""
+        if venue != old:
+            schedule.venue = venue
+            add_log("defense-scheduling", schedule.student_id, f"{faculty.name} (Panel Chair)", f"{schedule.defense_type} #{schedule.id}",
+                    DEFENSE_VENUE_LOG_RESULT, "Research Coordinator", f"{old} -> {venue}")
+            notify_schedule_people(
+                schedule, "defense_venue", f"Venue of the {schedule.defense_type} of {schedule.student.name} was set",
+                f"{defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)}. New venue or meeting link: {venue} (set by the panel chair).",
+                f"defense_venue:{now_utc().strftime('%Y%m%d%H%M%S%f')}",
+            )
+            run_google_calendar_hook(sync_defense_google_events, schedule)
+            db.session.commit()
+        return jsonify({"ok": True, "venue": schedule.venue, "venue_history": defense_venue_history(schedule)})
 
     @app.route("/api/faculty-portal/defense-schedules/<int:schedule_id>/cannot-attend", methods=["POST"])
     @require_api_login("faculty")
@@ -30644,10 +30705,16 @@ def validate_panel_selection(student: Student, gate: str, faculty_ids: list[int]
         raise ValueError(f"Select {len(roles)} different faculty members for the defense panel.")
     adviser_ids = student_adviser_faculty_ids(student)
     chosen = []
-    for faculty_id in faculty_ids:
+    for faculty_id, seat in zip(faculty_ids, roles):
         faculty = Faculty.query.filter_by(id=faculty_id, active=True).first()
         if not faculty:
             raise ValueError("One of the selected faculty members is no longer active.")
+        needed = "Panel Chair" if seat == "Panel Chair" else "Panel Member"
+        if needed not in faculty_eligible_roles(faculty):
+            raise ValueError(
+                f"{faculty.name} is not marked as a {needed} in the faculty profile, so cannot be seated as {seat}. "
+                "Mark the role in the profile first, or choose someone else."
+            )
         if faculty.id in adviser_ids:
             raise ValueError(
                 f"{faculty.name} is this student's research adviser and cannot also be a panel chair or member "
@@ -31435,6 +31502,18 @@ def request_panel_availability(
 
 
 # ---- panel invitations (declined seats block a booking) --------------------------------------
+def unanswered_panel_invitations(student: Student, gate: str) -> list[str]:
+    """Names of the seated panelists who have not yet accepted or declined the panel invitation."""
+    seated = {item.faculty_id for item in active_panel_assignments(student, gate)}
+    if not seated:
+        return []
+    rows = PanelInvitation.query.filter(
+        PanelInvitation.student_id == student.id, PanelInvitation.gate == gate,
+        PanelInvitation.faculty_id.in_(seated), PanelInvitation.status == "Invited",
+    ).all()
+    return [row.faculty.name for row in rows if row.faculty]
+
+
 def declined_invitation_problems(student: Student, panel: list[PanelAssignment]) -> list[str]:
     ids = {assignment.faculty_id for assignment in panel}
     if not ids:
@@ -32440,6 +32519,22 @@ def schedule_people_accounts(schedule: ScheduleRequest) -> list[UserAccount]:
         accounts.extend(accounts_for_faculty(faculty_id))
     unique = {account.id: account for account in accounts}
     return list(unique.values())
+
+
+DEFENSE_VENUE_LOG_RESULT = "Venue / meeting link changed"
+
+
+def defense_venue_history(schedule: ScheduleRequest) -> list[dict]:
+    """Every venue / meeting-link change on a booked defense, newest first."""
+    rows = TransactionLog.query.filter_by(
+        transaction_slug="defense-scheduling", result=DEFENSE_VENUE_LOG_RESULT, student_id=schedule.student_id,
+        source_reference=f"{schedule.defense_type} #{schedule.id}",
+    ).order_by(TransactionLog.id.desc()).all()
+    history = []
+    for row in rows:
+        before, _sep, after = (row.notes or "").partition(" -> ")
+        history.append({"at": iso(row.created_at), "by": row.actor_role, "from": before, "to": after})
+    return history
 
 
 def notify_schedule_people(schedule: ScheduleRequest, kind: str, title: str, body: str, dedupe: str, link_student: str = "/student/calendar") -> None:
@@ -36676,6 +36771,7 @@ def close_satisfied_research_tasks(student: Student, progress: dict) -> int:
     uploads_missing = any(item["student_upload"] and item["status"] == "Missing" for item in requirements)
     booked_now = bool(active_schedule_for_gate(student, current_gate))
     panel_now = bool(active_panel_assignments(student, current_gate))
+    panel_accepted = not unanswered_panel_invitations(student, current_gate)  # I-314: acceptance, not booking, closes the task
     ethics_done = student_ethics_cleared(student)
     flagged_types = {
         row.defense_type
@@ -36698,7 +36794,7 @@ def close_satisfied_research_tasks(student: Student, progress: dict) -> int:
             elif title == f"Review student {defense_type} schedule request":
                 done = gate_done or (on_gate and booked_now)
             elif title == f"Confirm assigned panel acceptance ({defense_type})":
-                done = gate_done or (on_gate and booked_now)
+                done = gate_done or (on_gate and booked_now and panel_accepted)
             elif title == f"Reschedule deferred {defense_type}" or title == f"Reschedule cancelled {defense_type}":
                 done = gate_done or (on_gate and booked_now)
             elif title == f"Re-confirm {defense_type} schedule after panel change":
@@ -36714,7 +36810,7 @@ def close_satisfied_research_tasks(student: Student, progress: dict) -> int:
         else:
             if title == "Confirm assigned panel acceptance":
                 # Older tasks do not name the stage: stale once the stage moved on or a booking exists.
-                done = booked_now or not panel_now
+                done = (booked_now and panel_accepted) or not panel_now
             elif title in ("Resolve ethics clearance form", ETHICS_APPLICATION_TASK):
                 done = ethics_done
         if done:
