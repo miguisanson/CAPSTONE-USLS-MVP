@@ -32,6 +32,8 @@ import { EmptyState, InlineNotice } from "./ui/index.js";
  *   renderColumnFooter  (column, items) => node
  *   emptyText      text for an empty column (shown with the shared EmptyState)
  *   columnClassName  classes for each column (width etc.); the default is a narrow column so more stages fit
+ *   columnBodyClassName classes for each column's card list (height, overflow, spacing, etc.)
+ *   fitColumns     lets a small set of columns share the full desktop width while keeping a readable minimum width
  *
  * On a phone (below 640 px) every board is the same stacked list instead: one group per stage that has cards, in the
  * board's order, each card with the same "Move to..." menu or lock reason and no dragging (I-199, IM24).
@@ -60,6 +62,8 @@ export default function StageBoard({
   renderColumnFooter,
   emptyText = "Nothing here",
   columnClassName = "w-[248px]",
+  columnBodyClassName = "",
+  fitColumns = false,
   ariaLabel = "Stage board",
   phoneAriaLabel = ariaLabel,
   readOnly = false,
@@ -315,9 +319,9 @@ export default function StageBoard({
               <section key={column.key} aria-label={column.label} className="space-y-3">
                 <header className="flex items-center justify-between gap-2">
                   <h3 className="section-title min-w-0 break-words">{column.label}</h3>
-                  <span data-testid="stage-count" className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">{columnItems.length}</span>
+                  <span data-testid="stage-count" className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">{column.count ?? columnItems.length}</span>
                 </header>
-                <div className="space-y-3">{columnItems.map((item) => renderItem(item, column))}</div>
+                <div data-testid="stage-scroll" className={`space-y-2 ${columnBodyClassName}`}>{columnItems.map((item) => renderItem(item, column))}</div>
                 {renderColumnFooter ? renderColumnFooter(column, columnItems) : null}
               </section>
             ))
@@ -355,7 +359,7 @@ export default function StageBoard({
         aria-label={ariaLabel}
         tabIndex={0}
       >
-        <div className="flex w-max gap-3">
+        <div className={fitColumns ? "flex min-w-full w-max gap-3" : "flex w-max gap-3"}>
           {columns.map((column) => {
             const columnItems = items.filter((item) => getColumnKey(item) === column.key);
             const isHover = hoverColumn === column.key && Boolean(draggedItem);
@@ -368,7 +372,7 @@ export default function StageBoard({
                 onDragOver={readOnly ? undefined : (event) => onDragOver(event, column)}
                 onDragLeave={readOnly ? undefined : () => hoverColumn === column.key && setHoverColumn(null)}
                 onDrop={readOnly ? undefined : (event) => onDrop(event, column)}
-                className={`${columnClassName} flex shrink-0 flex-col rounded-2xl border bg-slate-50/70 p-3 transition-colors duration-150 ${
+                className={`${columnClassName} ${fitColumns ? "min-w-64 flex-1" : "shrink-0"} flex flex-col rounded-2xl border bg-slate-50/70 p-3 transition-colors duration-150 ${
                   allowedHere
                     ? "border-brand-400 bg-brand-50/60 ring-2 ring-brand-200"
                     : refusedHere
@@ -382,7 +386,7 @@ export default function StageBoard({
                   <header className="mb-3">
                     <div className="flex items-center justify-between gap-2">
                       <h3 className="section-title min-w-0 break-words">{column.label}</h3>
-                      <span className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">{columnItems.length}</span>
+                      <span data-testid="stage-count" className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">{column.count ?? columnItems.length}</span>
                     </div>
                     {column.description && <p className="meta mt-1 leading-relaxed">{column.description}</p>}
                   </header>
@@ -392,7 +396,7 @@ export default function StageBoard({
                     {hoverVerdict.reason || "That move is not allowed."}
                   </InlineNotice>
                 )}
-                <div className="flex-1 space-y-3">
+                <div data-testid="stage-scroll" className={`flex-1 space-y-2 ${columnBodyClassName}`}>
                   {columnItems.length ? (
                     columnItems.map((item) => renderItem(item, column))
                   ) : (

@@ -23,15 +23,25 @@ test("Research Gate shows the three stages as columns at desktop and phone width
     try {
       const overview = await (await context.request.get("/api/research-gate/overview")).json();
       await page.goto("/workflow/research-gate");
-      await expect(page.getByTestId("stage-board")).toBeVisible();
+      const board = page.getByTestId("stage-board");
+      await expect(board).toBeVisible();
+      const boardHeight = await board.evaluate((element) => element.getBoundingClientRect().height);
+      expect(boardHeight, "the stage board stays compact so the student record remains nearby").toBeLessThan(width === 390 ? 1300 : 700);
+      if (width > 390) {
+        await expect(page.getByTestId("board-scroll-hint"), "all three stages fit without horizontal board scrolling at desktop widths").toHaveCount(0);
+      }
       for (const label of columns) {
-        await expect(page.getByRole("region", { name: label })).toBeVisible();
+        const region = page.getByRole("region", { name: label });
+        await expect(region).toBeVisible();
+        await expect(region.getByTestId("stage-scroll")).toBeVisible();
+        const total = overview.items.filter((row) => row.board_stage === label).length;
+        await expect(region.getByTestId("stage-count")).toHaveText(String(total));
       }
       for (const row of overview.items) {
         expect(columns).toContain(row.board_stage);
         const name = `Open the Research Gate record of ${row.student.name}, ${row.student.student_number}`;
         await expect(page.getByRole("button", { name, exact: true })).toHaveCount(1);
-        await expect(page.getByRole("region", { name: row.board_stage }).getByRole("button", { name, exact: true })).toBeVisible();
+        await expect(page.getByRole("region", { name: row.board_stage }).getByRole("button", { name, exact: true })).toHaveCount(1);
       }
       await expect(page.getByRole("columnheader")).toHaveCount(0);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);

@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { ClipboardList } from "lucide-react";
+import { ChevronRight, ClipboardList } from "lucide-react";
 import { api } from "../../api";
 import StageBoard from "../../components/StageBoard";
 import { useApi } from "../../hooks";
@@ -23,12 +23,20 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
   const [state, setState] = useState("");
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
+  const allRows = data?.items || [];
   const rows = useMemo(
-    () => (data?.items || []).filter((row) => {
-      const searchable = `${row.student.name} ${row.student.program_code || ""} ${row.status || ""} ${row.reason || ""}`.toLowerCase();
+    () => allRows.filter((row) => {
+      const searchable = `${row.student.name} ${row.student.student_number || ""} ${row.student.program_code || ""} ${row.status || ""} ${row.reason || ""}`.toLowerCase();
       return (!state || row.state === state) && (!deferredSearch || searchable.includes(deferredSearch));
     }),
-    [data, deferredSearch, state],
+    [allRows, deferredSearch, state],
+  );
+  const boardColumns = useMemo(
+    () => BOARD_COLUMNS.map((column) => ({
+      ...column,
+      count: allRows.filter((row) => row.board_stage === column.key).length,
+    })),
+    [allRows],
   );
   const boardItems = useMemo(() => {
     const items = [...rows];
@@ -42,26 +50,29 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
 
   function renderCard(row) {
     if (row._empty) {
-      return <p className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-5 text-center text-sm text-slate-500">No students here</p>;
+      return <p className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-4 text-center text-sm text-slate-500">No students match</p>;
     }
     return (
-      <article className={`rounded-xl border bg-white p-4 shadow-sm ${row.student.id === selectedId ? "border-brand-400 ring-2 ring-brand-100" : "border-slate-200"}`}>
+      <article className={`overflow-hidden rounded-lg border bg-white ${row.student.id === selectedId ? "border-brand-400 ring-2 ring-brand-100" : "border-slate-200"}`}>
         <button
           type="button"
           onClick={() => onOpen(row.student)}
           aria-label={`Open the Research Gate record of ${row.student.name}, ${row.student.student_number}`}
-          className="min-h-11 w-full cursor-pointer rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          className="group min-h-16 w-full cursor-pointer p-3 text-left transition-colors duration-200 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         >
-          <span className="block break-words font-semibold text-ink">{row.student.name}</span>
-          <span className="meta mt-0.5 block">{row.student.program_code} · {row.student.student_number}</span>
+          <span className="flex items-start justify-between gap-2">
+            <span className="min-w-0">
+              <span className="block break-words text-sm font-semibold text-ink group-hover:text-brand-800">{row.student.name}</span>
+              <span className="meta mt-0.5 block">{row.student.program_code} · {row.student.student_number}</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5">
+              <StatusChip status={STATE_LABEL[row.state] || row.status} dot={false} />
+              <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-brand-700" aria-hidden="true" />
+            </span>
+          </span>
+          <span className="mt-1.5 block truncate text-xs font-medium text-slate-600">{row.status}</span>
+          <span className="sr-only">{row.reason}. {row.waiting_on ? `Waiting on ${row.waiting_on}.` : ""} {STATE_HELP[row.state]}</span>
         </button>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <StatusChip status={STATE_LABEL[row.state] || row.status} dot={false} />
-          <span className="text-xs font-medium text-slate-600">{row.status}</span>
-        </div>
-        <p className="mt-2 text-sm leading-6 text-slate-700">{row.reason}</p>
-        {row.waiting_on && <p className="mt-2 text-xs font-semibold text-slate-600">Waiting on: {row.waiting_on}</p>}
-        <p className="sr-only">{STATE_HELP[row.state]}</p>
       </article>
     );
   }
@@ -70,7 +81,7 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
     <Card pad="lg" id="research-gate-overview" className="min-w-0 overflow-hidden">
       <SectionTitle
         title="Who is at the Research Gate"
-        subtitle="Students are grouped into the three Research Gate stages. Choose a student to open the progress record."
+        subtitle="Students are grouped into the three Research Gate stages. Select a name to open the progress record below."
         icon={ClipboardList}
       />
       {error && !data ? (
@@ -79,7 +90,7 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
         <div className="mt-4 min-w-0 space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Search students">
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, program, status, or waiting reason" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, student number, program, status, or waiting reason" />
             </Field>
             <Field label="Status">
               <Select
@@ -90,11 +101,12 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
               />
             </Field>
           </div>
+          <p className="meta" role="status">Showing {rows.length} of {allRows.length} students. The number beside each stage is the total in that stage.</p>
           {loading && !data ? (
             <p role="status" className="py-8 text-center text-sm text-slate-600">Loading Research Gate stages…</p>
           ) : (
             <StageBoard
-              columns={BOARD_COLUMNS}
+              columns={boardColumns}
               items={boardItems}
               getItemId={(item) => item._empty ? item.id : item.student.id}
               getColumnKey={(item) => item.board_stage}
@@ -103,7 +115,9 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
               readOnly
               ariaLabel="Research Gate stages"
               phoneAriaLabel="Research Gate stages"
-              columnClassName="w-[min(22rem,calc(100vw-3rem))]"
+              columnClassName=""
+              columnBodyClassName="max-h-[26rem] overflow-y-auto overscroll-contain pr-1 max-sm:max-h-72"
+              fitColumns
               emptyText="No students here"
             />
           )}
