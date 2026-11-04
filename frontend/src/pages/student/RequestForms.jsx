@@ -254,9 +254,10 @@ export function ReadmissionRequestForm({ data, onSaved }) {
 function ReadmissionForm({ data, overview, can, editable, submitState }) {
   const { busy, error, message, submit } = submitState;
   const { errors, fail, clear, messageFor } = useFormErrors();
-  const requirements = data.readmission_requirements || [];
-  const previousSemesters = data.semester_options || [];
-  const needsPreviousLeave = !can.linked_case_id;
+  const checks = data.readmission_checks || [];
+  const previousSemesters = can.previous_semester_options || [];
+  // The leave period comes from the leave case or the enrollment records; ask only when neither has it.
+  const needsPreviousLeave = !can.leave_period;
   const returnOptions = withCurrentValue(
     (overview.return_semester_options || []).map((name) => ({ value: name, label: name })),
     editable?.target_term || "",
@@ -267,15 +268,8 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
     previous_loa_start: editable?.period?.start_label || "",
     previous_loa_end: editable?.period?.end_label || "",
   }));
-  const [selectedItems, setSelectedItems] = useState(() => (
-    editable
-      ? requirements.filter((item) => (editable.checklist || []).some((entry) => entry.item === item && entry.checked))
-      : []
-  ));
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
-  const toggleItem = (item) => setSelectedItems((current) => (current.includes(item) ? current.filter((value) => value !== item) : [...current, item]));
 
-  const firstUnticked = requirements.findIndex((item) => !selectedItems.includes(item));
   // Submit is off only when no answer can fix it; a missing answer is reported when Submit is pressed.
   const noReturnSemester = returnOptions.length === 0;
   const hint = noReturnSemester ? "No upcoming semester is set up yet. Please ask Graduate School staff." : "";
@@ -286,7 +280,6 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
     if (needsPreviousLeave && !form.previous_loa_end) found.push({ id: "readmission-leave-end", message: "Choose the semester your leave ended in." });
     if (!form.target_return_term) found.push({ id: "readmission-term", message: "Choose the semester you want to return in." });
     if (!form.return_intent.trim()) found.push({ id: "readmission-intent", message: "Say why you are ready to come back." });
-    if (firstUnticked >= 0) found.push({ id: `readmission-item-${firstUnticked}`, message: "Tick every item on the checklist." });
     return found;
   }
 
@@ -301,7 +294,6 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
     const payload = {
       target_return_term: form.target_return_term,
       return_intent: form.return_intent,
-      readmission_items: selectedItems,
     };
     if (needsPreviousLeave) {
       payload.previous_loa_start = form.previous_loa_start;
@@ -320,8 +312,8 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
 
       <form noValidate onSubmit={onSubmit} className="mt-4 space-y-4">
         <ErrorSummary errors={errors} />
-        {can.linked_case_id ? (
-          <InlineNotice tone="info" title={`You are ending your leave: ${can.leave_period || "your leave of absence"}.`}>
+        {!needsPreviousLeave ? (
+          <InlineNotice tone="info" title={`You are ending your leave: ${can.leave_period}.`}>
             {can.leave_end && `It runs until ${formatDate(can.leave_end)}.`}
           </InlineNotice>
         ) : (
@@ -354,20 +346,19 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
           <Textarea id="readmission-intent" value={form.return_intent} onChange={set("return_intent")} placeholder="Say that you want to return and briefly explain how you are ready to continue your studies." />
         </Field>
 
-        {requirements.length > 0 && (
+        {checks.length > 0 && (
           <div>
-            <p className="field-label">Before you send this, confirm each item</p>
-            <div className="mt-2 space-y-1.5">
-              {requirements.map((item, index) => (
-                <label key={item} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                  <input id={`readmission-item-${index}`} type="checkbox" checked={selectedItems.includes(item)} onChange={() => toggleItem(item)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
-                  {item}
-                </label>
+            <p className="field-label">What is checked for you</p>
+            <ul className="mt-2 space-y-1.5" data-testid="readmission-checks">
+              {checks.map((row) => (
+                <li key={row.item} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                  <span className="block font-medium text-ink">{row.item}</span>
+                  <span className="block text-xs text-slate-500">
+                    {row.source === "system" ? "Checked by the system: " : "Confirmed by Graduate School staff: "}{row.detail}
+                  </span>
+                </li>
               ))}
-            </div>
-            {messageFor(`readmission-item-${firstUnticked}`) && (
-              <p role="alert" className="mt-1 text-xs font-medium text-red-700">{messageFor(`readmission-item-${firstUnticked}`)}</p>
-            )}
+            </ul>
           </div>
         )}
 
@@ -380,11 +371,10 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
 export function AwolReturnRequestForm({ data, onSaved }) {
   const existing = data.awol_case;
   const student = data.student;
-  const semesters = data.upcoming_semesters || [];
-  const allSemesters = data.semester_options || [];
+  const awolReturn = data.awol_return || {};
+  const semesters = awolReturn.return_semester_options || [];
   const [form, setForm] = useState({
-    target_return_term: "",
-    last_enrolled_term: existing?.last_enrolled_term || "",
+    target_return_term: awolReturn.default_return_term || "",
     return_intent: existing?.return_intent || "",
     return_reason: existing?.return_reason || "",
   });
@@ -403,7 +393,7 @@ export function AwolReturnRequestForm({ data, onSaved }) {
       return;
     }
     clear();
-    submit({ student_id: data.student.id, ...form }, { lines: ["Return from AWOL", `Return in: ${form.target_return_term}`] });
+    submit(form, { lines: ["Return from AWOL", `Return in: ${form.target_return_term}`] });
   }
 
   return (
@@ -431,7 +421,7 @@ export function AwolReturnRequestForm({ data, onSaved }) {
           </InlineNotice>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Intended return semester" required error={messageFor("awol-term")}><Select id="awol-term" value={form.target_return_term} onChange={(event) => setForm((current) => ({ ...current, target_return_term: event.target.value }))} placeholder="Select semester" options={semesters} /></Field>
-            <Field label="Last enrolled semester"><Select value={form.last_enrolled_term} onChange={(event) => setForm((current) => ({ ...current, last_enrolled_term: event.target.value }))} placeholder="Select semester" options={allSemesters} /></Field>
+            <Field label="Last enrolled semester" hint="Taken from your enrollment records."><p className="text-sm font-medium text-ink" data-testid="awol-last-enrolled">{awolReturn.last_enrolled_term || "Not on record"}</p></Field>
           </div>
           <Field label="Written intention to resume enrollment" required error={messageFor("awol-intent")}><Textarea id="awol-intent" value={form.return_intent} onChange={(event) => setForm((current) => ({ ...current, return_intent: event.target.value }))} placeholder="I intend to resume enrollment in the selected semester…" /></Field>
           <Field label="Reason for returning and readiness to continue" required error={messageFor("awol-reason")}><Textarea id="awol-reason" value={form.return_reason} onChange={(event) => setForm((current) => ({ ...current, return_reason: event.target.value }))} /></Field>

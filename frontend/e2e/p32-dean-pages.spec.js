@@ -42,10 +42,10 @@ async function okJson(res, what) {
 const TERM = "AY 2026-2027 2nd Semester";
 const TERM_AFTER = "AY 2027-2028 1st Semester";
 const CHECKLIST = [
-  "Structured return intention completed",
-  "Updated study plan confirmed",
-  "Program or adviser consultation completed",
-  "No pending accountability confirmed",
+  "Written intention to enroll",
+  "Evaluation of subject/grade requirements",
+  "Clearance from Business Office",
+  "Interview (reason for delay, residency requirements)",
 ];
 
 /** Put three leave cases and one course-offering plan in front of the Dean. */
@@ -81,7 +81,7 @@ async function putWorkInFrontOfTheDean(playwright) {
   const gabriel = await apiAs(playwright, "readmission.gabriel@usls.edu.ph");
   const back = await okJson(
     await gabriel.post("/api/student-portal/requests/readmission", {
-      data: { target_return_term: TERM, return_intent: "Ready to come back early.", readmission_items: CHECKLIST },
+      data: { target_return_term: TERM, return_intent: "Ready to come back early." },
     }),
     "Gabriel files a readmission",
   );
@@ -513,13 +513,13 @@ test.describe("P3.2 Dean pages", () => {
     await expect(facts.getByText("What the student intends to do")).toBeVisible();
     await expect(facts).toContainText("Ready to come back early.");
 
-    // The checklist: four items, ticked by the student, not yet verified by staff.
+    // The checklist: four items; the system confirmed two from the records, staff have not verified the other two.
     const checklist = page.getByRole("heading", { name: "Checklist", exact: true }).locator("xpath=ancestor::section[1]");
     for (const item of CHECKLIST) await expect(checklist).toContainText(item);
-    await expect(checklist.getByText("Student ticked")).toHaveCount(4);
-    await expect(checklist.getByText("Staff not verified")).toHaveCount(4);
-    const ticked = await look(checklist.getByText("Student ticked").first());
-    expect(await look(checklist.getByText("Staff not verified").first()), "a missing tick is greyed").not.toBe(ticked);
+    await expect(checklist.getByText(/^Checked by the system:/)).toHaveCount(2);
+    await expect(checklist.getByText("Not verified by staff yet")).toHaveCount(2);
+    const ticked = await look(checklist.getByText(/^Checked by the system:/).first());
+    expect(await look(checklist.getByText("Not verified by staff yet").first()), "a missing tick is greyed").not.toBe(ticked);
 
     // The policy chips: Pass/Provided green, the two Needs Review amber.
     const policy = page.getByRole("heading", { name: "Policy check" }).locator("xpath=ancestor::section[1]");

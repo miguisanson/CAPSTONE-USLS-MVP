@@ -189,8 +189,9 @@ export function ChecklistView({ detail }) {
             <div className="min-w-0">
               <p className="font-medium text-ink">{row.item}</p>
               <p className="text-xs text-slate-500">
-                {row.checked ? "The student ticked this." : "The student has not ticked this."}{" "}
-                {row.confirmed ? "Verified by staff." : "Not verified by staff yet."}
+                {row.source === "system"
+                  ? `${row.confirmed ? "Checked by the system" : "Not confirmed by the system"}: ${row.detail}`
+                  : row.confirmed ? "Verified by staff." : "Not verified by staff yet."}
               </p>
             </div>
           </li>

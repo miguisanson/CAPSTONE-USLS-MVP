@@ -131,8 +131,7 @@ test.describe("P99 student requests behave alike", () => {
       d.student.standing = "AWOL";
       d.student.enrollment_tag = "AWOL";
       d.standalone_cases = { ...(d.standalone_cases || {}), awol: [] };
-      d.upcoming_semesters = ["AY 2026-2027 2nd Semester", "AY 2027-2028 1st Semester"];
-      d.semester_options = ["AY 2025-2026 2nd Semester", "AY 2026-2027 1st Semester"];
+      d.awol_return = { last_enrolled_term: "AY 2026-2027 1st Semester", return_semester_options: ["AY 2026-2027 2nd Semester", "AY 2027-2028 1st Semester"], default_return_term: null };
       d.awol_case = w.length ? { id: 5, status: "Return Submitted", last_enrolled_term: "AY 2026-2027 1st Semester", return_intent: "Spec intention.", return_reason: "Spec reason." } : null;
     });
     try {

@@ -45,12 +45,18 @@ from app import (  # noqa: E402
 )
 import leave_workflow  # noqa: E402
 
-CHECKLIST = [
-    "Structured return intention completed",
-    "Updated study plan confirmed",
-    "Program or adviser consultation completed",
-    "No pending accountability confirmed",
+# Handbook 2022-2023 p. 45 ("For Returnees") and p. 53 (written intention to enroll).
+# Owner rule 2026-11-04: the student ticks nothing. The system works out what the
+# records show; staff confirm what only an office can confirm.
+SYSTEM_CHECKS = [
+    "Written intention to enroll",
+    "Evaluation of subject/grade requirements",
 ]
+STAFF_CHECKS = [
+    "Clearance from Business Office",
+    "Interview (reason for delay, residency requirements)",
+]
+CHECKLIST = SYSTEM_CHECKS + STAFF_CHECKS
 
 
 class LeaveCaseTests(unittest.TestCase):
@@ -593,7 +599,8 @@ class LeaveCaseTests(unittest.TestCase):
             self.assertEqual(case.linked_case_id, leave_id)
             self.assertEqual(case.target_term.label, "Term Two")
             self.assertEqual(case.start_term.label, "Running Term")  # the leave being ended
-            self.assertEqual({row["item"]: row["checked"] for row in leave_workflow_checklist(case)}, {i: True for i in CHECKLIST})
+            self.assertEqual({row["item"]: row["source"] for row in leave_workflow_checklist(case)},
+                             {**{i: "system" for i in SYSTEM_CHECKS}, **{i: "staff" for i in STAFF_CHECKS}})
         # A second request while one is open is refused.
         dup = self.student_client().post("/api/student-portal/requests/readmission", json=body)
         self.assertEqual(dup.status_code, 409)
@@ -664,13 +671,121 @@ class LeaveCaseTests(unittest.TestCase):
         case_id = self.case()
         detail = self.staff_client().get(f"/api/leave-cases/{case_id}").get_json()["case"]
         self.assertEqual([row["item"] for row in detail["checklist"]], CHECKLIST)
-        self.assertTrue(all(row["checked"] for row in detail["checklist"]))
-        self.assertFalse(any(row["confirmed"] for row in detail["checklist"]))  # staff start unverified
-        self.act(self.staff_client(), case_id, "forward", confirmed_items=CHECKLIST[:2])
-        detail = self.staff_client().get(f"/api/leave-cases/{case_id}").get_json()["case"]
+        # The system items are worked out from the request and the records; nothing is "ticked by the student".
         self.assertEqual([row["confirmed"] for row in detail["checklist"]], [True, True, False, False])
+        self.assertTrue(all("checked" not in row for row in detail["checklist"]))
+        self.act(self.staff_client(), case_id, "forward", confirmed_items=STAFF_CHECKS[:1])
+        detail = self.staff_client().get(f"/api/leave-cases/{case_id}").get_json()["case"]
+        self.assertEqual([row["confirmed"] for row in detail["checklist"]], [True, True, True, False])
         self.assertEqual(detail["eligibility_result"], "Needs Review")
         self.assertEqual(detail["policy_snapshot"]["recommendation"], "Needs Review")
+
+    # ---- owner rule 2026-11-04: never make a user enter what the system knows ----------
+    def test_readmission_asks_the_student_to_tick_nothing_and_shows_what_the_records_show(self):
+        self.make_on_leave("Running Term", "Term One")
+        context = self.student_client().get("/api/student-portal/context").get_json()
+        self.assertNotIn("readmission_requirements", context)  # nothing for the student to tick
+        preview = {row["item"]: row for row in context["readmission_checks"]}
+        self.assertEqual(list(preview), CHECKLIST)
+        self.assertEqual({item: row["source"] for item, row in preview.items()},
+                         {**{i: "system" for i in SYSTEM_CHECKS}, **{i: "staff" for i in STAFF_CHECKS}})
+        # The subject evaluation comes from the course records: 0 of the program's 1 subject done.
+        self.assertIn("0 of 1", preview["Evaluation of subject/grade requirements"]["detail"])
+        response = self.student_client().post("/api/student-portal/requests/readmission", json={
+            "target_return_term": "Term Two", "return_intent": "Ready to resume my thesis."})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        detail = self.staff_client().get(f"/api/leave-cases/{self.case()}").get_json()["case"]
+        rows = {row["item"]: row for row in detail["checklist"]}
+        self.assertTrue(rows["Written intention to enroll"]["confirmed"])
+        self.assertTrue(rows["Evaluation of subject/grade requirements"]["confirmed"])
+        self.assertFalse(rows["Clearance from Business Office"]["confirmed"])
+
+    def test_student_ticks_never_count_as_office_checks(self):
+        self.make_on_leave("Running Term", "Term One")
+        response = self.student_client().post("/api/student-portal/requests/readmission", json={
+            "target_return_term": "Term Two", "return_intent": "Ready.", "readmission_items": CHECKLIST})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with app.app_context():
+            case = db.session.get(LeaveCase, self.case())
+            staff_rows = [row for row in leave_workflow_checklist(case) if row["source"] == "staff"]
+            self.assertEqual([row["confirmed"] for row in staff_rows], [False, False])
+
+    def test_staff_confirming_both_office_checks_passes_the_checklist(self):
+        self.make_on_leave("Running Term", "Term One")
+        self.student_client().post("/api/student-portal/requests/readmission", json={
+            "target_return_term": "Term Two", "return_intent": "Ready."})
+        case_id = self.case()
+        forwarded = self.act(self.staff_client(), case_id, "forward", confirmed_items=STAFF_CHECKS)
+        self.assertEqual(forwarded.status_code, 200, forwarded.get_json())
+        detail = self.staff_client().get(f"/api/leave-cases/{case_id}").get_json()["case"]
+        self.assertTrue(all(row["confirmed"] for row in detail["checklist"]))
+        check = next(c for c in detail["policy_snapshot"]["checks"] if c["label"] == "Checklist verified by staff")
+        self.assertEqual(check["status"], "Pass")
+        self.assertIn("2 of 2", check["detail"])
+
+    def test_a_program_without_a_curriculum_on_record_cannot_pass_the_subject_evaluation(self):
+        with app.app_context():
+            CourseRecord.query.delete()
+            SubjectEnrollment.query.delete()
+            Course.query.delete()
+            db.session.commit()
+        self.make_on_leave("Running Term", "Term One")
+        self.student_client().post("/api/student-portal/requests/readmission", json={
+            "target_return_term": "Term Two", "return_intent": "Ready."})
+        case_id = self.case()
+        self.act(self.staff_client(), case_id, "forward", confirmed_items=STAFF_CHECKS)
+        detail = self.staff_client().get(f"/api/leave-cases/{case_id}").get_json()["case"]
+        row = next(r for r in detail["checklist"] if r["item"] == "Evaluation of subject/grade requirements")
+        self.assertFalse(row["confirmed"])
+        self.assertEqual(detail["eligibility_result"], "Needs Review")
+
+    def test_the_previous_leave_period_comes_from_the_leave_semesters_on_record(self):
+        # A student marked on leave by an older import has no leave case, only the LOA semesters.
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.standing, student.enrollment_tag = "On Leave", "LOA"
+            for label in ("Past Term", "Running Term"):
+                db.session.add(TermEnrollment(student_id=self.student_id, term_id=self.term_ids[label], status="LOA"))
+            db.session.commit()
+        context = self.student_client().get("/api/student-portal/context").get_json()
+        can = context["leave_overview"]["can_file"]["readmission"]
+        self.assertEqual(can["leave_period"], "Past Term to Running Term")
+        response = self.student_client().post("/api/student-portal/requests/readmission", json={
+            "target_return_term": "Term One", "return_intent": "Ready.",
+            "previous_loa_start": "Term Three", "previous_loa_end": "Term Four"})  # ignored
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with app.app_context():
+            case = db.session.get(LeaveCase, self.case())
+            self.assertEqual((case.start_label, case.end_label), ("Past Term", "Running Term"))
+
+    def mark_awol(self, last_enrolled="Past Term"):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.standing, student.enrollment_tag = "AWOL", "AWOL"
+            db.session.add(TermEnrollment(student_id=self.student_id, term_id=self.term_ids[last_enrolled],
+                                          status="Confirmed", source_reference="AIMS export"))
+            db.session.commit()
+
+    def test_awol_return_takes_the_last_enrolled_semester_from_the_records(self):
+        self.mark_awol("Past Term")
+        context = self.student_client().get("/api/student-portal/context").get_json()
+        self.assertEqual(context["awol_return"]["last_enrolled_term"], "Past Term")
+        # Only semesters that have not started yet; the next one is the default.
+        self.assertEqual(context["awol_return"]["return_semester_options"][0], "Term One")
+        self.assertNotIn("Running Term", context["awol_return"]["return_semester_options"])
+        self.assertEqual(context["awol_return"]["default_return_term"], "Term One")
+        response = self.student_client().post("/api/student-portal/requests/awol-return", json={
+            "target_return_term": "Term One", "last_enrolled_term": "Term Four",  # a forged value is ignored
+            "return_intent": "I intend to resume.", "return_reason": "Ready."})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with app.app_context():
+            self.assertEqual(AwolCase.query.filter_by(student_id=self.student_id).one().last_enrolled_term, "Past Term")
+
+    def test_awol_return_refuses_a_semester_that_has_already_started(self):
+        self.mark_awol("Past Term")
+        response = self.student_client().post("/api/student-portal/requests/awol-return", json={
+            "target_return_term": "Running Term", "return_intent": "I intend to resume.", "return_reason": "Ready."})
+        self.assertEqual(response.status_code, 400, response.get_json())
 
     def test_the_policy_check_uses_the_date_the_request_was_filed(self):
         with app.app_context():
@@ -1246,7 +1361,7 @@ class LeaveCaseTests(unittest.TestCase):
         self.assertEqual(self.act(self.staff_client(), case_id, "forward").status_code, 200)
         detail = self.dean_client().get(f"/api/leave-cases/{case_id}").get_json()["case"]
         self.assertEqual(detail["eligibility_result"], "Needs Review")
-        self.assertFalse(any(row["confirmed"] for row in detail["checklist"]))
+        self.assertFalse(any(row["confirmed"] for row in detail["checklist"] if row["source"] == "staff"))
         bad = self.act(self.staff_client(), self.case(), "forward", confirmed_items=["Made-up item"])
         self.assertIn(bad.status_code, {400, 409})
 

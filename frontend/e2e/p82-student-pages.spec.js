@@ -781,14 +781,15 @@ test.describe("P82 changes: request forms show an error summary on submit", () =
     }
   });
 
-  test("Readmission: the summary lists the missing answers and the unticked checklist", async ({ browser }) => {
-    const ITEMS = ["Structured return intention completed", "Updated study plan confirmed"];
+  test("Readmission: the summary lists the missing answers and nothing is ticked", async ({ browser }) => {
     const { context, page, writes } = await formPage(browser, (d) => {
       leaveOpen(d);
-      d.leave_overview.can_file.readmission = { allowed: true, reason: "" };
+      d.leave_overview.can_file.readmission = { allowed: true, reason: "", previous_semester_options: ["AY 2025-2026 1st Semester"] };
       d.leave_overview.return_semester_options = ["AY 2026-2027 2nd Semester"];
-      d.semester_options = ["AY 2025-2026 1st Semester"];
-      d.readmission_requirements = ITEMS;
+      d.readmission_checks = [
+        { item: "Written intention to enroll", source: "system", confirmed: false, detail: "Spec detail." },
+        { item: "Clearance from Business Office", source: "staff", confirmed: false, detail: "Spec staff detail." },
+      ];
     });
     try {
       await page.goto("/student/requests/readmission");
@@ -797,21 +798,21 @@ test.describe("P82 changes: request forms show an error summary on submit", () =
       await submit.click();
       const box = summary(page);
       await expect(box).toBeVisible();
-      for (const message of ["Choose the semester your leave started in.", "Choose the semester your leave ended in.", "Choose the semester you want to return in.", "Say why you are ready to come back.", "Tick every item on the checklist."]) {
+      for (const message of ["Choose the semester your leave started in.", "Choose the semester your leave ended in.", "Choose the semester you want to return in.", "Say why you are ready to come back."]) {
         await expect(box.getByRole("link", { name: message, exact: true }), message).toBeVisible();
       }
-      await box.getByRole("link", { name: "Tick every item on the checklist.", exact: true }).click();
-      await expect(page.getByRole("checkbox", { name: ITEMS[0] }), "the checklist link focuses its first item").toBeFocused();
+      await expect(page.getByRole("checkbox"), "the student ticks nothing").toHaveCount(0);
       expect(lastWrite(writes, "requests/readmission")).toBeUndefined();
       // a fully answered form sends
       await ctl(page, "Your leave started in").selectOption("AY 2025-2026 1st Semester");
       await ctl(page, "Semester you want to return in").selectOption("AY 2026-2027 2nd Semester");
       await ctl(page, "Why you are ready to come back").fill("Spec: ready.");
-      for (const item of ITEMS) await page.getByLabel(item).check();
       await submit.click();
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
-      expect(lastWrite(writes, "requests/readmission").body).toMatchObject({ target_return_term: "AY 2026-2027 2nd Semester", readmission_items: ITEMS });
+      const sent = lastWrite(writes, "requests/readmission").body;
+      expect(sent).toMatchObject({ target_return_term: "AY 2026-2027 2nd Semester" });
+      expect(sent).not.toHaveProperty("readmission_items");
     } finally {
       await context.close();
     }
@@ -823,8 +824,7 @@ test.describe("P82 changes: request forms show an error summary on submit", () =
       d.student.enrollment_tag = "AWOL";
       d.awol_case = null;
       d.standalone_cases = { ...(d.standalone_cases || {}), awol: [] };
-      d.upcoming_semesters = ["AY 2026-2027 2nd Semester"];
-      d.semester_options = ["AY 2025-2026 2nd Semester"];
+      d.awol_return = { last_enrolled_term: null, return_semester_options: ["AY 2026-2027 2nd Semester"], default_return_term: null };
     });
     try {
       await page.goto("/student/requests/awol-return");

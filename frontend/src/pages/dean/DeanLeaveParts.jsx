@@ -153,8 +153,11 @@ export function LeaveCaseSummary({ item }) {
                 <li key={`${index}-${row.item}`} className="rounded-lg bg-slate-50 px-3 py-2">
                   <p className="text-sm font-semibold text-slate-700">{row.item}</p>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                    <Tick on={Boolean(row.checked)} yes="Student ticked" no="Student did not tick" />
-                    <Tick on={Boolean(row.confirmed)} yes="Staff verified" no="Staff not verified" />
+                    {row.source === "system" ? (
+                      <Tick on={Boolean(row.confirmed)} yes={`Checked by the system: ${row.detail}`} no={`Not confirmed by the system: ${row.detail}`} />
+                    ) : (
+                      <Tick on={Boolean(row.confirmed)} yes="Verified by staff" no="Not verified by staff yet" />
+                    )}
                   </div>
                 </li>
               ))}
