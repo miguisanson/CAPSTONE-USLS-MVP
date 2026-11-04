@@ -28545,7 +28545,7 @@ def monitoring_portal_create_student(data: dict) -> tuple[Student, UserAccount]:
         if "@" not in email or " " in email:
             raise MonitoringEntryError("Enter a valid email address.")
         _monitoring_email_free(email)
-    term = db.session.get(AcademicTerm, safe_int(data.get("term_id")) or 0) if data.get("term_id") else get_active_term()
+    term = get_active_term()  # never a client-sent term_id (I-246 pattern)
 
     student = Student(
         student_number=student_number,
