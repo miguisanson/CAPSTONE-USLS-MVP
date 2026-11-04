@@ -1,29 +1,25 @@
 # State
 
-## Demo Guide built — 2026-11-04 (branch pkt/demo-guide, worktree wt/kguide)
+## 2026-11-04 afternoon — known-data rule + Demo Guide (session "known-data"; pushed to v6.1-migui)
 
-- Server: `GET /api/demo/guide-state` in `app.py` (`tests/test_demo_guide.py` OK). Frontend: `frontend/src/lib/demoGuide/{engine,guides,narration}.js`,
-  `components/DemoGuide.jsx` (launcher in the shared header + panel), "Demo guide" entry and `?as=<email>` on `pages/Login.jsx`, `demo-guide:api`
-  event in `api.js`. Spec `frontend/e2e/p114-demo-guide.spec.js` (owns demo student `therese`; resets it before and after).
-  Not in the guide yet: withdrawal / graduation / practicum scripts (the server route already answers for them); upload writes (FormData fetches) do not emit the event.
+**For Natalie (next session): start with `/continue_CAPSTONE-USLS-MVP`, then read this block.**
 
-
-## Known-data rule sweep — 2026-11-04 (IN PROGRESS, session "known-data", NOT committed)
-
-- Owner rule: "never make a user type, pick or tick something the system already knows or can check."
-- Findings: I-242..I-263 in ISSUES.md (sweep notes: side-session notes `known-data-sweep.md`); R-028/R-029.
-- Packet A (I-242/243/244, readmission + AWOL): failing tests written in `tests/test_loa_readmission.py`
-  (main checkout, uncommitted); Sonnet helper implementing in worktree `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/kreadm`
-  (branch `pkt/known-readm`). Readmission items are now the Handbook p. 45 list: system = "Written intention to
-  enroll", "Evaluation of subject/grade requirements"; staff = "Clearance from Business Office", "Interview (reason
-  for delay, residency requirements)". Forms Q23 answered that way; owner to confirm.
-- Landed on v6.1-migui (local, not pushed yet): merge pkt/known-readm (A), merge pkt/known-ui (C: I-255..261),
-  a9c18b5 (B server: I-245/246/247/249/251 + tests + narration/walkthrough/capture scripts). Targeted 167 OK.
-- Running: pkt/known-forms (B frontend, worktree wt/kforms); full Python gate (log in session scratchpad gate.txt).
-- Owner 2026-11-04 (meeting moved): commit + push + restart miguisanson.dev (`docker compose --profile tunnel up -d --build`),
-  then a multi-agent audit of every process (workflow `process-audit`, read-only, 6 groups + verifiers), fix
-  findings, and build the **Demo Guide** tutorial: design + contract `.planning/demo-guide/DESIGN.md`, failing
-  server test `tests/test_demo_guide.py` (route `/api/demo/guide-state` not built yet).
+- Owner rule: "never make a user type, pick or tick something the system already knows or can check" and
+  "if it can be automatic let it be automatic". Findings I-242..I-263 (ISSUES.md), R-028/R-029 (REGRESSION.md).
+- Done and pushed: Readmission (student ticks nothing; Handbook p. 45 items: system = "Written intention to
+  enroll", "Evaluation of subject/grade requirements"; staff = "Clearance from Business Office", "Interview
+  (reason for delay, residency requirements)"; leave period from LOA semesters on record), Return from AWOL
+  (last enrolled semester from TermEnrollment, next open semester preselected), student forms (no student_id /
+  term_id / defense type / school year / required hours sent), monitoring adviser = faculty select (server
+  refuses unknown names), term taken = semester select (server refuses malformed labels), P3 screens I-255..261.
+- **Demo Guide** (in-app tutorial, demo mode only): design `.planning/demo-guide/DESIGN.md`, server
+  `GET /api/demo/guide-state` (`tests/test_demo_guide.py`), UI `frontend/src/components/DemoGuide.jsx` +
+  `frontend/src/lib/demoGuide/`, spec p114 (owns demo student Therese; resets her before and after — watch it
+  when specs run in parallel). The web image needs `scripts/demo/narration.json` (Dockerfile copies it).
+- Site: `docker compose --profile tunnel up -d --build` after every pull (deploy/DOCKER.md). No schema change today.
+- Open owner/GS decisions: I-248 (store the three concept-paper titles?), I-252 (practicum hours verified by staff?),
+  Forms Q23 now follows the Handbook list (owner to confirm; forms pack GS-F-08 still lists the old platform checks).
+- Not re-recorded: demo videos (narration text updated only). Walkthrough screenshots not recaptured.
 
 ## Demo-day date waits skipped — 2026-11-04 (NOT committed)
 

@@ -538,7 +538,9 @@ class VerdictOutcomeTests(ResearchCoreBase):
             schedule = self.schedule(self.student_id, "Proposal Defense", day=future_weekday(20), names=names)
             db.session.commit()
             schedule_id = schedule.id
-        response = self.submit(schedule_id, "Passed")
+        # The real rule; the demo-day "Skip date waits" switch (default ON) is tested separately below.
+        with patch.dict(os.environ, {"DEMO_SKIP_DATE_WAITS": "0"}):
+            response = self.submit(schedule_id, "Passed")
         self.assertEqual(response.status_code, 400)
         self.assertIn("before", response.get_json()["error"].lower())
 
