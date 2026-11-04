@@ -32,6 +32,7 @@ import { EmptyState, InlineNotice, StatusLegend } from "./ui/index.js";
  *   renderColumnFooter  (column, items) => node
  *   emptyText      text for an empty column (shown with the shared EmptyState)
  *   columnClassName  classes for each column (width etc.); the default is a narrow column so more stages fit
+ *                    A column is as tall as its cards (at least 14rem); "Select all" sits right under the last card.
  *
  * On a phone (below 640 px) every board is the same stacked list instead: one group per stage that has cards, in the
  * board's order, each card with the same "Move to..." menu or lock reason and no dragging (I-199, IM24).
@@ -357,7 +358,7 @@ export default function StageBoard({
         aria-label={ariaLabel}
         tabIndex={0}
       >
-        <div className="flex w-max gap-3">
+        <div className="flex w-max items-start gap-3">
           {columns.map((column) => {
             const columnItems = items.filter((item) => getColumnKey(item) === column.key);
             const isHover = hoverColumn === column.key && Boolean(draggedItem);
@@ -370,7 +371,7 @@ export default function StageBoard({
                 onDragOver={readOnly ? undefined : (event) => onDragOver(event, column)}
                 onDragLeave={readOnly ? undefined : () => hoverColumn === column.key && setHoverColumn(null)}
                 onDrop={readOnly ? undefined : (event) => onDrop(event, column)}
-                className={`${columnClassName} flex shrink-0 flex-col rounded-2xl border bg-slate-50/70 p-3 transition-colors duration-150 ${
+                className={`${columnClassName} flex min-h-[14rem] shrink-0 flex-col rounded-2xl border bg-slate-50/70 p-3 transition-colors duration-150 ${
                   allowedHere
                     ? "border-brand-400 bg-brand-50/60 ring-2 ring-brand-200"
                     : refusedHere
@@ -394,7 +395,7 @@ export default function StageBoard({
                     {hoverVerdict.reason || "That move is not allowed."}
                   </InlineNotice>
                 )}
-                <div className="flex-1 space-y-3">
+                <div className="space-y-3">
                   {columnItems.length ? (
                     columnItems.map((item) => renderItem(item, column))
                   ) : (

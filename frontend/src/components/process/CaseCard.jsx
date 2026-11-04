@@ -11,29 +11,37 @@ export function ReadyMark({ ready, readyLabel = "Ready for Dean review", waiting
   return null;
 }
 
-/** A two-column grid of short facts. `facts` is [text] or [{ text, wide }]; empty ones are skipped. */
+/** A two-column grid of short facts. `facts` is [text] or [{ text, wide, strong, testId }]; empty ones are skipped. */
 export function CaseCardFacts({ facts }) {
   const shown = facts.map((fact) => (typeof fact === "string" ? { text: fact } : fact)).filter((fact) => fact.text);
   return (
-    <ul className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-slate-600">
+    <ul data-testid="case-facts" className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-slate-600">
       {shown.map((fact, index) => (
-        <li key={index} className={`min-w-0 break-words ${fact.wide ? "col-span-2" : index % 2 ? "text-right" : ""}`}>{fact.text}</li>
+        <li
+          key={index}
+          data-testid={fact.testId}
+          className={`min-w-0 break-words ${fact.wide ? "col-span-2" : index % 2 ? "text-right" : ""} ${fact.strong ? "text-sm font-semibold text-ink" : ""}`}
+        >
+          {fact.text}
+        </li>
       ))}
     </ul>
   );
 }
 
-/** The amber box with how many messages there are and the latest one (two lines). */
-export function MessageNote({ messages = [] }) {
-  if (!messages.length) return null;
-  const latest = messages[0];
+/**
+ * The amber box with how many messages there are and the latest one (two lines). Give `messages` (newest first) or, when a list only
+ * carries the number, `count` and the `latest` text; with a count and no text the box says where to read them.
+ */
+export function MessageNote({ messages = [], count = messages.length, latest = messages[0]?.comment || messages[0]?.template || "", unreadHint = "Open Message to read and reply." }) {
+  if (!count) return null;
   return (
     <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
       <p className="eyebrow !text-amber-800">
         <MessageSquare className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
-        {messages.length} visible message{messages.length === 1 ? "" : "s"}
+        {count} visible message{count === 1 ? "" : "s"}
       </p>
-      <p className="mt-1 line-clamp-2 text-xs text-amber-900">{latest?.comment || latest?.template}</p>
+      <p className="mt-1 line-clamp-2 text-xs text-amber-900">{latest || unreadHint}</p>
     </div>
   );
 }
@@ -44,9 +52,9 @@ export function NextOwner({ owner }) {
 }
 
 /** The card shell: green when it can move on, white otherwise. */
-export function CaseCardShell({ ready = false, children }) {
+export function CaseCardShell({ ready = false, selected = false, children }) {
   return (
-    <article className={`rounded-xl border p-3 shadow-sm transition-colors ${ready ? "border-emerald-300 bg-emerald-50 hover:border-emerald-500" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+    <article className={`rounded-xl border p-3 shadow-sm transition-colors ${ready ? "border-emerald-300 bg-emerald-50 hover:border-emerald-500" : "border-slate-200 bg-white hover:border-slate-300"} ${selected ? "ring-2 ring-brand-300" : ""}`}>
       {children}
     </article>
   );

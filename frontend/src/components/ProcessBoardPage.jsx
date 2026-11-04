@@ -7,6 +7,7 @@ import { formatDateTime } from "../lib/format";
 import { Button, EmptyState, InlineNotice, Modal, PageHeader, SkeletonBoard } from "./ui/index.js";
 import PolicyRules from "./PolicyRules";
 import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "./StageBoard";
+import { StageColumnHeader } from "./process";
 import { GUIDES, PROCESS_CONFIG } from "./processConfig";
 import ActionDialog from "../pages/leave/ActionDialog";
 import BatchBar, { BatchResult } from "../pages/leave/BatchBar";
@@ -159,6 +160,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
   const [selected, setSelected] = useState(() => new Set());
   const [detailId, setDetailId] = useState(null);
   const [detailVersion, setDetailVersion] = useState(0);
+  const [detailFocus, setDetailFocus] = useState(""); // "messages": the Message button opens the window on the note box
   const [dialog, setDialog] = useState(null); // { item, action, detail }
   const boardNotice = useBoardNotice(); // the one place a step says what happened (the board shows it above its columns)
   const dismissNotice = boardNotice.dismiss;
@@ -343,32 +345,28 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
         selectable={batchActionsOf(item).length > 0}
         selected={selected.has(item.id)}
         onToggleSelect={toggleSelect}
-        onOpen={(row) => setDetailId(row.id)}
+        onOpen={(row) => { setDetailFocus(""); setDetailId(row.id); }}
+        onMessage={(row) => { setDetailFocus("messages"); setDetailId(row.id); }}
       />
     ),
     [role, selected],
   );
 
+  // Khloe's header (components/process): the stage's number, its name, what it holds and how many cards.
   const renderColumnHeader = useCallback(
     (column, columnItems) => {
       const total = totals[column.key] || 0;
-      const filteredOut = columnItems.length !== total;
       return (
-        <header className="mb-3">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="section-title">{column.label}</h3>
-            <span
-              className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200"
-              aria-label={filteredOut ? `${columnItems.length} shown of ${total}` : `${plural(total, "request")}`}
-            >
-              {filteredOut ? `${columnItems.length} of ${total}` : total}
-            </span>
-          </div>
-          {column.description && <p className="meta mt-1 leading-relaxed">{column.description}</p>}
-        </header>
+        <StageColumnHeader
+          column={column}
+          count={columnItems.length}
+          total={total}
+          number={columns.findIndex((entry) => entry.key === column.key) + 1}
+          countLabel={columnItems.length === total ? plural(total, "request") : null}
+        />
       );
     },
-    [totals],
+    [totals, columns],
   );
 
   const renderColumnFooter = useCallback(
@@ -396,7 +394,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
     cases,
     data,
     reload: () => load({ quiet: true }),
-    openDetail: (item) => setDetailId(item.id),
+    openDetail: (item) => { setDetailFocus(""); setDetailId(item.id); },
     runAction,
     banner: boardNotice.show,
     signal,
@@ -508,7 +506,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
               selectedIds={selected}
               onToggle={toggleSelect}
               onToggleAll={setMany}
-              onOpen={(item) => setDetailId(item.id)}
+              onOpen={(item) => { setDetailFocus(""); setDetailId(item.id); }}
             />
           ) : (
             <EmptyState title={`No ${config.noun} match these filters`} hint="Clear a filter to see more." />
@@ -521,6 +519,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
       {detailId !== null && (
         <CaseDetailModal
           caseId={detailId}
+          focus={detailFocus}
           slug={slug}
           vocabulary={vocabulary}
           version={detailVersion}

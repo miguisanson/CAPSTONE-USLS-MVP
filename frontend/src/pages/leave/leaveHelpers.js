@@ -66,6 +66,44 @@ export function restLines(item) {
   return cardLines(item).slice(1);
 }
 
+// ---- Khloe's card (components/process): the same five facts on every board (IM24) -----------------------------------------
+// 1 what it is about (the key fact), 2 its size or period, 3 the status, 4 submitted, 5 updated. Pure text; the card draws them.
+export function caseFacts(item) {
+  const second = item.kind === "READMISSION"
+    ? (item.linked_case?.period_text ? `Leave: ${item.linked_case.period_text}` : "")
+    : restLines(item)[0] || "";
+  const submitted = item.submitted_at || item.created_at;
+  const updated = item.last_activity_at || item.updated_at;
+  const short = (value) => new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" }); // no year: it has to fit half a card
+  return [
+    { text: keyFact(item), wide: true, strong: true, testId: "case-key-fact" },
+    { text: second, wide: true },
+    { text: item.status_label || item.status, wide: true },
+    { text: submitted ? `Submitted ${short(submitted)}` : "Not submitted yet", wide: true },
+    { text: updated ? `Updated ${short(updated)}` : "", wide: true },
+  ];
+}
+
+// The short names of the four readmission checks (the server sends the long handbook wording).
+const CHECK_NAMES = [
+  [/^Written intention/, "Written intention"],
+  [/^Evaluation of subject/, "Subjects evaluated"],
+  [/^Clearance from Business/, "Business Office clearance"],
+  [/^Interview/, "Interview"],
+];
+
+// What this kind of request has to meet, for RequirementBoxes: readmission's system and staff checks, the AWOL residence limit,
+// the withdrawal window. Nothing is invented: a process with no requirement returns [].
+export function caseRequirements(item) {
+  const flagged = (key) => (item.flags || []).some((flag) => flag.key === key);
+  if (item.kind === "READMISSION") {
+    return (item.checklist || []).map((row) => ({ label: (CHECK_NAMES.find(([pattern]) => pattern.test(row.item)) || [null, row.item])[1], met: Boolean(row.confirmed) }));
+  }
+  if (item.kind === "AWOL") return [{ label: "Within the residence limits", met: !flagged("residence") }];
+  if (item.kind === "WITHDRAWAL") return [{ label: "Within the withdrawal window", met: !flagged("window") }];
+  return [];
+}
+
 function nothingToDoReason(item, vocabulary) {
   if (item.owner === "Dean") return "A request with the Dean can only be moved by the Dean.";
   if (item.owner === "Student") return "This request is waiting for the student. Only the student can move it.";
