@@ -346,7 +346,7 @@ async function toFile(fixture) {
   const key = Object.keys(FIXTURES).find((path) => path.endsWith(`/${fixture}`));
   if (!key) throw new AutopilotError(`The sample file "${fixture}" is missing.`);
   const blob = await (await fetch(FIXTURES[key])).blob();
-  const type = /\.pdf$/.test(fixture) ? "application/pdf" : /\.csv$/.test(fixture) ? "text/csv" : blob.type;
+  const type = /\.pdf$/.test(fixture) ? "application/pdf" : /\.csv$/.test(fixture) ? "text/csv" : /\.xlsx$/.test(fixture) ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : blob.type;
   return new File([blob], fixture, { type });
 }
 

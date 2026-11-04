@@ -105,3 +105,13 @@ process ... it should lock onto this kind of slideshow ... when click next arrow
   in memory; the step to resume after a sign-in as another person is in sessionStorage.
 - Slideshow on/off is `slideshow` in the panel's saved state (`SAVED_KEY`). Choosing a demo (sign-in box or panel) turns it on; the
   bar's Stop or "Change demo" turns it off, "Play as a slideshow" in the panel turns it back on.
+
+### Guides for the processes without a case row (2026-11-04, packet `pkt/guides-more`)
+Course Adjustments, Enrollment, Dropping a Subject, Policy Assistant, Student Handoff, Business Rules, Policy Documents, Residency,
+Calendars, Portals tour and Best features tour each have a guide in `guides/` and a test in `e2e/p122-autopilot-more.spec.js`.
+- They keep no case row, so they use `process: NO_CASE` (`"reports"`, the one slug `GET /api/demo/guide-state` answers with `case: null`
+  for any signed-in role). A step is done by `route`, by `apiWrite`, or by `"manual"` after an action that waits for the page's own
+  confirmation text. **An `apiWrite` step can be used once per path and per guide**: the writes are remembered for the whole run, so a
+  second step with the same path would count as done before it runs; later steps on the same path are `"manual"` with a `wait`.
+- Server change that would help (not made, `app.py` belongs to another packet): add these slugs to `DEMO_GUIDE_PROCESSES` and answer them
+  with `case: null` (or a `{status: "record"}` like `monitoring`), then change `NO_CASE` in `guides/_shared.js` to the guide's own slug.

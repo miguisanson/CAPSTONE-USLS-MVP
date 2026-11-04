@@ -52,14 +52,15 @@ export default defineConfig({
       : [{ name: "section-j", testMatch: /section-j\.spec\.js$/, dependencies: ["setup"] }]),
     // Page-migration packets (Phase 5): e2e/p<NN>-<name>.spec.js pin page behaviour. Some change data
     // (each uses its own demo students). Not in the negative control. New packets add a spec file only.
+    // p122 (the guides of the other processes) plays in the same project for the same reason.
     // p115 (the Demo Guide autopilot) plays whole processes with demo students that p32, p114 and section-j also use, so it is not in
     // "pages": its own project runs after every other writer has finished (e2e/DATA-OWNERSHIP.md).
     ...(negative
       ? []
-      : [{ name: "pages", testMatch: /(^|[\/])p(?!115-)\d+-[\w-]+\.spec\.js$/, dependencies: ["setup"] }]),
+      : [{ name: "pages", testMatch: /(^|[\/])p(?!115-|122-)\d+-[\w-]+\.spec\.js$/, dependencies: ["setup"] }]),
     ...(negative
       ? []
-      : [{ name: "autopilot", testMatch: /p115-autopilot\.spec\.js$/, dependencies: ["sweep", "section-j", "pages"] }]),
+      : [{ name: "autopilot", testMatch: /p(115-autopilot|122-autopilot-more)\.spec\.js$/, dependencies: ["sweep", "section-j", "pages"] }]),
     // Phase 5 component gallery at /__ui (ui-gallery.spec.js plus one ui-gallery-<packet>.spec.js per packet). Read-only. Needs the e2e build (VITE_UI_GALLERY=1, set by
     // `node scripts/e2e.mjs --build`, which `npm run e2e` uses). Not in the negative control.
     ...(negative
@@ -72,7 +73,7 @@ export default defineConfig({
     command: "node e2e/support/server.mjs",
     url: `${BASE_URL}/api/auth/config`,
     timeout: 5 * 60 * 1000,
-    reuseExistingServer: false,
+    reuseExistingServer: process.env.E2E_REUSE === "1", // E2E_REUSE=1: a server started by hand (node e2e/support/server.mjs) is used as it is
     stdout: "pipe",
     stderr: "pipe",
     gracefulShutdown: { signal: "SIGTERM", timeout: 5000 },
