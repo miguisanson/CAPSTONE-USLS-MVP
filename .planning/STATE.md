@@ -1,5 +1,16 @@
 # State
 
+## Documents reorganised + Fable review fixes — 2026-11-04 08:20 (session cb21b273, NOT committed)
+
+- Fable review of meeting deliverables: report kept in the session scratchpad (REVIEW.md). Fixed here: UAT (P1+P2,
+  98 items, K1-K8), narration (no pronouns, re-intros, off-screen claims; builder supports `<part>:signin:<role>:2`),
+  2l video trimmed to 4:19, both cheat sheets, README-FOR-MIGUI. Forms findings fixed on `pkt/forms-ops` (forms session, unmerged).
+- Documents/ moved (git mv, nothing deleted): Demo_Migui -> Meeting_2026-11-04, CAPSTONE_ONLY/UAT -> UAT, proposal
+  papers -> Capstone_Papers, walkthrough + screenshots -> Walkthrough, CAPRIT2 OLD + Stakeholder_Meeting_Prep -> Archive.
+  CAPSTONE_ONLY keeps only what app.py/tests read (USLS_Documents, Ops Manual, operations_manual_rules.json).
+  Map: Documents/README.md. References updated (scripts, AGENTS/CLAUDE.md, .gitignore, .dockerignore).
+  tests.test_policy_documents + test_operations_manual_content 56 OK. Owner commits.
+
 ## Merge recovery — 2026-11-04 (current)
 
 - Merging origin v6.1-migui a22916c into local 3131fcf. Five conflicts resolved
@@ -149,7 +160,7 @@ Stakeholder meeting 2026-11-04. Owner asked for, in this order:
    tunnel token from a file the owner fills), `deploy/DOCKER.md` (helper C). Owner: domain NOT yet on Cloudflare;
    public sign-in page SHOWS the demo accounts (DEMO_SHOW_ACCOUNTS=1, owner choice, risk told).
 7. Then polish / improvement / optimization loop (IMPROVE.md) until 10:00 Manila.
-**RUN ENDED 07:40 Nov 4 (owner: stop by 09:00, he checks things).** ALL 5 DELIVERABLES DONE + pushed; owner entry point
+**RUN ENDED 08:30 Nov 4; full report `.planning/SESSION-REPORT-2026-11-04.md`. Site turned OFF at the owner's request (start: `deploy\START-SITE.cmd`).** ALL 5 DELIVERABLES DONE + pushed; owner entry point
 `Documents/CAPSTONE_ONLY/Demo_Migui/README-FOR-MIGUI.md`. Videos (local only, gitignored) re-recorded on the final night code.
 v6.1-migui @ 61c40e6 (pushed): night1..13 merged after gates. Last full Python gate 983 tests: only failures = Myrine's
 test_teaching_schedule (I-236, hers: her 26c8892 removed the published-timetable guard and the Schedule tab; her p110/p84 specs
