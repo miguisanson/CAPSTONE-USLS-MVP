@@ -300,5 +300,32 @@ class PracticumPayloadTests(Audit2Base):
             self.assertNotEqual(record.completion_status, "Completed and accepted")
 
 
+class GenericDocumentUploadTests(Audit2Base):
+    """I-280: the generic upload route does not bypass the Research Gate rules."""
+
+    def make_doc(self, gate, item_name):
+        with app.app_context():
+            doc = DocumentCheck(student_id=self.student_id, gate=gate, item_name=item_name, status="Missing")
+            db.session.add(doc)
+            db.session.commit()
+            return doc.id
+
+    def upload(self, doc_id):
+        from io import BytesIO
+        return self.client("student").post(
+            f"/api/student-portal/documents/{doc_id}/upload",
+            data={"file": (BytesIO(b"%PDF-1.4\nx\n%%EOF\n"), "x.pdf")}, content_type="multipart/form-data",
+        )
+
+    def test_research_gate_documents_are_refused_and_stay_missing(self):
+        for gate, item in (("Form 4 - Proposal Defense Readiness", "Ethics Clearance"), ("Form 1 - Title Defense", "Academic Coordinator endorsement/e-signature")):
+            doc_id = self.make_doc(gate, item)
+            response = self.upload(doc_id)
+            self.assertEqual(response.status_code, 409, (gate, response.get_json()))
+            self.assertIn("Research Gate", response.get_json()["error"])
+            with app.app_context():
+                self.assertEqual(db.session.get(DocumentCheck, doc_id).status, "Missing")
+
+
 if __name__ == "__main__":
     unittest.main()

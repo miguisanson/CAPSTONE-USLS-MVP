@@ -15576,6 +15576,8 @@ def register_routes(app: Flask) -> None:
             student.id,
             "Student",
             evidence.original_name,
+        if doc.gate in RESEARCH_MILESTONES:  # the Research Gate has its own route and rules (current stage, source, locks)
+            return jsonify({"error": "Research Gate documents are uploaded from the Research Gate page, which checks the stage and the rules."}), 409
             f"{doc.item_name} submitted",
             "Research Coordinator",
             f"Student uploaded a supporting document for {doc.gate}. Staff must verify before marking it complete.",
