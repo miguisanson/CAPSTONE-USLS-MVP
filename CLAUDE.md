@@ -41,10 +41,9 @@ Commands: `/continue_CAPSTONE-USLS-MVP` (start any session with it).
   (no `pytest` dependency, no `package.json` test script). They build their
   own temp SQLite DB before importing `app`, so they never touch
   `usls_gs_demo.sqlite3` or need `.env`.
-- Schema changes are additive `ALTER TABLE … ADD COLUMN` statements, guarded
-  by an existence check, added near the top of the startup
-  `with app.app_context():` block in `app.py` — never a destructive
-  migration. See AGENTS.md Rule 4.
+- Schema changes (owner decision IM4): edit the SQLAlchemy model and the
+  seed, then rebuild the demo database with `npm run seed`. Do not add
+  `ALTER TABLE` patches. See AGENTS.md Rule 4.
 - Official student/enrollment/grade data is read-only and sourced only from
   an AIMS export import — never add a path that lets a user hand-edit it.
   See AGENTS.md Rule 4.

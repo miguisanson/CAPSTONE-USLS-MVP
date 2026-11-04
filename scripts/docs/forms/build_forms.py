@@ -1611,7 +1611,7 @@ add("45", "Data Privacy Consent and Acknowledgement", "Data privacy and records 
            "I agree that the Graduate School keeps and uses my personal data for the lifecycle of a graduate student (admission, enrollment, requests, research, graduation) as GS-P-04 describes.",
            "I understand that, when the Policy Assistant is switched on, my questions and short policy passages (and, for a personal question, a short summary of my own record or work queue) are sent to an outside service to produce an answer, as GS-P-04 section 5 describes.",
            "Faculty members only: I agree that defense schedules are written to the Google Calendar I connect to the platform, with the defense type, the student's name, the time and the venue.",
-           "I know my rights to be informed, to object, to access, to correct, to have data blocked or removed, to data portability and to claim damages, and that I may complain to the National Privacy Commission (RA 10173, section 16)."], cols=1),
+           "I know my rights to be informed, to object, to access, to correct, to have data blocked or removed, to data portability and to claim damages, and that I may complain to the National Privacy Commission (RA 10173, sections 16 and 18)."], cols=1),
         B(None, "Remarks or objections of the person (the Graduate School will answer in writing):", 1.4),
         S("Signatures", [("Person", "Signature over printed name"), ("Received by", "Graduate School Staff")]),
     ],
@@ -1994,7 +1994,7 @@ SIGN_STD = lambda reviewer: [("Prepared by", "Capstone group CAP-IT1 (platform p
 
 policy("03", "Electronic Approval and Signature Policy", "4.22", "Electronic approval and signatures",
     instructions=[
-        "This policy proposes when an approval recorded in the Graduate School platform counts as the signature of the same officer on the matching GS-F form. It takes effect when the Dean signs below.",
+        "This policy states when an approval recorded in the Graduate School platform counts as the signature of the same officer on the matching GS-F form. It takes effect when the Dean signs below.",
         "Until it takes effect, forms are signed on paper or, for the Research Protocol forms, with the e-signature sent by email as the Protocol already requires.",
         "The laws are cited so that the Dean and the University's legal counsel can check them. This document is not legal advice.",
     ],
@@ -2007,7 +2007,7 @@ policy("03", "Electronic Approval and Signature Policy", "4.22", "Electronic app
         ]),
         ("Legal basis", [
             ("p", "Republic Act No. 8792, the Electronic Commerce Act of 2000: section 7 gives electronic documents the legal recognition of written ones; section 8 makes an electronic signature equivalent to a handwritten signature when a procedure that the parties cannot alter identifies the signer, is reliable for the purpose, is needed for the signer to go on with the transaction, and can be verified by the other party; section 9 sets a presumption for electronic signatures; section 12 deals with the admissibility and weight of an electronic data message or document. The reading of section 8 is a paraphrase."),
-            ("p", "The Graduate School already works this way by email. The Research Protocol AY 2024-2025 and the Handbook (pp. 61, 63, 72-73) require Form 4 and Form 4.3 to be accomplished with e-signature and move Forms 3 and 3.1 by email between the Academic Coordinator, the Research Coordinator and the Dean (Operations Manual rules PRP-02, FIN-12, ADV-09). This policy applies the same idea to the platform."),
+            ("p", "The Graduate School already works this way by email. The Research Protocol AY 2024-2025 and the Handbook (pp. 61, 63, 72-73) require Form 4 and Form 4.3 to be accomplished with e-signature and move Forms 3 and 3.1 by email between the Academic Coordinator, the Research Coordinator and the Dean (Operations Manual sections 4.12, 4.13 and 4.14). This policy applies the same idea to the platform."),
         ]),
         ("The rule", [
             ("p", "An approval, endorsement, recommendation or decision recorded in the platform by the signed-in holder of the role named on a GS-F form counts as that officer's signature on that form, at the date and time recorded."),
@@ -2043,7 +2043,6 @@ policy("04", "Data Privacy Notice and Records Retention Schedule", "4.23", "Data
     instructions=[
         "This notice tells every account holder of the Graduate School platform what personal data is kept, why, who sees it, what leaves the platform for an outside service, how long it is kept, and how to use the rights the law gives. A short form of it is shown once at first sign-in; GS-F-45 is its paper twin.",
         "Section 5 states what each call to an outside service sends.",
-        "At the time of writing the platform is a capstone prototype that holds demonstration data only. This notice is drafted for the day it holds real student records.",
     ],
     sections=[
         ("Purpose, scope and status", [
@@ -2084,7 +2083,7 @@ policy("04", "Data Privacy Notice and Records Retention Schedule", "4.23", "Data
             ("p", "Nothing else sends personal data out of the platform. The platform sends no email: staff send the exports to the Registrar by the University's own email. What each outside service does with the data is governed by its own terms."),
         ]),
         ("Your rights", [
-            ("p", "Under section 16 of the Act the person has the right to be informed, to object, to access, to correct, to have the data suspended, withdrawn, blocked, removed or destroyed, to data portability, and to claim damages. Consent given at first sign-in may be withdrawn in writing; the Graduate School then keeps only what a rule of the University or the law requires."),
+            ("p", "Under sections 16 and 18 of the Act the person has the right to be informed, to object, to access, to correct, to have the data suspended, withdrawn, blocked, removed or destroyed, to data portability, and to claim damages. Consent given at first sign-in may be withdrawn in writing; the Graduate School then keeps only what a rule of the University or the law requires."),
             ("p", "To use a right, write to the Graduate School Office or the DPO (contact: ______________________). The Graduate School answers in writing within fifteen working days. A complaint may be filed with the National Privacy Commission."),
         ]),
         ("Security measures", [
@@ -2130,7 +2129,7 @@ policy("05", "Platform Access and Roles Matrix", "4.21", "Platform accounts and 
         ]),
         ("Account lifecycle", [
             ("p", "Request: the person fills GS-F-46; the head of the person's office endorses; the Dean approves. Nobody receives an account without the Dean's approval, except a student, whose account is created by the platform when the student is handed off from admission."),
-            ("p", "Set-up as the platform works today: a student account is created at the admission handoff import; a faculty login is created by Graduate School Staff or an Academic Coordinator from the Faculty page with a temporary password; the other roles are set up by the administrator, because the platform has no screen to create them. The temporary or generated password is handed over privately and must be replaced at first sign-in (at least 10 characters, not the email name)."),
+            ("p", "Account set-up: a student account is created at the admission handoff import; a faculty login is created by Graduate School Staff or an Academic Coordinator from the Faculty page with a temporary password; accounts for the other roles are created by the administrator. The temporary or generated password is handed over privately and must be replaced at first sign-in (at least 10 characters, not the email name)."),
             ("p", "First sign-in: choose a new password, then read and accept the privacy notice (GS-P-04, GS-F-45). The acceptance is stored once per account with the notice version."),
             ("p", "Review: each term, the Academic Coordinators and the Graduate School Staff check the list of accounts against the people who still hold the role. A change of role uses GS-F-46."),
             ("p", "Removal: when a person leaves the Graduate School or the role, GS-F-46 asks for the account to be deactivated the same day. A deactivated account cannot sign in; its log entries stay."),
@@ -2155,7 +2154,7 @@ policy("06", "AIMS and Registrar Data Exchange Specification", "4.24", "AIMS and
         ]),
         ("Files that come in", [
             ("t", [("File", 4.0), ("Columns the import reads", 7.6), ("Type, sent by, when", 5.4)], [
-                ["Program monitoring sheet (AC Student Monitoring workbook) - the import that works today", "A1 = PROGRAM: code. Header row with IDNO and COURSE (and YR, COMPRE, NOTE); the row under it with AY ENTRY, SN, FN, the subject codes and the milestones TITLE, PROPOSAL, ETHICS, FINAL. One student per row; a subject cell with a unit value means completed. Required per row: student ID, first name, last name, school year of entry (a row missing one is reported, not imported)", "Excel .xlsx or .xlsm. The Registrar or the Academic Coordinator sends it; Graduate School Staff upload it through Student Handoff. When: at the start of each term and after grades are posted"],
+                ["Program monitoring sheet (AC Student Monitoring workbook) - the import in use", "A1 = PROGRAM: code. Header row with IDNO and COURSE (and YR, COMPRE, NOTE); the row under it with AY ENTRY, SN, FN, the subject codes and the milestones TITLE, PROPOSAL, ETHICS, FINAL. One student per row; a subject cell with a unit value means completed. Required per row: student ID, first name, last name, school year of entry (a row missing one is reported, not imported)", "Excel .xlsx or .xlsm. The Registrar or the Academic Coordinator sends it; Graduate School Staff upload it through Student Handoff. When: at the start of each term and after grades are posted"],
                 ["Class list", "Student ID, Subject code, Faculty (the column must exist), and optionally Academic year, Term, Enrollment status (enrolled or current, or dropped), Status effective date, Remarks, first and last name, program. A row for a different semester than the one chosen is refused; a subject the program does not offer is refused", "CSV or Excel. The Registrar sends it; Graduate School Staff or an Academic Coordinator preview and import it. When: each term after enrollment closes"],
             ]),
         ]),

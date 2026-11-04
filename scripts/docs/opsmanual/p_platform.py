@@ -4,7 +4,7 @@ Neither the Handbook nor the Research Protocol covers these areas, so every rule
 A rule that rests on a statute (RA 8792, RA 10173) cites the statute as its basis and is still
 Proposed, because the reading of the statute is the group's and the University must confirm it.
 Platform statements were checked against app.py, teaching_backend.py and the files in
-Documents/AIMS_Export/.
+Documents/Sample_Data/AIMS_Export/.
 """
 
 from __future__ import annotations
@@ -224,7 +224,7 @@ DATAEXCHANGE = Process(
     rules=[
         R("DEX-01", "AIMS stays an external system and the official record of identity, enrollment and grades. The platform has no live link, no AIMS login and no screen reading of AIMS; only files are exchanged.", [C("21 July 2026", "the group was told the platform cannot be integrated with AIMS"), (PLAT, "AIMS boundary")], PROPOSED),
         R("DEX-02", "Files come in by upload by GS staff or the Academic Coordinator: the student monitoring workbook (.xlsx or .xlsm) at handoff, and class lists (.csv or .xlsx with a faculty column) for enrollment tagging. The platform validates a file, refuses rows it cannot accept (for example a row for another semester, or for a student who is on leave, AWOL or withdrawn) and never changes grades.", (PLAT, "student handoff and class list import"), PROPOSED),
-        R("DEX-03", "The proposed AIMS export contract (version PROPOSED-1.0, Documents/AIMS_Export/) is a workbook with the sheets Export_Metadata, Students, Enrollment_Subjects, Grades and Subject_Offerings. STUDENT_NUMBER is the identity key; official values are kept as exported. The exact columns, the exporting office and the cadence are for the AIMS and Registrar owner to confirm (OQ-50). The current build does not yet read this workbook.", (PLAT, "Documents/AIMS_Export"), PROPOSED),
+        R("DEX-03", "The proposed AIMS export contract (version PROPOSED-1.0, Documents/Sample_Data/AIMS_Export/) is a workbook with the sheets Export_Metadata, Students, Enrollment_Subjects, Grades and Subject_Offerings. STUDENT_NUMBER is the identity key; official values are kept as exported. The exact columns, the exporting office and the cadence are for the AIMS and Registrar owner to confirm (OQ-50). The current build does not yet read this workbook.", (PLAT, "Documents/Sample_Data/AIMS_Export"), PROPOSED),
         R("DEX-04", "The files from AIMS or the Registrar are supplied at the start of each term, after enrollment closes, and again after grades are posted (proposed). Between those dates the platform sends changes out by the daily change report (DEX-06).", GP, PROPOSED),
         R("DEX-05", "Identity, enrollment, grade and completion values imported from AIMS are read-only. If the Graduate School's record differs, the difference is flagged for follow-up and corrected in AIMS, and a replacement export is imported with its history kept.", [("This manual", "section 3.3"), (PLAT, "read-only official data")], PROPOSED),
         R("DEX-06", "Every change made in the platform that the Registrar must apply in AIMS (enrollment or subject change, withdrawal, course adjustment, leave, readmission, AWOL or residency, graduation) appears on a dated daily change report. The Academic Coordinator or GS staff apply it in AIMS and mark it reflected; the platform does not write to AIMS.", (PLAT, "daily change report"), PROPOSED),
@@ -246,6 +246,6 @@ DATAEXCHANGE = Process(
         ("Leave and readmission export log; endorsed graduation list", "Platform; GS staff; Dean"),
         ("GS-F-44 Records Transmittal and Registrar acknowledgement", "GS staff; Registrar"),
     ],
-    platform="GS staff upload the Academic Coordinator's monitoring workbook at handoff; GS staff and the Academic Coordinator upload class lists. The platform shows a daily change report of the changes the Registrar must apply in AIMS, with a reflected mark and the time and person. It exports Dean-approved leave and readmission cases as CSV or Excel with an export log and status changes, and the Dean exports the endorsed graduation list as CSV. Imported official data are read-only, and the proposed AIMS export workbook is kept in Documents/AIMS_Export/.",
+    platform="GS staff upload the Academic Coordinator's monitoring workbook at handoff; GS staff and the Academic Coordinator upload class lists. The platform shows a daily change report of the changes the Registrar must apply in AIMS, with a reflected mark and the time and person. It exports Dean-approved leave and readmission cases as CSV or Excel with an export log and status changes, and the Dean exports the endorsed graduation list as CSV. Imported official data are read-only, and the proposed AIMS export workbook is kept in Documents/Sample_Data/AIMS_Export/.",
     platform_diff="The platform does not read the proposed AIMS export workbook (PROPOSED-1.0) yet; the working inputs are the Academic Coordinator's monitoring workbook and the class lists. The Registrar's acknowledgement of a graduation list is not recorded; the leave export records a manual acknowledgement. The cadence in DEX-04 and the exact columns are proposals (OQ-50).",
 )

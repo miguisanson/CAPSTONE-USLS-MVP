@@ -4355,12 +4355,12 @@
       "id": "DEX-03",
       "process": "AIMS and Registrar data exchange",
       "process_section": "4.24",
-      "rule": "The proposed AIMS export contract (version PROPOSED-1.0, Documents/AIMS_Export/) is a workbook with the sheets Export_Metadata, Students, Enrollment_Subjects, Grades and Subject_Offerings. STUDENT_NUMBER is the identity key; official values are kept as exported. The exact columns, the exporting office and the cadence are for the AIMS and Registrar owner to confirm (OQ-50). The current build does not yet read this workbook.",
-      "source": "Platform (current build), Documents/AIMS_Export",
+      "rule": "The proposed AIMS export contract (version PROPOSED-1.0, Documents/Sample_Data/AIMS_Export/) is a workbook with the sheets Export_Metadata, Students, Enrollment_Subjects, Grades and Subject_Offerings. STUDENT_NUMBER is the identity key; official values are kept as exported. The exact columns, the exporting office and the cadence are for the AIMS and Registrar owner to confirm (OQ-50). The current build does not yet read this workbook.",
+      "source": "Platform (current build), Documents/Sample_Data/AIMS_Export",
       "sources": [
         {
           "document": "Platform (current build)",
-          "location": "Documents/AIMS_Export"
+          "location": "Documents/Sample_Data/AIMS_Export"
         }
       ],
       "page": "",

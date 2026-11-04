@@ -10,7 +10,7 @@ Documents/
     UAT/                 [CAP-IT2] UAT Instrument - Revised (.docx/.pdf) + UAT-REVIEW-NOTES.md
     Meeting_2026-11-04/  ZOOM-CHEAT-SHEET, MEETING-CHEAT-SHEET, NARRATION-SCRIPT, README-FOR-MIGUI, videos/
   Graduate_School/     documents for and from the USLS Graduate School
-    Forms/               forms pack GS-F-01..44, GS-P-01 approval sheet, GS-P-02 routing guide, USLS-GS-Forms-Pack.pdf
+    Forms/               60 documents (forms GS-F-01..54, GS-P-01..06) in one folder per manual chapter, USLS-GS-Forms-Pack.pdf, 00-INVENTORY.md
     Operations_Manual/   USLS GS Operations Manual - DRAFT for Validation (.docx/.pdf/.md) + operations_manual_rules.json
     Policy_Sources/      Graduate School Handbook 2022-23, Research Protocol, monitoring templates (the Policy Assistant's library)
   Sample_Data/         demo data the web app imports
