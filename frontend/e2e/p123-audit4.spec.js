@@ -5,6 +5,7 @@
 //   I-328  a practicum case waiting for staff to forward documents sits in Documents Review, whatever the hours
 //   I-329  an exported graduation batch says it is exported, not "export it" (the full board check is p77)
 //   I-332  staff are told when the demo data is old
+//   I-296  the AWOL board has the same Registrar list as Leave of Absence (download, mark as sent, mark as acknowledged)
 import { test, expect } from "@playwright/test";
 import { join } from "node:path";
 import { AUTH_DIR } from "./support/paths.mjs";
@@ -125,5 +126,52 @@ test.describe("I-332 the demo data age notice", () => {
     await page.goto("/");
     await expect(main(page)).toBeVisible();
     await expect(page.getByTestId("demo-data-notice")).toHaveCount(0);
+  });
+});
+
+test.describe("I-296 the AWOL Registrar list", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+
+  test("an approved return is listed; download marks it exported; sent and acknowledged move it on", async ({ page }) => {
+    let handoff = "Pending Handoff";
+    const calls = [];
+    await page.route(/\/api\/process-cases\?slug=awol/, async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.cases = json.cases.map((item, index) =>
+        index === 0 ? { ...item, status: "Return Approved", status_label: "Return approved", registrar: { status: handoff } } : item,
+      );
+      await route.fulfill({ response, json });
+    });
+    await page.route(/\/api\/awol\/\d+\/registrar-report/, async (route) => {
+      calls.push("report");
+      if (handoff === "Pending Handoff") handoff = "Exported - Ready to Send";
+      await route.fulfill({ status: 200, headers: { "Content-Type": "text/csv", "Content-Disposition": 'attachment; filename="awol-registrar-test.csv"' }, body: "a,b" });
+    });
+    await page.route(/\/api\/awol\/\d+\/registrar-handoff/, async (route) => {
+      const target = route.request().postDataJSON().target;
+      calls.push(target);
+      const order = { "Exported - Ready to Send": "Sent to Registrar", "Sent to Registrar": "Acknowledged" };
+      if (order[handoff] !== target) return route.fulfill({ status: 409, json: { error: `The AWOL return is "${handoff}"; it cannot move to "${target}" now.` } });
+      handoff = target;
+      await route.fulfill({ json: { ok: true } });
+    });
+    await page.goto("/workflow/awol");
+    const panel = page.getByRole("region", { name: "Registrar list" });
+    await panel.scrollIntoViewIfNeeded();
+    await expect(panel.getByRole("button", { name: "Download list (CSV)" })).toBeVisible();
+    const row = panel.getByRole("table").getByRole("row").filter({ hasText: "Pending Handoff" });
+    await expect(row).toHaveCount(1);
+    await row.getByRole("checkbox").check();
+    await panel.getByRole("button", { name: "Download list (CSV)" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Got it" }).click();
+    await expect(panel.getByRole("table").getByText("Exported - Ready to Send")).toBeVisible();
+    await panel.getByRole("checkbox", { name: /^Tick / }).first().check();
+    await panel.getByRole("button", { name: "Mark as sent" }).click();
+    await expect(panel.getByRole("table").getByText("Sent to Registrar")).toBeVisible();
+    await panel.getByRole("checkbox", { name: /^Tick / }).first().check();
+    await panel.getByRole("button", { name: "Mark as acknowledged" }).click();
+    await expect(panel.getByRole("table").getByText("Acknowledged")).toBeVisible();
+    expect(calls).toEqual(["report", "Sent to Registrar", "Acknowledged"]);
   });
 });

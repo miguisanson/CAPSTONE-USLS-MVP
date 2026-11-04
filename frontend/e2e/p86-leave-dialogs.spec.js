@@ -380,23 +380,23 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       await expect(page.getByRole("dialog")).toHaveCount(0);
     });
 
-    test("AWOL & Residency: the Registrar list shows the approved returns with their report link", async ({ page }) => {
+    test("AWOL & Residency: the Registrar list shows the approved returns with the same buttons as Leave of Absence", async ({ page }) => {
       await page.route(/\/api\/process-cases\?slug=awol/, async (route) => {
         const response = await route.fetch();
         const json = await response.json();
-        json.cases = json.cases.map((item) => (item.student.name === "Clarisse Tan" ? { ...item, status: "Return Approved", status_label: "Return approved" } : item));
+        json.cases = json.cases.map((item) => (item.student.name === "Clarisse Tan" ? { ...item, status: "Return Approved", status_label: "Return approved", registrar: { status: "Pending Handoff" } } : item));
         await route.fulfill({ response, json });
       });
       await page.goto("/workflow/awol");
       const panel = page.getByRole("region", { name: "Registrar list" });
       await panel.scrollIntoViewIfNeeded();
       await expect(panel.getByRole("heading", { level: 3, name: "Registrar list" })).toBeVisible();
-      await expect(panel.getByText(/\d+ reports? available\./)).toBeVisible();
+      await expect(panel.getByRole("button", { name: "Download list (CSV)" })).toBeVisible();
+      await expect(panel.getByRole("button", { name: "Mark as sent" })).toBeVisible();
       const row = panel.getByRole("table").getByRole("row").filter({ hasText: "Clarisse Tan" });
       await expect(row).toHaveCount(1);
-      await expect(row).toContainText("Return approved");
-      await expect(row.getByRole("link", { name: "Download report" })).toHaveAttribute("href", "/api/awol/1/registrar-report");
-      for (const head of ["Student", "Type", "Status"]) await expect(panel.getByRole("columnheader", { name: head })).toBeVisible();
+      await expect(row).toContainText("Pending Handoff");
+      for (const head of ["Student", "Return", "Handoff"]) await expect(panel.getByRole("columnheader", { name: head })).toBeVisible();
       await shot(page, "awol-registrar-1366.png");
     });
 
