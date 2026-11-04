@@ -18451,6 +18451,8 @@ def register_routes(app: Flask) -> None:
             if note:
                 item.staff_notes = "\n".join(part for part in [item.staff_notes, f"Dean: {note}"] if part)
             resolve_standing_change_tasks(student.id, "AWOL", "Dean")
+            if decision == "approve" and student.enrollment_tag != "AWOL":
+                resolve_standing_change_tasks(student.id, "Review automatic AWOL policy alert", "Academic Coordinator")
             workflow_message_record(
                 "awol", student, account, "Student", result,
                 note or f"Policy classification: {item.policy_classification}. Next owner: {next_owner}.",
@@ -31894,7 +31896,7 @@ def handle_awol(data: MultiDict) -> int:
 
     elif action == "forward_return_to_dean":
         item = AwolCase.query.get_or_404(safe_int(data.get("case_id")))
-        if item.student_id != student.id or item.status not in {"Return Submitted", "Returned for Revision"}:
+        if item.student_id != student.id or item.status != "Return Submitted":
             raise ValueError("Only a submitted AWOL return intent can be forwarded to the Dean.")
         if not item.return_intent:
             raise ValueError("The student's structured written return declaration is required before Dean review.")
@@ -31943,6 +31945,7 @@ def handle_awol(data: MultiDict) -> int:
             flag.resolved_at = now_utc()
             flag.updated_at = now_utc()
         resolve_standing_change_tasks(student.id, "Re-evaluate courses after maximum residence", "Academic Coordinator")
+        resolve_standing_change_tasks(student.id, "Review automatic AWOL policy alert", "Academic Coordinator")
         result = "Full re-enrollment completed; student is active again"
         workflow_message_record(
             "awol", student, account, "Student", result,

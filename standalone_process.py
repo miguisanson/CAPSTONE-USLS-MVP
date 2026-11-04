@@ -169,7 +169,7 @@ def _move(action, label, from_statuses, to, roles, *, kinds, comment=False, tone
 # Every allowed move. ``to`` is a status name; "*approved*" means the app decides from the record.
 TRANSITIONS = {
     SLUG_AWOL: [
-        _move("forward", "Forward to Dean", ["Return Submitted", "Returned for Revision"], "Dean Review",
+        _move("forward", "Forward to Dean", ["Return Submitted"], "Dean Review",
               {"staff", "academic_coordinator"}, kinds=[KIND_AWOL], batch=True,
               confirm="The written return goes to the Dean, who decides. Nothing is decided yet."),
         _move("approve", "Approve the return", ["Dean Review"], "*approved*", {"dean"}, kinds=[KIND_AWOL], batch=True,
