@@ -20,7 +20,7 @@ From the repo root:
 npm run e2e
 ```
 
-On this PC Playwright needs `PLAYWRIGHT_BROWSERS_PATH=E:/DevCache/ms-playwright` (`scripts/e2e.mjs` sets it); on another PC `npx playwright install chromium` once is enough.
+On this PC `playwright.config.js` uses the browsers in `E:/DevCache/ms-playwright` by itself (no variable to set); on another PC `npx playwright install chromium` once is enough.
 
 It builds the SPA (`vite build`), then runs Playwright. Chromium only. A full
 run takes about 4 minutes (the server start-up is 30-90 s of that).
