@@ -1,5 +1,5 @@
-import { CheckCircle2, Eye } from "lucide-react";
 import { StatusChip } from "../../components/ui/index.js";
+import { RequirementBoxes, StageCheck } from "../../components/process";
 import { printDataTable } from "../../lib/print";
 import { uniqueValues } from "./shared";
 
@@ -329,75 +329,37 @@ export function graduationBatchCurrentStage(group) {
   return stages.find((stage) => ["Needs action", "Current", "Mixed", "Pending"].includes(stage.state)) || stages[stages.length - 1];
 }
 
-export function GraduationBatchStageCheck({ group, compact = false, onViewStage }) {
-  const stages = graduationBatchStageChecks(group);
-  const currentStage = graduationBatchCurrentStage(group);
-  const completed = stages.filter((stage) => stage.state === "Complete").length;
-  const progress = Math.round((completed / stages.length) * 100);
-  if (compact) {
-    return (
-      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Stage check</p>
-            <p className="mt-1 truncate text-sm font-semibold text-ink">Step {currentStage.number}: {currentStage.label}</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <StatusChip status={`${completed}/${stages.length}`} dot={false} />
-            {onViewStage && <button type="button" onClick={() => onViewStage(group)} className="btn-ghost cursor-pointer px-2 py-1.5" aria-label={`View graduation stage check for ${group.label}`}><Eye className="h-4 w-4" /></button>}
-          </div>
-        </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
-          <div className="h-full rounded-full bg-brand-500" style={{ width: `${progress}%` }} />
-        </div>
-      </div>
-    );
-  }
+// The steps of one batch for the shared stage check (components/process/StageCheck).
+export function graduationBatchStages(group) {
+  return graduationBatchStageChecks(group);
+}
+
+export function GraduationBatchStageCheck({ group }) {
   return (
-    <div className="w-full max-w-none rounded-xl border border-slate-200 bg-white p-3">
-      <div className="flex w-full flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-ink">Graduation stage check for {group.label}</p>
-          <p className="text-xs text-slate-500">Follow where this batch is in the graduation endorsement process.</p>
-        </div>
-        <StatusChip status={`Step ${currentStage.number}: ${currentStage.state}`} dot={false} />
-      </div>
-      <ol className="mt-3 grid w-full grid-cols-1 gap-2 2xl:grid-cols-2">
-        {stages.map((stage) => (
-          <li key={stage.label} className="flex w-full max-w-none gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-            <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold ${stage.state === "Complete" ? "bg-brand-600 text-white" : stage.state === "Current" ? "bg-amber-100 text-amber-800" : stage.state === "Needs action" ? "bg-red-100 text-red-700" : "bg-white text-slate-500 ring-1 ring-slate-200"}`}>{stage.number}</span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-800">{stage.label}</p>
-                <StatusChip status={stage.state} dot={false} />
-              </div>
-              <p className="mt-1 text-xs text-slate-500">{stage.detail}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </div>
+    <StageCheck
+      title={`Graduation stage check for ${group.label}`}
+      subtitle="Follow where this batch is in the graduation endorsement process."
+      stages={graduationBatchStageChecks(group)}
+    />
   );
 }
 
-export function GraduationRequirementBoxes({ row }) {
+// The practicum counts as met when it is not required or already completed.
+const PRACTICUM_MET = ["Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"];
+
+export function graduationRequirementItems(row) {
   const eligibility = row.eligibility || {};
-  const items = [
-    "Coursework completed",
-    "Thesis / research completed",
-    eligibility.practicum_status === "Not Required" ? "Practicum not required" : "Practicum completed",
-    "Eligible for graduation",
+  const known = Boolean(row.eligibility);
+  return [
+    { label: "Coursework completed", met: !known || eligibility.coursework_status === "Complete" || eligibility.eligible === true },
+    { label: "Thesis / research completed", met: !known || eligibility.research_status === "Complete" || eligibility.eligible === true },
+    { label: eligibility.practicum_status === "Not Required" ? "Practicum not required" : "Practicum completed", met: !known || PRACTICUM_MET.includes(eligibility.practicum_status) || eligibility.eligible === true },
+    { label: "Eligible for graduation", met: !known || eligibility.eligible !== false },
   ];
-  return (
-    <div className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="Completed graduation requirements">
-      {items.map((label) => (
-        <div key={label} className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900">
-          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><CheckCircle2 className="h-3.5 w-3.5" /></span>
-          <p className="text-xs font-semibold">{label}</p>
-        </div>
-      ))}
-      </div>
-  );
+}
+
+export function GraduationRequirementBoxes({ row }) {
+  return <RequirementBoxes items={graduationRequirementItems(row)} />;
 }
 
 export function GraduationCompletedCourseworkView({ row, id }) {

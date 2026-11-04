@@ -164,8 +164,9 @@ test.describe("Practicum (staff)", () => {
     await expect(card).toContainText("0/200 hrs");
     await expect(card).toContainText("Next: Graduate School Staff");
     // CHANGED BY conC (I-126): a card has one button, "View details", like the process boards; Message / Return is in the case window.
-    await expect(card.getByRole("button", { name: "View details for Andrea Villanueva" })).toHaveText("View details");
-    await expect(card.getByRole("button", { name: /Message/ })).toHaveCount(0);
+    // CHANGED BY khloe-ui: Khloe's card has View details and Message again (Message / Return also stays in the case window).
+    await expect(card.getByRole("button", { name: "View details for Andrea Villanueva" })).toHaveText("View"); // CHANGED BY khloe-ui: "View" and "Message" side by side, as on Khloe's card
+    await expect(card.getByRole("button", { name: "Message Andrea Villanueva" })).toBeVisible();
     await shotsAt(page, "practicum-card");
 
     await main(page).getByRole("button", { name: "Table" }).click();

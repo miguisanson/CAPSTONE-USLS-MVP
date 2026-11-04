@@ -10,6 +10,7 @@ import {
   CheckSquare,
   BookOpenCheck,
   Printer,
+  Users,
 } from "lucide-react";
 import { api } from "../../api";
 import { formatDate } from "../../lib/format";
@@ -19,8 +20,9 @@ import WorkflowTimeline, { graduationTimelineSteps } from "../../components/Work
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
 import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
 import { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
+import { GroupBadge, GroupCard, GroupOverview, MemberList, StageColumnHeader, selectionWords, stageCheckSummary } from "../../components/process";
 import { GraduationBatchModal } from "./GraduationBatchModal";
-import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchCurrentStage, graduationBatchGroups, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, printGraduationBatch, sortSelectedWorkflowRows } from "./graduationShared";
+import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchGroups, graduationBatchStages, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, printGraduationBatch, sortSelectedWorkflowRows } from "./graduationShared";
 import { CaseMessageHistory, DemoResetButton, Detail, RosterFilters, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, uniqueValues, useDemoCaseReset } from "./shared";
 
 function graduationBatchSelectionState(group, selectedIds) {
@@ -40,75 +42,35 @@ function graduationBatchDetailMode(group, accountRole) {
   return "";
 }
 
-// The students of one batch, with the buttons that open a student's case, the discussion, and the completion details.
+// The students of one batch as the shared member list: requirement boxes, discussion count, View, the detail toggles the
+// signed-in role may open, and Message / Return.
 function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, detailMode = "" }) {
-  const [expandedDetailKeys, setExpandedDetailKeys] = useState(() => new Set());
-  const showCourseworkAction = ["coursework", "all-completion"].includes(detailMode);
-  const showResearchPracticumActions = ["research-practicum", "all-completion"].includes(detailMode);
-  function toggleDetail(studentId, detail) {
-    const key = `${studentId}:${detail}`;
-    setExpandedDetailKeys((current) => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  }
-  return (
-    <ul className="space-y-3">
-      {rows.map((row) => {
-        const courseworkOpen = expandedDetailKeys.has(`${row.student.id}:coursework`);
-        const researchOpen = expandedDetailKeys.has(`${row.student.id}:research`);
-        const practicumOpen = expandedDetailKeys.has(`${row.student.id}:practicum`);
-        const courseworkPanelId = `graduation-card-coursework-${row.student.id}`;
-        const researchPanelId = `graduation-card-research-${row.student.id}`;
-        const practicumPanelId = `graduation-card-practicum-${row.student.id}`;
-        return (
-          <li key={row.student.id} className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
-                <p className="meta">{row.student.student_number} · {row.student.program_code}</p>
-              </div>
-              <span className="flex flex-wrap items-center gap-1.5">
-                <StatusChip status={graduationRowStatus(row)} dot={false} />
-                {!row.has_submitted_documents && <StatusChip label="Waiting for documents" tone="neutral" size="sm" dot={false} />}
-              </span>
-            </div>
-            <GraduationRequirementBoxes row={row} />
-            {row.messages?.length > 0 && <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-semibold text-amber-800"><MessageSquare className="mr-1 inline h-3.5 w-3.5" /> {row.messages.length} discussion message{row.messages.length === 1 ? "" : "s"}</p>}
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button variant="secondary" size="sm" icon={Eye} onClick={() => onOpenStudent(row.student.id)}>View</Button>
-              {showCourseworkAction && (
-                <Button variant="secondary" size="sm" icon={BookOpenCheck} onClick={() => toggleDetail(row.student.id, "coursework")} aria-expanded={courseworkOpen} aria-controls={courseworkPanelId}>
-                  {courseworkOpen ? "Hide coursework completed" : "View coursework completed"}
-                </Button>
-              )}
-              {showResearchPracticumActions && (
-                <>
-                  <Button variant="secondary" size="sm" icon={FileCheck} onClick={() => toggleDetail(row.student.id, "research")} aria-expanded={researchOpen} aria-controls={researchPanelId}>
-                    {researchOpen ? "Hide research completion details" : "View research completion details"}
-                  </Button>
-                  <Button variant="secondary" size="sm" icon={Briefcase} onClick={() => toggleDetail(row.student.id, "practicum")} aria-expanded={practicumOpen} aria-controls={practicumPanelId}>
-                    {practicumOpen ? "Hide practicum completion details" : "View practicum completion details"}
-                  </Button>
-                </>
-              )}
-              {row.endorsement && <Button variant="danger" size="sm" icon={MessageSquare} onClick={() => onMessageStudent(row)}>Message / Return</Button>}
-            </div>
-            {showCourseworkAction && courseworkOpen && <GraduationCompletedCourseworkView id={courseworkPanelId} row={row} />}
-            {showResearchPracticumActions && researchOpen && <GraduationResearchRequirementsView id={researchPanelId} row={row} />}
-            {showResearchPracticumActions && practicumOpen && <GraduationPracticumCompletionView id={practicumPanelId} row={row} />}
-          </li>
-        );
-      })}
-    </ul>
-  );
+  const showCoursework = ["coursework", "all-completion"].includes(detailMode);
+  const showResearchPracticum = ["research-practicum", "all-completion"].includes(detailMode);
+  const members = rows.map((row) => ({
+    id: row.student.id,
+    title: row.student.name,
+    subtitle: `${row.student.student_number} · ${row.student.program_code}`,
+    chip: <StatusChip status={graduationRowStatus(row)} dot={false} />,
+    badges: !row.has_submitted_documents ? <GroupBadge>Waiting for documents</GroupBadge> : null,
+    ready: Boolean(row.has_submitted_documents),
+    boxes: <GraduationRequirementBoxes row={row} />,
+    messageCount: row.messages?.length || 0,
+    onView: () => onOpenStudent(row.student.id),
+    onMessage: row.endorsement ? () => onMessageStudent(row) : null,
+    details: [
+      showCoursework && { key: "coursework", icon: BookOpenCheck, label: "View coursework completed", hideLabel: "Hide coursework completed", render: (id) => <GraduationCompletedCourseworkView id={id} row={row} /> },
+      showResearchPracticum && { key: "research", icon: FileCheck, label: "View research completion details", hideLabel: "Hide research completion details", render: (id) => <GraduationResearchRequirementsView id={id} row={row} /> },
+      showResearchPracticum && { key: "practicum", icon: Briefcase, label: "View practicum completion details", hideLabel: "Hide practicum completion details", render: (id) => <GraduationPracticumCompletionView id={id} row={row} /> },
+    ].filter(Boolean),
+  }));
+  return <MemberList members={members} />;
 }
 
 // "View details" on a batch card: the stage check and, below it, every student of the batch.
 // The batch's step (and the Dean's Export) are buttons in this window, not on the card, like the process boards.
 function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStudent, onMessageStudent, onProcessBatch, onExportBatch, onPrintBatch = null, exporting = false }) {
-  const currentStage = graduationBatchCurrentStage(group);
+  const currentStage = stageCheckSummary(graduationBatchStages(group)).current;
   const modalId = `graduation-stage-${String(group.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
   const stageSelection = graduationStageSelection(group.rows, accountRole);
   const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
@@ -249,7 +211,7 @@ function graduationBoardLockReason(item, accountRole) {
     return "Only Graduate School Staff create a graduation batch.";
   }
   const group = item.group;
-  if (group.boardStatus === "Dean Approved") return accountRole === "dean" ? "Open View details to export the list." : "Waiting for: Dean (export)";
+  if (group.boardStatus === "Dean Approved") return accountRole === "dean" ? "Approved. Export it from this card." : "Waiting for: Dean (export)";
   const owners = (group.nextOwners || []).filter(Boolean);
   return owners.length ? `Waiting for: ${owners.join(", ")}` : "No step is open right now";
 }
@@ -265,7 +227,7 @@ function graduationBoardCheckMove(item, toColumn, accountRole) {
   const group = item.group;
   const selection = graduationStageSelection(group.rows, accountRole);
   if (!selection.action) {
-    if (group.boardStatus === "Dean Approved") return { allowed: false, reason: "Export is a button in the batch View details window." };
+    if (group.boardStatus === "Dean Approved") return { allowed: false, reason: "Export is a button on the batch card." };
     return { allowed: false, reason: `No step is due on this batch for your role; waiting for: ${group.nextOwners.join(", ")}.` };
   }
   const actionLabel = graduationBatchActionLabel(selection.action);
@@ -276,24 +238,49 @@ function graduationBoardCheckMove(item, toColumn, accountRole) {
   return { allowed: false, reason: `Move this batch one step at a time, to '${destination.label}': ${actionLabel}.` };
 }
 
-// One card, the same skeleton as the process boards' CaseCard: name, number line, 1-2 detail lines, "Next:", one status chip.
-function GraduationCard({ selected = false, checkbox = null, title, subtitle, lines = [], next, chip, notes = null, children }) {
+// The candidate card in Khloe's layout: name, number, application status, the four requirement boxes, the completed courses,
+// the application PDF, "Next:" and View details.
+function GraduationCandidateCard({ row, stage, canSelect, selected, onToggleStudent, onOpenStudent }) {
+  const applicationFile = row.endorsement?.request_attachment;
+  const awaiting = stage === "stage-1";
+  const courses = row.eligibility?.completed_courses || [];
   return (
-    <article className={`rounded-xl border bg-white p-3 shadow-sm transition-colors ${selected ? "border-brand-400 ring-2 ring-brand-100" : "border-slate-200 hover:border-slate-300"}`}>
-      <div className="flex items-start gap-2.5">
-        {checkbox}
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-ink">{title}</p>
-          <p className="truncate text-xs text-slate-500">{subtitle}</p>
+    <article className={`rounded-xl border p-3 shadow-sm transition-colors ${selected ? "border-brand-400 ring-2 ring-brand-100" : awaiting ? "border-slate-200 bg-slate-50/60 hover:border-slate-300" : "border-emerald-200 bg-emerald-50/70 hover:border-emerald-400"}`}>
+      <div>
+        <div className="flex min-w-0 items-start gap-2.5">
+          {canSelect && (
+            <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
+            <p className="truncate text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
+          </div>
         </div>
       </div>
-      {lines.map((line, index) => (
-        <p key={index} className={index === 0 ? "mt-2.5 text-xs font-medium text-slate-700" : "mt-0.5 text-xs text-slate-500"}>{line}</p>
-      ))}
-      <p className="mt-2.5 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {next}</p>
-      <div className="mt-2">{chip}</div>
-      {notes}
-      {children}
+      <div className="mt-2"><StatusChip status={row.application_status} dot={false} /></div>
+      <GraduationRequirementBoxes row={row} />
+      {courses.length > 0 && (
+        <p className="mt-2 text-xs text-slate-500">
+          <span className="font-semibold text-slate-700">Completed courses:</span>{" "}
+          {courses.slice(0, 4).map((course) => course.code).join(", ")}
+          {courses.length > 4 ? ` +${courses.length - 4} more` : ""}
+        </p>
+      )}
+      {row.has_submitted_documents && applicationFile?.file_exists !== false && applicationFile?.url && (
+        <a
+          href={applicationFile.url}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          aria-label={`View submitted graduation application PDF for ${row.student.name}`}
+        >
+          <FileText className="h-3.5 w-3.5" aria-hidden="true" /> View PDF <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+        </a>
+      )}
+      {row.has_submitted_documents && applicationFile?.file_exists === false && <p className="mt-2 text-xs font-semibold text-red-700">PDF unavailable</p>}
+      {row.messages?.length > 0 && <GraduationNote>{row.messages.length} discussion message{row.messages.length === 1 ? "" : "s"}</GraduationNote>}
+      <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || (awaiting ? "Student" : "Graduate School Staff")}</p>
+      <ViewDetailsButton onClick={() => onOpenStudent(row.student.id)} label={row.student.name} />
     </article>
   );
 }
@@ -307,7 +294,7 @@ function GraduationNote({ icon: Icon = MessageSquare, children }) {
   );
 }
 
-// The one button on a card, the same as the process boards' card: "View details", full width.
+// The one button under a candidate card: "View details", full width, like the process boards.
 function ViewDetailsButton({ onClick, label }) {
   return (
     <Button variant="secondary" size="sm" icon={Eye} onClick={onClick} className="mt-3 w-full" aria-label={`View details for ${label}`}>
@@ -316,80 +303,73 @@ function ViewDetailsButton({ onClick, label }) {
   );
 }
 
-function GraduationStudentCard({ row, stage, canSelect, selected, onToggleStudent, onOpenStudent }) {
-  const applicationFile = row.endorsement?.request_attachment;
-  const awaiting = stage === "stage-1";
-  const lines = [awaiting ? "Requirements met. Signed application not in yet." : "Signed application is on file."];
-  return (
-    <GraduationCard
-      selected={selected}
-      checkbox={canSelect && (
-        <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />
-      )}
-      title={row.student.name}
-      subtitle={`${row.student.student_number} · ${row.student.program_code}`}
-      lines={lines}
-      next={row.next_action_owner || (awaiting ? "Student" : "Graduate School Staff")}
-      chip={<StatusChip status={row.application_status} dot={false} />}
-      notes={(
-        <>
-          {row.has_submitted_documents && applicationFile?.file_exists !== false && applicationFile?.url && (
-            <a
-              href={applicationFile.url}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              aria-label={`View submitted graduation application PDF for ${row.student.name}`}
-            >
-              <FileText className="h-3.5 w-3.5" aria-hidden="true" /> View PDF <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-            </a>
-          )}
-          {row.has_submitted_documents && applicationFile?.file_exists === false && <p className="mt-2 text-xs font-semibold text-red-700">PDF unavailable</p>}
-          {row.messages?.length > 0 && <GraduationNote>{row.messages.length} discussion message{row.messages.length === 1 ? "" : "s"}</GraduationNote>}
-        </>
-      )}
-    >
-      <ViewDetailsButton onClick={() => onOpenStudent(row.student.id)} label={row.student.name} />
-    </GraduationCard>
-  );
+function graduationBatchBadges(group) {
+  const applicationComplete = group.rows.length > 0 && group.rows.every((row) => row.has_submitted_documents);
+  const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
+  return [
+    graduationReadyForDeanReview(group) && <GroupBadge key="dean" tone="ready">Ready for Dean review</GroupBadge>,
+    !applicationComplete && <GroupBadge key="docs" tone="warning">Application document issue</GroupBadge>,
+    messageCount > 0 && <GroupBadge key="msg" tone="warning">{messageCount} message{messageCount === 1 ? "" : "s"}</GroupBadge>,
+  ].filter(Boolean);
 }
 
-function GraduationBatchCard({ group, selectedIds, onToggleBatch, onViewBatch }) {
-  const selectionState = graduationBatchSelectionState(group, selectedIds);
-  const currentStage = graduationBatchCurrentStage(group);
+// What a batch says about itself, shared by its card and its row in the overview.
+function graduationBatchFacts(group) {
   const names = group.rows.map((row) => row.student.name).slice(0, 3).join(", ");
   const hiddenCount = group.rows.length - Math.min(group.rows.length, 3);
-  const applicationComplete = group.rows.length > 0 && group.rows.every((row) => row.has_submitted_documents);
   const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
-  const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
-  const programs = uniqueValues(group.rows.map((row) => row.student.program_code)).join(", ");
+  return {
+    students: `${names}${hiddenCount > 0 ? ` +${hiddenCount} more` : ""}`,
+    count: `${group.rows.length} candidate${group.rows.length === 1 ? "" : "s"}`,
+    chip: <StatusChip status={group.boardStatus === "Dean Approved" && alreadyExported ? "Exported - Ready to Send" : group.boardStatus} dot={false} />,
+    badges: graduationBatchBadges(group),
+  };
+}
+
+// The batch card in Khloe's layout: GroupCard with Students, Next, the stage strip, and View students / Select batch / the step.
+function GraduationBatchCard({ group, accountRole, selectedIds, expanded, onToggleBatch, onToggleExpanded, onViewBatch, onProcessBatch, onExportBatch, exporting, children }) {
+  const selection = graduationBatchSelectionState(group, selectedIds);
+  const stageSelection = graduationStageSelection(group.rows, accountRole);
+  const facts = graduationBatchFacts(group);
+  const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
+  const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
   return (
-    <GraduationCard
-      selected={selectionState.selectedCount > 0}
+    <GroupCard
+      ready={Boolean(stageSelection.action) || canExport}
+      selected={selection.selectedCount > 0}
       checkbox={onToggleBatch && (
         <input
           type="checkbox"
-          checked={selectionState.allSelected}
-          aria-checked={selectionState.partiallySelected ? "mixed" : selectionState.allSelected}
+          checked={selection.allSelected}
+          aria-checked={selection.partiallySelected ? "mixed" : selection.allSelected}
           onChange={() => onToggleBatch(group)}
           className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
           aria-label={`Select ${group.label}`}
         />
       )}
       title={group.label}
-      subtitle={`${group.rows.length} candidate${group.rows.length === 1 ? "" : "s"}${programs ? ` · ${programs}` : ""}`}
-      lines={[`Students: ${names}${hiddenCount > 0 ? ` +${hiddenCount} more` : ""}`, `Step ${currentStage.number}: ${currentStage.label}`]}
-      next={group.nextOwners.join(", ")}
-      chip={<StatusChip status={group.boardStatus === "Dean Approved" && alreadyExported ? "Exported - Ready to Send" : group.boardStatus} dot={false} />}
-      notes={(
+      count={facts.count}
+      selection={onToggleBatch ? selectionWords(selection.selectedCount, group.rows.length) : ""}
+      chip={facts.chip}
+      badges={facts.badges}
+      facts={[{ label: "Students", value: facts.students }, { label: "Next", value: group.nextOwners.join(", ") }]}
+      stages={graduationBatchStages(group)}
+      onOpenStages={() => onViewBatch(group)}
+      openStagesLabel={`View details for ${group.label}`}
+      actions={(
         <>
-          {!applicationComplete && <GraduationNote icon={FileText}>Some application documents are missing.</GraduationNote>}
-          {messageCount > 0 && <GraduationNote>{messageCount} discussion message{messageCount === 1 ? "" : "s"}</GraduationNote>}
+          <Button variant="secondary" size="sm" icon={Users} onClick={() => onToggleExpanded(group.id)} aria-expanded={expanded}>{expanded ? "Hide students" : "View students"}</Button>
+          {onToggleBatch && <Button variant="secondary" size="sm" onClick={() => onToggleBatch(group)}>Select batch</Button>}
+          {canExport ? (
+            <Button size="sm" icon={Download} loading={exporting} onClick={() => onExportBatch(group)}>{alreadyExported ? "Export batch again" : "Export batch"}</Button>
+          ) : stageSelection.action ? (
+            <Button size="sm" icon={CheckSquare} onClick={() => onProcessBatch(group)}>{graduationBatchActionLabel(stageSelection.action)}</Button>
+          ) : null}
         </>
       )}
     >
-      <ViewDetailsButton onClick={() => onViewBatch(group)} label={group.label} />
-    </GraduationCard>
+      {expanded ? children : null}
+    </GroupCard>
   );
 }
 
@@ -416,6 +396,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
   const [batchOpen, setBatchOpen] = useState(false);
   const [view, setView] = useState("board");
   const [stageGroupId, setStageGroupId] = useState(null);
+  const [expandedBatchIds, setExpandedBatchIds] = useState(() => new Set());
   const [exportingBatchId, setExportingBatchId] = useState("");
   const [exportNotice, setExportNotice] = useState(null);
   const reset = useDemoCaseReset("graduation", refetch);
@@ -580,10 +561,17 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
     }
     return undefined; // the dialog is open; the card says "Moving to ..." until it closes
   }
+  function toggleExpandedBatch(groupId) {
+    setExpandedBatchIds((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
+      return next;
+    });
+  }
   function renderGraduationBoardCard(item) {
     if (item.kind === "student") {
       return (
-        <GraduationStudentCard
+        <GraduationCandidateCard
           row={item.row}
           stage={item.stage}
           canSelect={item.stage === "stage-2" && accountRole === "staff"}
@@ -596,12 +584,46 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
     return (
       <GraduationBatchCard
         group={item.group}
+        accountRole={accountRole}
         selectedIds={selectedIds}
+        expanded={expandedBatchIds.has(item.group.id)}
         onToggleBatch={canTickBatches ? toggleBatchGroup : null}
+        onToggleExpanded={toggleExpandedBatch}
         onViewBatch={(group) => setStageGroupId(group.id)}
-      />
+        onProcessBatch={processBatchGroup}
+        onExportBatch={accountRole === "dean" ? (group) => exportApproved([group]) : null}
+        exporting={exportingBatchId === item.group.id}
+      >
+        <GraduationBatchStudentList
+          rows={item.group.rows}
+          onOpenStudent={openCase}
+          onMessageStudent={setMessageRow}
+          detailMode={graduationBatchDetailMode(item.group, accountRole)}
+        />
+      </GraduationBatchCard>
     );
   }
+  // Khloe's header: the first two columns carry a number in a circle, every column says what it holds and how many cards.
+  function renderBoardColumnHeader(column, columnItems) {
+    const number = column.kind === "stage" ? Number(column.key.replace("stage-", "")) : null;
+    return <StageColumnHeader column={column} count={columnItems.length} number={number} />;
+  }
+  // The row of each batch in the overview above the board: the same facts as its card, with the stage check.
+  const overviewGroups = visibleBatchGroups.map((group) => {
+    const facts = graduationBatchFacts(group);
+    return {
+      id: group.id,
+      label: group.label,
+      count: facts.count,
+      updated: group.updatedAt ? formatDate(group.updatedAt) : "",
+      students: facts.students,
+      next: group.nextOwners.join(", "),
+      chip: facts.chip,
+      badges: facts.badges,
+      stages: graduationBatchStages(group),
+      ready: Boolean(graduationStageSelection(group.rows, accountRole).action),
+    };
+  });
   function renderColumnFooter(column, columnItems) {
     if (column.key !== "stage-2" || accountRole !== "staff" || !columnItems.length) return null;
     const allOn = columnItems.every((item) => selectedIds.has(item.row.student.id));
@@ -746,6 +768,12 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           onClear={() => setSelectedIds(new Set())}
         />
       )}
+      <GroupOverview
+        title="Created graduation batches"
+        hint="Every batch and where it stands. Open the stage check to follow it step by step."
+        groups={overviewGroups}
+        onOpen={(group) => setStageGroupId(group.id)}
+      />
       {view !== "board" && <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />}
       {view === "board" ? (
         <StageBoard
@@ -763,6 +791,8 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           checkMove={(item, toColumn) => graduationBoardCheckMove(item, toColumn, accountRole)}
           onMove={moveGraduationBoardItem}
           renderColumnFooter={renderColumnFooter}
+          renderColumnHeader={renderBoardColumnHeader}
+          columnClassName="w-[320px]"
           emptyText="No candidates here"
         />
       ) : tableRows.length ? (

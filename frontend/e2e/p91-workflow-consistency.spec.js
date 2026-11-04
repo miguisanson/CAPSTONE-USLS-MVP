@@ -119,10 +119,16 @@ test.describe("conC: the six boards have the same parts", () => {
         const names = await buttons.evaluateAll((nodes) => nodes.map((node) => ({ name: node.getAttribute("aria-label") || node.textContent.trim(), text: node.textContent.trim(), primary: node.classList.contains("btn-primary") })));
         const view = names.filter((item) => /^View details for /.test(item.name));
         expect(view.length, `card ${i}: one View details button`).toBe(1);
-        expect(view[0].text, `card ${i}: the button says "View details"`).toBe("View details");
+        // CHANGED BY khloe-ui (owner 2026-11-04, "i want khloe's work back"): Practicum and Graduation cards are Khloe's cards again.
+        // Practicum: View + Message. Graduation: the stage-check eye, View students, Select batch and the one step button (primary).
+        // The other boards keep "View details" only until their own packet (LOA, readmission, AWOL, withdrawal, residency).
+        const khloe = slug === "practicum" || slug === "graduation";
+        if (!khloe) expect(view[0].text, `card ${i}: the button says "View details"`).toBe("View details");
+        const KHLOE_EXTRA = /^Message |^(View|Hide) students$|^Select batch$|^Export batch|^Select .* for batch creation$/;
         for (const item of names) {
-          expect(item.primary, `card ${i}: "${item.name}" is a primary button on a card`).toBe(false);
-          expect(/^View details for /.test(item.name) || /^Move to/.test(item.text), `card ${i}: unexpected button "${item.name}"`).toBe(true);
+          const allowedExtra = khloe && (KHLOE_EXTRA.test(item.name) || (slug === "graduation" && item.primary));
+          expect(item.primary && !allowedExtra, `card ${i}: "${item.name}" is a primary button on a card`).toBe(false);
+          expect(/^View details for /.test(item.name) || /^Move to/.test(item.text) || allowedExtra, `card ${i}: unexpected button "${item.name}"`).toBe(true);
         }
       }
       await page.mouse.move(0, 0);

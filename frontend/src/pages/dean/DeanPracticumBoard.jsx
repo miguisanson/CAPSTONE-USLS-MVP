@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Briefcase, CheckCircle2, Eye, HelpCircle, History, MessageSquare, RotateCcw } from "lucide-react";
+import { Briefcase, CheckCircle2, Eye, HelpCircle, History, RotateCcw } from "lucide-react";
 import { Button, DataTable, EmptyState, PageHeader, StatusChip } from "../../components/ui/index.js";
 import StepDialog from "../../components/StepDialog";
 import PolicyRules from "../../components/PolicyRules";
 import StageBoard from "../../components/StageBoard";
+import { CaseCardFacts, CaseCardShell, MessageNote, NextOwner, ReadyMark } from "../../components/process";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS, matchesFilters, plural } from "../leave/leaveHelpers";
 import { WorkflowSupportModal } from "../workflow/shared";
@@ -57,29 +58,22 @@ function hoursText(item) {
   return record ? `${record.completed_hours}/${record.required_hours} hrs` : "No hours recorded";
 }
 
+// The same card as the staff practicum board (components/process): ready mark, facts grid, message box, Next, View details.
 function PracticumCard({ item }) {
-  const latestMessage = item.messages?.[0];
   const updated = item.last_activity_at || item.submitted_at;
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-slate-300">
-      <p className="truncate text-sm font-semibold text-ink">{item.student.name}</p>
-      <p className="meta truncate">{item.student.student_number} · {item.student.program_code}</p>
-      <StatusChip className="mt-2" status={item.status} size="sm" dot={false} />
-      <p className="mt-2.5 text-xs font-medium text-slate-700">{item.record?.practicum_site || "Site not recorded"}</p>
-      <p className="meta mt-0.5">{hoursText(item)}</p>
-      {updated && <p className="meta mt-0.5">Updated {formatDate(updated)}</p>}
-      {item.messages?.length > 0 && (
-        <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
-          <p className="eyebrow !text-amber-800">
-            <MessageSquare className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
-            {plural(item.messages.length, "visible message")}
-          </p>
-          <p className="mt-1 line-clamp-2 text-xs text-amber-900">{latestMessage?.comment || latestMessage?.template}</p>
+    <CaseCardShell ready={isWaiting(item)}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="break-words text-sm font-semibold text-ink">{item.student.name}</p>
+          <p className="meta">{item.student.student_number} · {item.student.program_code}</p>
         </div>
-      )}
-      <p className="mt-2.5 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">
-        {item.next_action_owner ? `Next: ${item.next_action_owner}` : "No further step"}
-      </p>
+        <ReadyMark ready={isWaiting(item)} />
+      </div>
+      <StatusChip className="mt-2" status={item.status} size="sm" dot={false} />
+      <CaseCardFacts facts={[item.record?.practicum_site || "Site not recorded", hoursText(item), { text: updated ? `Updated ${formatDate(updated)}` : "", wide: true }]} />
+      <MessageNote messages={item.messages} />
+      <NextOwner owner={item.next_action_owner || "No further step"} />
       <Button
         as={Link}
         to={casePath(item)}
@@ -91,7 +85,7 @@ function PracticumCard({ item }) {
       >
         View details
       </Button>
-    </article>
+    </CaseCardShell>
   );
 }
 
