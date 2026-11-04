@@ -1,5 +1,5 @@
 import { LogOut, UserX } from "lucide-react";
-import { Card, HistoryPanel, InlineNotice } from "../../components/ui/index.js";
+import { Card, EditableText, HistoryPanel, InlineNotice } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus";
@@ -25,7 +25,7 @@ const eventEntry = (entry) => ({
   note: entry.comment,
 });
 
-export function ProcessCaseCard({ item, current = true }) {
+export function ProcessCaseCard({ item, current = true, onChanged }) {
   const Icon = ICONS[item.kind] || LogOut;
   const open = Boolean(item.owner) && item.timeline?.some((step) => step.state === "current");
   const returned = RETURNED.includes(item.status);
@@ -76,7 +76,9 @@ export function ProcessCaseCard({ item, current = true }) {
       {texts.map((row) => (
         <div key={row.label} className="mt-3">
           <p className="eyebrow">{row.label}</p>
-          <p className="mt-0.5 whitespace-pre-line text-sm text-slate-600">{row.value}</p>
+          <div className="mt-0.5 text-sm text-slate-600">
+            {row.edit ? <EditableText edit={row.edit} value={row.value} onSaved={onChanged} /> : <p className="whitespace-pre-line">{row.value}</p>}
+          </div>
         </div>
       ))}
 
@@ -87,7 +89,7 @@ export function ProcessCaseCard({ item, current = true }) {
       <div className="mt-4 space-y-2">
         {messages.length > 0 && (
           <HistoryPanel label="View messages" hideLabel="Hide messages" count={messages.length}>
-            <WorkflowDiscussion messages={messages} embedded showHeader={false} title={`${item.kind_label} messages`} />
+            <WorkflowDiscussion messages={messages} embedded showHeader={false} title={`${item.kind_label} messages`} onEdited={onChanged} />
           </HistoryPanel>
         )}
         <HistoryPanel

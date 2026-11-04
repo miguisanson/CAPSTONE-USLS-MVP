@@ -1,7 +1,7 @@
 import { CheckCircle2, Circle, Download, FileCheck, FileSpreadsheet, Eye, GraduationCap, History, ListChecks, ShieldCheck, Users } from "lucide-react";
 import { formatDate, formatDateTime } from "../../lib/format";
 import { ProgressBar } from "../../components/ui/ProgressBar.jsx";
-import { Button, HistoryPanel, StatusChip } from "../../components/ui/index.js";
+import { Button, EditableText, HistoryPanel, StatusChip } from "../../components/ui/index.js";
 import { Block } from "./leaveUi";
 import { plural, whenDates, whenText } from "./leaveHelpers";
 
@@ -15,7 +15,7 @@ function Row({ label, children, full = false }) {
 }
 
 // AWOL and Withdrawal send their own rows (`summary_rows`); the layout is the same as Leave's.
-function SummaryRows({ item }) {
+function SummaryRows({ item, onEdited }) {
   return (
     <Block title="The request">
       <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -51,7 +51,9 @@ export function CaseSummary({ item }) {
         </Row>
         <Row label="Type">{item.kind_label}</Row>
         {readmission ? (
-          <Row label="Returning in">{item.target_term || "Not chosen yet"}</Row>
+          <Row label="Returning in">
+            <EditableText edit={edits.target_term} value={item.target_term} empty="Not chosen yet" onSaved={onEdited} />
+          </Row>
         ) : (
           <Row label="Leave period">
             {whenText(item)}

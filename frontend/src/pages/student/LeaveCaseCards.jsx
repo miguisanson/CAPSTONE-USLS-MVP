@@ -10,7 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { api } from "../../api";
-import { Button, Card, HistoryPanel, InlineNotice } from "../../components/ui/index.js";
+import { Button, Card, EditableText, HistoryPanel, InlineNotice } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { LeaveStatusBadge, LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus";
@@ -227,7 +227,9 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
         <Fact label="Sent to the Dean">{item.forwarded_at ? formatDate(item.forwarded_at) : null}</Fact>
         <Fact label="Decision">{item.decided_at ? formatDate(item.decided_at) : null}</Fact>
         {isReadmission ? (
-          <Fact label="Return semester">{item.target_term}</Fact>
+          <Fact label="Return semester">
+            {item.target_term ? <EditableText edit={edits.target_term} value={item.target_term} onSaved={onChanged} /> : null}
+          </Fact>
         ) : (
           <>
             <Fact label="Leave starts">{item.period?.start_date ? `${item.period.start_label ? `${item.period.start_label}, ` : ""}${formatDate(item.period.start_date)}` : item.period?.start_label}</Fact>
@@ -263,7 +265,9 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
       {isReadmission && item.return_intent && (
         <div className="mt-3">
           <p className="eyebrow">What you told us</p>
-          <p className="mt-0.5 whitespace-pre-line text-sm text-slate-600">{item.return_intent}</p>
+          <div className="mt-0.5 text-sm text-slate-600">
+            <EditableText edit={edits.return_intent} value={item.return_intent} onSaved={onChanged} />
+          </div>
         </div>
       )}
 
@@ -317,7 +321,7 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
       <div className="mt-4 space-y-2">
         {!current && messages.length > 0 && (
           <HistoryPanel label="View messages" hideLabel="Hide messages" count={messages.length}>
-            <WorkflowDiscussion messages={messages} embedded showHeader={false} title={`${item.kind_label} messages`} />
+            <WorkflowDiscussion messages={messages} embedded showHeader={false} title={`${item.kind_label} messages`} onEdited={onChanged} />
           </HistoryPanel>
         )}
         <HistoryPanel

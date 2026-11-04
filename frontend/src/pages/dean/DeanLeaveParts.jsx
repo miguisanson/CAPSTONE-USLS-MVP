@@ -1,13 +1,14 @@
 import { useId, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronDown, Circle } from "lucide-react";
-import { InlineNotice, StatusChip } from "../../components/ui/index.js";
+import { EditableText, InlineNotice, StatusChip } from "../../components/ui/index.js";
 import { LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus.jsx";
 import { formatDate } from "../../lib/format";
 import { toneOf } from "../../lib/tone";
 import { useIsPhone } from "../../hooks";
 
 // Plain-language Dean view of one Leave of Absence / Readmission case.
-// Everything here is read-only: the Dean's buttons and comment box stay in WorkflowApprovalCard.
+// The facts are read-only (the Dean's buttons and comment box stay in WorkflowApprovalCard); the Dean can correct the Dean's own
+// remarks, and every edited text shows its Edited chip with the history.
 
 export const LEAVE_TYPES = ["leave-of-absence", "readmission"];
 
@@ -99,6 +100,7 @@ export function LeaveCaseSummary({ item }) {
   const summary = c.student_summary;
   const review = c.policy_review;
   const checks = review?.checks || [];
+  const edits = c.edits || {};
   const comments = (c.events || []).filter((event) => event.comment && String(event.comment).trim());
   const earlier = c.earlier_cases || [];
   const early = isEarlyReturn(c);
@@ -167,7 +169,9 @@ export function LeaveCaseSummary({ item }) {
           )}
           <dl className="mt-3 space-y-3 border-t border-slate-100 pt-3">
             <Fact label="Staff eligibility result">{c.eligibility_result || "Not recorded"}</Fact>
-            <Fact label="Staff notes">{c.staff_notes && c.staff_notes.trim() ? c.staff_notes : "No notes from staff."}</Fact>
+            <Fact label="Staff notes">
+              <EditableText edit={edits.staff_notes} value={c.staff_notes && c.staff_notes.trim() ? c.staff_notes : ""} empty="No notes from staff." />
+            </Fact>
           </dl>
         </Panel>
       </div>
@@ -236,7 +240,12 @@ export function LeaveCaseSummary({ item }) {
       {(comments.length > 0 || c.dean_remarks) && (
         <Panel title="Comments on earlier decisions">
           <ul className="space-y-2">
-            {c.dean_remarks && <li className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700"><span className="font-semibold">Dean: </span>{c.dean_remarks}</li>}
+            {c.dean_remarks && (
+              <li className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <span className="font-semibold">Dean: </span>
+                <EditableText edit={edits.dean_remarks} value={c.dean_remarks} />
+              </li>
+            )}
             {comments.map((event) => (
               <li key={event.id} className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 <span className="font-semibold">{event.actor_name || event.actor_role || "Staff"}</span>
