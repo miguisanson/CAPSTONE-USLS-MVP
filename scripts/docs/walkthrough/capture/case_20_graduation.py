@@ -92,7 +92,6 @@ def run(rt):
     rt.step("student opens Graduation Endorsement", s_open)
 
     def s_submit():
-        student.locator("main select").first.select_option(index=0)  # the school year that is open
         student.locator("main input[type=file]").set_input_files(bad)
         student.get_by_label(re.compile("Remarks for the reviewer")).fill("Signed graduation application.")
         rt.shot(student, f"{S}-02", full=True)
@@ -159,7 +158,6 @@ def run(rt):
 
     def s_resubmit():
         student.locator("main input[type=file]").set_input_files(good)
-        student.locator("main select").first.select_option(index=0)
         rt.shot(student, f"{S}-13", full=True)
         student.get_by_role("button", name=re.compile("(Re)?submit graduation application", re.I)).click()
         confirm_send(rt, student)
