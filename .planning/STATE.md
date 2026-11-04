@@ -720,3 +720,11 @@ uncommitted changes is half-done — read its diff, run its tests, then decide.
 - Post-publication warning refinement (I-226): existing lifecycle test strengthened to assert no false legacy free-text warning for own structured publication; RED showed2falsewarnings. sections_context now recognizes per-offering active published ClassSection records, retaining true legacy warnings. Two relevant lifecycle/no-joint cases rerunning -> teaching-publication-recheck.log. No schema/permission/conflict changes. No further feature scope planned; collect gate and save work.
 
 - Saved local commits e7d7176 (Dean review) and3131fcf (teaching scheduling + tests/docs). No push/merge. Temporary helperworktrees and codex/teaching-* branches removed after verifying root production files tracked. Only remaining background job is fullPython99914; output teaching-full-python.log. Postpublication warning recheck2PASS; final live workflowPASS24.4s. Additional doc clarification: StudyPlanDraft exists but is generated/reviewed projection, not confirmed attendance. Next collect fullgate, record result/scope and make final documentation commit.
+
+## 2026-11-04 — audit round 3 (branch pkt/audit-round3, worktree kaudit3, not pushed)
+
+Fixed and marked in ISSUES.md: I-342, I-351, I-349, I-294, I-295, I-301, I-300, I-312, I-320, I-322, I-325, I-305, I-307, I-308, I-347
+(regression row R-032). No schema change (no reseed needed). Tests: `tests/test_audit3.py`, `tests/test_audit3_research.py`, plus new methods in
+`test_loa_readmission`, `test_monitoring_crud`, `test_academic_fixes`. The API refuses an unconsented account except when `TESTING` (set
+`app.config["ENFORCE_PRIVACY_CONSENT"]` in a test to turn it on). Known old failure: e2e p113 line 141 expects no "Defense type" text, the form has had that label since 05a8e5a.
+
