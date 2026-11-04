@@ -2,16 +2,16 @@
 // students started, how many are on coursework, on thesis / dissertation, and graduated. A stacked bar and a table with the
 // same numbers; every count opens the students behind it. Under it, the older views that go deeper (every stage, graduation
 // candidates, defenses) so nothing is lost but nothing is repeated as a separate tab (IM24).
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { EmptyState, Modal, SectionCard, Spinner } from "../../components/ui/index.js";
+import { EmptyState, SectionCard, Spinner } from "../../components/ui/index.js";
 import { BarsChart, ChartCard } from "./ChartParts.jsx";
 import ListDialog, { CountButton } from "./ListDialog.jsx";
 import ReportPanel from "./ReportPanel.jsx";
 import { REPORTS } from "./reportConfig.js";
-import { STATES, normalYear, stateOfStage, summarizeYears, yearLabel } from "./yearStarted.js";
+import { STATES, summarizeYears } from "./yearStarted.js";
 
 const DETAIL_VIEWS = [
   { key: "stages", report: "cohorts", label: "Every stage" },
@@ -22,40 +22,11 @@ const STUDENT_COLUMNS = [
   { key: "student", label: "Student" }, { key: "program", label: "Program" }, { key: "stage", label: "Stage" }, { key: "detail", label: "Year started" },
 ];
 
-// shortcut: the lists behind the counts are built here from /api/students (all pages, 100 at a time) because the cohorts report
-// sends counts only. Upgrade to one server call that lists the students of a year and a state (see the packet report).
-async function loadStudents(programId) {
-  const rows = [];
-  for (let page = 1; page <= 50; page += 1) {
-    const res = await api.students({ page, page_size: 100, program_id: programId || undefined });
-    rows.push(...res.items);
-    if (page >= res.pages) break;
-  }
-  return rows;
-}
-
+// The students behind a count come from one server call (GET /api/reports/cohorts/students), which also gives the Excel and PDF downloads.
 function StudentsOf({ pick, programId, onClose }) {
-  const [rows, setRows] = useState(null);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    let live = true;
-    loadStudents(programId)
-      .then((all) => live && setRows(all))
-      .catch((err) => live && setError(err.message || "Could not load the students."));
-    return () => { live = false; };
-  }, [programId]);
   const title = `${pick.state.label}, started ${pick.year.label}`;
-  if (!rows) {
-    return (
-      <Modal title={title} size="xl" onClose={onClose} closeLabel={`Close ${title}`}>
-        {error ? <EmptyState icon={AlertTriangle} title="Could not load this list" hint={error} /> : <Spinner label="Loading the students…" />}
-      </Modal>
-    );
-  }
-  const list = rows
-    .filter((s) => normalYear(s.academic_year_entry) === pick.year.entry && stateOfStage(s.current_stage) === pick.state.key)
-    .map((s) => ({ student_id: s.id, student: s.name, student_number: s.student_number, program: s.program_code, stage: s.current_stage, detail: yearLabel(normalYear(s.academic_year_entry)) }));
-  return <ListDialog title={title} subtitle="Students of the program and year you picked, in this state." columns={STUDENT_COLUMNS} rows={list} onClose={onClose} />;
+  const params = { entry: pick.year.entry, state: pick.state.key === "other" ? "away" : pick.state.key, ...(programId ? { program_id: programId } : {}) };
+  return <ListDialog title={title} subtitle="Students of the program and year you picked, in this state." endpoint="cohorts/students" params={params} columns={STUDENT_COLUMNS} onClose={onClose} />;
 }
 
 export default function YearStartedView({ params, setParam, clearFilters }) {

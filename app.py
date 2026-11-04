@@ -15776,6 +15776,13 @@ def register_routes(app: Flask) -> None:
     def reports_cohorts():
         return report_response("cohorts", request.args)
 
+    @app.route("/api/reports/cohorts/students")
+    @require_api_login("staff", "academic_coordinator")
+    def reports_cohort_students():
+        if _filter_value(request.args, "state") not in COHORT_STATE_STAGES:
+            return jsonify({"error": "Choose coursework, thesis, graduated or away."}), 400
+        return report_response("cohort-students", request.args)
+
     @app.route("/api/reports/overdue")
     @require_api_login("staff", "academic_coordinator")
     def reports_overdue():
@@ -25971,6 +25978,35 @@ def report_cohorts(args) -> dict:
     )
 
 
+# "By year started": the four states a stage belongs to (the screen's counts and this list use the same four).
+COHORT_STATE_STAGES = {
+    "coursework": ("Admission", "Coursework", "Comprehensive Exam"),
+    "thesis": ("Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense"),
+    "graduated": ("Completed",),
+    "away": ("LOA", "AWOL", "Withdrawal In Progress", "Withdrawn"),
+}
+
+
+def report_cohort_students(args) -> dict:
+    """The students behind one count of the "By year started" report: a year started and a state."""
+    entry, state = _filter_value(args, "entry"), _filter_value(args, "state")
+    filters = {"program_id": _filter_value(args, "program_id"), "entry": entry, "state": state}
+    stages = COHORT_STATE_STAGES[state]
+    students = [
+        s for s in _report_students(args).order_by(Student.last_name, Student.first_name).all()
+        if s.current_stage in stages and (not entry or _cohort_entry_label(s) == entry)
+    ]
+    rows = [
+        {"student_id": s.id, "student": s.name, "student_number": s.student_number, "program": s.program.code,
+         "stage": s.current_stage, "detail": re.sub(r"^(\d{2})-(\d{2})$", r"20\g<1>-20\g<2>", _cohort_entry_label(s))}
+        for s in students
+    ]
+    columns = [("student", "Student"), ("student_number", "Student number"), ("program", "Program"),
+               ("stage", "Stage"), ("detail", "Year started")]
+    return _report_result("cohort-students", "Students by year started", columns, rows, filters,
+                          _report_option_lists(), "No student matches these filters.")
+
+
 def _latest_logs_by_student(slug: str, student_ids: list) -> dict:
     latest = {}
     query = (
@@ -26175,6 +26211,7 @@ def report_graduation(args) -> dict:
 REPORT_BUILDERS = {
     "at-risk": report_at_risk,
     "cohorts": report_cohorts,
+    "cohort-students": report_cohort_students,
     "overdue": report_overdue,
     "defenses": report_defenses,
     "graduation": report_graduation,

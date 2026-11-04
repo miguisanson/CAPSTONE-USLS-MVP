@@ -255,5 +255,58 @@ class EnrollmentPeriodTests(KFollowBase):
         self.assertNotIn("Enrollment is closed", str(response.get_json()))
 
 
+class CohortStudentsTests(KFollowBase):
+    def add_students(self):
+        with app.app_context():
+            other = Program(code="KG", name="Other Program", college="Graduate School", has_practicum=False)
+            db.session.add(other)
+            db.session.flush()
+            self.other_program_id = other.id
+            specs = [("A", "Coursework", "24-25", self.program_id), ("B", "Comprehensive Exam", "24-25", self.program_id),
+                     ("C", "Writing", "24-25", self.program_id), ("D", "Completed", "24-25", self.program_id),
+                     ("E", "AWOL", "24-25", self.program_id), ("F", "Coursework", "23-24", self.program_id),
+                     ("G", "Coursework", "2024-2025", other.id)]
+            for key, stage, entry, program_id in specs:
+                db.session.add(Student(
+                    student_number=f"GS-KF-{key}", first_name=key, last_name="Cohort", email=f"kf-{key}@example.test",
+                    program_id=program_id, entry_year=2024, academic_year_entry=entry, year_level="1",
+                    current_stage=stage, standing="Active", enrollment_tag="Enrolled"))
+            db.session.commit()
+
+    def rows(self, role="staff", **params):
+        query = "&".join(f"{key}={value}" for key, value in params.items())
+        response = self.client(role).get(f"/api/reports/cohorts/students?{query}")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        return response.get_json()["rows"]
+
+    def test_each_state_lists_the_students_of_that_year(self):
+        self.add_students()
+        names = lambda state, **more: sorted(row["student"].split()[0] for row in self.rows(entry="24-25", state=state, **more))
+        self.assertEqual(names("coursework"), ["A", "B", "G"])
+        self.assertEqual(names("thesis"), ["C"])
+        self.assertEqual(names("graduated"), ["D"])
+        self.assertEqual(names("away"), ["E"])
+        self.assertEqual(names("coursework", program_id=self.program_id), ["A", "B"])
+
+    def test_row_shape_and_year_label(self):
+        self.add_students()
+        row = self.rows(entry="24-25", state="graduated")[0]
+        self.assertEqual(set(row), {"student_id", "student", "student_number", "program", "stage", "detail"})
+        self.assertEqual((row["program"], row["stage"], row["detail"]), ("KF", "Completed", "2024-2025"))
+
+    def test_coordinator_has_the_same_scope_and_other_roles_are_refused(self):
+        self.add_students()
+        self.assertEqual(len(self.rows("academic_coordinator", entry="24-25", state="coursework")), 3)
+        self.assertEqual(self.client("student").get("/api/reports/cohorts/students?entry=24-25&state=coursework").status_code, 403)
+
+    def test_unknown_state_is_refused_and_downloads_work(self):
+        self.add_students()
+        self.assertEqual(self.client("staff").get("/api/reports/cohorts/students?entry=24-25&state=nope").status_code, 400)
+        for fmt, mime in (("xlsx", "spreadsheetml"), ("pdf", "pdf")):
+            response = self.client("staff").get(f"/api/reports/cohorts/students?entry=24-25&state=coursework&format={fmt}")
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(mime, response.mimetype)
+
+
 if __name__ == "__main__":
     unittest.main()
