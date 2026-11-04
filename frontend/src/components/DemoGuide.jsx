@@ -14,11 +14,12 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { Button, InlineNotice, ProgressBar, Select } from "./ui/index.js";
 import { GUIDES, RESET_KEYS, guideById } from "../lib/demoGuide/guides.js";
+import { switchToAccount } from "../lib/demoGuide/session.js";
 import { sayLine } from "../lib/demoGuide/narration.js";
-import { guideEnabled, setGuideEnabled, watchGuideEnabled } from "../lib/demoGuide/prefs.js";
+import { SAVED_KEY, guideEnabled, setGuideEnabled, watchGuideEnabled } from "../lib/demoGuide/prefs.js";
 import { ROLE_NAMES, caseStatus, isDone, offScript, resolveStep } from "../lib/demoGuide/engine.js";
 
-const STORE = "usls-demo-guide";
+const STORE = SAVED_KEY;
 
 // Progress per browser. Every use is in try/catch: a private window or blocked storage must not break the guide.
 function loadSaved() {
@@ -176,8 +177,8 @@ export default function DemoGuide() {
 
   // Read the record when the panel opens, the guide or followed student changes, the page changes or another role signs in.
   useEffect(() => {
-    if (demoOn && open && guide) refresh();
-  }, [demoOn, open, guide, followId, pathname, user && user.role, refresh]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (demoOn && enabled && guide) refresh(); // also with the panel closed: the header button shows the step
+  }, [demoOn, enabled, guide, followId, pathname, user && user.role, refresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // After each write the app makes: re-read the record (the step moves by itself); a refused write shows its reason.
   useEffect(() => {
@@ -193,11 +194,11 @@ export default function DemoGuide() {
       setNotice("");
       setBrowse(null);
       setWrites((list) => [...list.slice(-49), write]);
-      if (guide && open) refresh();
+      if (guide) refresh();
     };
     window.addEventListener("demo-guide:api", onWrite);
     return () => window.removeEventListener("demo-guide:api", onWrite);
-  }, [demoOn, guide, open, refresh]);
+  }, [demoOn, guide, refresh]);
 
   // Steps finished by the page, the role or a write stay finished (the presenter may leave the page afterwards).
   const liveDone = useMemo(() => {
@@ -223,6 +224,8 @@ export default function DemoGuide() {
   const targetSelector = shown ? shown.target : null;
   const role = data && data.role;
   const canReset = role === "staff" || role === "admin";
+  // Who takes part, in order of first appearance: the presenter is told how many accounts the demo uses.
+  const people = guide ? [...new Set(steps.map((item) => item.role).filter(Boolean))].map((r) => (r === "student" ? "the student" : (guide.accounts[r] && guide.accounts[r].who) || ROLE_NAMES[r] || r)) : [];
   const resetKey = data && data.student ? RESET_KEYS[data.student.student_number] : null;
 
   // The panel never covers the step's target (desktop): the preferred side wins unless the target sits under it and the other side is free.
@@ -295,13 +298,9 @@ export default function DemoGuide() {
     setNotice("");
     refresh();
   }
-  async function signInAs(email) {
-    try {
-      await api.logout();
-    } catch {
-      /* the sign-in page still opens */
-    }
-    window.location.assign(`/login?as=${encodeURIComponent(email)}`);
+  function stopGuide() {
+    update({ open: false, guideId: null });
+    setGuideEnabled(false);
   }
   async function resetStudent() {
     if (!guide || !resetKey || !data.student) return;
@@ -350,6 +349,7 @@ export default function DemoGuide() {
 
   const dockClass = side === "left" ? "sm:left-4 sm:right-auto" : "sm:left-auto sm:right-4";
   const stepsDone = guide && resolved ? steps.filter((item, index) => liveDone.has(item.id) || index < resolved.index).length : 0;
+  const headLabel = !guide ? "Demo guide" : shownIndex >= 0 ? `Demo guide · ${guide.title} ${shownIndex + 1}/${steps.length}` : `Demo guide · ${guide.title}`;
   const panel = open ? (
     <section
       ref={panelRef}
@@ -403,7 +403,6 @@ export default function DemoGuide() {
                   <span className="meta block">{item.summary}</span>
                 </button>
               ))}
-              <Button size="sm" variant="secondary" icon={EyeOff} onClick={() => { update({ open: false }); setGuideEnabled(false); }}>Hide the Demo guide</Button>
             </div>
           )}
 
@@ -416,6 +415,10 @@ export default function DemoGuide() {
 
           {guide && data && shown && (
             <>
+              <p className="rounded-xl bg-brand-50 px-3 py-2 text-sm text-ink">
+                This demo has {people.length} {people.length === 1 ? "person" : "people"}: {people.join(", ")}.
+                {people.length > 1 && " The guide switches between them for you."}
+              </p>
               <div className="meta">
                 <span className="font-semibold text-ink">{guide.title}</span>
                 {data.student && <span> · {data.student.name} ({data.student.student_number})</span>}
@@ -442,7 +445,7 @@ export default function DemoGuide() {
               {issues.map((issue) => (
                 <InlineNotice key={issue.kind} tone="warning">
                   <p>{issue.message}</p>
-                  {issue.fix.type === "signIn" && <Button size="sm" className="mt-2" onClick={() => signInAs(issue.fix.email)}>{issue.fix.label}</Button>}
+                  {issue.fix.type === "signIn" && <Button size="sm" className="mt-2" onClick={() => switchToAccount(issue.fix.email, issue.fix.to)}>{issue.fix.label}</Button>}
                   {issue.fix.type === "go" && <Button size="sm" className="mt-2" onClick={() => navigate(issue.fix.to)}>{issue.fix.label}</Button>}
                 </InlineNotice>
               ))}
@@ -544,15 +547,19 @@ export default function DemoGuide() {
                 {!canReset && guide.accounts.staff && data.student && (
                   <p className="meta">
                     Only Graduate School staff can reset a demo student.{" "}
-                    <button type="button" className="cursor-pointer font-semibold text-brand-700 underline" onClick={() => signInAs(guide.accounts.staff.email)}>Switch to the staff account</button>
+                    <button type="button" className="cursor-pointer font-semibold text-brand-700 underline" onClick={() => switchToAccount(guide.accounts.staff.email, firstRoute(guide.steps.find((item) => item.role === "staff") || {}))}>Switch to the staff account</button>
                   </p>
                 )}
-                <Button size="sm" variant="secondary" className="ml-auto" onClick={() => update({ guideId: null })}>Change demo</Button>
-                <Button size="sm" variant="secondary" icon={EyeOff} onClick={() => { update({ open: false }); setGuideEnabled(false); }}>Hide the Demo guide</Button>
               </div>
             </>
           )}
           {guide && !data && load === "loading" && <p role="status" className="meta">Reading the record…</p>}
+        </div>
+      )}
+      {!collapsed && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-2.5">
+          {guide && <Button size="sm" variant="secondary" onClick={() => update({ guideId: null })}>Change demo</Button>}
+          <Button size="sm" variant="secondary" icon={EyeOff} className="ml-auto" onClick={stopGuide}>Stop the demo guide</Button>
         </div>
       )}
     </section>
@@ -561,7 +568,7 @@ export default function DemoGuide() {
   return (
     <>
       <Button variant="secondary" size="sm" icon={Compass} aria-expanded={open} onClick={toggle}>
-        <span className="max-sm:sr-only">Demo guide</span>
+        <span className="max-sm:sr-only">{headLabel}</span>
       </Button>
       {panel && createPortal(panel, document.body)}
       {open && !collapsed && shown && <TargetRing selector={shown.target} strong={showMe === "flash"} />}

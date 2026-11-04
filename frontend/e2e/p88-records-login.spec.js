@@ -475,6 +475,8 @@ test.describe("sign-in page: UX research sections 3 and 7", () => {
     await page.getByRole("button", { name: /Demo accounts/ }).click();
     await expect(page.locator("#demo-accounts-panel li").first()).toBeVisible();
     await page.waitForLoadState("networkidle");
+    // The page is taller now (the guided-demo box is above the button), so the click may have scrolled it and the sticky form follows: measure from the top.
+    await page.evaluate(() => window.scrollTo(0, 0));
     expect(await top(), "the form does not slide down when the panel opens").toBe(before);
   });
 

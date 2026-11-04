@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { BookPlus, BriefcaseBusiness, CalendarOff, CheckCircle2, ChevronDown, Compass, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, PlayCircle, RotateCcw, SlidersHorizontal, UserCog, UserRound, UserX } from "lucide-react";
+import { BookPlus, BriefcaseBusiness, CalendarOff, CheckCircle2, ChevronDown, ChevronRight, Compass, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, PlayCircle, RotateCcw, SlidersHorizontal, UserCog, UserRound, UserX } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { homePath } from "../lib/homePaths.js";
 import { GUIDES } from "../lib/demoGuide/guides.js";
+import { firstStop, startDemoSession } from "../lib/demoGuide/session.js";
 import { guideEnabled, setGuideEnabled } from "../lib/demoGuide/prefs.js";
 import { Button, InlineNotice, Input, PageHeader } from "../components/ui/index.js";
 
@@ -75,12 +76,19 @@ const STANDALONE_STUDENT_DEMOS = [
   },
 ];
 
+// Where "Start a guided demo" sends the signed-in presenter. Kept outside the component: refresh() shows the app's loading screen,
+// which unmounts this page, so a state value would be lost before the redirect.
+let pendingLanding = "";
+
 export default function Login() {
   const { user, refresh } = useAuth();
   const expired = new URLSearchParams(window.location.search).get("expired") === "1"; // sent by api.js on a 401 (I-211)
   // The form always starts empty: nothing is pre-filled, so a real typed login can be shown.
   // The one exception: the Demo Guide's "Sign in as ..." opens this page with ?as=<email>, so that account is ready to sign in.
   const asEmail = new URLSearchParams(window.location.search).get("as") || "";
+  // The Demo Guide's "Switch to ..." button adds go=1 (sign in by itself with the demo password) and to=<page of the step>.
+  const autoGo = new URLSearchParams(window.location.search).get("go") === "1";
+  const wantedPage = new URLSearchParams(window.location.search).get("to") || "";
   const [form, setForm] = useState({ email: asEmail, password: "" });
   const [showPassword, setShowPassword] = useState(false);
   // The sign-in is made here (not through the auth context's login(), which sets the app-wide loading flag and so
@@ -91,9 +99,12 @@ export default function Login() {
   // Global demo switch (null until the server answers, or with demo mode off): steps never wait for a calendar date.
   const [skipDateWaits, setSkipDateWaits] = useState(null);
   const [demoOpen, setDemoOpen] = useState(Boolean(asEmail));
-  const [guideOpen, setGuideOpen] = useState(false);
   const [guideOn, setGuideOn] = useState(guideEnabled); // per browser; off unless the presenter turns it on
-  const [guidePick, setGuidePick] = useState("");
+  const [starting, setStarting] = useState(""); // the guide being started (its button shows "Signing in...")
+  const [startError, setStartError] = useState("");
+  // Where to go once signed in; empty = the role's home. Only a page of this app is accepted.
+  const [landing, setLanding] = useState(pendingLanding || (autoGo && /^\/(?![/\\])/.test(wantedPage) ? wantedPage : ""));
+  const autoTried = useRef(false);
   const [demoAccounts, setDemoAccounts] = useState([]);
   const [demoStudents, setDemoStudents] = useState([]);
   const [demoLoading, setDemoLoading] = useState(false);
@@ -124,7 +135,7 @@ export default function Login() {
 
   // Demo credentials are fetched only when the presenter expands the panel.
   useEffect(() => {
-    if (!demoMode || !(demoOpen || guideOpen) || demoLoaded) return undefined;
+    if (!demoMode || !demoOpen || demoLoaded) return undefined;
     let active = true;
     setDemoLoading(true);
     Promise.all([api.demoAccounts(), api.demoStudents()])
@@ -143,7 +154,9 @@ export default function Login() {
     return () => {
       active = false;
     };
-  }, [demoMode, demoOpen, guideOpen, demoLoaded]);
+  }, [demoMode, demoOpen, demoLoaded]);
+
+  const sharedPassword = demoAccounts[0]?.password || demoStudents[0]?.password || "";
 
   // With ?as=<email>, once the demo accounts are known, the shared demo password goes in as well.
   useEffect(() => {
@@ -151,7 +164,23 @@ export default function Login() {
     if (match) setForm((current) => (current.password ? current : { email: match.email, password: match.password || "" }));
   }, [asEmail, demoAccounts]);
 
-  if (user?.role) return <Navigate to={homePath(user.role)} replace />;
+  // "Switch to ...": the page was opened with go=1, so once the demo password is known the account signs in by itself.
+  useEffect(() => {
+    const password = demoAccounts.concat(demoStudents).find((account) => account.email === asEmail)?.password || sharedPassword;
+    if (!autoGo || !asEmail || !password || autoTried.current) return;
+    autoTried.current = true;
+    setSigningIn(true);
+    signIn({ email: asEmail, password }).catch((requestError) => {
+      setSignInError(requestError.message || "Could not sign in.");
+      setSigningIn(false);
+    });
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (user?.role) pendingLanding = "";
+  }, [user]);
+
+  if (user?.role) return <Navigate to={landing || homePath(user.role)} replace />;
 
   async function signIn(credentials) {
     // The role is decided by the server from the account; the form never sends one.
@@ -189,6 +218,30 @@ export default function Login() {
       setDemoError(requestError.message || `Could not sign in as ${account.name || account.label}.`);
     } finally {
       setQuickLoginBusy("");
+    }
+  }
+
+  // "Start a guided demo": one click signs in as the person of the demo's first step, turns the guide on and lands on that step's page.
+  async function startDemo(guide) {
+    const { account } = firstStop(guide);
+    setStartError("");
+    setStarting(guide.id);
+    try {
+      let password = sharedPassword;
+      if (!password) {
+        const [accounts, students] = await Promise.all([api.demoAccounts(), api.demoStudents()]);
+        setDemoAccounts(accounts.items || []);
+        setDemoStudents(students.items || []);
+        setDemoLoaded(true);
+        password = accounts.items?.[0]?.password || students.items?.[0]?.password || "";
+      }
+      if (!password) throw new Error("The demo accounts could not be loaded. Use Demo accounts below.");
+      pendingLanding = await startDemoSession(guide, password); // a failed sign-in leaves the guide as it was
+      setLanding(pendingLanding);
+      await refresh();
+    } catch (requestError) {
+      setStartError(requestError.message || `Could not sign in as ${account.label}.`);
+      setStarting("");
     }
   }
 
@@ -235,8 +288,6 @@ export default function Login() {
     }
   }
 
-  const sharedPassword = demoAccounts[0]?.password || demoStudents[0]?.password || "";
-
   return (
     <div className="min-h-screen bg-canvas">
       <main className="mx-auto grid min-h-screen w-full max-w-page grid-cols-1 items-start gap-8 px-4 py-8 lg:grid-cols-2 lg:px-8 lg:py-16">
@@ -255,53 +306,72 @@ export default function Login() {
             />
           </div>
 
-          {skipDateWaits !== null && (
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3">
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 accent-amber-600"
-                checked={skipDateWaits}
-                onChange={(event) => {
-                  const wanted = event.target.checked;
-                  setSkipDateWaits(wanted);
-                  api.setDemoSettings({ skip_date_waits: wanted })
-                    .then((result) => setSkipDateWaits(Boolean(result.skip_date_waits)))
-                    .catch(() => setSkipDateWaits(!wanted));
-                }}
-              />
-              <span className="min-w-0">
-                <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-900">
-                  <CalendarOff className="h-4 w-4" aria-hidden="true" /> Skip date waits
-                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">Demo mode</span>
-                </span>
-                <span className="mt-0.5 block text-xs text-amber-800">
-                  On: steps go ahead without waiting for a real date (a panel verdict before the defense day, AWOL before the leave ends). Applies to every account. Off: the real date rules.
-                </span>
-              </span>
-            </label>
+          {demoMode && (
+            <section aria-labelledby="start-demo-title" className="rounded-2xl border border-amber-300 bg-amber-50">
+              <div className="space-y-1 px-4 pb-2 pt-4">
+                <h2 id="start-demo-title" className="card-title flex items-center gap-2 !text-amber-900">
+                  <Compass className="h-4 w-4" aria-hidden="true" /> Start a guided demo
+                </h2>
+                <p className="text-sm text-amber-900">Pick a demo. The app signs you in as the first person and a guide panel tells you what to click and what to say.</p>
+              </div>
+              <ul className="divide-y divide-amber-200 border-t border-amber-200">
+                {GUIDES.map((guide) => (
+                  <li key={guide.id}>
+                    <button
+                      type="button"
+                      disabled={Boolean(starting)}
+                      onClick={() => startDemo(guide)}
+                      className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-ink">{guide.title}</span>
+                        <span className="meta block">{starting === guide.id ? "Signing in…" : guide.summary}</span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-amber-800" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {startError && (
+                <div className="border-t border-amber-200 p-3">
+                  <InlineNotice tone="danger">{startError}</InlineNotice>
+                </div>
+              )}
+            </section>
           )}
 
           {(demoMode || skipDateWaits !== null) && (
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3">
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 accent-amber-600"
-                checked={guideOn}
-                onChange={(event) => {
-                  setGuideEnabled(event.target.checked);
-                  setGuideOn(event.target.checked);
-                }}
-              />
-              <span className="min-w-0">
-                <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-900">
-                  <Compass className="h-4 w-4" aria-hidden="true" /> Show the Demo guide
-                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">Demo mode</span>
-                </span>
-                <span className="mt-0.5 block text-xs text-amber-800">
-                  On: after signing in, the top bar has a Demo guide button that walks through a demo. Off: the app looks as usual. Applies to this browser only.
-                </span>
-              </span>
-            </label>
+            <section aria-labelledby="presenter-settings-title" className="rounded-2xl border border-amber-200 bg-amber-50/60">
+              <h2 id="presenter-settings-title" className="eyebrow px-4 pt-3 !text-amber-900">Presenter settings</h2>
+              <div className="divide-y divide-amber-200">
+                {skipDateWaits !== null && (
+                  <PresenterSwitch
+                    icon={CalendarOff}
+                    title="Skip date waits"
+                    hint="On: steps go ahead without waiting for a real date (a panel verdict before the defense day, AWOL before the leave ends). Applies to every account. Off: the real date rules."
+                    checked={skipDateWaits}
+                    stateId="skip-date-waits-state"
+                    onChange={(wanted) => {
+                      setSkipDateWaits(wanted);
+                      api.setDemoSettings({ skip_date_waits: wanted })
+                        .then((result) => setSkipDateWaits(Boolean(result.skip_date_waits)))
+                        .catch(() => setSkipDateWaits(!wanted));
+                    }}
+                  />
+                )}
+                <PresenterSwitch
+                  icon={Compass}
+                  title="Demo guide panel"
+                  hint="On: after signing in, the guide panel and its button show in the top bar. Off: the app looks as usual. This browser only."
+                  checked={guideOn}
+                  stateId="demo-guide-panel-state"
+                  onChange={(wanted) => {
+                    setGuideEnabled(wanted);
+                    setGuideOn(wanted);
+                  }}
+                />
+              </div>
+            </section>
           )}
 
           {demoMode && (
@@ -426,61 +496,6 @@ export default function Login() {
               )}
             </div>
           )}
-          {demoMode && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/60">
-              <button
-                type="button"
-                onClick={() => setGuideOpen((value) => !value)}
-                aria-expanded={guideOpen}
-                aria-controls="demo-guide-panel"
-                className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-              >
-                <span className="min-w-0">
-                  <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-900">
-                    <Compass className="h-4 w-4" aria-hidden="true" /> Demo guide
-                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">Demo mode</span>
-                  </span>
-                  <span className="mt-0.5 block text-xs text-amber-800">{guideOn ? "Which account to use for each demo. After signing in, open Demo guide in the top bar." : "Turned off in this browser."}</span>
-                </span>
-                <ChevronDown className={`h-4 w-4 shrink-0 text-amber-800 transition-transform ${guideOpen ? "rotate-180" : ""}`} aria-hidden="true" />
-              </button>
-              {guideOpen && (
-                <div id="demo-guide-panel" className="space-y-3 border-t border-amber-200 px-4 pb-4 pt-3">
-                  {!guideOn && (
-                    <p className="text-xs text-amber-900">
-                      The Demo guide is hidden. Turn on Show the Demo guide above to use it after signing in.{" "}
-                      <button type="button" className="cursor-pointer font-semibold underline" onClick={() => { setGuideEnabled(true); setGuideOn(true); }}>Turn it on</button>
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-2" role="group" aria-label="Choose a demo">
-                    {GUIDES.map((guide) => (
-                      <Button key={guide.id} size="sm" variant={guidePick === guide.id ? "primary" : "secondary"} aria-pressed={guidePick === guide.id} onClick={() => setGuidePick(guide.id)}>
-                        {guide.title}
-                      </Button>
-                    ))}
-                  </div>
-                  {GUIDES.filter((guide) => guide.id === guidePick).map((guide) => (
-                    <div key={guide.id} className="space-y-2">
-                      <p className="text-xs text-slate-600">{guide.summary}</p>
-                      <ol className="divide-y divide-amber-100 overflow-hidden rounded-xl border border-amber-100 bg-white">
-                        {["student", "staff", "academic_coordinator", "research_coordinator", "dean"].filter((role) => guide.accounts[role]).map((role) => (
-                          <li key={role} className="flex items-center gap-2 p-2">
-                            <span className="min-w-0 flex-1 px-1">
-                              <span className="block truncate text-sm font-semibold text-ink">{guide.accounts[role].label.charAt(0).toUpperCase() + guide.accounts[role].label.slice(1)}</span>
-                              <span className="meta block truncate">{guide.accounts[role].who === guide.accounts[role].label ? "" : `${guide.accounts[role].who} · `}{guide.accounts[role].email}</span>
-                            </span>
-                            <Button size="sm" variant="secondary" className="shrink-0" aria-label={`Fill form for ${guide.accounts[role].who}`} onClick={() => fillForm({ email: guide.accounts[role].email, password: sharedPassword })}>
-                              Fill form
-                            </Button>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </section>
 
         <section className="card p-5 sm:p-6 lg:sticky lg:top-8" aria-labelledby="sign-in-title">
@@ -548,6 +563,30 @@ export default function Login() {
         </section>
       </main>
     </div>
+  );
+}
+
+// One row of the Presenter settings: a title, one line of help, and an On / Off switch (a checkbox with role="switch": keyboard and screen readers work).
+function PresenterSwitch({ icon: Icon, title, hint, checked, onChange, stateId }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 px-4 py-3">
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+          <Icon className="h-4 w-4" aria-hidden="true" /> {title}
+        </span>
+        <span className="mt-0.5 block text-xs text-amber-800">{hint}</span>
+      </span>
+      <span className="flex shrink-0 items-center gap-2">
+        <span data-testid={stateId} className="w-7 text-right text-xs font-semibold text-amber-900">{checked ? "On" : "Off"}</span>
+        <span className="relative h-6 w-11 shrink-0">
+          <input type="checkbox" role="switch" aria-label={title} className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none relative block h-6 w-11 rounded-full bg-slate-400 transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-transform after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-amber-500 peer-focus-visible:ring-offset-2"
+          />
+        </span>
+      </span>
+    </label>
   );
 }
 
