@@ -876,6 +876,28 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(endorsement.request_attachment_id, replacement_file.id)
             self.assertEqual(return_message.status, "Responded")
 
+    def test_graduation_route_ignores_client_registrar_status_and_dean_remarks(self):
+        with app.app_context():
+            application_file = self._attachment("graduation", "audit-research2-02")
+            db.session.add(GraduationEndorsement(
+                student_id=self.student_id,
+                request_attachment_id=application_file.id,
+                batch_name="Batch audit",
+                review_window="AY 2026-2027",
+                endorsement_status="For Review",
+            ))
+            db.session.commit()
+            self._transition(self._staff_client(), "graduation", {
+                "student_id": self.student_id,
+                "endorsement_status": "Coursework Review",
+                "registrar_status": "Exported - Ready to Send",
+                "dean_remarks": "Approved by the Dean",
+            })
+            endorsement = GraduationEndorsement.query.filter_by(student_id=self.student_id).first()
+            self.assertEqual(endorsement.endorsement_status, "Coursework Review")
+            self.assertNotEqual(endorsement.registrar_status, "Exported - Ready to Send")
+            self.assertFalse(endorsement.dean_remarks)
+
     def test_graduation_incomplete_coursework_and_research_are_routed_to_staff(self):
         with app.app_context():
             staff = self._staff_client()

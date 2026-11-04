@@ -32039,10 +32039,6 @@ def handle_graduation(data: MultiDict) -> int:
     elif not normalize_graduation_school_year(endorsement.review_window):
         endorsement.review_window = default_graduation_school_year()
     requested_status = (data.get("endorsement_status") or "").strip()
-    if data.get("dean_remarks"):
-        endorsement.dean_remarks = data.get("dean_remarks")
-    if data.get("registrar_status"):
-        endorsement.registrar_status = data.get("registrar_status")
     transition_comment = workflow_transition_comment(data)
 
     if requested_status == "Coursework Review":
