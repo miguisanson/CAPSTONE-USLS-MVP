@@ -693,6 +693,35 @@ class MonitoringPortalCrudTests(unittest.TestCase):
             self.assertEqual((student.entry_year, student.academic_year_entry), (2026, "26-27"))
         self.assertEqual(handoff(first_name="An4", student_number="2690996").status_code, 400)
 
+    # -- audit round 3 ------------------------------------------------------
+    def test_i305_bulk_add_refuses_a_term_taken_that_is_not_a_semester(self):
+        student_id = self._create_student()["student"]["id"]
+        response = self._client("staff").post("/api/monitoring/subjects/bulk-add-remaining", json={
+            "program_id": self.program_id, "student_ids": [student_id], "term_label": "whenever lol"})
+        self.assertEqual(response.status_code, 400, response.get_json())
+        self.assertIn("semester", response.get_json()["error"].lower())
+        with app.app_context():
+            self.assertEqual(CourseRecord.query.filter_by(student_id=student_id, status="Planned").count(), 0)
+
+    def test_i307_the_export_lists_subjects_withdrawn_or_dropped_through_the_workflow(self):
+        from app import SubjectEnrollment
+        student_id = self._create_student()["student"]["id"]
+        with app.app_context():
+            term = AcademicTerm.query.filter_by(is_active_planning_term=True).one()
+            for code, status in (("MPT-501", "Withdrawn"), ("MPT-502", "Dropped"), ("MPT-503", "Enrolled")):
+                db.session.add(SubjectEnrollment(
+                    student_id=student_id, course_id=Course.query.filter_by(code=code).one().id, term_id=term.id, status=status))
+            label = term.label
+            db.session.commit()
+        response = self._client("dean").get(f"/api/monitoring/export?program_id={self.program_id}")
+        detail = load_workbook(BytesIO(response.data), data_only=True)["Subject rows"]
+        header = [cell.value for cell in detail[1]]
+        rows = {(r["Subject code"]): r for r in ({header[i]: c.value for i, c in enumerate(row)} for row in detail.iter_rows(min_row=2))}
+        self.assertEqual(rows["MPT-501"]["Status"], "Withdrawn")
+        self.assertEqual(rows["MPT-502"]["Status"], "Dropped")
+        self.assertEqual(rows["MPT-501"]["Term taken"], label)
+        self.assertNotIn("MPT-503", rows)  # an enrolled subject is not a monitoring row until it is taken
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -18144,6 +18144,8 @@ def register_routes(app: Flask) -> None:
             effective_date = date.fromisoformat(raw_effective_date)
         except ValueError:
             return jsonify({"error": "Use a valid effective date."}), 400
+        if effective_date > ph_today():
+            return jsonify({"error": "The effective date cannot be in the future: a drop records absences that already happened."}), 400
 
         student = enrollment.student
         course = enrollment.course
@@ -29896,6 +29898,8 @@ def monitoring_portal_bulk_add_remaining(program: Program, data: dict) -> dict:
     if status != "Planned":
         raise MonitoringEntryError("Only Planned can be added in bulk; set other statuses one subject at a time.")
     term_label = _monitoring_clean(data.get("term_label"), 40)
+    if not _monitoring_term_label_ok(term_label):  # the same check as the single-row path (I-305)
+        raise MonitoringEntryError("Choose the semester from the list (for example AY 2026-2027 1st Semester).")
     curriculum = monitoring_curriculum_courses(program)
     if data.get("course_ids"):
         wanted = {safe_int(item) for item in data.get("course_ids")}
@@ -30187,7 +30191,28 @@ def monitoring_export_workbook(program: Program) -> bytes:
          if (item.status or "") not in MONITORING_NO_ROW_STATUSES or item.removed_at),
         key=lambda item: (by_id[item.student_id].last_name, by_id[item.student_id].first_name, item.course.code),
     )
+    # A subject withdrawn or dropped through the workflow is reset on the monitoring record (no adverse grade) and the
+    # grid shows it from the enrollment ledger, so the export adds it the same way (I-307).
+    ledger = [
+        item for item in SubjectEnrollment.query.filter(
+            SubjectEnrollment.student_id.in_([s.id for s in students] or [-1]),
+            SubjectEnrollment.status.in_(["Withdrawn", "Dropped"]),
+        ).all()
+        if item.course and (records.get((item.student_id, item.course_id)) is None
+                            or (records[(item.student_id, item.course_id)].status or "") in MONITORING_NO_ROW_STATUSES)
+    ]
+    ordered = ordered + sorted(ledger, key=lambda item: (by_id[item.student_id].last_name, by_id[item.student_id].first_name, item.course.code))
     for row_number, record in enumerate(ordered, 2):
+        if isinstance(record, SubjectEnrollment):
+            student, course = by_id[record.student_id], record.course
+            values = [
+                student.student_number, student.name, program.code, course.code, course.title, course.units or 3,
+                "Yes" if course.id in curriculum_ids else "No", record.term.label if record.term else "", record.status,
+                record.status_note or "", "Enrollment workflow", "", "", "", "", "", "",
+            ]
+            for column, value in enumerate(values, 1):
+                rows_sheet.cell(row=row_number, column=column, value=value)
+            continue
         student, course = by_id[record.student_id], record.course
         manual = record.source == MONITORING_MANUAL_SOURCE
         values = [
