@@ -146,7 +146,7 @@ test.describe("Student forms never ask for what the system knows", () => {
     });
     try {
       await page.goto("/student/defense-schedule");
-      await expect(page.getByText("Defense type", { exact: true })).toHaveCount(0); // the picker is gone
+      await expect(page.getByLabel("Defense type")).toHaveCount(0); // the picker is gone (a read-only "Defense type" heading may stay)
       await expect(page.locator("main select").filter({ has: page.locator("option", { hasText: "Final Defense" }) })).toHaveCount(0);
       await expect(page.locator("main")).toContainText("Your next defense: Proposal Defense");
       await ctl(page, "Preferred date").fill("2026-12-04");
