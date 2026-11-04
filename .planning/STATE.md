@@ -1,25 +1,41 @@
 # State
 
-## 2026-11-04 afternoon — known-data rule + Demo Guide (session "known-data"; pushed to v6.1-migui)
+## 2026-11-04 afternoon — known-data rule, process audit, Demo Guide (session "known-data"; pushed to v6.1-migui)
 
 **For Natalie (next session): start with `/continue_CAPSTONE-USLS-MVP`, then read this block.**
+**After `git pull` run `npm run seed` once** (two new columns today: `ResidencyEnrollment.prior_enrollment_tag`,
+`DefenseVerdict.title_before_verdict`; IM4, no ALTER patches). The live site was rebuilt and reseeded at ~12:50.
 
-- Owner rule: "never make a user type, pick or tick something the system already knows or can check" and
-  "if it can be automatic let it be automatic". Findings I-242..I-263 (ISSUES.md), R-028/R-029 (REGRESSION.md).
-- Done and pushed: Readmission (student ticks nothing; Handbook p. 45 items: system = "Written intention to
-  enroll", "Evaluation of subject/grade requirements"; staff = "Clearance from Business Office", "Interview
-  (reason for delay, residency requirements)"; leave period from LOA semesters on record), Return from AWOL
-  (last enrolled semester from TermEnrollment, next open semester preselected), student forms (no student_id /
-  term_id / defense type / school year / required hours sent), monitoring adviser = faculty select (server
-  refuses unknown names), term taken = semester select (server refuses malformed labels), P3 screens I-255..261.
-- **Demo Guide** (in-app tutorial, demo mode only): design `.planning/demo-guide/DESIGN.md`, server
-  `GET /api/demo/guide-state` (`tests/test_demo_guide.py`), UI `frontend/src/components/DemoGuide.jsx` +
-  `frontend/src/lib/demoGuide/`, spec p114 (owns demo student Therese; resets her before and after — watch it
-  when specs run in parallel). The web image needs `scripts/demo/narration.json` (Dockerfile copies it).
-- Site: `docker compose --profile tunnel up -d --build` after every pull (deploy/DOCKER.md). No schema change today.
-- Open owner/GS decisions: I-248 (store the three concept-paper titles?), I-252 (practicum hours verified by staff?),
-  Forms Q23 now follows the Handbook list (owner to confirm; forms pack GS-F-08 still lists the old platform checks).
-- Not re-recorded: demo videos (narration text updated only). Walkthrough screenshots not recaptured.
+- Owner rules today: "never make a user type, pick or tick something the system already knows or can check" and
+  "if it can be automatic let it be automatic".
+- Known-data sweep I-242..I-263: all fixed except I-254 (LOA extension start, RequestForms) and the questions I-248, I-252.
+  Readmission now follows Handbook p. 45 (system: "Written intention to enroll", "Evaluation of subject/grade
+  requirements"; staff: "Clearance from Business Office", "Interview (reason for delay, residency requirements)").
+- **Process audit** (workflow `process-audit`: 6 auditor groups + adversarial verifiers): 93 findings, 88 confirmed,
+  logged as **I-264..I-351** in ISSUES.md (class/severity/evidence per row; owner questions marked `question`).
+  24 fixed today (server P1/P2: graduation route trusted client registrar_status/dean_remarks, Dean single decision
+  without status check, seed calendar, failed subject passing readmission evaluation, residency term/tag, AWOL task
+  and re-forward, reschedule keeping venue, title verdict correction; docs/capture-script drift; I-330 token guard).
+  **Open queue, highest first:** I-336 (bell links to pages the role cannot open), I-341 (guide-state readable by
+  faculty for any student), records-03 row (monitoring edit can set Withdrawn/Dropped/Completed outside the workflow),
+  leave-02 (gap semesters after a leave pass), leave-07 (date-driven moves only on a refresh button -> automate),
+  research2-01 (practicum hours/status from back-office payload), research1-02 (generic upload bypasses gate rules),
+  research1-04 (student schedule request retyped by staff), research2-06 (no notice when a verdict is recorded),
+  coverage-03/04 (Docker reset/update by hand; stale demo data warning), cross-07/08 (home numbers vs lists, assistant counts),
+  I-352 (after a Docker rebuild the tunnel may need `docker compose --profile tunnel restart tunnel`; check https://miguisanson.dev/api/health).
+- **Demo Guide** (in-app tutorial, demo mode only, off by default per browser; sign-in switch "Show the Demo guide"):
+  design `.planning/demo-guide/DESIGN.md`, server `GET /api/demo/guide-state` (`tests/test_demo_guide.py`),
+  UI `frontend/src/components/DemoGuide.jsx` + `frontend/src/lib/demoGuide/` (8 guides: LOA, Readmission, AWOL,
+  Monitoring Sheet, Reports, Withdrawal, Practicum, Graduation), spec p114 (owns demo student Therese).
+  Follows the live record, so off-script panel requests resync with "Continue from here".
+- Automated today: Playwright finds `E:/DevCache/ms-playwright` by itself (playwright.config.js); Docker web build
+  copies `scripts/demo/narration.json` (the guide imports it); test guards the tunnel token placeholder.
+- Gates: full Python gate on 0e7d623 = 1025 tests, only I-236 `test_teaching_schedule` failing (+ one test fixed);
+  after the audit merge a broad targeted set was run (see the commit message of the last commit); build + check:ui 0;
+  e2e p114/p21/p81/p88/p113/p42 139 passed. Full e2e suite NOT run today.
+- Process note: the audit workflow ran 2 agents while 2 helpers ran (4 at once for ~20 min, over the 3-helper limit).
+- Not done: demo videos not re-recorded; walkthrough screenshots not recaptured; forms pack GS-F-08 still lists
+  the old platform checks (Forms Q23); capture scripts for cases 06/16/17 follow the old booking flow.
 
 ## Demo-day date waits skipped — 2026-11-04 (NOT committed)
 
