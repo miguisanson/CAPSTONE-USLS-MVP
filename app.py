@@ -6057,6 +6057,7 @@ def run_maintenance_sweeps() -> dict:
     ``POST /api/maintenance/refresh`` runs it on request. A page view itself never does.
     """
     awol = sync_automatic_awol_statuses(commit=False)
+    close_ended_residencies()
     leave = sync_leave_cases(commit=False)
     risk = refresh_risk_levels(force=True)
     reviews = ensure_onboarding_reviews()
@@ -9051,6 +9052,40 @@ def latest_awol_case(student_id: int) -> AwolCase | None:
         .order_by(AwolCase.updated_at.desc(), AwolCase.id.desc())
         .first()
     )
+
+
+def close_residency_record(item: ResidencyEnrollment) -> None:
+    """Close one residency: the record, its semester row, and (when no other residency is open) the student's earlier tag."""
+    student = item.student
+    item.status = "Completed"
+    item.ended_at = now_utc()
+    item.updated_at = now_utc()
+    enrollment = TermEnrollment.query.filter_by(student_id=item.student_id, term_id=item.term_id).first()
+    if enrollment and enrollment.status == "Residency":
+        enrollment.status = "Completed"
+    still_active = ResidencyEnrollment.query.filter(
+        ResidencyEnrollment.student_id == item.student_id, ResidencyEnrollment.status == "Active",
+        ResidencyEnrollment.id != item.id).first()
+    if not still_active:
+        student.enrollment_tag = item.prior_enrollment_tag or "Enrolled"
+
+
+def close_ended_residencies() -> int:
+    """Residency is per semester (Handbook p.48): close every Active residency whose semester has ended (I-300)."""
+    closed = 0
+    for item in ResidencyEnrollment.query.filter_by(status="Active").all():
+        if not item.term or item.term.end_date >= ph_today():
+            continue
+        student = item.student
+        close_residency_record(item)
+        closed += 1
+        workflow_message_record(
+            "awol", student, None, "Student", "Residency enrollment closed",
+            f"Residency for {item.term.label} ended with the semester.", "notice", "Residency", student.standing, status="Sent",
+        )
+        add_log("awol", student.id, "Workflow System", "Residency record", "Residency enrollment closed", "Student",
+                f"{item.term.label} ended.", previous_status="Residency", new_status=student.standing)
+    return closed
 
 
 def latest_residency_enrollment(student_id: int, active_only: bool = False) -> ResidencyEnrollment | None:
@@ -33027,17 +33062,7 @@ def handle_awol(data: MultiDict) -> int:
         item = ResidencyEnrollment.query.get_or_404(safe_int(data.get("residency_id")))
         if item.student_id != student.id or item.status != "Active":
             raise ValueError("Choose an active residency enrollment to close.")
-        item.status = "Completed"
-        item.ended_at = now_utc()
-        item.updated_at = now_utc()
-        enrollment = TermEnrollment.query.filter_by(student_id=student.id, term_id=item.term_id).first()
-        if enrollment and enrollment.status == "Residency":
-            enrollment.status = "Completed"
-        still_active = ResidencyEnrollment.query.filter(
-            ResidencyEnrollment.student_id == student.id, ResidencyEnrollment.status == "Active",
-            ResidencyEnrollment.id != item.id).first()
-        if not still_active:
-            student.enrollment_tag = item.prior_enrollment_tag or "Enrolled"
+        close_residency_record(item)
         student.standing = "Active"
         result = "Residency enrollment closed"
         workflow_message_record("awol", student, account, "Student", result, f"Residency for {item.term.label if item.term else 'the semester'} was closed.", "notice", "Residency", "Active", status="Sent")

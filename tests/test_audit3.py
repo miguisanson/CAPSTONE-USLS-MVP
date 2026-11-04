@@ -3,6 +3,7 @@
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from datetime import date, timedelta
 
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
@@ -12,7 +13,8 @@ os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="pol
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 
 from app import (  # noqa: E402
-    AcademicTerm, Course, Faculty, Program, Student, UserAccount, app, db, generate_password_hash,
+    AcademicTerm, Course, Faculty, GraduationEndorsement, Program, ResidencyEnrollment, Student, TermEnrollment, UserAccount, app, db,
+    generate_password_hash, run_maintenance_sweeps,
 )
 
 
@@ -148,6 +150,40 @@ class PrivacyNoticeEnforcedByTheApiTests(Audit3Base):
     def test_accepted_account_is_not_affected(self):
         self.accept("dean")
         self.assertEqual(self.client("dean").get("/api/meta").status_code, 200)
+
+
+class ResidencyClosesAtSemesterEndTests(Audit3Base):
+    """I-300: the daily sweep closes a residency whose semester is over and gives the student the earlier tag back."""
+
+    def residency(self, label, student_id=None):
+        term = AcademicTerm.query.filter_by(label=label).one()
+        student = db.session.get(Student, student_id or self.student_id)
+        student.enrollment_tag = "Residency"
+        db.session.add(TermEnrollment(student_id=student.id, term_id=term.id, status="Residency"))
+        item = ResidencyEnrollment(student_id=student.id, term_id=term.id, reason="Thesis writing",
+                                   policy_status="Eligible for Residency", status="Active", prior_enrollment_tag="Enrolled")
+        db.session.add(item)
+        db.session.commit()
+        return item.id
+
+    def test_a_past_semester_residency_is_closed_and_the_tag_restored(self):
+        with app.app_context():
+            item_id = self.residency("Past Term")
+            run_maintenance_sweeps()
+            db.session.commit()
+            item = db.session.get(ResidencyEnrollment, item_id)
+            self.assertEqual(item.status, "Completed")
+            self.assertIsNotNone(item.ended_at)
+            self.assertEqual(db.session.get(Student, self.student_id).enrollment_tag, "Enrolled")
+            self.assertEqual(TermEnrollment.query.filter_by(student_id=self.student_id).one().status, "Completed")
+
+    def test_a_residency_in_the_running_semester_stays_active(self):
+        with app.app_context():
+            item_id = self.residency("Running Term")
+            run_maintenance_sweeps()
+            db.session.commit()
+            self.assertEqual(db.session.get(ResidencyEnrollment, item_id).status, "Active")
+            self.assertEqual(db.session.get(Student, self.student_id).enrollment_tag, "Residency")
 
 
 if __name__ == "__main__":
