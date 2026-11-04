@@ -407,8 +407,8 @@ def demo_data_age_notice(account: UserAccount | None) -> dict | None:
         "seeded_on": seeded.date().isoformat(),
         "message": (
             f"The demo data was built {age} days ago. Steps that wait on dates (for example the withdrawal window, "
-            "which closes 14 days after the semester starts) can be closed now. Reset the demo data by running "
-            "`npm run seed` on the server."
+            "which closes 14 days after the semester starts) can be closed now. To reset the demo data, run "
+            "npm run seed on the server."
         ),
     }
 

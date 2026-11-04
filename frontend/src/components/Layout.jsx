@@ -30,7 +30,8 @@ import {
   Scale,
 } from "lucide-react";
 import { useAuth } from "../auth";
-import { Button, Drawer } from "./ui/index.js";
+import { api } from "../api";
+import { Button, Drawer, InlineNotice } from "./ui/index.js";
 import { PORTAL_NAV, PORTAL_FOOTERS, findNavItem, usePortalNav } from "./portalNav";
 import NotificationBell from "./NotificationBell";
 import DemoGuide from "./DemoGuide";
@@ -238,6 +239,14 @@ export default function Layout({ children }) {
   const [recordTitle, setRecordTitle] = useState(""); // set by a record page through useRecordTitle (I-196)
   const location = useLocation();
   const { user, logout } = useAuth();
+  // Staff are told when the demo data is old (I-332): the dates it was built with have moved on.
+  const [demoNotice, setDemoNotice] = useState(null);
+  useEffect(() => {
+    if (!user || !["staff", "admin"].includes(user.role)) return undefined;
+    let current = true;
+    api.me().then((res) => current && setDemoNotice(res.demo_notice || null)).catch(() => {});
+    return () => { current = false; };
+  }, [user?.id, user?.role]);
   // Every role has a sidebar; the page's name is its sidebar label (without a "3 · " step number).
   const current = findNavItem(PORTAL_NAV[user?.role] || NAV_GROUPS, location.pathname);
   const pageTitle = current ? withoutStep(current.item.label) : FALLBACK_LABELS[location.pathname] || null;
@@ -315,6 +324,7 @@ export default function Layout({ children }) {
           </div>
         </header>
 
+        {demoNotice && <div className="mx-auto w-full max-w-page px-4 pt-4 lg:px-6 2xl:px-8"><InlineNotice tone="warning" icon data-testid="demo-data-notice" onDismiss={() => setDemoNotice(null)}>{demoNotice.message}</InlineNotice></div>}
         <main id="main-content" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-page flex-1 px-4 py-6 focus:outline-none lg:px-6 lg:py-7 2xl:px-8 2xl:py-8"><RecordTitleProvider value={setRecordTitle}>{children}</RecordTitleProvider></main>
       </div>
     </div>
