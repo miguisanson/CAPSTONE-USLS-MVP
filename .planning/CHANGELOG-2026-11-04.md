@@ -29,12 +29,17 @@ Branch: `v6.1-migui` until 13:3x, then `v6.2-migui`. Every item has its ISSUES r
 | eve | Audit round 2 (10 rows): guide-state privacy, bell links per role, daily automatic leave/AWOL sweeps, monitoring edits refused for enrolled current-term subjects, readmission gap semesters flagged, practicum completion from records + certificate, gate documents only through the gate, student schedule request prefills staff booking, verdict/revision notices, coordinator home scope | I-341, I-336, I-270, I-275, I-267, I-286, I-280, I-282, I-289, I-339 | 0a8a94e |
 | eve | Demo Guide: 5 research guides (title + Form 1, panel matching, scheduling, verdicts, proposal + final) played with `>` only, Panel Chair never signs in — 24 guides in all | — | 074327f |
 | eve | Course Adjustments table fits again at 1366; e2e temp folder made automatically; deploy UPDATE-SITE + RESET-DEMO-DATA one-click scripts | I-331 | ac767cb |
+| night | Audit round 3 (12 rows): "Skip date waits" needs a signed-in staff/Dean account; privacy notice enforced by the API; LOA Registrar task stays until export; second AWOL flagged; AWOL last enrolled at detection; residency closes at term end; defense lead time shown and enforced; Form 1 only at its gate; batch approve re-checks eligibility; verdict standing check; bulk term / future drop / export of withdrawn subjects | I-342, I-351, I-349, I-294, I-295, I-301, I-300, I-312, I-320, I-322, I-325, I-305, I-307, I-308, I-347 | 4865c02 |
+| night | Audit round 4 (10 rows): practicum refused for AWOL/on-leave students; panel seats check the faculty's Panel Chair / Member role; booking warns about unanswered invitations; the chair sets the defense room or link (with history); one practicum review column; exported batch card; AWOL Registrar handoff tracking; stale demo data notice for staff; the Dean's assistant counts like the Dean home | I-290, I-283, I-314, I-318, I-321, I-328, I-329, I-296, I-332, I-340 | 83a7aeb |
+| night | Docs follow the app (Reports and Dean Reports cases, setup, Docker) + Reports capture/video scripts; requirement boxes in the shared tones (no false error banners); one-click UPDATE-SITE proved itself (auto-reseed + tunnel restart) | I-338, I-343, I-344, I-350 | 3a8e213, 419ad84, f0e?? |
 
 ## In progress
-- Audit round 3 (`pkt/audit-round3`): demo switch needs sign-in, privacy notice enforced by the API, Registrar task, second AWOL, AWOL last enrolled at detection, residency closes at term end, defense lead time, Form 1 only at its gate, batch approve check, verdict standing check, bulk term/drop date/export, test order.
+- AWOL Registrar list on the AWOL board (`pkt/awol-registrar-ui`, I-296 UI).
+- Final Python gate on 83a7aeb.
 
 ## Gates
 - Full Python gate on 0a8a94e: 1,120 tests, 1 failure = known I-236 `test_teaching_schedule` (Myrine's teaching schedule).
+- Full e2e (`npm run e2e`) on b9e91cf: 953 passed, 12 failed -> fixed: page sweep x5 (requirement boxes read as error banners), p117, p32; p112/p88 pass alone (cross-spec data, see I-364); known: p110, p84:376 (I-236), p79 flaky. Then 194/194 on 83a7aeb incl. the sweep for every role.
 - Browser: every touched spec green on the merged code (p113-p122, p114/p115/p122 autopilot, p42, p77, p78, p84 except known I-236 line ~376, p86, p91, p93, p101, p116-p121).
 
 ## Next
