@@ -330,4 +330,12 @@ test.describe("Staff pages: sections, years, colleges", () => {
     const year = page.getByLabel("Year of new record");
     await expect(year).toHaveAttribute("max", String(new Date().getFullYear()));
   });
+
+  test("B-67: a new faculty member's temporary password is made by the system", async ({ page }) => {
+    await page.goto("/faculty");
+    await page.getByRole("button", { name: "Add faculty" }).click();
+    const password = page.getByRole("dialog").getByLabel("Temporary password (at least 8 characters)");
+    await expect(password).toHaveValue(/^[A-Za-z2-9]{10}$/);
+    await expect(page.getByRole("dialog").getByText("Made for this person.")).toBeVisible();
+  });
 });
