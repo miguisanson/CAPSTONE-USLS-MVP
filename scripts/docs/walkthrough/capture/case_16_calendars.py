@@ -69,7 +69,7 @@ def run(rt: Runtime) -> None:
         snap(rt, staff, sid(1))
         facts["staff_event"] = open_event(staff)
         facts["staff_detail"] = h.page_text(staff, 6000)
-        h.scroll_to_text(staff, "GS-2026-UD", offset=110)
+        h.scroll_to_text(staff, "26912", offset=110)
         snap(rt, staff, sid(2))
     rt.step("A1 staff opens the Calendar tab and selects a defense", staff_calendar)
 
@@ -117,7 +117,7 @@ def run(rt: Runtime) -> None:
         snap(rt, cruz, sid(6))
         facts["cruz_event"] = open_event(cruz)
         facts["cruz_detail"] = h.page_text(cruz, 6000)
-        h.scroll_to_text(cruz, "GS-2026-UD", offset=110)
+        h.scroll_to_text(cruz, "26912", offset=110)
         snap(rt, cruz, sid(7))
     rt.step("C1 faculty My Calendar: week, month and a defense", faculty_calendar)
 

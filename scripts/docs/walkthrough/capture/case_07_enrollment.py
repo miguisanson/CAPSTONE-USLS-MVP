@@ -37,8 +37,8 @@ def _make_class_list() -> Path:
               "Section", "Faculty", "Schedule", "Units", "Enrollment Status", "Status Effective Date", "Remarks"]
     today = time.strftime("%Y-%m-%d")
     rows = [
-        ["2026-2027", "1st Semester", "GS-2026-ENR-01", "Dela Cruz", "Clarissa", "MAED", "MAED-MAJ2", "MAED-MAJ2", "A", "Dr. Marlon Geronimo", "Sat 8:00-11:00", "3", "Enrolled", today, "Late enrollment"],
-        ["2026-2027", "1st Semester", "GS-2026-ENR-02", "Gonzales", "Martin", "MAED", "MAED-MAJ2", "MAED-MAJ2", "A", "Dr. Marlon Geronimo", "Sat 8:00-11:00", "3", "Enrolled", today, ""],
+        ["2026-2027", "1st Semester", "2690501", "Dela Cruz", "Clarissa", "MAED", "MAED-MAJ2", "MAED-MAJ2", "A", "Dr. Marlon Geronimo", "Sat 8:00-11:00", "3", "Enrolled", today, "Late enrollment"],
+        ["2026-2027", "1st Semester", "2690502", "Gonzales", "Martin", "MAED", "MAED-MAJ2", "MAED-MAJ2", "A", "Dr. Marlon Geronimo", "Sat 8:00-11:00", "3", "Enrolled", today, ""],
         ["2026-2027", "1st Semester", "2670001", "Sanson", "Miguel", "MAED", "MAED-MAJ2", "MAED-MAJ2", "A", "Dr. Marlon Geronimo", "Sat 8:00-11:00", "3", "Enrolled", today, "Not a student of record"],
         ["2026-2027", "1st Semester", "2560001", "Cruz", "Daniel", "MAED", "MAED-XYZ9", "Unknown subject", "A", "Dr. Marlon Geronimo", "Sat 8:00-11:00", "3", "Enrolled", today, "Subject code not in the curriculum"],
     ]
@@ -157,7 +157,7 @@ def run(rt: Runtime) -> None:
         topts = sels.nth(1).locator("option").all_inner_texts()
         sels.nth(1).select_option(label=next(o for o in topts if CURRENT in o))
         rt.settle(staff)
-        row = staff.locator("tr", has_text="GS-2026-ENR-01").first
+        row = staff.locator("tr", has_text="2690501").first
         row.scroll_into_view_if_needed()
         staff.evaluate("window.scrollBy(0, 180)")
         staff.wait_for_timeout(400)

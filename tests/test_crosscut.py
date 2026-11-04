@@ -84,7 +84,7 @@ class CrossCutBase(unittest.TestCase):
             course = Course(program_id=program.id, code="XC-501", title="Crosscut Course", units=3, category="Major")
             db.session.add(course)
             student = Student(
-                student_number="GS-2026-XC",
+                student_number="9900107",
                 first_name="Cross",
                 last_name="Cut",
                 email="cross@example.test",
@@ -423,7 +423,7 @@ class StudentMergeTests(CrossCutBase):
 
     def test_merge_moves_every_student_linked_table_and_loses_nothing(self):
         with app.app_context():
-            source = Student(student_number="GS-2026-DUP", first_name="Dup", last_name="Licate",
+            source = Student(student_number="9900108", first_name="Dup", last_name="Licate",
                              email="dup@example.test", program_id=self.program_id, entry_year=2025,
                              current_stage="Coursework", standing="Active")
             db.session.add(source)
@@ -456,7 +456,7 @@ class StudentMergeTests(CrossCutBase):
 
     def test_merge_does_not_orphan_the_duplicates_login(self):
         with app.app_context():
-            source = Student(student_number="GS-2026-DUP2", first_name="Dup", last_name="Two",
+            source = Student(student_number="9900109", first_name="Dup", last_name="Two",
                              email="dup2@example.test", program_id=self.program_id, entry_year=2025,
                              current_stage="Coursework", standing="Active")
             db.session.add(source)
@@ -659,7 +659,7 @@ class QueueAndRiskTests(CrossCutBase):
             add_log("withdrawal", self.student_id, "Graduate School Staff · Grace", "Approved subject withdrawals workbook",
                     "Approved subject withdrawal added to Registrar Excel list", "Graduate School Staff", "",
                     new_status="Exported - Ready to Send")
-            open_student = Student(student_number="GS-2026-OPEN", first_name="Still", last_name="Open", email="o@example.test",
+            open_student = Student(student_number="9900110", first_name="Still", last_name="Open", email="o@example.test",
                                    program_id=self.program_id, entry_year=2025, current_stage="Coursework", standing="Active")
             db.session.add(open_student)
             db.session.flush()

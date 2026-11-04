@@ -5,7 +5,7 @@ export default {
   process: "practicum",
   title: "Practicum",
   summary: "A Psychology or MSGC student sends the MOA and the hours; the Coordinator may ask for more certificates; the Dean reviews the report.",
-  studentNumber: "GS-2026-PRAC-02",
+  studentNumber: "2690202",
   walkthrough: "18_practicum",
   accounts: {
     student: { who: "the student", label: "Paolo Ramirez", email: "practicum.paolo@usls.edu.ph" },

@@ -5,6 +5,7 @@ F-41 = issues I-060, I-061, I-062, I-070, I-094, I-095. One seeded temporary dat
 whole module (the way tests/test_v53_backend.py builds its own); every test only reads it.
 """
 import os
+import re
 import tempfile
 import unittest
 from collections import Counter
@@ -29,8 +30,10 @@ from app import (  # noqa: E402
     PanelAssignment,
     Program,
     SEEDED_HISTORY_SOURCE,
+    STUDENT_NUMBER_RE,
     Student,
     SubjectEnrollment,
+    DEMO_STUDENT_NUMBERS,
     Task,
     TransactionLog,
     UserAccount,
@@ -183,7 +186,7 @@ class SeedQualityTests(unittest.TestCase):
                 SubjectEnrollment.student_id == default.id,
                 SubjectEnrollment.status.in_(("Enrolled", "Current")),
             ).count())
-            for number in ("GS-2026-WD-01", "GS-2026-WD-02"):
+            for number in ("2690401", "2690402"):
                 student = Student.query.filter_by(student_number=number).one()
                 self.assertGreaterEqual(SubjectEnrollment.query.filter(
                     SubjectEnrollment.student_id == student.id,
@@ -207,7 +210,7 @@ class SeedQualityTests(unittest.TestCase):
             self.assertEqual(10, window["fee_percent"], window)
             # Still open for the next week of a demo or UAT.
             self.assertTrue(subject_withdrawal_window(subject, self.today + timedelta(days=7))["eligible"])
-            joshua = Student.query.filter_by(student_number="GS-2026-WD-02").one()
+            joshua = Student.query.filter_by(student_number="2690402").one()
             joshua_subject = SubjectEnrollment.query.filter_by(student_id=joshua.id, status="Enrolled").first()
             self.assertTrue(subject_withdrawal_window(joshua_subject)["eligible"])
             subject_id, account_id = subject.id, account.id
@@ -237,6 +240,25 @@ class SeedQualityTests(unittest.TestCase):
             years = sorted({int(term.label.split()[1].split("-")[0]) for term in AcademicTerm.query.all()})
             self.assertEqual(list(range(current_start - 2, current_start + 3)), years)
             self.assertEqual(10, AcademicTerm.query.count())
+
+    # ------------------------------------------------------------------ I-353: one student-ID format
+    def test_every_seeded_student_has_a_seven_digit_id_and_a_yy_yy_school_year(self):
+        with app.app_context():
+            students = Student.query.all()
+            self.assertTrue(students)
+            bad_ids = [s.student_number for s in students if not STUDENT_NUMBER_RE.fullmatch(s.student_number or "")]
+            self.assertEqual([], bad_ids)
+            self.assertEqual(len(students), len({s.student_number for s in students}))
+            bad_ay = [s.academic_year_entry for s in students if not re.fullmatch(r"\d{2}-\d{2}", s.academic_year_entry or "")]
+            self.assertEqual([], bad_ay)
+
+    def test_the_demo_personas_come_from_one_mapping_table(self):
+        with app.app_context():
+            numbers = set(DEMO_STUDENT_NUMBERS.values())
+            self.assertEqual(len(numbers), len(DEMO_STUDENT_NUMBERS))
+            self.assertTrue(all(STUDENT_NUMBER_RE.fullmatch(n) for n in numbers))
+            seeded = {s.student_number for s in Student.query.all()}
+            self.assertEqual(set(), numbers - seeded)
 
 
 if __name__ == "__main__":

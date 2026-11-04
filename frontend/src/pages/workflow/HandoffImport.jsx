@@ -540,7 +540,7 @@ function MonitoringIssueModal({ issue, busy, error, onClose, onResolve }) {
             <h3 className="card-title flex items-center gap-2"><Pencil className="h-4 w-4 text-brand-700" aria-hidden="true" /> Edit uploaded values</h3>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {[["student_number", "Student ID"], ["first_name", "First name"], ["last_name", "Last name"], ["academic_year_entry", "School Year / AY Entry"]].map(([key, label]) => (
-                <Field key={key} label={label} hint={key === "student_number" ? studentIdWarning(edited[key]) || undefined : undefined}>
+                <Field key={key} label={label} error={key === "student_number" ? studentIdWarning(edited[key]) || undefined : undefined}>
                   {key === "academic_year_entry" ? (
                     <AyEntrySelect value={edited[key]} onChange={(event) => setEdited((current) => ({ ...current, [key]: event.target.value }))} />
                   ) : (

@@ -742,6 +742,16 @@ class AdviserMigrationTests(AdviserBase):
         self.assertEqual(again.status_code, 409)
         self.assertEqual(self.student().post("/api/adviser-appointments/record", json={}).status_code, 403)
 
+    def test_an_appointment_cannot_be_dated_in_the_future(self):
+        body = {"student_id": self.new_student_id, "faculty_id": self.faculty_ids["Content Person"]}
+        tomorrow = self.research().post("/api/adviser-appointments/record", json={
+            **body, "appointed_on": (date.today() + timedelta(days=2)).isoformat()})
+        self.assertEqual(tomorrow.status_code, 400, tomorrow.get_json())
+        self.assertIn("future", tomorrow.get_json()["error"].lower())
+        today = self.research().post("/api/adviser-appointments/record", json={
+            **body, "appointed_on": app_module.ph_today().isoformat()})
+        self.assertEqual(today.status_code, 201, today.get_json())
+
     def test_editing_the_adviser_on_the_monitoring_sheet_records_an_appointment(self):
         with app.app_context():
             student = db.session.get(Student, self.new_student_id)

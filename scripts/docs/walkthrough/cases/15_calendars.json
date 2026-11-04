@@ -185,7 +185,7 @@
   "The Dean has no calendar page in this version: the former Dean calendar address leads back to the Approvals Queue.",
   "The private link is a secret address: anyone who has it can read the owner's calendar, so it can be replaced (**New link**) or switched off (**Turn off**) at any time. Faculty do not use this link; they use the Google Calendar card.",
   "The Google Calendar connection could not be run in this walk-through (no Google keys on the demo server). Everything said about the connected state comes from the text and buttons of the faculty screens.",
-  "The demonstration students GS-2026-UD-01 to 03 that carry the scheduling and verdict cases do not have a student login, so their own notices cannot be shown from the student side. The adviser appointment screens are shown in {case:research_title}.",
+  "The demonstration students 2691201 to 03 that carry the scheduling and verdict cases do not have a student login, so their own notices cannot be shown from the student side. The adviser appointment screens are shown in {case:research_title}.",
   "Faculty bell items and deadline flags are computed when the bell or the calendar is opened; there is no email."
  ]
 }

@@ -1,6 +1,6 @@
 """Case 14 - Panel Matching with explainable scores.
 
-Miguel Yu (after case 13) and the seven demo students GS-2026-PM-01 .. PM-07.
+Miguel Yu (after case 13) and the seven demo students 2690101 .. PM-07.
 Also the Faculty page: expertise records and editing (the added record is removed again at the end).
 Facts read off the screens are written to shots/_facts_14.json for the case text.
 """
@@ -27,7 +27,7 @@ def shot(rt, page, shot_id: str, **kw):
 
 
 WIDE = {"width": 1700, "height": 960}
-PM_STUDENTS = [f"GS-2026-PM-0{n}" for n in range(1, 8)]
+PM_STUDENTS = [f"269010{n}" for n in range(1, 8)]
 
 
 def sid(n: int) -> str:
@@ -227,7 +227,7 @@ def run(rt):
     target = "Dr. Teresa Lim"
 
     def before():
-        h.pick_student(staff, "GS-2026-PM-04")
+        h.pick_student(staff, "2690104")
         table = staff.get_by_role("table", name="Ranked panel candidates")
         h.scroll_to(staff, table, 70)
         facts["pm04_before"] = [r for r in read_facts(staff)["rows"]]
@@ -261,7 +261,7 @@ def run(rt):
 
     def after():
         rt.go(staff, "/workflow/panel-matching")
-        h.pick_student(staff, "GS-2026-PM-04")
+        h.pick_student(staff, "2690104")
         table = staff.get_by_role("table", name="Ranked panel candidates")
         h.scroll_to(staff, table, 70)
         facts["pm04_after"] = [r for r in read_facts(staff)["rows"]]

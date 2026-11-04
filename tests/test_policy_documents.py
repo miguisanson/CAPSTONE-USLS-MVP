@@ -140,7 +140,7 @@ class PolicyTestBase(unittest.TestCase):
             db.session.add(program)
             db.session.flush()
             student = appmod.Student(
-                student_number="GS-2026-POL", first_name="Policy", last_name="Student",
+                student_number="9900111", first_name="Policy", last_name="Student",
                 email="policy-student@example.test", program_id=program.id, entry_year=2025,
                 academic_year_entry="25-26", year_level="1", current_stage="Coursework", standing="Active",
             )

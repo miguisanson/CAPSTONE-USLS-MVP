@@ -5,7 +5,7 @@ export default {
   process: "withdrawal",
   title: "Subject Withdrawal",
   summary: "A student withdraws from one subject inside the handbook window, staff forward it, the Dean decides, staff tag the subject and export the Registrar list.",
-  studentNumber: "GS-2026-WD-01",
+  studentNumber: "2690401",
   walkthrough: "06_withdrawal",
   accounts: {
     student: { who: "the student", label: "Elena Navarro", email: "withdrawal.elena@usls.edu.ph" },

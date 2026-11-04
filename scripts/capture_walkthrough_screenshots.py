@@ -164,11 +164,11 @@ def capture_core_records(
 
     open_screen(page, base_url, "/students")
     capture(page, output_dir, "student_records")
-    open_screen(page, base_url, "/students?q=GS-2026-HO-01")
+    open_screen(page, base_url, "/students?q=2690601")
     capture(page, output_dir, "students_filtered")
     student_results = checked_json(
         page.request.get(
-            f"{base_url}/api/students?q=GS-2026-HO-01&page_size=10"
+            f"{base_url}/api/students?q=2690601&page_size=10"
         ),
         "Find Student Handoff demo record",
     )
@@ -555,11 +555,11 @@ def capture_residency_flow(
         capture(page, output_dir, "residency_case_detail")
         close_dialog(page)
 
-    open_screen(page, base_url, "/students?q=GS-2026-RES-01")
+    open_screen(page, base_url, "/students?q=2691101")
     capture(page, output_dir, "residency_students_sync")
     results = checked_json(
         page.request.get(
-            f"{base_url}/api/students?q=GS-2026-RES-01&page_size=10"
+            f"{base_url}/api/students?q=2691101&page_size=10"
         ),
         "Find Residency demo record",
     )

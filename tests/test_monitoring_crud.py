@@ -600,6 +600,99 @@ class MonitoringPortalCrudTests(unittest.TestCase):
         self.assertEqual(records["MPT-501"]["status"], "Completed")
         self.assertEqual(records["MPT-501"]["source"], "Manual entry")
 
+    # -- I-353: one student-ID format, and server checks behind the dropdowns --
+    def test_a_student_id_must_be_exactly_seven_digits_everywhere(self):
+        staff = self._client("staff")
+        for bad in ("GS-2026-0001", "212321314", "123456", "12345678", "20260001 ", "22A0004", ""):
+            response = staff.post("/api/monitoring/students", json=self._student_payload(student_number=bad))
+            self.assertEqual(response.status_code, 400, (bad, response.get_json()))
+            if bad.strip():
+                self.assertIn("7 digits", response.get_json()["error"], bad)
+        student_id = self._create_student(student_number="2690990")["student"]["id"]
+        url = f"/api/monitoring/students/{student_id}"
+        edit = staff.patch(url, json={"student_number": "GS-123213", "reason": "typo"})
+        self.assertEqual(edit.status_code, 400, edit.get_json())
+        self.assertIn("7 digits", edit.get_json()["error"])
+        fine = staff.patch(url, json={"student_number": "2690991", "reason": "typo"})
+        self.assertEqual(fine.status_code, 200, fine.get_json())
+        with app.app_context():
+            self.assertEqual(Student.query.get(student_id).student_number, "2690991")
+
+    def test_an_import_refuses_a_row_whose_id_is_not_seven_digits(self):
+        result = self._import_row("GS-2026-0001", "Ana", "Reyes", {"MPT-501": True})
+        self.assertEqual(result["created"], 0)
+        self.assertEqual(result["conflict_count"], 1)
+        self.assertIn("7 digits", result["conflicts"][0]["reason"])
+        with app.app_context():
+            self.assertEqual(Student.query.count(), 0)
+
+    def test_school_year_entry_must_be_yy_yy_in_the_configured_range(self):
+        staff = self._client("staff")
+        for bad in ("62-27", "26-28", "26-26", "40-41", "99-00", "26", "2026-27x", "1926-1927"):
+            response = staff.post("/api/monitoring/students", json=self._student_payload(academic_year_entry=bad))
+            self.assertEqual(response.status_code, 400, (bad, response.get_json()))
+        for good, stored in (("26-27", "26-27"), ("2026-2027", "26-27"), ("2026-27", "26-27")):
+            with app.app_context():
+                Student.query.delete()
+                db.session.commit()
+            body = self._create_student(academic_year_entry=good)
+            self.assertEqual(body["student"]["academic_year_entry"], stored)
+            with app.app_context():
+                self.assertEqual(Student.query.get(body["student"]["id"]).entry_year, 2026)
+        editing = self._client("staff").patch(
+            f"/api/monitoring/students/{body['student']['id']}", json={"academic_year_entry": "62-27", "reason": "typo"})
+        self.assertEqual(editing.status_code, 400, editing.get_json())
+
+    def test_an_import_stores_the_school_year_as_yy_yy_and_refuses_a_bad_one(self):
+        ok = self._import_row("9000301", "Ana", "Reyes", {"MPT-501": True}, ay="2025-2026")
+        self.assertEqual(ok["created"], 1, ok)
+        bad = self._import_row("9000302", "Ben", "Cruz", {"MPT-501": True}, ay="62-27")
+        self.assertEqual(bad["created"], 0, bad)
+        self.assertEqual(bad["conflict_count"], 1)
+        with app.app_context():
+            self.assertEqual(Student.query.filter_by(student_number="9000301").one().academic_year_entry, "25-26")
+            self.assertIsNone(Student.query.filter_by(student_number="9000302").first())
+
+    def test_email_and_names_are_checked_on_the_server(self):
+        staff = self._client("staff")
+        for bad in ("maria", "maria@", "@usls.edu.ph", "maria@usls", "ma ria@usls.edu.ph", "a@b@c.ph"):
+            response = staff.post("/api/monitoring/students", json=self._student_payload(email=bad))
+            self.assertEqual(response.status_code, 400, (bad, response.get_json()))
+            self.assertIn("email", response.get_json()["error"].lower())
+        for field in ("first_name", "last_name"):
+            for bad in ("Mar1a", "Maria_", "Maria<b>", "12", "M@ria"):
+                response = staff.post("/api/monitoring/students", json=self._student_payload(**{field: bad}))
+                self.assertEqual(response.status_code, 400, (field, bad, response.get_json()))
+                self.assertIn("letters", response.get_json()["error"].lower())
+        ok = self._create_student(first_name="Ma. Lorianne", last_name="D'Souza-O’Neil", email="maria.d@usls.edu.ph")
+        url = f"/api/monitoring/students/{ok['student']['id']}"
+        self.assertEqual(staff.patch(url, json={"email": "nope", "reason": "typo"}).status_code, 400)
+        self.assertEqual(staff.patch(url, json={"first_name": "J0se", "reason": "typo"}).status_code, 400)
+
+    def test_the_manual_handoff_takes_only_a_seven_digit_id_and_derives_the_entry_year(self):
+        with app.app_context():
+            term_id = AcademicTerm.query.filter_by(is_active_planning_term=True).one().id
+        staff = self._client("staff")
+
+        def handoff(**over):
+            body = {"program_id": self.program_id, "term_id": term_id, "first_name": "Ana", "last_name": "Reyes",
+                    "student_number": "2690995", "admission_signal": "Admission Confirmed", "entry_year": "1999"}
+            body.update(over)
+            return staff.post("/api/transactions/student-handoff", json=body)
+
+        for bad in ("2026-0001", "GS-2026-0001", "", "123"):
+            response = handoff(student_number=bad)
+            self.assertEqual(response.status_code, 400, (bad, response.get_json()))
+            self.assertIn("7 digits", response.get_json()["error"])
+        with app.app_context():
+            self.assertEqual(Student.query.count(), 0)
+        ok = handoff()
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        with app.app_context():
+            student = Student.query.filter_by(student_number="2690995").one()
+            self.assertEqual((student.entry_year, student.academic_year_entry), (2026, "26-27"))
+        self.assertEqual(handoff(first_name="An4", student_number="2690996").status_code, 400)
+
 
 if __name__ == "__main__":
     unittest.main()

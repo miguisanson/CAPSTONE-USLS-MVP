@@ -562,7 +562,7 @@ function DetailsTab({ data, canEdit, termLabels, studentValues, onChanged }) {
   const [error, setError] = useState("");
   const idWarning = studentIdWarning(form.student_number);
   const emailError = emailProblem(form.email) || nameProblem(form.first_name) || nameProblem(form.last_name);
-  const dirty = !emailError && (adviserChanged || Object.keys(initial).some((key) => form[key] !== initial[key]));
+  const dirty = !emailError && !idWarning && (adviserChanged || Object.keys(initial).some((key) => form[key] !== initial[key]));
   const stopEditing = () => { setEditing(false); setForm(initial); setAdviserPick(null); };
 
   async function save(reason) {
@@ -619,7 +619,7 @@ function DetailsTab({ data, canEdit, termLabels, studentValues, onChanged }) {
       className="space-y-4"
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Student ID" required hint={idWarning || undefined}><Input autoFocus value={form.student_number} onChange={set("student_number")} required maxLength={40} inputMode="numeric" autoComplete="off" /></Field>
+        <Field label="Student ID" required error={idWarning || undefined}><Input autoFocus value={form.student_number} onChange={set("student_number")} required maxLength={40} inputMode="numeric" autoComplete="off" /></Field>
         <Field label="School year / AY entry" required><AyEntrySelect value={form.academic_year_entry} onChange={set("academic_year_entry")} termLabels={termLabels} studentValues={studentValues} required /></Field>
         <Field label="First name" required error={nameProblem(form.first_name) || undefined}><Input value={form.first_name} onChange={set("first_name")} required maxLength={80} /></Field>
         <Field label="Last name" required error={nameProblem(form.last_name) || undefined}><Input value={form.last_name} onChange={set("last_name")} required maxLength={80} /></Field>

@@ -207,8 +207,8 @@ test.describe("P4.1 shared student parts", () => {
       await expect(m.locator("h1")).toHaveText("Welcome, Therese");
       const header = m.locator("h1").locator("xpath=ancestor::*[.//p][1]");
       await expect(header).toContainText("Master of Arts in Education");
-      await expect(header).toContainText("GS-2026-READ-01");
-      await expect(header).toContainText(/AY entry 2026-2027/);
+      await expect(header).toContainText("2690901");
+      await expect(header).toContainText(/AY entry 26-27/);
       await expect(header).toContainText(/Year 1/);
       await expect(header).toContainText("On Track");
       // the key numbers: label and value together (Coursework and Research; Stage moved into the lifecycle card)

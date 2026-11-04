@@ -25,7 +25,7 @@
  "data": [
   [
    "Student",
-   "Nicolas Valdez, GS-2026-RES-01, MAED (demo group AWOL & Residency)"
+   "Nicolas Valdez, 2691101, MAED (demo group AWOL & Residency)"
   ],
   [
    "Residency purpose",
@@ -88,7 +88,7 @@
    "intro": null,
    "steps": [
     {
-     "text": "Type Nicolas in the board search. His card is in the **Residency** column (Active no-subject residency semesters): Nicolas Valdez, GS-2026-RES-01 · MAED, the purpose, the semester, Next: Graduate School Staff and the chip **Eligible for Residency**. Select **View details**: the window shows the title **Residency active**, the tracker (**Residency recorded**, **Residency closed**), the request (student, type Residency, semester, purpose, policy result, date recorded, staff notes) and the policy check, with the buttons **Close details** and **Close the residency**. This walkthrough does not close the residency.",
+     "text": "Type Nicolas in the board search. His card is in the **Residency** column (Active no-subject residency semesters): Nicolas Valdez, 2691101 · MAED, the purpose, the semester, Next: Graduate School Staff and the chip **Eligible for Residency**. Select **View details**: the window shows the title **Residency active**, the tracker (**Residency recorded**, **Residency closed**), the request (student, type Residency, semester, purpose, policy result, date recorded, staff notes) and the policy check, with the buttons **Close details** and **Close the residency**. This walkthrough does not close the residency.",
      "shots": [
       {
        "id": "residency-05",

@@ -5,7 +5,7 @@ export default {
   process: "readmission",
   title: "Readmission",
   summary: "A student on leave asks to come back, staff verify the return checklist, the Dean approves.",
-  studentNumber: "GS-2026-READ-01",
+  studentNumber: "2690901",
   walkthrough: "10_readmission",
   accounts: {
     student: { who: "the student", label: "Therese Lacson", email: "readmission.therese@usls.edu.ph" },

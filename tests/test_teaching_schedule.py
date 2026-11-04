@@ -258,6 +258,23 @@ class TeachingScheduleTests(unittest.TestCase):
         result = self.coordinator.patch(f"/api/course-offerings/{offering_id}", json={"schedule": "Monday 1PM"})
         self.assertEqual(result.status_code, 409, result.get_json())
 
+    def test_a_section_is_a_single_letter_a_to_z(self):
+        with app.app_context():
+            offering_id = CurriculumOffering.query.filter_by(course_id=self.f.course_ids[0], semester="2nd Semester").one().id
+        url = f"/api/course-offerings/{offering_id}"
+        for bad in ("AB", "1", "A-1", "ñ", "Sec A"):
+            result = self.coordinator.patch(url, json={"section": bad})
+            self.assertEqual(result.status_code, 400, (bad, result.get_json()))
+            self.assertIn("A to Z", result.get_json()["error"])
+        result = self.coordinator.patch(url, json={"section": " b "})
+        self.assertEqual(result.status_code, 200, result.get_json())
+        with app.app_context():
+            self.assertEqual(db.session.get(CurriculumOffering, offering_id).section, "B")
+        result = self.coordinator.patch(url, json={"section": ""})
+        self.assertEqual(result.status_code, 200, result.get_json())
+        with app.app_context():
+            self.assertIsNone(db.session.get(CurriculumOffering, offering_id).section)
+
     def test_explicit_revision_rebuilds_changed_source_offerings(self):
         plan = self.ready_plan()
         with app.app_context():

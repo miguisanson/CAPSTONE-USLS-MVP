@@ -179,126 +179,126 @@
       ],
       [
        "Andrea Villanueva",
-       "GS-2026-PRAC-01",
+       "2690201",
        "practicum.andrea@usls.edu.ph",
        "Psychology student ready to begin the Practicum process",
        "{case:practicum}"
       ],
       [
        "Paolo Ramirez",
-       "GS-2026-PRAC-02",
+       "2690202",
        "practicum.paolo@usls.edu.ph",
        "MSGC student ready to begin the Practicum process",
        "{case:practicum}"
       ],
       [
        "Bianca Santos",
-       "GS-2026-GRAD-01",
+       "2690301",
        "graduation.bianca@usls.edu.ph",
        "Ready to submit a Graduation application",
        "{case:graduation}"
       ],
       [
        "Carlo Mendoza",
-       "GS-2026-GRAD-02",
+       "2690302",
        "graduation.carlo@usls.edu.ph",
        "Ready to submit a Graduation application",
        "{case:graduation}"
       ],
       [
        "Elena Navarro",
-       "GS-2026-WD-01",
+       "2690401",
        "withdrawal.elena@usls.edu.ph",
        "Enrolled in three active subjects; ready to choose one for a Withdrawal request",
        "{case:withdrawal}"
       ],
       [
        "Joshua Lim",
-       "GS-2026-WD-02",
+       "2690402",
        "withdrawal.joshua@usls.edu.ph",
        "Enrolled in three active subjects; ready to choose one for a Withdrawal request",
        "{case:withdrawal}"
       ],
       [
        "Clarissa Dela Cruz",
-       "GS-2026-ENR-01",
+       "2690501",
        "enrollment.clarissa@usls.edu.ph",
        "Active student with no current subjects; ready for single-student enrollment",
        "{case:enrollment}"
       ],
       [
        "Martin Gonzales",
-       "GS-2026-ENR-02",
+       "2690502",
        "enrollment.martin@usls.edu.ph",
        "Active student with completed prerequisites; ready for offered-subject enrollment",
        "{case:enrollment}"
       ],
       [
        "Sofia Reyes",
-       "GS-2026-HO-01",
+       "2690601",
        "handoff.sofia@usls.edu.ph",
        "New student with a complete admissions handoff and portal profile",
        "{case:monitoring_sheet}"
       ],
       [
        "Anton Bautista",
-       "GS-2026-HO-02",
+       "2690602",
        "anton.bautista@student.usls.edu.ph",
        "New student with one handoff item awaiting staff follow-up",
        "{case:monitoring_sheet}"
       ],
       [
        "Lianne Mercado",
-       "GS-2026-CA-01",
+       "2690701",
        "adjustments.lianne@usls.edu.ph",
        "Demand persona with several missing MAED subjects",
        "{case:course_adjustments}"
       ],
       [
        "Roberto Aquino",
-       "GS-2026-CA-02",
+       "2690702",
        "roberto.aquino@student.usls.edu.ph",
        "Demand persona nearing completion with focused subject needs",
        "{case:course_adjustments}"
       ],
       [
        "Maureen Castillo",
-       "GS-2026-LOA-01",
+       "2690801",
        "maureen.castillo@student.usls.edu.ph",
        "Active student ready to submit a structured one-semester LOA request",
        "{case:leave_of_absence}"
       ],
       [
        "Daniel Fernandez",
-       "GS-2026-LOA-02",
+       "2690802",
        "loa.daniel@usls.edu.ph",
        "Active student ready to demonstrate the two-semester LOA policy check",
        "{case:leave_of_absence}"
       ],
       [
        "Therese Lacson",
-       "GS-2026-READ-01",
+       "2690901",
        "readmission.therese@usls.edu.ph",
        "On approved LOA; ready to submit a structured readmission request",
        "{case:readmission}"
       ],
       [
        "Gabriel Domingo",
-       "GS-2026-READ-02",
+       "2690902",
        "readmission.gabriel@usls.edu.ph",
        "On approved LOA; ready to demonstrate return-semester policy checks",
        "{case:readmission}"
       ],
       [
        "Maya Torres",
-       "GS-2026-AWOL-01",
+       "2691001",
        "awol.maya@usls.edu.ph",
        "Automatically flagged AWOL; ready to submit a structured return declaration",
        "{case:awol}"
       ],
       [
        "Nicolas Valdez",
-       "GS-2026-RES-01",
+       "2691101",
        "residency.nicolas@usls.edu.ph",
        "Active research-stage student ready for a residency policy review",
        "{case:residency}"
@@ -307,7 +307,7 @@
     },
     {
      "type": "p",
-     "text": "The seeded faculty roster, the seven panel-matching students (GS-2026-PM-01 to GS-2026-PM-07) and the seeded defenses used by the scheduling cases are described where they are used. Each workflow demo student can be put back to the start from the Student workflow demos list in the Demo accounts panel (Reset button) and, for Practicum and Graduation, from the staff Reset demo case button; {case:reset-demo} explains both. A reset restores that student's own workflow state only."
+     "text": "The seeded faculty roster, the seven panel-matching students (2690101 to 2690107) and the seeded defenses used by the scheduling cases are described where they are used. Each workflow demo student can be put back to the start from the Student workflow demos list in the Demo accounts panel (Reset button) and, for Practicum and Graduation, from the staff Reset demo case button; {case:reset-demo} explains both. A reset restores that student's own workflow state only."
     }
    ]
   },

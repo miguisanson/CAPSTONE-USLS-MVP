@@ -23,6 +23,8 @@ This file is the map; `e2e/support/check-ownership.mjs` is the guard.
    student nobody else writes.
 3. **A writer uses its own demo student** (list in `WORKFLOW_DEMO_STUDENTS`, `app.py`). Unused today: `enrollment-clarissa`
    (p79), `student-handoff-sofia`, `student-handoff-anton`, `course-adjustments-lianne`, `residency-nicolas`.
+   Every demo student's number is exactly 7 digits from one table, `DEMO_STUDENT_NUMBERS` (`panel_demo_data.py`, also
+   `app.DEMO_STUDENT_NUMBERS`; the 269xxxx block, e.g. `awol-maya` = 2691001). Specs name numbers, never the old `GS-2026-...` labels (I-353).
 4. **Sessions are shared state too.** Never sign an account out that another spec uses. See "Sessions" below.
 
 Run the guard alone: `node e2e/support/check-ownership.mjs` (from `frontend/`). `playwright.config.js` runs it first on every

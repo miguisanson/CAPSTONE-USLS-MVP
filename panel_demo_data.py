@@ -9,6 +9,40 @@ entered in the portal. The file holds plain data only; app.py does the seeding.
 
 DEMO_SEED_SOURCE = "demo seed"
 
+# One mapping table for the seeded demo personas (I-353). Every number is exactly 7 digits and sits in the 269xxxx
+# block, which no imported student uses (the sheets use 226/236/246/256). Tests, e2e specs, walkthroughs and the
+# demo guides name the same numbers; change one here and run: grep -rn <old number> .
+DEMO_STUDENT_NUMBERS = {
+    "PM-01": "2690101",
+    "PM-02": "2690102",
+    "PM-03": "2690103",
+    "PM-04": "2690104",
+    "PM-05": "2690105",
+    "PM-06": "2690106",
+    "PM-07": "2690107",
+    "PRAC-01": "2690201",
+    "PRAC-02": "2690202",
+    "GRAD-01": "2690301",
+    "GRAD-02": "2690302",
+    "WD-01": "2690401",
+    "WD-02": "2690402",
+    "ENR-01": "2690501",
+    "ENR-02": "2690502",
+    "HO-01": "2690601",
+    "HO-02": "2690602",
+    "CA-01": "2690701",
+    "CA-02": "2690702",
+    "LOA-01": "2690801",
+    "LOA-02": "2690802",
+    "READ-01": "2690901",
+    "READ-02": "2690902",
+    "AWOL-01": "2691001",
+    "RES-01": "2691101",
+    "UD-01": "2691201",
+    "UD-02": "2691202",
+    "UD-03": "2691203",
+}
+
 # (kind, text, year) per faculty member. Kinds: research_interest, publication,
 # past_advisee_title, past_panel_title, degree. The roster's own SPECIALIZATION
 # text stays on Faculty.specialization and is used as evidence too.
@@ -138,7 +172,7 @@ FACULTY_EXPERTISE_DEMO = {
 # is the historical title-defense panel for students past the title defense.
 PANEL_MATCHING_DEMO_STUDENTS = [
     {
-        "student_number": "GS-2026-PM-01",
+        "student_number": DEMO_STUDENT_NUMBERS["PM-01"],
         "first_name": "Camille", "last_name": "Dizon",
         "program_code": "MSN", "adviser": "Dr. Teodoro Ramos", "stage": "title",
         "field": "nursing and health informatics",
@@ -166,7 +200,7 @@ PANEL_MATCHING_DEMO_STUDENTS = [
         ],
     },
     {
-        "student_number": "GS-2026-PM-02",
+        "student_number": DEMO_STUDENT_NUMBERS["PM-02"],
         "first_name": "Rafael", "last_name": "Ocampo",
         "program_code": "MAPSY", "adviser": "Dr. Liwayway Bautista", "stage": "title",
         "field": "psychology and student well-being",
@@ -193,7 +227,7 @@ PANEL_MATCHING_DEMO_STUDENTS = [
         ],
     },
     {
-        "student_number": "GS-2026-PM-03",
+        "student_number": DEMO_STUDENT_NUMBERS["PM-03"],
         "first_name": "Jasper", "last_name": "Lorenzo",
         "program_code": "MSCS", "adviser": "Dr. Marlon Geronimo", "stage": "title",
         "field": "engineering systems and predictive maintenance",
@@ -219,7 +253,7 @@ PANEL_MATCHING_DEMO_STUDENTS = [
         ],
     },
     {
-        "student_number": "GS-2026-PM-04",
+        "student_number": DEMO_STUDENT_NUMBERS["PM-04"],
         "first_name": "Bea", "last_name": "Fontanilla",
         "program_code": "MBA", "adviser": "Dr. Angela Cruz", "stage": "title",
         "field": "financial technology",
@@ -244,7 +278,7 @@ PANEL_MATCHING_DEMO_STUDENTS = [
         ],
     },
     {
-        "student_number": "GS-2026-PM-05",
+        "student_number": DEMO_STUDENT_NUMBERS["PM-05"],
         "first_name": "Miko", "last_name": "Almario",
         "program_code": "MBA", "adviser": "Dr. Paolo Navarro", "stage": "proposal",
         "field": "supply chain and operations",
@@ -280,7 +314,7 @@ PANEL_MATCHING_DEMO_STUDENTS = [
         ),
     },
     {
-        "student_number": "GS-2026-PM-06",
+        "student_number": DEMO_STUDENT_NUMBERS["PM-06"],
         "first_name": "Liza", "last_name": "Marquez",
         "program_code": "DBA", "adviser": "Dr. Benjamin Reyes", "stage": "proposal",
         "field": "family business and strategy",
@@ -317,7 +351,7 @@ PANEL_MATCHING_DEMO_STUDENTS = [
         ),
     },
     {
-        "student_number": "GS-2026-PM-07",
+        "student_number": DEMO_STUDENT_NUMBERS["PM-07"],
         "first_name": "Nico", "last_name": "Baltazar",
         "program_code": "MBA", "adviser": "Dr. Angela Cruz", "stage": "title",
         "field": "digital marketing and consumer behavior",
@@ -350,19 +384,19 @@ PANEL_MATCHING_DEMO_STUDENTS = [
 # "days_ahead" days from today. The seeder keeps the date in the future on every start.
 UPCOMING_DEFENSE_DEMO = [
     {
-        "base": "GS-2026-PM-05", "student_number": "GS-2026-UD-01", "first_name": "Nico", "last_name": "Barrientos",
+        "base": DEMO_STUDENT_NUMBERS["PM-05"], "student_number": DEMO_STUDENT_NUMBERS["UD-01"], "first_name": "Nico", "last_name": "Barrientos",
         "case_title": "Reorder Point Policies and Service Levels for a Regional Hardware Distributor",
-        "days_ahead": 6, "start": "09:00", "end": "10:30", "mode": "In person", "venue": "Graduate School Conference Room",
+        "days_ahead": 6, "start": "09:00", "end": "10:30", "mode": "On-site", "venue": "Graduate School Conference Room",
     },
     {
-        "base": "GS-2026-PM-06", "student_number": "GS-2026-UD-02", "first_name": "Bea", "last_name": "Salonga",
+        "base": DEMO_STUDENT_NUMBERS["PM-06"], "student_number": DEMO_STUDENT_NUMBERS["UD-02"], "first_name": "Bea", "last_name": "Salonga",
         "case_title": "Governance and Continuity Planning in Second-Generation Family Enterprises",
         "days_ahead": 11, "start": "13:30", "end": "15:30", "mode": "Online", "venue": "Zoom (link sent by the Graduate School)",
     },
     {
-        "base": "GS-2026-PM-05", "student_number": "GS-2026-UD-03", "first_name": "Gab", "last_name": "Tolentino",
+        "base": DEMO_STUDENT_NUMBERS["PM-05"], "student_number": DEMO_STUDENT_NUMBERS["UD-03"], "first_name": "Gab", "last_name": "Tolentino",
         "case_title": "Inventory Accuracy and Order Fulfilment Time in a Cold-Chain Warehouse",
-        "days_ahead": 19, "start": "10:00", "end": "11:30", "mode": "In person", "venue": "Graduate School Conference Room",
+        "days_ahead": 19, "start": "10:00", "end": "11:30", "mode": "On-site", "venue": "Graduate School Conference Room",
     },
 ]
 
@@ -370,36 +404,36 @@ UPCOMING_DEFENSE_DEMO = [
 # Research advisers of the workflow demo students (I-060). The faculty limit is 5 advisees each
 # (business rule faculty.max_advisees), so the demo cohort is spread over five faculty members, and
 # an adviser never sits on the panel of their own advisee. Students that panel-matching demo data
-# places (GS-2026-PM-xx) and the sheet students keep the adviser they were seeded with.
+# places (2690101 to 2690107) and the sheet students keep the adviser they were seeded with.
 DEMO_ADVISER_FALLBACK = "Dr. Daniel Uy"
 DEMO_PANEL_REPLACEMENT = "Dr. Celeste Tan"
 DEMO_STUDENT_ADVISERS = {
-    # Dr. Liwayway Bautista (5 with GS-2026-PM-02, who is placed by PANEL_MATCHING_DEMO_STUDENTS)
+    # Dr. Liwayway Bautista (5 with 2690102, who is placed by PANEL_MATCHING_DEMO_STUDENTS)
     "2260007": "Dr. Liwayway Bautista",
-    "GS-2026-READ-01": "Dr. Liwayway Bautista",
-    "GS-2026-READ-02": "Dr. Liwayway Bautista",
-    "GS-2026-AWOL-01": "Dr. Liwayway Bautista",
-    # Dr. Marlon Geronimo (4 with GS-2026-PM-03)
-    "GS-2026-WD-01": "Dr. Marlon Geronimo",
-    "GS-2026-WD-02": "Dr. Marlon Geronimo",
-    "GS-2026-ENR-01": "Dr. Marlon Geronimo",
+    DEMO_STUDENT_NUMBERS["READ-01"]: "Dr. Liwayway Bautista",
+    DEMO_STUDENT_NUMBERS["READ-02"]: "Dr. Liwayway Bautista",
+    DEMO_STUDENT_NUMBERS["AWOL-01"]: "Dr. Liwayway Bautista",
+    # Dr. Marlon Geronimo (4 with 2690103)
+    DEMO_STUDENT_NUMBERS["WD-01"]: "Dr. Marlon Geronimo",
+    DEMO_STUDENT_NUMBERS["WD-02"]: "Dr. Marlon Geronimo",
+    DEMO_STUDENT_NUMBERS["ENR-01"]: "Dr. Marlon Geronimo",
     # Dr. Patricia Salvador
-    "GS-2026-ENR-02": "Dr. Patricia Salvador",
-    "GS-2026-HO-01": "Dr. Patricia Salvador",
-    "GS-2026-HO-02": "Dr. Patricia Salvador",
-    "GS-2026-CA-01": "Dr. Patricia Salvador",
-    "GS-2026-CA-02": "Dr. Patricia Salvador",
-    # Dr. Teodoro Ramos (5 with GS-2026-PM-01)
-    "GS-2026-LOA-01": "Dr. Teodoro Ramos",
-    "GS-2026-LOA-02": "Dr. Teodoro Ramos",
-    "GS-2026-GRAD-01": "Dr. Teodoro Ramos",
-    "GS-2026-GRAD-02": "Dr. Teodoro Ramos",
+    DEMO_STUDENT_NUMBERS["ENR-02"]: "Dr. Patricia Salvador",
+    DEMO_STUDENT_NUMBERS["HO-01"]: "Dr. Patricia Salvador",
+    DEMO_STUDENT_NUMBERS["HO-02"]: "Dr. Patricia Salvador",
+    DEMO_STUDENT_NUMBERS["CA-01"]: "Dr. Patricia Salvador",
+    DEMO_STUDENT_NUMBERS["CA-02"]: "Dr. Patricia Salvador",
+    # Dr. Teodoro Ramos (5 with 2690101)
+    DEMO_STUDENT_NUMBERS["LOA-01"]: "Dr. Teodoro Ramos",
+    DEMO_STUDENT_NUMBERS["LOA-02"]: "Dr. Teodoro Ramos",
+    DEMO_STUDENT_NUMBERS["GRAD-01"]: "Dr. Teodoro Ramos",
+    DEMO_STUDENT_NUMBERS["GRAD-02"]: "Dr. Teodoro Ramos",
     # Dr. Celeste Tan: not on the panel of the MAED research cohort, so she can advise its members
     "2260004": "Dr. Celeste Tan",
     "2360008": "Dr. Celeste Tan",
-    "GS-2026-PRAC-01": "Dr. Celeste Tan",
-    "GS-2026-PRAC-02": "Dr. Celeste Tan",
-    "GS-2026-RES-01": "Dr. Celeste Tan",
+    DEMO_STUDENT_NUMBERS["PRAC-01"]: "Dr. Celeste Tan",
+    DEMO_STUDENT_NUMBERS["PRAC-02"]: "Dr. Celeste Tan",
+    DEMO_STUDENT_NUMBERS["RES-01"]: "Dr. Celeste Tan",
 }
 
 

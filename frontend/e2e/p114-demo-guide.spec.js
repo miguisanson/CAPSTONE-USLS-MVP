@@ -22,8 +22,8 @@ const SHOTS = join(ARTIFACTS_DIR, "screens", "p114");
 mkdirSync(SHOTS, { recursive: true });
 
 const THERESE_EMAIL = "readmission.therese@usls.edu.ph";
-const THERESE = { id: 9001, name: "Therese Lacson", student_number: "GS-2026-READ-01" };
-const GABRIEL = { id: 9002, name: "Gabriel Domingo", student_number: "GS-2026-READ-02" };
+const THERESE = { id: 9001, name: "Therese Lacson", student_number: "2690901" };
+const GABRIEL = { id: 9002, name: "Gabriel Domingo", student_number: "2690902" };
 const readmission = GUIDES.find((guide) => guide.id === "readmission");
 
 // ------------------------------------------------------------------------------------------------ helpers
@@ -399,7 +399,7 @@ test.describe("off script (the record is answered by page.route)", () => {
     const { context, page } = await openAs(browser, "staff@usls.edu.ph");
     try {
       let skip = false;
-      await mockState(page, () => stateBody({ process: "awol", skip_date_waits: skip, student: { id: 9003, name: "Maya Torres", student_number: "GS-2026-AWOL-01" }, case: { ...caseOf("Return Submitted", "Return filed"), kind: "AWOL" } }));
+      await mockState(page, () => stateBody({ process: "awol", skip_date_waits: skip, student: { id: 9003, name: "Maya Torres", student_number: "2691001" }, case: { ...caseOf("Return Submitted", "Return filed"), kind: "AWOL" } }));
       await page.route("**/api/auth/demo-settings", (route) => { skip = Boolean(route.request().postDataJSON().skip_date_waits); return route.fulfill({ json: { skip_date_waits: skip } }); });
       await page.goto("/workflow/awol");
       const panel = await openGuide(page, "AWOL return");
@@ -707,7 +707,7 @@ test.describe("the sign-in page: Start a guided demo", () => {
   test("the panel names the people of the demo, the coordinators too", async ({ browser }) => {
     const { context, page } = await openAs(browser, "staff@usls.edu.ph");
     try {
-      await mockState(page, stateBody({ process: "graduation", student: { id: 9103, name: "Carlo Mendoza", student_number: "GS-2026-GRAD-02" }, case: null }));
+      await mockState(page, stateBody({ process: "graduation", student: { id: 9103, name: "Carlo Mendoza", student_number: "2690302" }, case: null }));
       await page.goto("/workflow/graduation");
       const panel = await openGuide(page, "Graduation");
       await expect(panel).toContainText(/This demo has \d people: .*the Academic Coordinator.*the Research Coordinator/);
@@ -853,11 +853,11 @@ test.describe("show me, the step list and the keys", () => {
 
 test.describe("more guides", () => {
   const cases = [
-    { id: "withdrawal", title: "Subject Withdrawal", student: { id: 9101, name: "Elena Navarro", student_number: "GS-2026-WD-01" }, route: "/workflow/withdrawal", first: "The student asks to withdraw from a subject",
+    { id: "withdrawal", title: "Subject Withdrawal", student: { id: 9101, name: "Elena Navarro", student_number: "2690401" }, route: "/workflow/withdrawal", first: "The student asks to withdraw from a subject",
       mid: [["Dean Review", "The Dean decides"], ["Exported - Ready to Send", "The student sees the result"], ["Returned", "Correct it and send it again"], ["Denied", "Not approved"]] },
-    { id: "practicum", title: "Practicum", student: { id: 9102, name: "Paolo Ramirez", student_number: "GS-2026-PRAC-02" }, route: "/workflow/practicum", first: "The student sends the MOA",
+    { id: "practicum", title: "Practicum", student: { id: 9102, name: "Paolo Ramirez", student_number: "2690202" }, route: "/workflow/practicum", first: "The student sends the MOA",
       mid: [["Documents Under Review", "The Coordinator checks the hours"], ["Additional Certificates Requested", "The student sends the missing documents again"], ["Report Sent to Dean", "The Dean reviews the report"]] },
-    { id: "graduation", title: "Graduation", student: { id: 9103, name: "Carlo Mendoza", student_number: "GS-2026-GRAD-02" }, route: "/workflow/graduation", first: "The student sends the graduation application",
+    { id: "graduation", title: "Graduation", student: { id: 9103, name: "Carlo Mendoza", student_number: "2690302" }, route: "/workflow/graduation", first: "The student sends the graduation application",
       mid: [["Coursework Review", "The Academic Coordinator checks coursework"], ["Returned for Clarification", "Send a corrected application"], ["Returned for Revision", "Staff correct the list and send it again"], ["Ready for Dean Review", "The Dean approves and exports"]] },
   ];
   for (const c of cases) {

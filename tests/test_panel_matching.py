@@ -53,13 +53,13 @@ PROGRAMS = [
 
 # What each demo paper is about, and who should come out on top.
 PAPERS = {
-    "GS-2026-PM-01": ({"Dr. Adriana Santos"}, {"nursing", "health", "medication", "patient", "telehealth", "hypertension"}),
-    "GS-2026-PM-02": ({"Dr. Celeste Tan"}, {"burnout", "well-being", "motivation", "psychology", "psychological"}),
-    "GS-2026-PM-03": ({"Dr. Daniel Uy"}, {"maintenance", "sensor", "fault", "energy", "machine learning", "automation"}),
-    "GS-2026-PM-04": ({"Dr. Benjamin Reyes"}, {"wallet", "fintech", "financial technology", "savings", "payment", "accounting"}),
-    "GS-2026-PM-05": ({"Dr. Marco Villanueva"}, {"supply chain", "inventory", "simulation", "logistics", "forecasting", "quality"}),
-    "GS-2026-PM-06": ({"Dr. Angela Cruz"}, {"family business", "succession", "governance", "entrepreneur", "strategic"}),
-    "GS-2026-PM-07": ({"Dr. Teresa Lim"}, {"marketing", "consumer", "brand", "purchase intention", "social media", "retail"}),
+    "2690101": ({"Dr. Adriana Santos"}, {"nursing", "health", "medication", "patient", "telehealth", "hypertension"}),
+    "2690102": ({"Dr. Celeste Tan"}, {"burnout", "well-being", "motivation", "psychology", "psychological"}),
+    "2690103": ({"Dr. Daniel Uy"}, {"maintenance", "sensor", "fault", "energy", "machine learning", "automation"}),
+    "2690104": ({"Dr. Benjamin Reyes"}, {"wallet", "fintech", "financial technology", "savings", "payment", "accounting"}),
+    "2690105": ({"Dr. Marco Villanueva"}, {"supply chain", "inventory", "simulation", "logistics", "forecasting", "quality"}),
+    "2690106": ({"Dr. Angela Cruz"}, {"family business", "succession", "governance", "entrepreneur", "strategic"}),
+    "2690107": ({"Dr. Teresa Lim"}, {"marketing", "consumer", "brand", "purchase intention", "social media", "retail"}),
 }
 
 
@@ -160,7 +160,7 @@ class PanelMatchingTests(unittest.TestCase):
 
     def test_each_candidate_has_an_explainable_breakdown(self):
         with app.app_context():
-            rows = self._rank("GS-2026-PM-01")
+            rows = self._rank("2690101")
             row = rows[0]
             breakdown = row["breakdown"]
             components = breakdown["components"]
@@ -173,7 +173,7 @@ class PanelMatchingTests(unittest.TestCase):
             self.assertEqual(breakdown["method_label"], "Similarity match (keyword TF-IDF)")
             self.assertTrue(breakdown["matched_topics"])
             self.assertTrue(breakdown["matched_passage"])
-            paper = self._student("GS-2026-PM-01")
+            paper = self._student("2690101")
             source = " ".join(
                 item.extracted_text for item in app_module.ResearchEvidenceFile.query.filter_by(student_id=paper.id)
             )
@@ -187,14 +187,14 @@ class PanelMatchingTests(unittest.TestCase):
     def test_expertise_records_change_the_ranking(self):
         with app.app_context():
             uy = self._faculty("Dr. Daniel Uy")
-            before = self._rank("GS-2026-PM-01")
+            before = self._rank("2690101")
             before_rank = [r["faculty"].name for r in before].index(uy.name)
             db.session.add(FacultyExpertise(
                 faculty_id=uy.id, kind="publication", year=2025, source="manual entry",
                 text="Text-message reminders and medication adherence among patients with hypertension: telehealth follow-up study",
             ))
             db.session.commit()
-            after = self._rank("GS-2026-PM-01")
+            after = self._rank("2690101")
             after_rank = [r["faculty"].name for r in after].index(uy.name)
             self.assertLess(after_rank, before_rank)
             uy_row = next(r for r in after if r["faculty"].id == uy.id)
@@ -203,7 +203,7 @@ class PanelMatchingTests(unittest.TestCase):
     # --------------------------------------------------------------------- D4
     def test_students_own_adviser_is_never_recommended(self):
         with app.app_context():
-            for number, adviser in (("GS-2026-PM-02", "Dr. Liwayway Bautista"), ("GS-2026-PM-03", "Dr. Marlon Geronimo")):
+            for number, adviser in (("2690102", "Dr. Liwayway Bautista"), ("2690103", "Dr. Marlon Geronimo")):
                 student = self._student(number)
                 self.assertEqual(student.adviser_name, adviser)
                 result = panel_matching_result(student)
@@ -215,8 +215,8 @@ class PanelMatchingTests(unittest.TestCase):
 
     def test_the_top_expert_is_dropped_when_she_is_the_advisor(self):
         with app.app_context():
-            student = self._student("GS-2026-PM-01")
-            best = self._rank("GS-2026-PM-01")[0]["faculty"]
+            student = self._student("2690101")
+            best = self._rank("2690101")[0]["faculty"]
             self.assertEqual(best.name, "Dr. Adriana Santos")
             app_module.AdviserAssignment.query.filter_by(student_id=student.id).delete()
             student.adviser_name = best.name
@@ -237,9 +237,9 @@ class PanelMatchingTests(unittest.TestCase):
 
     def test_panel_composition_follows_the_research_protocol(self):
         with app.app_context():
-            project_paper = self._student("GS-2026-PM-02")   # MAPSY = project paper
-            thesis = self._student("GS-2026-PM-01")          # MSN = thesis
-            dissertation = self._student("GS-2026-PM-06")    # DBA = dissertation
+            project_paper = self._student("2690102")   # MAPSY = project paper
+            thesis = self._student("2690101")          # MSN = thesis
+            dissertation = self._student("2690106")    # DBA = dissertation
             self.assertEqual(panel_roles_for_student(project_paper), ["Panel Chair", "Content Specialist", "Method Specialist"])
             self.assertEqual(len(panel_roles_for_student(thesis)), 4)
             self.assertEqual(
@@ -271,11 +271,11 @@ class PanelMatchingTests(unittest.TestCase):
             # creates them, the second links them (existing behaviour of the startup helper).
             link_faculty_accounts()
             link_faculty_accounts()
-            student = self._student("GS-2026-PM-01")
+            student = self._student("2690101")
             adviser = self._faculty(student.adviser_name)
             sid = student.id
             adviser_id = adviser.id
-            others = [row["faculty"].id for row in self._rank("GS-2026-PM-01")[:3]]
+            others = [row["faculty"].id for row in self._rank("2690101")[:3]]
             required = panel_roles_for_student(student, current_panel_gate(student))
         client = self._client(self.staff_id, "staff")
         response = client.post("/api/transactions/panel-matching", json={
@@ -392,7 +392,7 @@ class PanelMatchingTests(unittest.TestCase):
             return vectors
 
         with app.app_context():
-            student = self._student("GS-2026-PM-04")
+            student = self._student("2690104")
             with patch.dict(os.environ, {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""}):
                 plain = panel_matching_result(student)
             self.assertEqual(plain["method"], "tfidf")
@@ -415,7 +415,7 @@ class PanelMatchingTests(unittest.TestCase):
 
     def test_screen_payload_does_not_call_the_similarity_score_rag(self):
         with app.app_context():
-            student_id = self._student("GS-2026-PM-01").id
+            student_id = self._student("2690101").id
         client = self._client(self.staff_id, "staff")
         with patch.dict(os.environ, {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""}):
             response = client.get(f"/api/transactions/panel-matching/context?student_id={student_id}")
@@ -436,7 +436,7 @@ class PanelMatchingTests(unittest.TestCase):
     # ------------------------------------------------------------- flags
     def test_workload_and_availability_flags(self):
         with app.app_context():
-            student = self._student("GS-2026-PM-01")
+            student = self._student("2690101")
             busy = self._faculty("Dr. Adriana Santos")
             idle_windows = self._faculty("Dr. Celeste Tan")
             FacultyAvailability.query.filter_by(faculty_id=idle_windows.id).delete()
@@ -455,7 +455,7 @@ class PanelMatchingTests(unittest.TestCase):
                 db.session.add(PanelAssignment(student_id=other.id, faculty_id=busy.id, gate="Form 1 - Title Defense",
                                                panel_role="Content Specialist", score=50))
             db.session.commit()
-            rows = {r["faculty"].name: r for r in self._rank("GS-2026-PM-01")}
+            rows = {r["faculty"].name: r for r in self._rank("2690101")}
             self.assertIn("overload", {f["type"] for f in rows["Dr. Adriana Santos"]["flags"]})
             self.assertIn("unavailable", {f["type"] for f in rows["Dr. Celeste Tan"]["flags"]})
             self.assertEqual(rows["Dr. Adriana Santos"]["workload"], 5)

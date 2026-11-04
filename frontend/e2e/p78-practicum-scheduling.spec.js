@@ -74,7 +74,7 @@ async function withOneCase(page) {
   await page.route(/\/api\/transactions\/practicum\/context/, async (route) => {
     const response = await route.fetch();
     const body = await response.json();
-    const row = body.roster.find((item) => item.student.student_number === "GS-2026-PRAC-01");
+    const row = body.roster.find((item) => item.student.student_number === "2690201");
     row.record = {
       id: 9100,
       student_id: row.student.id,
@@ -133,7 +133,7 @@ test.describe("Practicum (staff)", () => {
     for (const card of ["Andrea Villanueva", "Paolo Ramirez"]) {
       await expect(board.getByText(card, { exact: true }), card).toBeVisible();
     }
-    await expect(board.getByText("GS-2026-PRAC-01 · MAPSY")).toBeVisible();
+    await expect(board.getByText("2690201 · MAPSY")).toBeVisible();
     await expect(board.getByText("Waiting for documents").first()).toBeVisible();
     await expect(board.getByText("Waiting for: Student").first()).toBeVisible();
     await shotsAt(page, "practicum-board");
@@ -175,7 +175,7 @@ test.describe("Practicum (staff)", () => {
       await expect(table.getByRole("columnheader", { name: header }), header).toBeVisible();
     }
     const row = table.getByRole("row", { name: /Andrea Villanueva/ });
-    await expect(row).toContainText("GS-2026-PRAC-01");
+    await expect(row).toContainText("2690201");
     await expect(row).toContainText("0/200");
     await shotsAt(page, "practicum-table");
 

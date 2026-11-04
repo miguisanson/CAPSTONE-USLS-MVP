@@ -5,7 +5,7 @@ export default {
   process: "graduation",
   title: "Graduation",
   summary: "An eligible student applies, staff create a batch, the coordinators check it, the Dean approves and exports the list.",
-  studentNumber: "GS-2026-GRAD-02",
+  studentNumber: "2690302",
   walkthrough: "19_graduation",
   accounts: {
     student: { who: "the student", label: "Carlo Mendoza", email: "graduation.carlo@usls.edu.ph" },

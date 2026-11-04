@@ -136,14 +136,14 @@ test.describe("the action player", () => {
 // ------------------------------------------------------------------------------------------------ every guide, end to end
 // Final record per guide: the status GET /api/demo/guide-state reports once Next has played the last step.
 const PLAN = {
-  "leave-of-absence": { key: "autopilot-loa", reset: ["leave-of-absence-daniel"], number: "GS-2026-LOA-02", final: "On Leave" },
-  readmission: { key: "autopilot-readmission", reset: ["readmission-therese"], number: "GS-2026-READ-01", final: "Approved" },
-  awol: { key: "autopilot-awol", reset: ["awol-maya"], number: "GS-2026-AWOL-01", final: "Return Approved" },
+  "leave-of-absence": { key: "autopilot-loa", reset: ["leave-of-absence-daniel"], number: "2690802", final: "On Leave" },
+  readmission: { key: "autopilot-readmission", reset: ["readmission-therese"], number: "2690901", final: "Approved" },
+  awol: { key: "autopilot-awol", reset: ["awol-maya"], number: "2691001", final: "Return Approved" },
   monitoring: { key: "autopilot-monitoring", reset: [], number: null, final: null },
   reports: { key: "reports", reset: [], number: null, final: null },
-  withdrawal: { key: "autopilot-withdrawal", reset: ["withdrawal-elena"], number: "GS-2026-WD-01", final: "Exported - Ready to Send" },
-  practicum: { key: "autopilot-practicum", reset: ["practicum-paolo"], number: "GS-2026-PRAC-02", final: "Dean Reviewed" },
-  graduation: { key: "autopilot-graduation", reset: ["graduation-carlo"], number: "GS-2026-GRAD-02", final: "Dean Approved" },
+  withdrawal: { key: "autopilot-withdrawal", reset: ["withdrawal-elena"], number: "2690401", final: "Exported - Ready to Send" },
+  practicum: { key: "autopilot-practicum", reset: ["practicum-paolo"], number: "2690202", final: "Dean Reviewed" },
+  graduation: { key: "autopilot-graduation", reset: ["graduation-carlo"], number: "2690302", final: "Dean Approved" },
 };
 
 /** Press Next and wait until the step is done: the label moves on, or the bar says the demo is finished, or it stopped with a reason. */
@@ -237,7 +237,7 @@ test.describe("the slideshow bar", () => {
       await page.locator('#loa-remarks').fill("Typed by hand after taking over.");
       await expect(page.locator('#loa-remarks')).toHaveValue("Typed by hand after taking over.");
       // nothing was filed: the record is still where it was
-      const state = await (await page.request.get("/api/demo/guide-state?process=leave-of-absence&student_number=GS-2026-LOA-02")).json();
+      const state = await (await page.request.get("/api/demo/guide-state?process=leave-of-absence&student_number=2690802")).json();
       expect(state.case).toBeNull();
       await bar(page).getByRole("button", { name: "Stop" }).click();
       await expect(bar(page)).toHaveCount(0);
@@ -314,7 +314,7 @@ test.describe("the slideshow bar", () => {
       await expect(bar(page).getByTestId("autopilot-step")).toHaveText(/^Step 2 of /, { timeout: 30_000 }); // the guide followed the record
       await pressNext(page); // the autopilot plays the staff step on the request the presenter filed
       await expect(bar(page).getByTestId("autopilot-step")).toHaveText(/^Step 3 of /);
-      const state = await (await page.request.get("/api/demo/guide-state?process=leave-of-absence&student_number=GS-2026-LOA-02")).json();
+      const state = await (await page.request.get("/api/demo/guide-state?process=leave-of-absence&student_number=2690802")).json();
       expect(state.case.status).toBe("Staff Review");
     } finally {
       await context.close();
