@@ -31094,6 +31094,17 @@ OWNER_LABEL_ACCOUNT_ROLE = {
 }
 
 
+def workflow_link_for_role(slug: str, role: str) -> str:
+    """The page a bell notice opens: the Dean has its own approvals pages, and a role that cannot open a
+    /workflow page (e.g. the Academic Coordinator for readmission) lands on the Work Queue instead."""
+    slug = slug.replace("awol-return", "awol")
+    if role == "dean":
+        return f"/dean/approvals/{slug}"
+    if slug in ROLE_TRANSACTION_ACCESS.get(role, {slug}):
+        return f"/workflow/{slug}"
+    return "/work-queue"
+
+
 def notify_workflow_owner(
     slug: str, student: Student, result: str, next_owner: str | None, key: str, *,
     count: int = 1, actor: UserAccount | None = None,
@@ -31109,7 +31120,7 @@ def notify_workflow_owner(
         title, body = f"{name}: {student.name} is waiting for you", f"{result}."
     recipients = [row for row in accounts_for_roles(role) if not actor or row.id != actor.id]
     return notify_many(
-        recipients, "workflow_waiting", title, body, link=f"/workflow/{slug.replace('awol-return', 'awol')}",
+        recipients, "workflow_waiting", title, body, link=workflow_link_for_role(slug, role),
         related_type=slug, related_id=student.id, dedupe_key=f"waiting:{key}",
     )
 

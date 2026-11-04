@@ -13,7 +13,7 @@ os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 
 from app import (  # noqa: E402
     AcademicTerm, AwolCase, Course, Faculty, PanelAssignment, Program, Student, UserAccount,
-    app, db, generate_password_hash,
+    Notification, app, db, generate_password_hash, notify_workflow_owner,
 )
 
 
@@ -108,6 +108,28 @@ class GuideStatePrivacyTests(Audit2Base):
         # staff still see every candidate
         staff = self.client("staff").get("/api/demo/guide-state?process=awol").get_json()
         self.assertEqual(len(staff["candidates"]), 2)
+
+
+class WorkflowNoticeLinkTests(Audit2Base):
+    """I-336: the bell notice opens a page the recipient's role can open."""
+
+    def link_for(self, slug, owner_label, role):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            notify_workflow_owner(slug, student, "Test step", owner_label, f"t:{slug}:{role}")
+            row = Notification.query.filter_by(account_id=self.accounts[role], kind="workflow_waiting").first()
+            return row.link
+
+    def test_dean_notice_opens_dean_page(self):
+        self.assertEqual(self.link_for("readmission", "Dean", "dean"), "/dean/approvals/readmission")
+        self.assertEqual(self.link_for("awol-return", "Dean", "dean"), "/dean/approvals/awol")
+
+    def test_academic_coordinator_notice_for_readmission_opens_work_queue(self):
+        self.assertEqual(self.link_for("readmission", "Academic Coordinator", "academic_coordinator"), "/work-queue")
+        self.assertEqual(self.link_for("practicum", "Academic Coordinator", "academic_coordinator"), "/workflow/practicum")
+
+    def test_staff_notice_keeps_workflow_page(self):
+        self.assertEqual(self.link_for("withdrawal", "Graduate School Staff", "staff"), "/workflow/withdrawal")
 
 
 if __name__ == "__main__":
