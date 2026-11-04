@@ -417,7 +417,8 @@ test.describe("Adviser appointments", () => {
       await expect(noted).toContainText("Noted by Academic Coordinator");
       await expect(noted).toContainText("Academic Coordinator note");
       await expect(noted).toContainText("Fits the program; please send to the Dean.");
-      await expect(noted.getByRole("button")).toHaveCount(0);
+      // CHANGED BY known-data: everyone can edit what they sent (I-354), so the note may carry its Edit / Edited buttons - nothing else
+      await expect(noted.locator('button:not([data-edit-button]):not([aria-label^="Edited"])')).toHaveCount(0);
       await tab(page, "All").click();
       await expect(page.getByText(/\d+ appointments?, newest first\./)).toBeVisible();
       await expect(card(page, "Isabel Flores")).toContainText("Recorded");

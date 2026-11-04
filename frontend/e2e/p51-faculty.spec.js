@@ -245,7 +245,7 @@ test.describe("My Advisees", () => {
     await expect(overdue).toContainText("Overdue since");
     await expect(contract.locator("tbody tr", { hasText: "Waiting Student" })).toContainText("Not set");
     await expect(contract.locator("tbody tr", { hasText: "Done Student" })).toContainText("Received");
-    await expect(contract.locator("tbody tr", { hasText: "Done Student" }).locator('[data-status-tone="success"]')).toHaveCount(1); // I-099
+    await expect(contract.locator("tbody tr", { hasText: "Done Student" }).locator('[data-status-tone="done"]')).toHaveCount(1); // I-099; CHANGED BY known-data: a received contract is a finish (teal "done", I-358), not a decision
     await expect(contract.locator("tbody tr", { hasText: "Waiting Student" })).toContainText("Due ");
     await expect(contract.locator("tbody tr", { hasText: "Done Student" })).not.toContainText("Due ");
     await shots(page, "advisees-requests");
