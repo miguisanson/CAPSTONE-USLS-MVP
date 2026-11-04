@@ -15,7 +15,7 @@ const STATE_HELP = {
 const BOARD_COLUMNS = [
   { key: "Title Defense", label: "Title Defense", description: "Title requirements and the first panel decision." },
   { key: "Proposal Defense", label: "Proposal Defense", description: "Proposal requirements, ethics steps, and panel decision." },
-  { key: "Completion", label: "Completion", description: "Final Defense and completion evidence." },
+  { key: "Completion", label: "Final Defense", description: "Final defense requirements and panel decision." },
 ];
 
 export default function ResearchGateOverview({ onOpen, selectedId }) {

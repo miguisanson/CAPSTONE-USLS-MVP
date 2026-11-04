@@ -694,3 +694,9 @@ uncommitted changes is half-done — read its diff, run its tests, then decide.
 - RED evidence: the original board measured 23,937 px against the `<700 px` desktop contract; a follow-up visual-review assertion also failed while 1366 px still showed "1 more stage to the right". Both passed after the compact rows and responsive column fit were applied.
 - Verification: `npm run build:web` PASS; `npm --prefix frontend run check:ui:strict` PASS with every metric 0; focused p114 board walkthrough PASS at 1366/1920/390; focused p114 staff-verdict walkthrough PASS; all three screenshots opened and reviewed. The e2e wrapper was stopped with Ctrl+C only after Playwright printed the passing result and artifact paths because its Flask wrapper remained open.
 - Next action: none for this refinement. The running development server only needs a normal frontend refresh/restart to load the rebuilt UI.
+
+## Research Gate stage terminology corrected (2026-11-04)
+
+- Owner correction: the three visible stages are Title Defense, Proposal Defense, and Final Defense; "Completion" must not be shown as the third stage name.
+- Test-first contract updated in `frontend/e2e/p114-research-gate.spec.js`: the API's existing `Completion` grouping key must render in a region labeled `Final Defense`, retain its accurate total, and contain the same students. RED confirmed the old visible `Completion` region; the board now shows `Final Defense` with the description "Final defense requirements and panel decision." No backend key, grouping, workflow, or data changed.
+- Verification: `npm run build:web` PASS; `npm --prefix frontend run check:ui:strict` PASS with every metric 0; focused p114 board walkthrough PASS at 1366/1920/390; regenerated 1366 screenshot opened and reviewed. The e2e wrapper was stopped only after Playwright printed the passing result and artifact paths because its Flask wrapper remained open. Next action: none.

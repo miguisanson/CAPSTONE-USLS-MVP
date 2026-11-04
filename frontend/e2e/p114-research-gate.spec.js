@@ -8,7 +8,11 @@ import { ARTIFACTS_DIR, AUTH_DIR, BASE_URL } from "./support/paths.mjs";
 
 const authFile = (key) => join(AUTH_DIR, `${key}.json`);
 const shots = join(ARTIFACTS_DIR, "screens", "p114-research-gate");
-const columns = ["Title Defense", "Proposal Defense", "Completion"];
+const stages = [
+  { key: "Title Defense", label: "Title Defense" },
+  { key: "Proposal Defense", label: "Proposal Defense" },
+  { key: "Completion", label: "Final Defense" },
+];
 
 test.beforeAll(() => mkdirSync(shots, { recursive: true }));
 
@@ -30,18 +34,19 @@ test("Research Gate shows the three stages as columns at desktop and phone width
       if (width > 390) {
         await expect(page.getByTestId("board-scroll-hint"), "all three stages fit without horizontal board scrolling at desktop widths").toHaveCount(0);
       }
-      for (const label of columns) {
+      for (const { key, label } of stages) {
         const region = page.getByRole("region", { name: label });
         await expect(region).toBeVisible();
         await expect(region.getByTestId("stage-scroll")).toBeVisible();
-        const total = overview.items.filter((row) => row.board_stage === label).length;
+        const total = overview.items.filter((row) => row.board_stage === key).length;
         await expect(region.getByTestId("stage-count")).toHaveText(String(total));
       }
       for (const row of overview.items) {
-        expect(columns).toContain(row.board_stage);
+        const stage = stages.find(({ key }) => key === row.board_stage);
+        expect(stage).toBeTruthy();
         const name = `Open the Research Gate record of ${row.student.name}, ${row.student.student_number}`;
         await expect(page.getByRole("button", { name, exact: true })).toHaveCount(1);
-        await expect(page.getByRole("region", { name: row.board_stage }).getByRole("button", { name, exact: true })).toHaveCount(1);
+        await expect(page.getByRole("region", { name: stage.label }).getByRole("button", { name, exact: true })).toHaveCount(1);
       }
       await expect(page.getByRole("columnheader")).toHaveCount(0);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
