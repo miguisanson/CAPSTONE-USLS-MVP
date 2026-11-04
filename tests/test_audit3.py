@@ -114,5 +114,41 @@ class DemoSettingsNeedSignInTests(Audit3Base):
                 self.assertIs(response.get_json()["skip_date_waits"], wanted)
 
 
+class PrivacyNoticeEnforcedByTheApiTests(Audit3Base):
+    """I-349: an account that has not accepted the Data Privacy Notice gets nothing from the API but auth, consent and health."""
+
+    def setUp(self):
+        super().setUp()
+        app.config["ENFORCE_PRIVACY_CONSENT"] = True  # off while TESTING so the other suites need no consent step
+        self.addCleanup(lambda: app.config.pop("ENFORCE_PRIVACY_CONSENT", None))
+
+    def accept(self, role, accepted=True):
+        from app import PRIVACY_NOTICE_VERSION
+        with app.app_context():
+            account = db.session.get(UserAccount, self.accounts[role])
+            account.privacy_notice_version = PRIVACY_NOTICE_VERSION if accepted else None
+            db.session.commit()
+
+    def test_account_that_has_not_accepted_is_refused(self):
+        self.accept("staff", accepted=False)
+        client = self.client("staff")
+        response = client.get("/api/meta")
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(response.get_json()["privacy_consent_required"])
+        self.assertIn("Privacy", response.get_json()["error"])
+
+    def test_auth_consent_and_health_still_answer(self):
+        self.accept("staff", accepted=False)
+        client = self.client("staff")
+        self.assertEqual(client.get("/api/auth/me").status_code, 200)
+        self.assertEqual(client.get("/api/health").status_code, 200)
+        self.assertEqual(client.post("/api/auth/privacy-consent", json={"accept": True}).status_code, 200)
+        self.assertEqual(client.get("/api/meta").status_code, 200)
+
+    def test_accepted_account_is_not_affected(self):
+        self.accept("dean")
+        self.assertEqual(self.client("dean").get("/api/meta").status_code, 200)
+
+
 if __name__ == "__main__":
     unittest.main()

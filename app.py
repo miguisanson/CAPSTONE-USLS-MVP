@@ -5372,11 +5372,23 @@ def require_api_login(*roles):
                     "error": "Choose your own password before you continue.",
                     "must_change_password": True,
                 }), 403
+            if privacy_consent_enforced() and account.privacy_notice_version != PRIVACY_NOTICE_VERSION:
+                return jsonify({
+                    "error": "Accept the Data Privacy Notice before you continue.",
+                    "privacy_consent_required": True,
+                }), 403
             return fn(*args, **kwargs)
 
         return wrapper
 
     return decorator
+
+
+def privacy_consent_enforced() -> bool:
+    """The API refuses an account that has not accepted the Data Privacy Notice (I-349). Off while testing
+    (like the daily sweep) unless a test sets ENFORCE_PRIVACY_CONSENT, so suites that build bare accounts need no consent step."""
+    from flask import current_app
+    return not current_app.config.get("TESTING") or bool(current_app.config.get("ENFORCE_PRIVACY_CONSENT"))
 
 
 def require_workflow_actor(*roles) -> UserAccount:
