@@ -4432,6 +4432,22 @@ def _first_weeks_phrase(days: int) -> str:
     return "the first week of classes" if days == 7 else f"the first {days} calendar days of classes"
 
 
+def enrollment_window(term: AcademicTerm | None, as_of: date | None = None) -> dict:
+    """The enrollment period: the term's planning window. With no dates at all it counts as open.
+
+    One helper for the banner payloads and for every route that adds or changes subjects."""
+    today = as_of or ph_today()
+    opens = term.planning_window_open if term else None
+    closes = term.planning_window_close if term else None
+    state = "closed" if closes and today > closes else "not_yet" if opens and today < opens else "open"
+    dates = " to ".join(_plain_date(day) for day in (opens, closes) if day) if opens and closes else (
+        f"until {_plain_date(closes)}" if closes else f"from {_plain_date(opens)}" if opens else "")
+    message = "" if state == "open" else (
+        f"Enrollment is closed. " if state == "closed" else "Enrollment has not opened yet. "
+    ) + f"Subjects can be added or changed only during the enrollment period ({dates})."
+    return {"state": state, "is_open": state == "open", "open": iso(opens), "close": iso(closes), "message": message}
+
+
 def subject_adjustment_window(term: AcademicTerm, change: bool = False, as_of: date | None = None) -> dict:
     """Is adding (or changing) a subject in this semester still inside the allowed window?
 
@@ -14589,6 +14605,9 @@ def register_routes(app: Flask) -> None:
         term = get_active_term()  # owner rule 2026-11-04 (I-246): never a term id sent by the browser
         if not term:
             return jsonify({"error": "No active academic semester is available."}), 400
+        window = enrollment_window(term)
+        if not window["is_open"]:
+            return jsonify({"error": window["message"]}), 409
         try:
             requested_ids = {int(value) for value in (data.get("course_ids") or [])}
         except (TypeError, ValueError):
@@ -17586,6 +17605,9 @@ def register_routes(app: Flask) -> None:
         except (TypeError, ValueError):
             return jsonify({"error": "Subject IDs must be whole numbers."}), 400
         preview = enrollment_preview_payload(student, term, requested_ids)
+        window = enrollment_window(term)
+        if not window["is_open"] and (preview["additions"] or preview["removals"]):
+            return jsonify({"error": window["message"], "preview": preview}), 409
         if preview["has_blocking_conflicts"]:
             return jsonify({
                 "error": "Enrollment is blocked by the student's standing or invalid subject data.",
@@ -18492,6 +18514,9 @@ def register_routes(app: Flask) -> None:
             )
         if not target_term:
             return jsonify({"error": "Select an academic year and semester first."}), 400
+        window = enrollment_window(target_term)
+        if action in ("draft", "submit") and not window["is_open"]:
+            return jsonify({"error": window["message"]}), 409
         # The reference is the semester just before the target, never a later one.
         reference_term = (
             AcademicTerm.query.filter(
@@ -37605,13 +37630,16 @@ def course_adjustments_payload(program: Program, term: AcademicTerm | None = Non
         demand.append(row)
     demand.sort(key=lambda row: (-row["demand_count"], row["course"]["code"]))
     account = current_account()
+    window = enrollment_window(term)
     return {
         "program": program_dict(program),
         "programs": [program_dict(p) for p in Program.query.order_by(Program.code).all()],
         "term": term_dict(term) if term else None,
         "terms": [term_dict(item) for item in AcademicTerm.query.order_by(AcademicTerm.start_date.desc()).all()],
         "active_term": term_dict(get_active_term()) if get_active_term() else None,
-        "planning_window_open": True,
+        "enrollment_window": window,
+        "enrollment_open": window["is_open"],
+        "planning_window_open": window["is_open"],  # older name, still read by the screens' checks
         "permissions": {
             "can_manage": bool(account and account.role in ("academic_coordinator", "admin")),
         },
@@ -39921,6 +39949,9 @@ def seed_database() -> None:
     if active_term:
         active_term.is_active_planning_term = True
         active_term.status = active_term.status or "Active"
+        # The enrollment period (planning window): open now, closing in four weeks, relative to the seed day (R-001).
+        active_term.planning_window_open = ph_today() - timedelta(days=14)
+        active_term.planning_window_close = ph_today() + timedelta(days=28)
 
     # Curriculum, faculty, and students all come from imported source sheets — nothing
     # is randomly generated. Program curriculum arrives with each monitoring sheet, the

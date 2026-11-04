@@ -15,7 +15,7 @@ os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 from app import (  # noqa: E402
     AcademicTerm, AwolCase, Course, Program, Student, SubjectEnrollment, UserAccount,
     WithdrawalApplication, WorkflowMessage, app, db, generate_password_hash,
-    latest_message_brief, workflow_case_meta,
+    enrollment_window, latest_message_brief, ph_today, workflow_case_meta,
 )
 
 
@@ -173,6 +173,86 @@ class AwolResidenceTests(KFollowBase):
     def test_withdrawal_rows_have_no_residence(self):
         rows = self.client("staff").get("/api/process-cases?slug=withdrawal").get_json()["cases"]
         self.assertTrue(all("residence" not in row for row in rows))
+
+
+class EnrollmentPeriodTests(KFollowBase):
+    def set_window(self, open_offset, close_offset):
+        with app.app_context():
+            term = db.session.get(AcademicTerm, self.term_id)
+            today = ph_today()
+            term.planning_window_open = today + timedelta(days=open_offset) if open_offset is not None else None
+            term.planning_window_close = today + timedelta(days=close_offset) if close_offset is not None else None
+            term.is_active_planning_term = True
+            db.session.commit()
+            return term.planning_window_open, term.planning_window_close
+
+    def test_helper_open_closed_and_not_yet(self):
+        with app.app_context():
+            term = db.session.get(AcademicTerm, self.term_id)
+            self.assertTrue(enrollment_window(term)["is_open"])  # no dates: open
+            self.assertTrue(enrollment_window(None)["is_open"])
+        self.set_window(-5, 20)
+        with app.app_context():
+            window = enrollment_window(db.session.get(AcademicTerm, self.term_id))
+            self.assertTrue(window["is_open"])
+            self.assertEqual(window["message"], "")
+        opened, closed = self.set_window(-30, -2)
+        with app.app_context():
+            window = enrollment_window(db.session.get(AcademicTerm, self.term_id))
+            self.assertFalse(window["is_open"])
+            self.assertEqual(window["state"], "closed")
+            self.assertIn("Enrollment is closed", window["message"])
+            self.assertIn(opened.strftime("%b %d, %Y").replace(" 0", " "), window["message"])
+            self.assertIn(closed.strftime("%b %d, %Y").replace(" 0", " "), window["message"])
+        self.set_window(5, 30)
+        with app.app_context():
+            window = enrollment_window(db.session.get(AcademicTerm, self.term_id))
+            self.assertFalse(window["is_open"])
+            self.assertEqual(window["state"], "not_yet")
+
+    def test_course_adjustments_reports_a_real_enrollment_open(self):
+        url = f"/api/course-adjustments?program_id={self.program_id}&term_id={self.term_id}"
+        self.set_window(-5, 20)
+        data = self.client("academic_coordinator").get(url).get_json()
+        self.assertIs(data["enrollment_open"], True)
+        self.set_window(-30, -2)
+        data = self.client("academic_coordinator").get(url).get_json()
+        self.assertIs(data["enrollment_open"], False)
+        self.assertIs(data["planning_window_open"], False)
+        self.assertIn("Enrollment is closed", data["enrollment_window"]["message"])
+
+    def test_course_adjustment_save_refused_when_closed(self):
+        opened, closed = self.set_window(-30, -2)
+        for action in ("draft", "submit"):
+            response = self.client("academic_coordinator").post("/api/course-adjustments/plan", json={
+                "program_id": self.program_id, "term_id": self.term_id, "action": action})
+            self.assertEqual(response.status_code, 409, response.get_json())
+            self.assertIn("Enrollment is closed", response.get_json()["error"])
+        self.set_window(-5, 20)
+        response = self.client("academic_coordinator").post("/api/course-adjustments/plan", json={
+            "program_id": self.program_id, "term_id": self.term_id, "action": "draft"})
+        self.assertNotIn("Enrollment is closed", str(response.get_json()))
+
+    def test_student_portal_enrollment_refused_when_closed(self):
+        opened, closed = self.set_window(-30, -2)
+        response = self.client("student").post("/api/student-portal/enrollment", json={"course_ids": [self.course_id]})
+        self.assertEqual(response.status_code, 409, response.get_json())
+        error = response.get_json()["error"]
+        self.assertIn("Enrollment is closed", error)
+        self.assertIn(closed.strftime("%b %d, %Y").replace(" 0", " "), error)
+        self.set_window(-5, 20)
+        response = self.client("student").post("/api/student-portal/enrollment", json={"course_ids": [self.course_id]})
+        self.assertNotIn("Enrollment is closed", str(response.get_json()))
+
+    def test_coordinator_enrollment_refused_when_closed(self):
+        self.set_window(-30, -2)
+        body = {"confirmed": True, "student_id": self.student_id, "term_id": self.term_id, "course_ids": [self.course_id]}
+        response = self.client("academic_coordinator").post("/api/enrollment", json=body)
+        self.assertEqual(response.status_code, 409, response.get_json())
+        self.assertIn("Enrollment is closed", response.get_json()["error"])
+        self.set_window(-5, 20)
+        response = self.client("academic_coordinator").post("/api/enrollment", json=body)
+        self.assertNotIn("Enrollment is closed", str(response.get_json()))
 
 
 if __name__ == "__main__":

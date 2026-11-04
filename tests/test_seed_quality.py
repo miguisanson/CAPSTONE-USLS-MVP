@@ -39,6 +39,8 @@ from app import (  # noqa: E402
     UserAccount,
     WithdrawalApplication,
     align_seed_calendar,
+    enrollment_window,
+    get_active_term,
     generate_semester_calendar,
     seed_semester_years,
     subject_withdrawal_window,
@@ -233,6 +235,16 @@ class SeedQualityTests(unittest.TestCase):
             ordered = sorted(terms, key=lambda t: t.start_date)
             for earlier, later in zip(ordered, ordered[1:]):
                 self.assertLess(earlier.end_date, later.start_date, (today, earlier.label, later.label))
+
+    def test_the_active_semester_has_an_enrollment_period_that_is_open_on_the_seed_day(self):
+        """The enrollment banner and the server's refusals read the planning window; the seed gives the active term a real one."""
+        with app.app_context():
+            term = get_active_term()
+            self.assertIsNotNone(term.planning_window_open)
+            self.assertIsNotNone(term.planning_window_close)
+            self.assertTrue(enrollment_window(term)["is_open"])
+            self.assertGreaterEqual((term.planning_window_close - self.today).days, 14)
+            self.assertEqual(AcademicTerm.query.filter(AcademicTerm.planning_window_close.isnot(None)).count(), 1)
 
     def test_terms_cover_only_the_current_year_plus_or_minus_two(self):
         with app.app_context():
