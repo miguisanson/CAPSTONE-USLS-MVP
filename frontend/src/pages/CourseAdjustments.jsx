@@ -298,7 +298,7 @@ export default function CourseAdjustments() {
               title={s.offer ? "Offered - click to hold" : "Not offered - click to offer"}
               className={s.offer ? "!border-brand-200 !bg-brand-50 !text-brand-700" : ""}
             />
-            <StatusChip status={s.status || "No decision"} dot={false} />
+            <StatusChip status={s.status || "No decision"} size="sm" />
           </div>
         );
       },

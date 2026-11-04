@@ -468,7 +468,7 @@ test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-1
     expect(box.height / data.demand.length, `average row height ${Math.round(box.height / data.demand.length)} px`).toBeLessThan(96);
     // the stacked cards of the old page are gone
     await expect(main(page).getByText(/^Show the \d+ affected students?$/)).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(3000); // was 4,790 px before P6.5 and ~4,000 before I-117 merged the two subject lists
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(3120); // was 4,790 px before P6.5 and ~4,000 before I-117 merged the two subject lists; CHANGED BY known-data: +120 px for the enrollment OPEN/CLOSED banner the stakeholder asked for (I-355)
     for (const view of VIEWS.slice(1)) {
       await page.setViewportSize(view);
       expect(await noOverflow(page), `sideways scroll at ${view.width}`).toBe(true);
@@ -558,7 +558,7 @@ test.describe("I-117: Course Adjustments lists each subject once", () => {
   // the title follows the code with no space in the row text, so a code ending in a digit must not be followed by another digit (COG1 vs COG10)
   const codeRe = (code) => new RegExp(code + (/[0-9]$/.test(code) ? "(?![0-9])" : ""));
 
-  test("the page is under 3,000 px tall at 1366 and each subject code is in exactly one table row, not in a second list", async ({ page }) => {
+  test("the page is under 3,120 px tall at 1366 (3,000 + the enrollment banner) and each subject code is in exactly one table row, not in a second list", async ({ page }) => {
     test.setTimeout(120_000);
     const { data } = await openWithReport(page);
     for (const row of data.demand) {
@@ -569,7 +569,7 @@ test.describe("I-117: Course Adjustments lists each subject once", () => {
     await expect(main(page).getByRole("heading", { name: "Subject-needs report" })).toHaveCount(0);
     await expect(main(page).getByRole("button", { name: "Show students" })).toHaveCount(0);
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    expect(height, `page height ${height} px`).toBeLessThan(3000);
+    expect(height, `page height ${height} px`).toBeLessThan(3120); // CHANGED BY known-data: room for the enrollment banner (I-355)
     // the table fits its card at 1366: the Details button is not pushed out of sight (the scroll wrapper is for narrow screens)
     const clipped = await main(page).locator("[data-table-scroll]").first().evaluate((el) => el.scrollWidth - el.clientWidth);
     expect(clipped, `the table is ${clipped} px wider than its card`).toBeLessThanOrEqual(1);
