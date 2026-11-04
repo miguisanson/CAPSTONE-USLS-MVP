@@ -1617,6 +1617,11 @@ class DefenseVerdict(db.Model):
     corrected_by = db.Column(db.String(160))
     corrected_at = db.Column(db.DateTime)
     reset_log = db.Column(db.Text)
+    # I-361: Graduate School staff or the Research Coordinator recorded this for the panel chair.
+    recorded_for_panel_by = db.Column(db.String(160))
+    recorded_for_panel_role = db.Column(db.String(60))
+    recorded_for_panel_reason = db.Column(db.Text)
+    recorded_for_panel_at = db.Column(db.DateTime)
 
     student = db.relationship("Student")
     schedule = db.relationship("ScheduleRequest")
@@ -2993,6 +2998,13 @@ def defense_verdict_dict(verdict: DefenseVerdict | None) -> dict | None:
         "correction_reason": verdict.correction_reason,
         "corrected_by": verdict.corrected_by,
         "corrected_at": iso(verdict.corrected_at),
+        "recorded_for_panel_by": verdict.recorded_for_panel_by,
+        "recorded_for_panel_role": verdict.recorded_for_panel_role,
+        "recorded_for_panel_reason": verdict.recorded_for_panel_reason,
+        "recorded_for_panel_at": iso(verdict.recorded_for_panel_at),
+        "recorded_for_panel_label": (
+            f"Recorded by {verdict.recorded_for_panel_by} for the panel" if verdict.recorded_for_panel_by else None
+        ),
     }
 
 
@@ -5389,9 +5401,10 @@ _NOTE_STAFF = ("staff", "academic_coordinator", "research_coordinator")
 
 
 def _f(kind, *, roles=_NOTE_STAFF, check=None, get=None, apply=None, applies=None, options=None,
-       label="", multiline=True):
+       label="", multiline=True, staff_for_panel=False):
     return {"kind": kind, "roles": roles, "check": check or _edit_text(), "get": get, "apply": apply,
-            "applies": applies, "options": options, "label": label, "multiline": multiline}
+            "applies": applies, "options": options, "label": label, "multiline": multiline,
+            "staff_for_panel": staff_for_panel}
 
 
 def _note(label, roles=_NOTE_STAFF, limit=4000):
@@ -5507,9 +5520,9 @@ def _build_editable() -> dict:
             "model": DefenseVerdict, "student": lambda r: r.student_id, "slug": lambda r: "research-gate",
             "request": lambda r: r.schedule_request_id,
             "fields": {
-                "remarks": _f("faculty", label="Panel remarks", check=_edit_text(blank=True)),
+                "remarks": _f("faculty", label="Panel remarks", check=_edit_text(blank=True), staff_for_panel=True),
                 "selected_title": _f("faculty", label="Title selected by the panel", multiline=False, check=_edit_text(220),
-                                    apply=_apply_verdict_title),
+                                    apply=_apply_verdict_title, staff_for_panel=True),
             },
         },
     }
@@ -5542,6 +5555,8 @@ def record_edit_rule(account, entity: str, row, field: str) -> dict:
         return {"reason_required": not (created and now_utc() - created <= RECORD_EDIT_GRACE)}
     if kind == "faculty":
         # Stakeholder rule (I-354): the person who wrote it can always fix it; the Edited chip and history tell everyone.
+        if fspec.get("staff_for_panel") and role in EDIT_STAFF_ROLES:
+            return {"reason_required": True}  # I-361: staff may act for the panel; the history says who
         if role != "faculty" or not account.faculty_id or account.faculty_id != row.faculty_id:
             raise EditRefused("Only the faculty member who wrote this can edit it.", 403)
         return {"reason_required": True}
@@ -5659,6 +5674,7 @@ def record_edit_dict(item: RecordEdit) -> dict:
         "id": item.id, "entity": item.entity, "entity_id": item.entity_id, "field": item.field,
         "label": fspec.get("label") or item.field, "old_value": item.old_value, "new_value": item.new_value,
         "reason": item.reason, "actor_role": item.actor_role, "actor_name": item.actor_name,
+        "for_panel": item.entity == "defense_verdict" and item.actor_role != "faculty",
         "created_at": iso(item.created_at),
     }
 
@@ -16913,20 +16929,13 @@ def register_routes(app: Flask) -> None:
                 }), 400)
         return score, None
 
-    @app.route("/api/faculty-portal/defense-verdicts/<int:schedule_id>", methods=["POST"])
-    @require_api_login("faculty")
-    def faculty_defense_verdict(schedule_id: int):
-        account = current_account()
-        faculty = Faculty.query.get(account.faculty_id) if account and account.faculty_id else None
-        schedule = ScheduleRequest.query.get_or_404(schedule_id)
-        gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(schedule.defense_type or "")
-        assignment = PanelAssignment.query.filter_by(
-            faculty_id=faculty.id if faculty else 0,
-            student_id=schedule.student_id,
-            gate=gate,
-        ).first()
-        if not assignment or assignment.panel_role.lower() not in {"panel chair", "panel lead"}:
-            return jsonify({"error": "Only the assigned panel chair or panel lead can submit this verdict."}), 403
+    def record_defense_verdict(schedule: ScheduleRequest, gate: str, assignment: PanelAssignment, faculty: Faculty, recorder=None):
+        """The one place a defense verdict is checked and recorded, for the chair and (I-361) for staff
+        recording for the panel (`recorder` is then the staff account; the verdict still belongs to the chair)."""
+        data = request_payload()
+        reason = (data.get("reason") or "").strip()
+        if recorder and len(reason) < 5:
+            return jsonify({"error": "Give the reason you are recording this for the panel."}), 400
         try:
             require_open_standing(schedule.student, "recording a defense verdict")
         except ValueError as exc:
@@ -16945,7 +16954,6 @@ def register_routes(app: Flask) -> None:
                     f"({start.strftime('%Y-%m-%d %H:%M')} Manila time)."
                 )
             }), 400
-        data = request_payload()
         result = normalize_verdict_result(data.get("result"))
         error = allowed_verdict_or_error(result, gate)
         if error:
@@ -16972,33 +16980,79 @@ def register_routes(app: Flask) -> None:
             evaluation_score=score,
             selected_title=selected_title or None,
         )
+        if recorder:
+            verdict.recorded_for_panel_by = recorder.full_name
+            verdict.recorded_for_panel_role = ROLE_LABELS.get(recorder.role, recorder.role)
+            verdict.recorded_for_panel_reason = reason
+            verdict.recorded_for_panel_at = now_utc()
         db.session.add(verdict)
         db.session.flush()
         next_owner = apply_verdict_effects(student, schedule, verdict)
+        actor = f"{verdict.recorded_for_panel_role} · {recorder.full_name} (for the panel)" if recorder else f"Panel Chair · {faculty.name}"
         add_log(
-            "research-gate", student.id, f"Panel Chair · {faculty.name}", gate,
+            "research-gate", student.id, actor, gate,
             f"{schedule.defense_type}: {result}", next_owner,
-            f"Schedule #{schedule.id}; verdict submitted by assigned {assignment.panel_role}. {verdict.remarks or 'No remarks.'}",
+            f"Schedule #{schedule.id}; verdict submitted by assigned {assignment.panel_role}"
+            + (f", recorded for the panel by {recorder.full_name}. Reason: {reason}. " if recorder else ". ")
+            + f"{verdict.remarks or 'No remarks.'}",
         )
+        if recorder:
+            notify_schedule_people(
+                schedule, "defense_verdict_for_panel",
+                f"{schedule.defense_type} verdict of {student.name} recorded for the panel",
+                f"Recorded by {recorder.full_name} for the panel. Result: {result}. Reason: {reason}",
+                f"verdict_for_panel_{verdict.id}",
+            )
         sync_research_progress(student)
         db.session.commit()
         return jsonify({
             "ok": True,
-            "message": "Defense verdict submitted.",
+            "message": "Defense verdict recorded for the panel." if recorder else "Defense verdict submitted.",
             "verdict": defense_verdict_dict(verdict),
             "next_owner": next_owner,
             "follow_up": RESEARCH_VERDICTS[result]["summary"],
         })
 
-    @app.route("/api/faculty-portal/defense-verdicts/<int:verdict_id>/correction", methods=["POST"])
+    @app.route("/api/faculty-portal/defense-verdicts/<int:schedule_id>", methods=["POST"])
     @require_api_login("faculty")
-    def faculty_defense_verdict_correction(verdict_id: int):
-        """The chair may correct a wrongly entered verdict until it is acted on, with a reason."""
+    def faculty_defense_verdict(schedule_id: int):
         account = current_account()
         faculty = Faculty.query.get(account.faculty_id) if account and account.faculty_id else None
-        verdict = DefenseVerdict.query.get_or_404(verdict_id)
-        if not (verdict.faculty_id == (faculty.id if faculty else 0) or panel_chair_assignment(faculty, verdict.student_id, verdict.gate)):
-            return jsonify({"error": "Only the panel chair who submitted this verdict can correct it."}), 403
+        schedule = ScheduleRequest.query.get_or_404(schedule_id)
+        gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(schedule.defense_type or "")
+        assignment = PanelAssignment.query.filter_by(
+            faculty_id=faculty.id if faculty else 0,
+            student_id=schedule.student_id,
+            gate=gate,
+        ).first()
+        if not assignment or assignment.panel_role.lower() not in {"panel chair", "panel lead"}:
+            return jsonify({"error": "Only the assigned panel chair or panel lead can submit this verdict."}), 403
+        return record_defense_verdict(schedule, gate, assignment, faculty)
+
+    def schedule_chair(schedule: ScheduleRequest):
+        """The panel chair (assignment, faculty) of a defense, or (None, None) when no chair is assigned."""
+        gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(schedule.defense_type or "")
+        for assignment in PanelAssignment.query.filter_by(student_id=schedule.student_id, gate=gate).all():
+            if assignment.panel_role.lower() in {"panel chair", "panel lead"} and assignment.faculty:
+                return assignment, assignment.faculty
+        return None, None
+
+    @app.route("/api/research-gate/<int:schedule_id>/verdict", methods=["POST"])
+    @require_api_login("staff", "research_coordinator")
+    def staff_defense_verdict(schedule_id: int):
+        """I-361: Graduate School staff or the Research Coordinator records the verdict for the panel chair."""
+        schedule = ScheduleRequest.query.get_or_404(schedule_id)
+        gate = RESEARCH_DEFENSE_TYPES_TO_GATES.get(schedule.defense_type or "")
+        if not gate:
+            return jsonify({"error": "This is not a research defense."}), 400
+        assignment, chair = schedule_chair(schedule)
+        if not assignment:
+            return jsonify({"error": "No panel chair is assigned to this defense yet. Match the panel first."}), 400
+        return record_defense_verdict(schedule, gate, assignment, chair, recorder=current_account())
+
+    def correct_defense_verdict(verdict: DefenseVerdict, faculty: Faculty | None, recorder=None):
+        """Correct a verdict until it is acted on, with a reason. Same rules for the chair and for staff
+        acting for the panel (`recorder` is then the staff account)."""
         data = request_payload()
         reason = (data.get("reason") or "").strip()
         if len(reason) < 5:
@@ -17025,18 +17079,64 @@ def register_routes(app: Flask) -> None:
             verdict.evaluation_score = score
         selected_title = (data.get("selected_title") or "").strip()[:220]
         verdict.selected_title = selected_title or (verdict.selected_title if result == VERDICT_PASSED else None)
-        verdict.corrected_by = faculty.name if faculty else None
+        who = f"{recorder.full_name} (for the panel)" if recorder else (faculty.name if faculty else None)
+        verdict.corrected_by = who
         verdict.corrected_at = now_utc()
         verdict.correction_reason = reason
         next_owner = apply_verdict_effects(student, verdict.schedule, verdict)
+        actor = (
+            f"{ROLE_LABELS.get(recorder.role, recorder.role)} · {recorder.full_name} (for the panel)"
+            if recorder else f"Panel Chair · {faculty.name if faculty else 'Chair'}"
+        )
         add_log(
-            "research-gate", student.id, f"Panel Chair · {faculty.name if faculty else 'Chair'}", verdict.gate,
+            "research-gate", student.id, actor, verdict.gate,
             f"{verdict.defense_type}: verdict corrected from {previous} to {result}", next_owner,
             f"Schedule #{verdict.schedule_request_id}. Reason: {reason}",
         )
+        if recorder:
+            notify_schedule_people(
+                verdict.schedule, "defense_verdict_for_panel",
+                f"{verdict.defense_type} verdict of {student.name} corrected for the panel",
+                f"Corrected from {previous} to {result} by {recorder.full_name} for the panel. Reason: {reason}",
+                f"verdict_for_panel_{verdict.id}_{int(verdict.corrected_at.timestamp())}",
+            )
         sync_research_progress(student)
         db.session.commit()
         return jsonify({"ok": True, "message": "Verdict corrected.", "verdict": defense_verdict_dict(verdict), "next_owner": next_owner})
+
+    @app.route("/api/faculty-portal/defense-verdicts/<int:verdict_id>/correction", methods=["POST"])
+    @require_api_login("faculty")
+    def faculty_defense_verdict_correction(verdict_id: int):
+        """The chair may correct a wrongly entered verdict until it is acted on, with a reason."""
+        account = current_account()
+        faculty = Faculty.query.get(account.faculty_id) if account and account.faculty_id else None
+        verdict = DefenseVerdict.query.get_or_404(verdict_id)
+        if not (verdict.faculty_id == (faculty.id if faculty else 0) or panel_chair_assignment(faculty, verdict.student_id, verdict.gate)):
+            return jsonify({"error": "Only the panel chair who submitted this verdict can correct it."}), 403
+        return correct_defense_verdict(verdict, faculty)
+
+    @app.route("/api/research-gate/verdicts/<int:verdict_id>/correction", methods=["POST"])
+    @require_api_login("staff", "research_coordinator")
+    def staff_defense_verdict_correction(verdict_id: int):
+        """I-361: staff or the Research Coordinator corrects a verdict for the panel (reason required)."""
+        verdict = DefenseVerdict.query.get_or_404(verdict_id)
+        return correct_defense_verdict(verdict, verdict.faculty, recorder=current_account())
+
+    def confirm_defense_revisions(verdict: DefenseVerdict, confirmed_by: str, note: str, actor: str):
+        verdict.revision_status = REVISION_CONFIRMED
+        verdict.revisions_confirmed_by = confirmed_by
+        verdict.revisions_confirmed_at = now_utc()
+        verdict.revision_confirm_note = note or None
+        student = verdict.student
+        after_defense_cleared(student, verdict.gate, verdict)
+        add_log(
+            "research-gate", student.id, actor, verdict.gate,
+            f"{verdict.defense_type}: revisions confirmed", "Research Coordinator",
+            f"Revisions after '{verdict.result}' confirmed by {confirmed_by}. {note or ''}".strip(),
+        )
+        sync_research_progress(student)
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Revisions confirmed. The stage is complete.", "verdict": defense_verdict_dict(verdict)})
 
     @app.route("/api/faculty-portal/defense-verdicts/<int:verdict_id>/confirm-revisions", methods=["POST"])
     @require_api_login("faculty")
@@ -17059,20 +17159,32 @@ def register_routes(app: Flask) -> None:
         if verdict.revision_status != REVISION_SUBMITTED:
             return jsonify({"error": "The student has not submitted the revisions yet."}), 409
         data = request_payload()
-        student = verdict.student
-        verdict.revision_status = REVISION_CONFIRMED
-        verdict.revisions_confirmed_by = faculty.name
-        verdict.revisions_confirmed_at = now_utc()
-        verdict.revision_confirm_note = (data.get("note") or "").strip() or None
-        after_defense_cleared(student, verdict.gate, verdict)
-        add_log(
-            "research-gate", student.id, f"{'Panel Chair' if chair else 'Research Adviser'} · {faculty.name}", verdict.gate,
-            f"{verdict.defense_type}: revisions confirmed", "Research Coordinator",
-            f"Revisions after '{verdict.result}' confirmed by {faculty.name}. {verdict.revision_confirm_note or ''}".strip(),
+        return confirm_defense_revisions(
+            verdict, faculty.name, (data.get("note") or "").strip(),
+            f"{'Panel Chair' if chair else 'Research Adviser'} · {faculty.name}",
         )
-        sync_research_progress(student)
-        db.session.commit()
-        return jsonify({"ok": True, "message": "Revisions confirmed. The stage is complete.", "verdict": defense_verdict_dict(verdict)})
+
+    @app.route("/api/research-gate/verdicts/<int:verdict_id>/confirm-revisions", methods=["POST"])
+    @require_api_login("staff", "research_coordinator")
+    def staff_confirm_defense_revisions(verdict_id: int):
+        """I-361: staff or the Research Coordinator confirms the revisions for the panel (reason required)."""
+        account = current_account()
+        verdict = DefenseVerdict.query.get_or_404(verdict_id)
+        if verdict_effect(verdict) not in REVISION_EFFECTS:
+            return jsonify({"error": "This verdict does not require revisions."}), 400
+        if verdict.revision_status == REVISION_CONFIRMED:
+            return jsonify({"error": "These revisions are already confirmed."}), 409
+        if verdict.revision_status != REVISION_SUBMITTED:
+            return jsonify({"error": "The student has not submitted the revisions yet."}), 409
+        data = request_payload()
+        reason = (data.get("reason") or "").strip()
+        if len(reason) < 5:
+            return jsonify({"error": "Give the reason you are confirming these revisions for the panel."}), 400
+        note = (data.get("note") or "").strip()
+        return confirm_defense_revisions(
+            verdict, f"{account.full_name} (for the panel)", f"{note} Reason: {reason}".strip(),
+            f"{ROLE_LABELS.get(account.role, account.role)} · {account.full_name} (for the panel)",
+        )
 
     @app.route("/api/student-portal/defense-verdicts/<int:verdict_id>/revisions", methods=["POST"])
     @require_api_login("student")
@@ -36093,6 +36205,47 @@ def research_gate_overview_row(student: Student, case: ResearchCase) -> dict | N
         "student": student_brief(student), "stage": stage, "gate": gate, "status": status,
         "state": state, "waiting_on": owner if state != "done" else None, "reason": reason,
         "research_title": case.title, "adviser_name": student.adviser_name,
+        "column": 1 if gate == RESEARCH_GATE_TITLE else 2 if gate == RESEARCH_GATE_PROPOSAL else 3,
+        "requirements": [{"label": item["label"], "met": item["status"] == "Complete"} for item in milestone["requirements"]],
+        "missing": [item["label"] for item in pending],
+        **research_gate_defense_facts(student, gate),
+    }
+
+
+def research_gate_defense_facts(student: Student, gate: str) -> dict:
+    """I-361/I-362: the next defense, its verdict and what staff may do for the panel, for one Research Gate card."""
+    defense_gate = RESEARCH_GATE_FINAL if gate == "Completion Evidence" else gate
+    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(defense_gate)
+    schedule = (
+        ScheduleRequest.query.filter(
+            ScheduleRequest.student_id == student.id,
+            ScheduleRequest.defense_type == defense_type,
+            ScheduleRequest.status.notin_([CANCELLED_DEFENSE_STATUS, RESCHEDULED_DEFENSE_STATUS]),
+        ).order_by(ScheduleRequest.id.desc()).first()
+        if defense_type else None
+    )
+    verdict = DefenseVerdict.query.filter_by(schedule_request_id=schedule.id).first() if schedule else None
+    chair = None
+    if schedule:
+        chair = next((a for a in PanelAssignment.query.filter_by(student_id=student.id, gate=defense_gate).all()
+                      if a.panel_role.lower() in {"panel chair", "panel lead"}), None)
+    can_record = bool(
+        schedule and chair and not verdict and schedule.status in ACTIVE_DEFENSE_STATUSES
+        and (demo_skip_date_waits() or defense_start_datetime(schedule) <= manila_now())
+    )
+    return {
+        "next_defense": {
+            "id": schedule.id, "defense_type": schedule.defense_type, "date": iso(schedule.preferred_date),
+            "start_time": schedule.start_time.strftime("%H:%M") if schedule.start_time else None,
+            "status": schedule.status, "panel_chair": chair.faculty.name if chair and chair.faculty else None,
+        } if schedule else None,
+        "verdict": defense_verdict_dict(verdict),
+        "verdict_options": verdict_options_for_gate(defense_gate) if defense_type else [],
+        "can_record_verdict": can_record,
+        "can_correct_verdict": bool(verdict and not verdict_is_acted_on(verdict)),
+        "can_confirm_revisions": bool(
+            verdict and verdict_effect(verdict) in REVISION_EFFECTS and verdict.revision_status == REVISION_SUBMITTED
+        ),
     }
 
 
