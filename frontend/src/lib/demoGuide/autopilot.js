@@ -88,7 +88,11 @@ function scopeOf(target, root) {
   return find(scope, root)[0] || null;
 }
 
-const asSpec = (target) => (typeof target === "string" ? (target.startsWith("#") ? { css: target } : { demo: target }) : target || {});
+const asSpec = (target) => {
+  if (typeof target === "string") return target.startsWith("#") ? { css: target } : { demo: target };
+  if (!target) return {};
+  return target.text || target.name ? { ...target, ...(target.text ? { text: stamped(target.text) } : {}), ...(target.name ? { name: stamped(target.name) } : {}) } : target;
+};
 
 /** Every visible element that matches the target, in page order (an empty list when none). */
 export function find(target, root = document) {
@@ -129,11 +133,9 @@ export function waitFor(target, { signal, timeout = 8000, enabled = false, gone 
   const spec = asSpec(target);
   const pick = () => {
     const list = find(spec);
-    const el = list[spec.nth || 0];
     if (gone) return list.length === 0 ? true : null;
-    if (!el) return null;
-    if (enabled && (el.disabled || el.getAttribute("aria-disabled") === "true")) return null;
-    return el;
+    const usable = enabled ? list.filter((el) => !el.disabled && el.getAttribute("aria-disabled") !== "true") : list;
+    return usable[spec.nth || 0] || null;
   };
   return new Promise((resolve, reject) => {
     if (signal && signal.aborted) return reject(new Aborted());
@@ -287,8 +289,23 @@ async function pick(target, signal, options) {
   return waitFor(target, { signal, enabled: true, ...options });
 }
 
-// "{stamp}" in typed text becomes the time of day as six digits, so a value that must be new (a Student ID) is new on every run.
-const stamped = (text) => String(text).replace(/\{stamp\}/g, () => new Date().toTimeString().slice(0, 8).replace(/:/g, ""));
+// "{stamp}" in typed text (and in a target's `text` or `name`) becomes the time of day as six digits, the same all through one demo run (kept in
+// sessionStorage, cleared when a demo starts), so a value that must be new (a Student ID, a batch number) is new on every run and the
+// later steps can find it again.
+const STAMP_KEY = "usls-demo-autopilot-stamp";
+function stampNow() {
+  try {
+    let value = window.sessionStorage.getItem(STAMP_KEY);
+    if (!value) {
+      value = new Date().toTimeString().slice(0, 8).replace(/:/g, "");
+      window.sessionStorage.setItem(STAMP_KEY, value);
+    }
+    return value;
+  } catch {
+    return new Date().toTimeString().slice(0, 8).replace(/:/g, "");
+  }
+}
+const stamped = (text) => String(text).replace(/\{stamp\}/g, stampNow);
 
 async function typeInto(el, raw, signal) {
   const text = stamped(raw);
@@ -365,7 +382,7 @@ async function play(action, ctx) {
     if (action.optional && error instanceof AutopilotError) return undefined; // "if it is there" (a window that may already be closed)
     throw error;
   }
-  await glideTo(el, signal);
+  await glideTo(key === "upload" ? el.closest("label") || el : el, signal); // a file input is hidden: point at its label
   if (key === "type") {
     pulse();
     el.click();

@@ -274,6 +274,9 @@ export default function DemoGuide() {
   }, [slideshow, data, load]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ahead = resolved && browse != null && shown && shown !== resolved.step;
+  // While a step plays, or stopped with a reason, the bar names THAT step (the record may already show the next one).
+  const barStep = (autopilot.stepId && autopilot.status !== "idle" && autopilot.status !== "paused" && guide.steps.find((item) => item.id === autopilot.stepId)) || shown;
+  const barIndex = steps.indexOf(barStep) >= 0 ? steps.indexOf(barStep) : shownIndex;
   const behind = Boolean(resolved && browse != null && resolved.index >= 0 && browse < resolved.index);
   function slideNext() {
     if (!resolved) return;
@@ -635,11 +638,11 @@ export default function DemoGuide() {
       {panel && createPortal(panel, document.body)}
       {slideshow && data && shown && (
         <DemoAutopilotBar
-          title={shown.title}
-          index={shownIndex}
+          title={barStep.title}
+          index={barIndex}
           count={steps.length}
           finished={Boolean(resolved && resolved.finished && browse == null)}
-          say={sayLine(shown.say) || shown.do}
+          say={sayLine(barStep.say) || barStep.do}
           status={autopilot.status}
           caption={autopilot.caption}
           error={autopilot.error}

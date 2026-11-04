@@ -18,6 +18,12 @@ export default {
     {
       id: "gr-file", title: "The student sends the graduation application", role: "student", route: "/student/graduation", page: "Graduation Endorsement",
       do: "Choose the open school year, choose the signed application PDF, add a remark and select Submit graduation application, then Send request.",
+      actions: [
+        { upload: "#graduation-pdf", fixture: "graduation-application.pdf" },
+        { type: { label: "Remarks for the reviewer" }, text: "Signed graduation application." },
+        { click: "submit" },
+        { click: { role: "button", name: "Send request", in: "dialog" } },
+      ],
       doneWhen: { status: from(GRADUATION_ORDER, "For Review") },
       branches: [{ status: ["Returned for Clarification"], goto: "gr-resend", note: "Staff returned the application for clarification. The student sends a corrected PDF." }],
       rule: "Only students whose coursework and research (and a practicum when the program needs one) are complete are listed.",
@@ -29,6 +35,15 @@ export default {
     {
       id: "gr-batch", title: "Staff create the batch", role: "staff", route: "/workflow/graduation", page: "Graduation Endorsement",
       do: "Drag the card from Application submitted to Batch created, set the batch number, month and year, create it, then drag the batch to Coursework review.",
+      actions: [
+        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
+        { click: { role: "menuitem", name: "Batch created", exact: true } },
+        { type: { label: "Batch No.", in: "dialog" }, text: "{stamp}" },
+        { click: { role: "button", name: "Create batch", exact: true, in: "dialog" } },
+        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Batch {stamp}" } } },
+        { click: { role: "menuitem", name: "Coursework review", exact: true } },
+        { click: { role: "button", name: "Forward to Academic Coordinator", exact: true, in: "dialog" } },
+      ],
       doneWhen: { status: from(GRADUATION_ORDER, "Coursework Review") },
       rule: "A drop opens the same window as the button and the server checks the rules again.",
       ifAsked: [
@@ -39,24 +54,51 @@ export default {
     {
       id: "gr-coursework", title: "The Academic Coordinator checks coursework", role: "academic_coordinator", route: "/workflow/graduation", page: "Graduation Endorsement",
       do: "Drag the batch from Coursework review to Research and practicum check, open View coursework completed if asked, and confirm.",
+      actions: [
+        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Batch {stamp}" } } },
+        { click: { role: "menuitem", name: "Research and practicum check", exact: true } },
+        { click: { role: "button", name: "Check coursework completion", exact: true, in: "dialog" } },
+      ],
       doneWhen: { status: from(GRADUATION_ORDER, "Research Review") },
       ifAsked: [{ q: "What does the Coordinator verify?", a: "That the coursework of each candidate is complete. The system already lists only candidates whose coursework is done." }],
     },
     {
       id: "gr-research", title: "The Research Coordinator checks research", role: "research_coordinator", route: "/workflow/graduation", page: "Graduation Endorsement",
       do: "Drag the batch to Endorsement prep or revision and validate the research and practicum requirements in the dialog.",
+      actions: [
+        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Batch {stamp}" } } },
+        { click: { role: "menuitem", name: "Endorsement prep or revision", exact: true } },
+        { click: { role: "button", name: "Validate research and practicum requirements", exact: true, in: "dialog" } },
+      ],
       doneWhen: { status: from(GRADUATION_ORDER, "Eligibility Confirmed") },
       ifAsked: [{ q: "What if the research is not complete?", a: "The case shows Research Incomplete (or Practicum Incomplete) and does not move on until the requirement is met." }],
     },
     {
       id: "gr-prepare", title: "Staff prepare the list and send it to the Dean", role: "staff", route: "/workflow/graduation", page: "Graduation Endorsement",
       do: "Open View details on the batch and select Prepare endorsement list, then drag the batch to Dean review and send the endorsement list.",
+      actions: [
+        { click: { role: "button", name: "View details for Batch {stamp}" } },
+        { click: { role: "button", name: "Prepare endorsement list", exact: true, in: "dialog" } },
+        { click: { role: "button", name: "Prepare endorsement list", exact: true, in: "dialog" } },
+        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Batch {stamp}" } } },
+        { click: { role: "menuitem", name: "Dean review", exact: true } },
+        { click: { role: "button", name: "Send endorsement list to Dean", exact: true, in: "dialog" } },
+      ],
       doneWhen: { status: from(GRADUATION_ORDER, "Ready for Dean Review") },
       ifAsked: [{ q: "Why is Prepare endorsement list a button and not a drag?", a: "It does not change the column. Steps that stay in the same column are buttons in the batch View details window." }],
     },
     {
       id: "gr-dean", title: "The Dean approves and exports", role: "dean", route: "/dean/approvals/graduation", page: "Graduation Endorsement (Dean)",
-      do: "Open the Endorsement batches tab, drag the batch to Approved, ready to export and approve; then select Export approved list in View details.",
+      do: "Open the Endorsement batches tab, drag the batch to Approved, ready to export and approve; then select Export approved list.",
+      actions: [
+        { click: { role: "tab", name: "Endorsement batches" } },
+        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Batch {stamp}" } } },
+        { click: { role: "menuitem", name: "Approved, ready to export", exact: true } },
+        { click: { role: "button", name: "Approve endorsement list", exact: true, in: "dialog" } },
+        { click: { role: "button", name: "Export approved list", exact: true } },
+        { wait: { text: "Graduation CSV export complete" } },
+        { click: { role: "button", name: "Got it" }, optional: true },
+      ],
       doneWhen: { status: from(GRADUATION_ORDER, "Dean Approved") },
       branches: [{ status: ["Returned for Revision"], goto: "gr-revise", note: "The Dean returned the list for revision. Staff correct it and send it again." }],
       rule: "Only the Dean approves the endorsement list and exports the CSV.",
@@ -68,6 +110,7 @@ export default {
     {
       id: "gr-result", title: "The student sees Dean Approved", role: "student", route: "/student/graduation", page: "Graduation Endorsement",
       do: "Sign in as the student: the status is Dean Approved, steps 1 to 5 are Completed and step 6 waits for the Dean's email to the Registrar.",
+      actions: [{ pause: 1500, caption: "Showing the student's page" }],
       doneWhen: "manual",
       ifAsked: [{ q: "Who sends the list to the Registrar?", a: "The Dean, outside the portal. Step 6 stays Pending review because the portal does not send that email." }],
     },

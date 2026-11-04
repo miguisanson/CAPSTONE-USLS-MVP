@@ -269,7 +269,7 @@ for (const guide of GUIDES) {
       if (guide.process === "monitoring") expect(writes).toEqual(["/api/monitoring/students 201", "/api/monitoring/students/*/subjects 201"]);
     } finally {
       await context.close();
-      await resetStudents(playwright, ...plan.reset);
+      if (!process.env.P115_KEEP) await resetStudents(playwright, ...plan.reset); // P115_KEEP=1 leaves the record where it stopped, to look at it
     }
   });
 }

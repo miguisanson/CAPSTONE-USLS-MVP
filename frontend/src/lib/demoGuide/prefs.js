@@ -27,6 +27,11 @@ export const SAVED_KEY = "usls-demo-guide"; // the panel's own memory (DemoGuide
 export function startGuide(guideId) {
   setGuideEnabled(true);
   try {
+    window.sessionStorage.removeItem("usls-demo-autopilot-stamp"); // a new run gets new Student IDs and batch numbers (autopilot.js)
+  } catch {
+    /* none */
+  }
+  try {
     const saved = JSON.parse(window.localStorage.getItem(SAVED_KEY) || "{}") || {};
     const done = { ...(saved.done || {}) };
     delete done[guideId];
