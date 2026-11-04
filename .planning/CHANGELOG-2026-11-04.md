@@ -16,7 +16,6 @@ Branch: `v6.1-migui` until 13:3x, then `v6.2-migui`. Every item has its ISSUES r
 | PM | Demo Guide autopilot slideshow: Next performs each step with a gliding cursor; Take over; all 8 guides play end to end (p115) | — | 59d0c61 |
 | PM | Leave extension start shown as text | I-254 | 44faece |
 | PM | Manual fields round 2: School year dropdown (AY 2026-2027 → "26-27"), 7-digit ID warning, email/name checks, time-slot and venue pickers, date/hours limits, section and batch-year dropdowns, generated faculty password | I-353 (part), inventory B-rows | da83ef6 |
-
 | PM | Edit anything with history: RecordEdit table, `/api/edits/<entity>/<id>`, Edit / Edited chip + history on chats, requests, remarks and notes of every process, every role; Dean notes on AWOL and withdrawal in their own field | I-354 | b6b81c3 |
 | PM | Status colours: seven meanings each with its own icon + "What the colours mean" legend; LOA card shows the reason; details window opens with reason and period; enrollment OPEN/CLOSED banner and controls off while closed; Reports "By year started" with On coursework / On thesis or dissertation / Graduated | I-355..I-358 | 82668c7 |
 | PM | Demo Guide: `>` and the Right arrow make the app do the step; panel steps aside while it runs; Stop ends the demo | — | 9d01167 |
