@@ -1,6 +1,6 @@
 {
  "_about": "Spoken lines for the recorded demo, written for a calm voice-over of about two minutes a video. Keys are the walkthrough screenshot ids (the video holds on each one as long as its line takes to say; an empty line is a short hold) plus '<part>:signin:<role>' (said while the login is typed; ':2' is a second sign-in of the same role). There are no intro cards. Rule: name the role every time (the student, the Dean, Graduate School staff); never a pronoun for a person. Edit a line, re-run record_demo.py and build_narration.py: the pause follows the length of the line.",
- "2d:signin:Graduate School Staff": "In this video, we'll look at the Monitoring Sheet. First, Graduate School staff signs in.",
+ "2d:signin:Graduate School Staff": "In this demo, we'll start with the Monitoring Sheet. First, Graduate School staff signs in.",
  "monitoring-sheet-01": "Here we have the Monitoring Sheet, under Records. Each row is a student, and each column is a subject. The colours show what is completed, what is enrolled, and what is not taken yet.",
  "monitoring-sheet-02": "Let's start by adding a student who is missing from the imported sheet. The window warns that this is a manual entry, and it records who made it and when.",
  "monitoring-sheet-03": "The form asks for the student ID and the name. The school year the student started comes already filled in. The same checks as an import still apply, so the same student can't be added twice.",
@@ -39,9 +39,9 @@
  "leave-of-absence-19": "Next, we have the Registrar list. The portal doesn't send e-mail. Graduate School staff sends it the official way.",
  "leave-of-absence-20": "",
  "leave-of-absence-21": "Then Graduate School staff marks the list as sent to the Registrar.",
- "2h-1:signin:Student:2": "Finally, let's check on Daniel. Daniel signs in one more time.",
+ "2h-1:signin:Student:2": "Let's check back on Daniel. Daniel signs in one more time.",
  "leave-of-absence-22": "And Daniel's page now shows the status On leave.",
- "2h-2:signin:Student": "Now let's look at Readmission, which is coming back from a leave. Therese has been on approved leave, and signs in to come back.",
+ "2h-2:signin:Student": "Now let's look at Readmission, for students coming back from a leave. Therese has been on approved leave, and signs in.",
  "readmission-01": "Here we have the Readmission page. Enrollment stays closed until the readmission is approved. The leave that is ending is already filled in.",
  "readmission-02": "The rule says a returning student must write an intent to enroll. That's on page fifty-three of the Handbook.",
  "readmission-03": "So Therese picks the return semester and gives a reason. There's nothing to tick. The system shows what it already checked in the records, and what staff still need to confirm.",
@@ -62,7 +62,7 @@
  "readmission-16": "On the staff board, the Academic Coordinator is now the next owner, and the case is flagged for the Registrar.",
  "readmission-17": "Here we have the same Registrar list as before. Download it, send it, mark it sent, and then mark it acknowledged.",
  "readmission-18": "Therese can see the approval, along with the messages from staff and the Dean.",
- "2h-2:signin:Student:2": "Finally, Therese signs back in.",
+ "2h-2:signin:Student:2": "Then Therese signs back in.",
  "2h-3:signin:Graduate School Staff": "Next, we have AWOL, and the return from AWOL. This one starts on the office side. Graduate School staff signs in.",
  "awol-01": "Here we have the AWOL and Residency board. It flags cases straight from the imported enrollment records. Nobody marks a student AWOL by hand.",
  "awol-02": "The card for Maya Torres is in the AWOL column, waiting on the student. Staff can't move it. Only the student can start a return.",
@@ -119,5 +119,5 @@
  "2h-2:signin:Graduate School Staff:2": "Back to the office side. Graduate School staff signs in again.",
  "2h-3:signin:Graduate School Staff:2": "Back to the office side. Graduate School staff signs in again.",
  "2h-3:signin:Graduate School Staff:3": "Graduate School staff signs in one last time.",
- "2h-3:signin:Student:2": "Finally, Maya signs in again."
+ "2h-3:signin:Student:2": "Then Maya signs in again."
 }

@@ -10,6 +10,10 @@
   `.srt`, `.timeline.json`, `NARRATION-SCRIPT.docx/.pdf` rebuilt. The `-FINAL.mp4` files are the owner's OLD voice-overs
   and are stale; the owner records new audio from the new `.srt`.
 - Recording needs `PYTHONIOENCODING=utf-8` when output goes to a file (capture cases print arrows; cp1252 crashes).
+- 14:00: owner narrates ONE take. `videos/` now holds `Full-Demo.mp4` (six parts joined, 0.4 s fade at each join,
+  durations unchanged) + `Full-Demo.srt` + `NARRATION-SCRIPT` with full-video times; the parts live in `videos/Parts/`,
+  the morning voice-overs in `videos/Archive/`. Rebuild: `build_narration.py --videos <videos>/Parts --full ../Full-Demo`
+  (times use each part's real mp4 length). mp4s stay gitignored (`videos/**/*.mp4`).
 
 ## 2026-11-04 afternoon — known-data rule, process audit, Demo Guide (session "known-data"; pushed to v6.1-migui)
 

@@ -76,7 +76,7 @@ And here we have the Registrar list. It has one report for each approved return.
 
 20
 00:02:41,900 --> 00:02:46,200
-Finally, Maya signs in again.
+Then Maya signs in again.
 
 21
 00:02:46,400 --> 00:02:55,100

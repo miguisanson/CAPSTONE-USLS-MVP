@@ -1,6 +1,6 @@
 1
 00:00:01,300 --> 00:00:10,200
-Now let's look at Readmission, which is coming back from a leave. Therese has been on approved leave, and signs in to come back.
+Now let's look at Readmission, for students coming back from a leave. Therese has been on approved leave, and signs in.
 
 2
 00:00:11,199 --> 00:00:19,800
@@ -68,7 +68,7 @@ Here we have the same Registrar list as before. Download it, send it, mark it se
 
 18
 00:02:42,900 --> 00:02:47,500
-Finally, Therese signs back in.
+Then Therese signs back in.
 
 19
 00:02:47,699 --> 00:02:52,600

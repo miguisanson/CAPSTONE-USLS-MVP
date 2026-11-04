@@ -58,6 +58,15 @@ def rows_for(key: str, events: list[dict]) -> list[tuple[float, float, str, str]
     return out
 
 
+def clip_secs(mp4: Path, fallback: float) -> float:
+    """Real length of a part, so the joined video's times do not drift (record_demo.py cuts ~1 s after the last event)."""
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.count_frames_and_secs(str(mp4))[1]
+    except Exception:  # noqa: BLE001 - no mp4 or no imageio-ffmpeg: the cut point is close enough
+        return fallback
+
+
 def shade(cell, fill: str) -> None:
     pr = cell._tc.get_or_add_tcPr()
     shd = OxmlElement("w:shd")
@@ -70,8 +79,12 @@ def shade(cell, fill: str) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--videos", required=True)
+    ap.add_argument("--full", help="stem of the joined video (e.g. ../Full-Demo): also write one .srt for it and put the "
+                                   "script's times on the full video, next to it")
     args = ap.parse_args()
     vids = Path(args.videos)
+    full = (vids / args.full).resolve() if args.full else None
+    offset, full_srt = 0.0, []
 
     doc = Document()
     sec = doc.sections[0]
@@ -97,8 +110,12 @@ def main() -> None:
         events = json.loads(tl.read_text(encoding="utf-8"))
         rows = rows_for(key, events)
         dur = events[-1]["t"] if events else 0
-        doc.add_heading(f"{stem.replace('-', ' ', 1).replace('-', ' ')}  ({ts(dur)})", 1)
-        doc.add_paragraph(f"Video: {stem}.mp4").runs[0].italic = True
+        title = stem.replace('-', ' ', 1).replace('-', ' ')
+        if full:
+            doc.add_heading(f"{title}  (starts at {ts(offset)} in {full.name}.mp4)", 1)
+        else:
+            doc.add_heading(f"{title}  ({ts(dur)})", 1)
+            doc.add_paragraph(f"Video: {stem}.mp4").runs[0].italic = True
         table = doc.add_table(rows=1, cols=3)
         table.style = "Table Grid"
         table.autofit = False
@@ -113,18 +130,24 @@ def main() -> None:
         srt = []
         for n, (start, end, screen, line) in enumerate(rows, 1):
             cells = table.add_row().cells
-            for j, (w, val) in enumerate(((1.4, ts(start)), (4.6, screen), (11.4, line))):
+            for j, (w, val) in enumerate(((1.4, ts(start + offset if full else start)), (4.6, screen), (11.4, line))):
                 cells[j].width = Cm(w)
                 cells[j].text = ""
                 run = cells[j].paragraphs[0].add_run(val)
                 run.font.size = Pt(9 if j == 1 else 10.5)
             srt.append(f"{n}\n{ts(start, True)} --> {ts(max(end - 0.2, start + 1), True)}\n{line}\n")
+            full_srt.append(f"{len(full_srt) + 1}\n{ts(start + offset, True)} --> "
+                            f"{ts(max(end - 0.2, start + 1) + offset, True)}\n{line}\n")
         (vids / f"{stem}.srt").write_text("\n".join(srt), encoding="utf-8")
+        offset += clip_secs(vids / f"{stem}.mp4", dur + 1.0)
 
-    path = vids / "NARRATION-SCRIPT.docx"  # the script lives next to the videos it narrates
+    out_dir = full.parent if full else vids
+    if full:
+        full.with_suffix(".srt").write_text("\n".join(full_srt), encoding="utf-8")
+    path = out_dir / "NARRATION-SCRIPT.docx"  # the script lives next to the video it narrates
     doc.save(path)
     subprocess.run([SOFFICE, "--headless", "-env:UserInstallation=file:///E:/Temp/claude/lo-profile-narr", "--convert-to", "pdf",
-                    "--outdir", str(vids), str(path)], check=False, capture_output=True)
+                    "--outdir", str(out_dir), str(path)], check=False, capture_output=True)
     print("saved", path)
 
 

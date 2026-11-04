@@ -80,7 +80,7 @@ Then Graduate School staff marks the list as sent to the Registrar.
 
 21
 00:02:37,099 --> 00:02:43,600
-Finally, let's check on Daniel. Daniel signs in one more time.
+Let's check back on Daniel. Daniel signs in one more time.
 
 22
 00:02:43,800 --> 00:02:47,200

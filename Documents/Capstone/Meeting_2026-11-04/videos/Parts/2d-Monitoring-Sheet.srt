@@ -1,6 +1,6 @@
 1
 00:00:01,100 --> 00:00:06,700
-In this video, we'll look at the Monitoring Sheet. First, Graduate School staff signs in.
+In this demo, we'll start with the Monitoring Sheet. First, Graduate School staff signs in.
 
 2
 00:00:09,300 --> 00:00:21,900
