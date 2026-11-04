@@ -12,7 +12,7 @@ os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="pol
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 
 from app import (  # noqa: E402
-    AcademicTerm, AwolCase, CourseRecord, LeaveCase, SubjectEnrollment, Course, Faculty, PanelAssignment, Program, Student, UserAccount,
+    AcademicTerm, AwolCase, CourseRecord, LeaveCase, SubjectEnrollment, leave_policy_review, Course, Faculty, PanelAssignment, Program, Student, UserAccount,
     Notification, app, db, generate_password_hash, notify_workflow_owner,
 )
 
@@ -216,6 +216,34 @@ class MonitoringEnrolledRowTests(Audit2Base):
             enrollment.status = "Completed"  # no longer actively enrolled this term
             db.session.commit()
         self.assertEqual(staff.patch(self.url, json={"status": "Completed", "reason": "late grade"}).status_code, 200)
+
+
+class ReadmissionGapTests(Audit2Base):
+    """I-267: a return semester later than the one right after the leave is flagged, naming the gap semesters."""
+
+    def check_for(self, target_label):
+        with app.app_context():
+            terms = {t.label: t for t in AcademicTerm.query.all()}
+            running = terms["Running Term"]
+            leave = LeaveCase(student_id=self.student_id, kind="LOA", status="On Leave", start_term_id=running.id,
+                              end_term_id=running.id, start_label=running.label, end_label=running.label)
+            db.session.add(leave)
+            db.session.flush()
+            case = LeaveCase(student_id=self.student_id, kind="READMISSION", status="Submitted", linked_case_id=leave.id,
+                             target_term_id=terms[target_label].id, target_label=target_label)
+            db.session.add(case)
+            db.session.flush()
+            checks = leave_policy_review(case)["checks"]
+            return next(c for c in checks if c["label"] == "Return semester after the leave")
+
+    def test_next_semester_passes(self):
+        self.assertEqual(self.check_for("Term One")["status"], "Pass")
+
+    def test_later_semester_needs_review_and_names_the_gap(self):
+        check = self.check_for("Term Three")
+        self.assertEqual(check["status"], "Needs Review")
+        self.assertIn("Term One", check["detail"])
+        self.assertIn("Term Two", check["detail"])
 
 
 if __name__ == "__main__":

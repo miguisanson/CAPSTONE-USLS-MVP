@@ -6897,7 +6897,19 @@ def leave_policy_review(case: LeaveCase) -> dict:
         end_date = leave_end_date(linked) if linked else None
         target = case.target_term
         if target and end_date:
-            if target.start_date > end_date:
+            gap = AcademicTerm.query.filter(
+                AcademicTerm.start_date > end_date, AcademicTerm.start_date < target.start_date,
+            ).order_by(AcademicTerm.start_date).all()
+            if target.start_date > end_date and gap:
+                checks.append({
+                    "label": "Return semester after the leave",
+                    "status": "Needs Review",
+                    "detail": (
+                        f"{target.label} is not the semester right after the leave. {', '.join(t.label for t in gap)} "
+                        "would be left without leave cover or enrollment. The Dean decides."
+                    ),
+                })
+            elif target.start_date > end_date:
                 checks.append({
                     "label": "Return semester after the leave",
                     "status": "Pass",
