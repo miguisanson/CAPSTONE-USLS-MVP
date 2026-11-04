@@ -522,7 +522,8 @@ export const GUIDES = [
         id: "pr-dean", title: "The Dean reviews the report", role: "dean", route: "/dean/approvals/practicum", page: "Practicum Reports",
         do: "Open View details on the card in With the Dean, type a review comment and select Mark reviewed, then confirm.",
         doneWhen: { status: from(PRACTICUM_ORDER, "Dean Reviewed") },
-        branches: [{ status: ["Returned"], goto: "pr-resubmit", note: "The report was returned. The student sends the missing documents again." }],
+        // A Dean return puts the record back to "Completed" with a "Revise practicum status report" task for the Coordinator.
+        branches: [{ status: ["Completed"], goto: "pr-verify", note: "The Dean returned the report. The Academic Coordinator revises it and sends it to the Dean again." }],
         rule: "The Dean reviews only after the Academic Coordinator has sent the status report.",
         ifAsked: [
           { q: "If the Dean was already signed in, why is the card missing?", a: "The Dean page is read when it opens. Reload it to see the new card." },
