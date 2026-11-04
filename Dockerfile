@@ -5,6 +5,8 @@ WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
+# The Demo Guide reads the narration lines (frontend/src/lib/demoGuide/narration.js imports ../../../../scripts/demo/narration.json).
+COPY scripts/demo/narration.json /scripts/demo/narration.json
 RUN npm run build
 
 # Stage 2: the Flask API (served by waitress through scripts/serve_uat.py) plus the built screens.

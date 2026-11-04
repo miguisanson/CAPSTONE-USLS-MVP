@@ -192,6 +192,16 @@ local demo flow keeps working; set `DEMO_MODE=0` (in `.env` or the environment) 
 Nothing is ever pre-filled: the presenter either types the password or presses **Fill form** /
 **Sign in** on a demo account.
 
+### Demo Guide (in-app tutorial)
+
+With `DEMO_MODE` on, every page has a **Demo guide** button in the header (and the sign-in page has a
+Demo guide entry). Pick a demo (Leave of Absence, Readmission, AWOL return, Monitoring Sheet, Reports):
+the panel shows one step at a time: who signs in, which page, what to do and what to say, plus answers
+for likely panel questions. It follows the live record, not the clicks (`GET /api/demo/guide-state`), so
+when a panelist asks for a different value, a different decision (return or deny) or another student,
+press **Continue from here** and the guide finds the right step. It never clicks for the presenter.
+Design and the off-script cases: `.planning/demo-guide/DESIGN.md`; spec `frontend/e2e/p114-demo-guide.spec.js`.
+
 Notes for a real deployment: the seeded staff, dean and faculty accounts and every new student
 account start with the shared demo password, and there is no password-reset screen yet, so change
 those passwords before real use. Lockout is kept in memory (per server process, reset on restart).
