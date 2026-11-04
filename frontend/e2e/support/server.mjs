@@ -19,6 +19,7 @@ rmSync(SIGNIN_DIR, { recursive: true, force: true });
 if (process.env.E2E_NEGATIVE !== "1") rmSync(SCREENS_DIR, { recursive: true, force: true });
 
 const base = process.env.USLS_E2E_TMP || tmpdir();
+mkdirSync(base, { recursive: true }); // a USLS_E2E_TMP folder that does not exist yet is made, not a crash
 for (const name of readdirSync(base)) {
   if (name.startsWith("usls-e2e-")) rmSync(join(base, name), { recursive: true, force: true, maxRetries: 3, retryDelay: 300 });
 }
