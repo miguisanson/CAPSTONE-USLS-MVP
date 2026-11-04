@@ -4,7 +4,8 @@
 //   B-01 School year / AY entry is a pick ("AY 2026-2027", value 26-27)   B-02 Student ID 7 digits (soft)   B-04 email shape
 import { test, expect } from "@playwright/test";
 import { join } from "node:path";
-import { AUTH_DIR } from "./support/paths.mjs";
+import { AUTH_DIR, BASE_URL } from "./support/paths.mjs";
+import { PASSWORD } from "./support/accounts.js";
 
 const authFile = (key) => join(AUTH_DIR, `${key}.json`);
 const norm = (raw) => { const m = /^\s*(\d{2}|\d{4})\s*-\s*(\d{2}|\d{4})\s*$/.exec(raw || ""); return m ? `${m[1].slice(-2)}-${m[2].slice(-2)}` : ""; };
@@ -181,5 +182,62 @@ test.describe("Defense scheduling: venue pick, time slots, mode", () => {
     expect(offered).toEqual(rooms);
     await venue.fill("A brand new room");
     await expect(venue).toHaveValue("A brand new room");
+  });
+});
+
+test.describe("Dates and numbers that cannot be wrong", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+
+  test("B-47: the adviser's appointment date cannot be in the future", async ({ page }) => {
+    await page.goto("/adviser-appointments");
+    await page.getByRole("button", { name: /Record an adviser appointed outside the portal/ }).click();
+    const date = page.getByLabel("Appointment date");
+    const today = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; });
+    await expect(date).toHaveAttribute("max", today);
+    await date.fill("2999-01-01");
+    await expect(page.getByText("The appointment date cannot be in the future.")).toBeVisible();
+    await date.fill(today);
+    await expect(page.getByText("The appointment date cannot be in the future.")).toHaveCount(0);
+  });
+});
+
+test.describe("Student practicum hours", () => {
+  test("B-23: completed hours are a whole number, 0 up to twice the required hours", async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width: 1366, height: 768 } });
+    const res = await context.request.post("/api/auth/login", { data: { email: "student@usls.edu.ph", password: PASSWORD } });
+    expect(res.ok()).toBeTruthy();
+    const writes = [];
+    await context.route("**/api/student-portal/context", async (route) => {
+      const response = await route.fetch();
+      const d = await response.json();
+      d.student.program_has_practicum = true; d.student.program_code = "MAPSY"; d.student.program_name = "Master of Arts in Psychology";
+      d.practicum_eligibility = { eligible: true, status: "Verified", checklist: [], program_scope: {} };
+      d.practicum_program_scope = { description: "Spec practicum scope text." };
+      d.practicum_record = { id: 21, status: "Practicum In Progress", updated_at: "2026-10-02T09:00:00", practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec", required_hours: 200, completed_hours: 50, certificate_count: 1, moa_attachment: { id: 6001, name: "moa-spec.pdf", url: "/spec/moa.pdf", file_exists: true, uploaded_by: "Spec", uploaded_at: "2026-09-01T09:00:00" }, certificate_attachment: null, completion_attachments: [], attachments: [] };
+      d.workflow_messages = [];
+      await route.fulfill({ response, json: d });
+    });
+    await context.route("**/api/student-portal/requests/practicum", (route) => { writes.push(route.request().method()); return route.fulfill({ json: { message: "Spec: request saved." } }); });
+    await context.route("**/api/student-portal/request-attachments/upload", (route) => route.fulfill({ json: { attachment: { id: 7001, name: "spec.pdf", url: "/spec/spec.pdf", file_exists: true } } }));
+    const page = await context.newPage();
+    await page.goto("/student/practicum");
+    const main = page.locator("main");
+    await main.locator('input[type="file"]').setInputFiles({ name: "spec.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 spec") });
+    const hours = main.locator("#practicum-hours");
+    await expect(hours).toHaveAttribute("max", "400");
+    await expect(hours).toHaveAttribute("step", "1");
+    await hours.fill("401");
+    await main.getByRole("button", { name: "Submit completion stage" }).click();
+    await expect(main.getByText(/more than 400 hours/).first()).toBeVisible();
+    expect(writes).toHaveLength(0);
+    await hours.fill("12.5");
+    await main.getByRole("button", { name: "Submit completion stage" }).click();
+    await expect(main.getByText(/whole number/).first()).toBeVisible();
+    expect(writes).toHaveLength(0);
+    await hours.fill("200");
+    await main.getByRole("button", { name: "Submit completion stage" }).click();
+    await expect(page.getByRole("dialog", { name: "Send this request?" })).toBeVisible();
+    await context.unrouteAll({ behavior: "ignoreErrors" });
+    await context.close();
   });
 });
