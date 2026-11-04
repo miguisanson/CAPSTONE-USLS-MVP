@@ -15023,6 +15023,10 @@ def register_routes(app: Flask) -> None:
                 )
             }), 403
 
+        try:
+            require_open_standing(student, "the practicum process")  # same check staff meet in handle_practicum
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 409
         record = latest_practicum_record(student.id)
         eligibility = practicum_eligibility(student)
         if not record and not eligibility["eligible"]:
