@@ -15757,6 +15757,9 @@ def register_routes(app: Flask) -> None:
             if not doc.evidence_files:
                 continue
             student = Student.query.get(doc.student_id)
+            progress = detected_research_progress(student)
+            if progress["gate"] != RESEARCH_GATE_TITLE:
+                continue  # past the title defense (or not there yet): nothing left to endorse (I-320)
             endorsement = Form1Endorsement.query.filter_by(student_id=student.id).first() if concept_paper_package_ready(student.id) else None
             case = ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
             rows.append({
@@ -15764,7 +15767,7 @@ def register_routes(app: Flask) -> None:
                 "research_title": case.title if case else "Research title pending Form 1 submission",
                 "form": document_check_dict(doc),
                 "endorsement": form1_endorsement_dict(endorsement),
-                "current_stage": detected_research_progress(student)["stage"],
+                "current_stage": progress["stage"],
             })
         return jsonify({"items": rows})
 
@@ -15807,6 +15810,11 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "The student must upload Form 1 before it can be endorsed."}), 400
         if not concept_paper_package_ready(student.id):
             return jsonify({"error": "The student must upload all three concept papers before Form 1 can be endorsed."}), 400
+        if detected_research_progress(student)["gate"] != RESEARCH_GATE_TITLE:
+            return jsonify({"error": "Form 1 is endorsed only while the student is at the Form 1 and title defense step."}), 409
+        existing = Form1Endorsement.query.filter_by(student_id=student.id).first()
+        if existing and existing.status == "Endorsed":
+            return jsonify({"error": "Form 1 is already endorsed for this student."}), 409
         signature_data = (data.get("signature_data") or "").strip()
         if signature_data and (not signature_data.startswith("data:image/png;base64,") or len(signature_data) > 750000):
             return jsonify({"error": "The drawn signature is not a valid PNG image."}), 400

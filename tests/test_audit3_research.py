@@ -48,5 +48,41 @@ class StudentDefenseDateLeadTimeTests(ResearchCoreBase):
         self.assertEqual(response.status_code, 200, response.get_json())
 
 
+class Form1GateOnlyTests(ResearchCoreBase):
+    """I-320: Form 1 is endorsed once, at the Form 1 gate; the queue lists only students still at that gate."""
+
+    SIGNATURE = "data:image/png;base64,iVBORw0KGgo="
+
+    def endorse_via_api(self):
+        return self.academic().post(
+            f"/api/research-gate/form1-endorsements/{self.student_id}", json={"signature_data": self.SIGNATURE})
+
+    def queue_ids(self):
+        rows = self.academic().get("/api/research-gate/form1-endorsements").get_json()["items"]
+        return [row["student"]["id"] for row in rows]
+
+    def test_a_student_at_the_form_1_gate_is_listed_and_can_be_endorsed_once(self):
+        with app.app_context():
+            self.fill_uploads(self.student_id, TITLE)
+            db.session.commit()
+        self.assertEqual(self.queue_ids(), [self.student_id])
+        first = self.endorse_via_api()
+        self.assertEqual(first.status_code, 200, first.get_json())
+        again = self.endorse_via_api()
+        self.assertEqual(again.status_code, 409, again.get_json())
+        self.assertIn("already", again.get_json()["error"])
+
+    def test_a_student_past_the_title_defense_is_not_listed_and_cannot_be_endorsed(self):
+        with app.app_context():
+            self.pass_gate(self.student_id, TITLE, "Title Defense")
+            db.session.commit()
+            endorsed_at = Form1Endorsement.query.filter_by(student_id=self.student_id).one().endorsed_at
+        self.assertEqual(self.queue_ids(), [])
+        response = self.endorse_via_api()
+        self.assertEqual(response.status_code, 409, response.get_json())
+        with app.app_context():
+            self.assertEqual(Form1Endorsement.query.filter_by(student_id=self.student_id).one().endorsed_at, endorsed_at)
+
+
 if __name__ == "__main__":
     unittest.main()
