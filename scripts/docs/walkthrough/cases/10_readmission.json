@@ -7,7 +7,7 @@
  "owner": "Student, GS Staff, Dean",
  "duration": "6 min",
  "story": [
-  "Second case of the 'LOA and AWOL' slot. In {case:leave-of-absence} Daniel left on an approved leave. This case shows the other end of a leave: the student comes back. We use a different demo student, Therese Lacson (Master of Arts in Education), whose approved leave is already running (AY 2026-2027 1st Semester to 2nd Semester, until May 10, 2027). Her enrollment is closed until a readmission is approved, so she files a separate Readmission request: the semester she wants to return in, why she is ready, and four confirmations.",
+  "Second case of the 'LOA and AWOL' slot. In {case:leave-of-absence} Daniel left on an approved leave. This case shows the other end of a leave: the student comes back. We use a different demo student, Therese Lacson (Master of Arts in Education), whose approved leave is already running (AY 2026-2027 1st Semester to 2nd Semester, until May 10, 2027). Her enrollment is closed until a readmission is approved, so she files a separate Readmission request: the semester she wants to return in, and why she is ready. The system and staff do the return checks; the student ticks nothing.",
   "The request goes through the same board as the Leave of Absence. Staff drag it to In staff review, read the policy check, verify the return checklist and forward it. The Dean drags the card to approve. On approval the student is active again; the Academic Coordinator plans the subjects later as a separate step. The next case, {case:awol}, covers the student who never filed a leave at all."
  ],
  "accounts": [
