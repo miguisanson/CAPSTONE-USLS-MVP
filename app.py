@@ -39065,6 +39065,28 @@ def seed_maed_personas() -> None:
     adopt_legacy_leave_logs()
 
 
+def align_seed_calendar(terms: list, today: date) -> None:
+    """Date the seeded semesters so one is running on the seed day, started 3 days ago and 120 days long.
+
+    The running semester is used; between semesters the next one is brought forward. Any later semester
+    that would now overlap is pushed back, keeping its original gap, so the calendar stays in order.
+    """
+    ordered = sorted(terms, key=lambda t: t.start_date)
+    anchor = next((i for i, t in enumerate(ordered) if t.start_date <= today <= t.end_date), None)
+    if anchor is None:
+        anchor = next((i for i, t in enumerate(ordered) if t.start_date > today), len(ordered) - 1)
+    if not ordered or (ordered[anchor].start_date <= today <= ordered[anchor].end_date
+                       and (today - ordered[anchor].start_date).days <= 3):
+        return
+    gaps = [later.start_date - earlier.end_date for earlier, later in zip(ordered, ordered[1:])]
+    ordered[anchor].start_date = today - timedelta(days=3)
+    ordered[anchor].end_date = ordered[anchor].start_date + timedelta(days=120)
+    for i in range(anchor + 1, len(ordered)):
+        if ordered[i].start_date <= ordered[i - 1].end_date:
+            ordered[i].start_date = ordered[i - 1].end_date + gaps[i - 1]
+            ordered[i].end_date = ordered[i].start_date + timedelta(days=120)
+
+
 def seed_database() -> None:
     # Deterministic seed data keeps demos repeatable while still showing varied
     # stages, risks, documents, panels, schedules, and activity history.
@@ -39098,12 +39120,8 @@ def seed_database() -> None:
         term = AcademicTerm(label=label, start_date=start, end_date=start + timedelta(days=120))
         db.session.add(term)
         terms.append(term)
-    # I-162 (IM16): the 14-day withdrawal window of the running semester must be open on any seed day, or the
-    # withdrawal demo cannot run. The running semester is dated as if it began 3 days ago; its end date stays.
-    today = ph_today()
-    running = next((t for t in terms if t.start_date <= today <= t.end_date), None)
-    if running and (today - running.start_date).days > 3:
-        running.start_date = today - timedelta(days=3)
+    # I-162 (IM16): the 14-day withdrawal window of the running semester must be open on any seed day.
+    align_seed_calendar(terms, ph_today())
     db.session.flush()
     active_term = get_active_term()
     if active_term:
