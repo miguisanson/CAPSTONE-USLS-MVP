@@ -9,6 +9,22 @@ import { PanelStamp } from "./process";
 const TITLE_GATE = "Form 1 - Title Defense";
 const FINAL_GATE = "Final Defense";
 
+// The room or meeting link of a booked defense. The panel chair sets it here (Research Protocol: the chair prepares the
+// online details); everyone else reads it. Every change is listed with who made it.
+function DefenseVenue({ panel, busy, onSave }) {
+  const [value, setValue] = useState(panel.defense.venue || "");
+  const history = panel.venue_history || [];
+  return <div className="mt-3 rounded-lg bg-slate-50 p-3">
+    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Venue or meeting link</p>
+    <p className="mt-1 text-sm text-slate-700">{panel.defense.mode ? `${panel.defense.mode}: ` : ""}{panel.defense.venue || "Not set yet"}</p>
+    {panel.can_set_venue && <div className="mt-2 flex flex-wrap items-end gap-2">
+      <label className="min-w-0 flex-1"><span className="field-label">Room or meeting link</span><input className="field-input" maxLength={160} value={value} onChange={(event) => setValue(event.target.value)} placeholder="Room number or online meeting link" /></label>
+      <button type="button" disabled={busy || value.trim().length < 2 || value.trim() === (panel.defense.venue || "")} onClick={() => onSave(value)} className="btn-ghost cursor-pointer">Save venue</button>
+    </div>}
+    {history.length > 0 && <ul className="mt-2 space-y-1 text-xs text-slate-500" aria-label="Venue changes">{history.map((change) => <li key={change.at + change.to}>{formatDateTime(change.at)} · {change.by}: {change.from || "not set"} to {change.to}</li>)}</ul>}
+  </div>;
+}
+
 // Verdict words, follow-ups and who acts next come from the API (`verdict_options` per panel,
 // RESEARCH_VERDICTS in app.py). Nothing is hard-coded here.
 // `view` selects which part of the workspace a portal page shows:
@@ -116,6 +132,7 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
           <p className="mt-2 flex items-start gap-1.5 text-sm text-slate-600"><BookOpen className="mt-0.5 h-4 w-4 shrink-0" />{panel.research_title || "Research title pending"}</p>
           <div className="mt-3 rounded-lg bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Current-stage papers</p>{panel.documents?.length ? <div className="mt-2 flex flex-wrap gap-2">{panel.documents.map((document) => <a key={document.id} href={document.url} target="_blank" rel="noreferrer" className="btn-ghost cursor-pointer px-3 py-2 text-xs"><Eye className="h-3.5 w-3.5" />{document.document_type}: {document.name}</a>)}</div> : <p className="mt-1 text-xs text-slate-500">No uploaded papers for this assigned stage.</p>}</div>
           {panel.defense && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-brand-800"><CalendarClock className="h-4 w-4" /><span className="font-semibold">{panel.defense.defense_type} · {formatDate(panel.defense.preferred_date)} {formatClock(panel.defense.start_time)}</span><StatusChip status={panel.defense.display_status || panel.defense.status} dot={false} /></div>}
+          {panel.defense && <DefenseVenue panel={panel} busy={busy} onSave={(venue) => run(() => api.setDefenseVenue(panel.defense.id, { venue }))} />}
           {verdict && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
             <p className="text-sm font-semibold text-emerald-800">Verdict: {verdict.label || verdict.result}{verdict.selected_title ? ` · ${verdict.selected_title}` : ""}</p>
             <p className="mt-1 text-xs text-emerald-700">Submitted by {verdict.chair_name} · {formatDateTime(verdict.submitted_at)}{verdict.revision_status ? ` · ${verdict.revision_status}` : ""}</p>

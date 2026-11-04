@@ -74,7 +74,7 @@ function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStuden
   const modalId = `graduation-stage-${String(group.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
   const stageSelection = graduationStageSelection(group.rows, accountRole);
   const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
-  const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
+  const alreadyExported = graduationGroupExported(group);
   return (
     <WorkflowCaseModal
       id={modalId}
@@ -205,12 +205,15 @@ function graduationBoardCanDrag(item, accountRole) {
 }
 
 // The short reason a graduation card sits still (StageBoard's lockReason), same wording as the process boards.
+const graduationGroupExported = (group) => group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
+
 function graduationBoardLockReason(item, accountRole) {
   if (item.kind === "student") {
     if (item.stage === "stage-1") return "Waiting for: Student (signed application)";
     return "Only Graduate School Staff create a graduation batch.";
   }
   const group = item.group;
+  if (group.boardStatus === "Dean Approved" && graduationGroupExported(group)) return "Exported. The list is ready to send to the Registrar.";
   if (group.boardStatus === "Dean Approved") return accountRole === "dean" ? "Approved. Export it from this card." : "Waiting for: Dean (export)";
   const owners = (group.nextOwners || []).filter(Boolean);
   return owners.length ? `Waiting for: ${owners.join(", ")}` : "No step is open right now";
@@ -227,7 +230,7 @@ function graduationBoardCheckMove(item, toColumn, accountRole) {
   const group = item.group;
   const selection = graduationStageSelection(group.rows, accountRole);
   if (!selection.action) {
-    if (group.boardStatus === "Dean Approved") return { allowed: false, reason: "Export is a button on the batch card." };
+    if (group.boardStatus === "Dean Approved") return { allowed: false, reason: graduationGroupExported(group) ? "The list is already exported; it is ready to send to the Registrar." : "Export is a button on the batch card." };
     return { allowed: false, reason: `No step is due on this batch for your role; waiting for: ${group.nextOwners.join(", ")}.` };
   }
   const actionLabel = graduationBatchActionLabel(selection.action);
@@ -317,7 +320,7 @@ function graduationBatchBadges(group) {
 function graduationBatchFacts(group) {
   const names = group.rows.map((row) => row.student.name).slice(0, 3).join(", ");
   const hiddenCount = group.rows.length - Math.min(group.rows.length, 3);
-  const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
+  const alreadyExported = graduationGroupExported(group);
   return {
     students: `${names}${hiddenCount > 0 ? ` +${hiddenCount} more` : ""}`,
     count: `${group.rows.length} candidate${group.rows.length === 1 ? "" : "s"}`,
@@ -332,7 +335,7 @@ function GraduationBatchCard({ group, accountRole, selectedIds, expanded, onTogg
   const stageSelection = graduationStageSelection(group.rows, accountRole);
   const facts = graduationBatchFacts(group);
   const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
-  const alreadyExported = group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
+  const alreadyExported = graduationGroupExported(group);
   return (
     <GroupCard
       ready={Boolean(stageSelection.action) || canExport}

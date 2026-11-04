@@ -326,6 +326,9 @@ test.describe("P7.7 Graduation actions as the Dean", () => {
     await page.reload();
     const exported = cardsOf(column(page.getByRole("region", { name: BOARD }), "Approved, ready to export")).filter({ hasText: BATCH });
     await expect(exported.getByText("Exported - Ready to Send")).toBeVisible();
+    // I-329: once exported the card no longer says to export it.
+    await expect(exported.getByText("Exported. The list is ready to send to the Registrar.")).toBeVisible();
+    await expect(exported.getByText("Approved. Export it from this card.")).toHaveCount(0);
     await exported.getByRole("button", { name: `View details for ${BATCH}` }).click();
     await expect(page.getByRole("dialog").getByRole("button", { name: "Export approved list again" })).toBeVisible();
   });
