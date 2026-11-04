@@ -43,18 +43,17 @@
   the morning voice-overs in `videos/Archive/`. Rebuild: `build_narration.py --videos <videos>/Parts --full ../Full-Demo`
   (times use each part's real mp4 length). mp4s stay gitignored (`videos/**/*.mp4`).
 
-## 2026-11-04 ~16:00 — build loop queue (session "known-data"; owner: "DO NOT STOP BUILDING, keep improving and polishing")
+## 2026-11-04 ~20:00 - build loop status (session "known-data"; everything below is pushed to v6.2-migui)
 
-Landed on v6.2-migui: autopilot slideshow (59d0c61), manual fields round 2 (da83ef6), edit anything with history
-(b6b81c3, RecordEdit table -> `npm run seed` after pull). Changelog: `.planning/CHANGELOG-2026-11-04.md`.
-Running: `pkt/server-checks` (wt/kserver, owns app.py: one 7-digit student ID everywhere I-353 + server checks for the
-new dropdowns), `pkt/ui-polish` (wt/kpolish: colours + legend I-358, LOA card I-356, enrollment banner I-355, Reports
-by year started I-357), `pkt/khloe-ui` (wt/kkhloe: Khloe's graduation + practicum batch UI I-359, design rules in
-`.planning/khloe-ui/COMPARE.md`). Main checkout (uncommitted until its tests pass): Demo Guide `>`/Right arrow run the step,
-panel collapsed in the slideshow, no half mode (DemoGuide.jsx, prefs.js, p114, p115).
-Queue after those: I-361 staff act for the panel + I-362 research gate stage columns (needs app.py, after server-checks);
-I-360 Khloe design on LOA/readmission/AWOL/withdrawal/residency (after khloe-ui); Demo Guide guides for the missing
-processes; full gate, push, Docker rebuild (restart tunnel on 1033), final report in the changelog.
+- Done today (details + commits: `.planning/CHANGELOG-2026-11-04.md`): known-data rule, process audit (88 rows; rounds 1-2
+  fixed 34), Demo Guide with autopilot (24 guides, `>` only), edit anything with history, manual fields -> dropdowns,
+  one 7-digit student ID, status colours + legend, enrollment window enforced, Reports by year started, Khloe's design on
+  graduation/practicum and the five standalone processes, Research Gate stage columns + staff record for the panel,
+  deploy one-click Start/Update/Reset.
+- Full Python gate on 0a8a94e: 1,120 tests, only known I-236 failing. Live site rebuilt + reseeded (~19:30).
+- After `git pull`: `npm run seed` (new tables/columns today). Live site: `deploy/UPDATE-SITE.cmd`.
+- Running: `pkt/audit-round3` (wt/kaudit3, owns app.py). Then: remaining open audit rows (mostly owner questions,
+  see ISSUES `question`), full `npm run e2e`, final report.
 
 ## 2026-11-04 afternoon — known-data rule, process audit, Demo Guide (session "known-data"; pushed to v6.1-migui)
 
