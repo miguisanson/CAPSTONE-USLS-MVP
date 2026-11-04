@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Handshake, UserCheck, UserRoundCog, Users } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, DataTable, Field, InlineNotice, SectionTitle, Spinner, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Card, DataTable, EApprovalNote, Field, InlineNotice, SectionTitle, Spinner, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatDay, useFaculty } from "./FacultyContext";
 
 const MIN_REASON = 3;
@@ -96,6 +96,7 @@ function RequestCard({ children, yesLabel, noLabel, reasonLabel, noConfirmLabel,
           <Button variant="secondary" disabled={busy} onClick={() => { setAsking(true); setError(""); }}>{noLabel}</Button>
         </div>
       )}
+      {!asking && <EApprovalNote />}
       <ErrorLine message={error} />
     </li>
   );

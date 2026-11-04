@@ -12,6 +12,7 @@ export * from "./PageHeader.jsx";
 export * from "./StatCard.jsx";
 export * from "./Stepper.jsx";
 export * from "./DecisionPanel.jsx";
+export * from "./EApprovalNote.jsx";
 export * from "./HistoryPanel.jsx";
 export * from "./ProgressBar.jsx";
 export * from "./Pill.jsx";

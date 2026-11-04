@@ -25,6 +25,7 @@ export default function CoursePlanning({ initialView = "adjustments" }) {
       <PageHeader
         icon={ClipboardList}
         title={PAGE.courseAdjustments}
+        forms="course-adjustments"
         description="Review subject demand, decide what to offer, then complete the semester schedule and faculty assignments in one workspace."
       />
 

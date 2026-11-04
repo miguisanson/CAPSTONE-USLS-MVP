@@ -338,7 +338,7 @@ export default function AdviserAppointments({ role, embedded = false, onChanged 
       {embedded ? (
         <p className="text-sm text-slate-600">{PROTOCOL}</p>
       ) : (
-        <PageHeader title="Research adviser appointments" description={PROTOCOL} icon={UserRoundCheck} />
+        <PageHeader title="Research adviser appointments" description={PROTOCOL} forms="adviser-designation" icon={UserRoundCheck} />
       )}
 
       {canRecord && <AdviserRecordCard onRecorded={refetch} />}

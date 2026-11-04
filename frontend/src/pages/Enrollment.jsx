@@ -399,6 +399,7 @@ export default function Enrollment() {
       <PageHeader
         icon={ClipboardCheck}
         title={PAGE.enrollment}
+        forms="enrollment"
         description={
           <>
             Assign official semester offerings to an individual student. Confirming runs all checks and synchronizes the class list, monitoring sheet, student profile, and portal in one action.

@@ -40,10 +40,15 @@
   - 4.17 Practicum
   - 4.18 Graduation application and endorsement
   - 4.19 Records handoff to the Registrar
+  - 4.20 Faculty course preference and teaching load
+  - 4.21 Platform accounts and roles
+  - 4.22 Electronic approval and signatures
+  - 4.23 Data privacy and records retention
+  - 4.24 AIMS and Registrar data exchange
 - 5 Consolidated business rules register
 - 6 Open questions for validation
 - 7 Validation and sign-off
-- Appendix A Forms named in the sources
+- Appendix A Forms crosswalk
 - Appendix B Glossary
 
 ## 1 Purpose, scope and how to read this manual
@@ -56,7 +61,7 @@ The Graduate School has told the capstone group that it does not have an operati
 
 ### 1.2 Scope
 
-The manual covers the processes that the Graduate School coordinates for a graduate student. It covers nineteen lifecycle areas, each in its own section of Chapter 4: admission handoff and onboarding; enrollment and academic load; course offering and course adjustments; withdrawal of subject; dropping; leave of absence; return from leave and readmission; absence without leave (AWOL); residency enrollment and maximum residence; the comprehensive examination; the title defense; adviser designation; the proposal defense and ethics review; the final defense; revisions and completion; defense scheduling and rescheduling; practicum; graduation application and endorsement; and the handoff of records to the Registrar.
+The manual covers the processes that the Graduate School coordinates for a graduate student. It covers nineteen lifecycle areas, each in its own section of Chapter 4: admission handoff and onboarding; enrollment and academic load; course offering and course adjustments; withdrawal of subject; dropping; leave of absence; return from leave and readmission; absence without leave (AWOL); residency enrollment and maximum residence; the comprehensive examination; the title defense; adviser designation; the proposal defense and ethics review; the final defense; revisions and completion; defense scheduling and rescheduling; practicum; graduation application and endorsement; and the handoff of records to the Registrar. Five further sections, 4.20 to 4.24, describe the platform basis that the lifecycle relies on: faculty course preference and teaching load, platform accounts and roles, electronic approval and signatures, data privacy and records retention, and the AIMS and Registrar data exchange. These five sections are the group's proposal; the Handbook and the Protocol do not cover them.
 
 The manual does not describe admission testing, billing, grading, the registration system or student discipline and student life (Handbook chapter 7) in detail. Those belong to the Admissions and Scholarship Administration Office, the Business Office and the University Registrar. Where the Graduate School hands a case to one of them, the manual states what is handed over and stops there.
 
@@ -74,8 +79,10 @@ Chapter 2 names the roles. Chapter 3 lists the records the office keeps and says
 - Procedure: a numbered table with the step, who does it, what they do, the form or record used, and the time limit. A dagger (†) next to a step number marks a step that is not described in the Handbook or the Protocol.
 - Business rules: a table with a rule number (for example WD-01), the rule in one plain sentence, the source with page or section, and a status.
 - Exceptions and unusual cases and how they are handled.
-- Records produced and where they go.
+- Records produced and where they go, with the forms of the process listed by code (for example GS-F-14).
 - How the platform supports the process, and any difference between the platform and the rule.
+
+Every chapter of Chapter 4 names its forms by code in its section on records. Appendix A is the full crosswalk: each GS-F and GS-P code with the form's name, the name it has in the Handbook or the Protocol, its chapter, and whether it is official by name or proposed. The printed forms pack is grouped by chapter in the folder Documents/Graduate_School/Forms/, one folder per chapter, with separate folders for forms control, platform basis and supplementary forms, and each form shows its manual section in its subtitle line.
 
 Each business rule carries one of three statuses:
 
@@ -154,7 +161,7 @@ The Graduate School keeps the following records. Chapter 4 says, for each proces
 | Class list or enrolled list per subject offering | Academic Coordinator and GS staff | Student first name, last name and ID number for each subject offered in a term; built by importing a class list or by searching for a student and tagging the student as enrolled. The group was told there is no standard Excel file, so the fields are defined by the office. | Consultation 21 July 2026 |
 | Subject status per student and subject | Academic Coordinator and GS staff | One status per student-subject pair: not taken, enrolled, taken, dropped, withdrawn, and (as reported by faculty) incomplete or failed. The status is a tag; it is not a grade. | Consultation 21 July 2026 |
 | Subject offering list per term | Academic Coordinator | Program, subject code, subject, faculty and schedule for each subject offered in a semester. | Group working notes, July 20 checklist, items 35 and 69 (stakeholder-identified fields) |
-| Forms and approvals | Research Coordinator and GS Office | Forms 1 to 13 and their sub-forms (Appendix A), kept with the e-signatures and dates, and the Withdrawal Form, the Incomplete Grade Removal Form, the comprehensive examination application and the Advice Slip. | Handbook 2022-2023, pp. 49, 54, 56-57, 59-75; Research Protocol AY2024-2025 |
+| Forms and approvals | Research Coordinator and GS Office | Forms 1 to 13 and their sub-forms and the other GS-F forms (Appendix A), kept with the e-signatures and dates, and the Withdrawal Form, the Incomplete Grade Removal Form, the comprehensive examination application and the Advice Slip. | Handbook 2022-2023, pp. 49, 54, 56-57, 59-75; Research Protocol AY2024-2025 |
 | Defense fee receipts | GS mailbox | The student's screenshot or deposit slip, sent within the first working day after a defense, with the subject line format LAST NAME_type of defense_receipt. | Research Protocol AY2024-2025, Title Defense, Part III, step 4 |
 | Leave, withdrawal, return and residency requests | Graduate School Dean's office and GS staff | The written request and the decision, the effective term, and the copy sent to the Registrar. | Handbook 2022-2023, pp. 49, 52-53 |
 | Practicum and graduation files | Academic Coordinator and GS staff | Practicum agreement (MOA), hours and certificates; the graduation candidate list and endorsement list. Their structure is the group's proposal (see Chapters 4.17 and 4.18). | Group working notes, BPM accurate flow, sections 11 and 12 |
@@ -183,7 +190,7 @@ AIMS and the University Registrar are the official record for enrollment and gra
 
 ## 4 Process chapters
 
-Each of the nineteen sections below follows the same layout: purpose, who is involved, trigger and preconditions, the procedure as a numbered table, the business rules table, exceptions, records, and how the platform supports the process together with any difference between the platform and the rule. Rule statuses are Official, Practice and Proposed (see 1.4). Rows marked Practice or Proposed are the ones the Graduate School is asked to confirm.
+Each of the twenty-four sections below (4.1 to 4.19 for the lifecycle, 4.20 to 4.24 for the platform basis) follows the same layout: purpose, who is involved, trigger and preconditions, the procedure as a numbered table, the business rules table, exceptions, records, and how the platform supports the process together with any difference between the platform and the rule. Rule statuses are Official, Practice and Proposed (see 1.4). Rows marked Practice or Proposed are the ones the Graduate School is asked to confirm.
 
 ### 4.1 Admission handoff and onboarding
 
@@ -251,6 +258,8 @@ To record that an applicant has been admitted through the University's admission
 - A foreign student must submit additional authenticated requirements (grade interpretation, course syllabus, recommendation in narrative form, passport, medical insurance) to the ASAO Director (Handbook 2022-2023, pp. 46-47).
 
 #### 4.1.7 Records produced and where they go
+
+**Forms of this process: GS-F-01 Onboarding Report for the Dean. Appendix A gives the name each has in the Handbook or the Protocol.**
 
 | Record | Where it goes |
 |---|---|
@@ -328,6 +337,8 @@ To state how a graduate student is advised and enrolled each semester and how ma
 
 #### 4.2.7 Records produced and where they go
 
+**Forms of this process: GS-F-02 Academic Advising and Study Plan; GS-F-51 Application for Cross-enrollment; GS-F-53 Request for Transfer between Master's Options. Appendix A gives the name each has in the Handbook or the Protocol.**
+
 | Record | Where it goes |
 |---|---|
 | Subject status per student and subject (enrolled) | Monitoring workbook and platform record |
@@ -394,6 +405,7 @@ To decide which subjects will be offered in a coming semester, to assign faculty
 | CRS-10 | The Dean approves the offering plan before it is published. | Group working notes, BPM accurate flow, section 3 | Proposed |
 | CRS-11 | When the Academic Coordinator decides not to offer a subject, the platform shows which students would be delayed, so that the decision can be made with that information; the decision stays with the Academic Coordinator. | Group working notes, July 20 checklist, items 32, 33 and 86 | Proposed |
 | CRS-12 | When assigning a professor the Academic Coordinator considers the professor's preferred subjects, availability, qualifications, current load and schedule conflicts; the platform only suggests. | Group working notes, July 20 checklist, items 36-40, 88-90 | Proposed |
+| CRS-13 | A special class is requested by the Academic Coordinator through the Dean and addressed to the Vice Chancellor for Academic Affairs; the fees for it are computed as the Handbook describes and the class follows the Blended Learning Mode of 32 contact hours plus independent study (see also ENR-07, CRS-04). | Handbook 2022-2023, p. 48 | Official |
 
 #### 4.3.6 Exceptions and unusual cases
 
@@ -402,6 +414,8 @@ To decide which subjects will be offered in a coming semester, to assign faculty
 - A student enrolls late or in an unusual case outside the normal flow: the Registrar sends a list and the student is added to the class list (Consultation 29 July 2026; process not fully described in the sources).
 
 #### 4.3.7 Records produced and where they go
+
+**Forms of this process: GS-F-03 Change or Add of Subject and Advice Slip; GS-F-04 Term Course Offering Plan; GS-F-52 Request for a Special Class. Appendix A gives the name each has in the Handbook or the Protocol.**
 
 | Record | Where it goes |
 |---|---|
@@ -492,6 +506,8 @@ To state when and how a student may withdraw from one subject, what the student 
 
 #### 4.4.7 Records produced and where they go
 
+**Forms of this process: GS-F-05 Application for Withdrawal of Subject. Appendix A gives the name each has in the Handbook or the Protocol.**
+
 | Record | Where it goes |
 |---|---|
 | Student's letter and the Dean's decision | Dean's office; GS staff |
@@ -566,6 +582,8 @@ To state how a subject is dropped, whether by the professor for excessive absenc
 - A drop that causes a student to fall behind the curriculum is a delayed case that the Academic Coordinator follows up (Proposed).
 
 #### 4.5.7 Records produced and where they go
+
+**Forms of this process: GS-F-06 Notice of Dropping from a Subject; GS-F-49 Request for Approved Absence; GS-F-50 Incomplete Grade Removal Form. Appendix A gives the name each has in the Handbook or the Protocol.**
 
 | Record | Where it goes |
 |---|---|
@@ -643,6 +661,8 @@ To allow a student who does not intend to enroll in a semester to stay connected
 
 #### 4.6.7 Records produced and where they go
 
+**Forms of this process: GS-F-07 Application for Leave of Absence. Appendix A gives the name each has in the Handbook or the Protocol.**
+
 | Record | Where it goes |
 |---|---|
 | Written leave request and Dean's decision | Dean's office; GS staff record |
@@ -709,6 +729,8 @@ To state how a student who was on leave of absence, or who was absent without le
 
 #### 4.7.7 Records produced and where they go
 
+**Forms of this process: GS-F-08 Application for Readmission (Return from Leave or AWOL). Appendix A gives the name each has in the Handbook or the Protocol.**
+
 | Record | Where it goes |
 |---|---|
 | Written return intention and the Dean's endorsement | Dean's office; University Registrar |
@@ -770,6 +792,8 @@ To state what happens to a student who stops enrolling without a formal leave of
 - A student with an approved leave is never AWOL; a student whose leave lapsed without return may become AWOL (Proposed; the platform does not do this automatically).
 
 #### 4.8.7 Records produced and where they go
+
+**Forms of this process: GS-F-09 Notice of Absence Without Leave (AWOL). Appendix A gives the name each has in the Handbook or the Protocol.**
 
 | Record | Where it goes |
 |---|---|
@@ -838,6 +862,8 @@ To state when a student with no subjects must still enroll (residency) and the l
 - The Handbook does not state a fee for residency enrollment or a limit on the number of residency semesters (OQ-15).
 
 #### 4.9.7 Records produced and where they go
+
+**Forms of this process: GS-F-10 Application for Residency Enrollment. Appendix A gives the name each has in the Handbook or the Protocol.**
 
 | Record | Where it goes |
 |---|---|
@@ -911,6 +937,8 @@ To state who may take the comprehensive examination, how to apply, how it is sco
 - A master's student is evaluated by the Academic Coordinator but a doctorate student by the College Dean; the office may prefer the Graduate School Dean (OQ-18).
 
 #### 4.10.7 Records produced and where they go
+
+**Forms of this process: GS-F-14 Application for Comprehensive Examination; GS-F-15 Comprehensive Examination Result Sheet. Appendix A gives the name each has in the Handbook or the Protocol.**
 
 | Record | Where it goes |
 |---|---|
@@ -989,6 +1017,8 @@ To have the student's three proposed research titles deliberated by a panel, so 
 - Fee tables are blank in the copy of the Protocol supplied; amounts are not known (OQ-27).
 
 #### 4.11.7 Records produced and where they go
+
+**Forms of this process: GS-F-16 Application for Title Defense; GS-F-17 Panel Nomination and Invitation Reply Slip; GS-F-18 Report of Title Defense. Appendix A gives the name each has in the Handbook or the Protocol.**
 
 | Record | Where it goes |
 |---|---|
@@ -1070,6 +1100,8 @@ To appoint a research adviser for a student, to set the advising timetable and c
 - The adviser is unavailable or leaves the University: not stated in the sources, apart from retirement (ADV-15).
 
 #### 4.12.7 Records produced and where they go
+
+**Forms of this process: GS-F-19 Application for Designation of Research Adviser; GS-F-20 Appointment for Research Adviser; GS-F-21 Request for Change of Research Adviser; GS-F-22 Research Timetable; GS-F-23 Thesis / Dissertation Advising Contract; GS-F-24 Request for Change of Title of the Study. Appendix A gives the name each has in the Handbook or the Protocol.**
 
 | Record | Where it goes |
 |---|---|
@@ -1156,6 +1188,8 @@ To have the student's research proposal examined by a panel and, after revisions
 - Panel fee amounts are not known (OQ-27).
 
 #### 4.13.7 Records produced and where they go
+
+**Forms of this process: GS-F-25 Statistical Consultation Form; GS-F-26 Co-authorship Information for Publication; GS-F-27 Endorsement for Proposal / Final Defense; GS-F-29 Comments Sheet for Proposal Defense; GS-F-30 Technical Review Certificate; GS-F-31 Application for Ethics Review. Appendix A gives the name each has in the Handbook or the Protocol.**
 
 | Record | Where it goes |
 |---|---|
@@ -1244,6 +1278,8 @@ To have the completed thesis or dissertation examined in a closed-door final def
 
 #### 4.14.7 Records produced and where they go
 
+**Forms of this process: GS-F-27 Endorsement for Proposal / Final Defense; GS-F-32 Comments Sheet for Final Defense; GS-F-33 Evaluation Sheet for Final Defense; GS-F-34 Settlement of Provisional Thesis / Dissertation Approval; GS-F-35 Endorsement for Public Final Defense. Appendix A gives the name each has in the Handbook or the Protocol.**
+
 | Record | Where it goes |
 |---|---|
 | Form 4, Form 4.3 and the manuscript | Research Coordinator; research monitoring workbook (endorsement for final defense, schedule of final defense, schedule of public defense) |
@@ -1324,6 +1360,8 @@ To have the final manuscript approved by the panel, scanned for similarity (Turn
 
 #### 4.15.7 Records produced and where they go
 
+**Forms of this process: GS-F-36 Similarity Index (Turnitin) Certification; GS-F-37 Editor Certification; GS-F-38 Approval Sheet; GS-F-39 Formal Invitation to Co-Author Journal Article; GS-F-40 Publication Information Form; GS-F-41 Evidence of Publication or Acceptance. Appendix A gives the name each has in the Handbook or the Protocol.**
+
 | Record | Where it goes |
 |---|---|
 | Turnitin certificate; Form 9; Form 10; panel approval emails; ethics clearance | GS Office; research monitoring workbook (Turnitin scan certificate, editor's certification, final approval sheet) |
@@ -1394,6 +1432,8 @@ To set a date, time, venue or meeting link for a defense with the panel and advi
 - A manuscript reaches the panel late: the 14-Day Rule is not met and the panel should not agree to the date (SCH-03, SCH-06).
 
 #### 4.16.7 Records produced and where they go
+
+**Forms of this process: GS-F-28 Request for Rescheduling or Cancellation of a Defense. Appendix A gives the name each has in the Handbook or the Protocol.**
 
 | Record | Where it goes |
 |---|---|
@@ -1467,6 +1507,8 @@ To record the practicum or internship required by some programs: the agreement w
 
 #### 4.17.7 Records produced and where they go
 
+**Forms of this process: GS-F-11 Practicum Agreement (Memorandum of Agreement); GS-F-12 Practicum Hours Log and Supervisor's Certification; GS-F-13 Practicum Completion Report. Appendix A gives the name each has in the Handbook or the Protocol.**
+
 | Record | Where it goes |
 |---|---|
 | MOA, site and supervisor | GS staff; Academic Coordinator |
@@ -1538,6 +1580,7 @@ To confirm that a student has met every graduation requirement and to hand the e
 | GRD-14 | A student is eligible for selection into a graduation batch only after coursework, research and practicum (where applicable) are complete and the student has submitted a signed graduation application; an application with incorrect information is returned and replaced by a completely new corrected document, the original being kept. | Group working notes, Scenario notes, graduation standard and unusual cases; Platform (current build) | Proposed |
 | GRD-15 | Candidates are reviewed within a graduation review window for a school year opened and closed by the Graduate School; the dates, the treatment of late applicants and the treatment of eligible students who miss the window are to be set by the Graduate School. | Group working notes, Scenario notes; Platform (current build) | Proposed |
 | GRD-16 | After the Dean approves a batch, the endorsed list is exported as a file and the Dean sends it to the Registrar by the official email; the platform records the export and the status Exported — Ready to Send, and does not record that an email was sent or that the Registrar acknowledged it. | Group working notes, Scenario notes; Platform (current build) | Proposed |
+| GRD-17 | A project paper, thesis or dissertation is nominated for the best thesis or dissertation award by the chairman of the committee or by the Dean; it is scored out of 100 points (format and content 15, analysis and discussion 40, findings, action plan or program 15, originality, novelty and contribution to new knowledge or applicability 30) and needs a cut-off of 96 points and the approval of the majority of the committee (see also CMP-12). | Handbook 2022-2023, pp. 76-77 | Official |
 
 #### 4.18.6 Exceptions and unusual cases
 
@@ -1547,6 +1590,8 @@ To confirm that a student has met every graduation requirement and to hand the e
 - Enrolled before AY 2022-2023: the publication requirement as written in GRD-09 applies only to those enrolled from AY 2022-2023 onwards; the earlier requirement is a conference presentation (CMP-08; OQ-25).
 
 #### 4.18.7 Records produced and where they go
+
+**Forms of this process: GS-F-42 Application for Graduation; GS-F-43 Graduation Endorsement List; GS-F-54 Nomination for Best Thesis / Dissertation. Appendix A gives the name each has in the Handbook or the Protocol.**
 
 | Record | Where it goes |
 |---|---|
@@ -1615,6 +1660,8 @@ To list what the Graduate School sends to the University Registrar and the Busin
 
 #### 4.19.7 Records produced and where they go
 
+**Forms of this process: GS-F-44 Records Transmittal to the University Registrar. Appendix A gives the name each has in the Handbook or the Protocol.**
+
 | Record | Where it goes |
 |---|---|
 | Handoff log | GS staff |
@@ -1626,11 +1673,392 @@ The platform prepares files and never sends them. It prepares the graduation CSV
 
 **Difference between the platform and the rule.** Whether the Graduate School should record a Registrar acknowledgement, with a reference number and date, or leave acknowledgement outside the platform, is an open decision (OQ-32). HND-09 is therefore met in part: each export is logged, the acknowledgement is not. The export columns and file names are not yet confirmed by the Registrar.
 
+### 4.20 Faculty course preference and teaching load
+
+#### 4.20.1 Purpose
+
+To record which subjects each professor prefers to teach and when the professor is available, and to assign professors to the subjects offered in a term within a teaching-load limit, with the Dean's approval of the offering and the professor's acknowledgement. The Handbook says nothing about teaching load. Graduate School staff said that the Academic Coordinator decides which professor teaches each subject (Consultation 21 July 2026). This chapter is therefore the group's proposal and follows what the platform does.
+
+#### 4.20.2 Who is involved
+
+- Faculty member
+- Academic Coordinator
+- Graduate School Dean
+- GS staff
+- Research Coordinator (availability for defenses)
+
+#### 4.20.3 Trigger and preconditions
+
+**Trigger.** The offering for a coming term is being planned (CRS-09), a new professor joins, a professor's preferred subjects or hours change, or the Research Coordinator or GS staff need a professor's availability for a defense.
+
+**Preconditions.**
+
+- The professor has a faculty profile that is Active, with college or department, specialization, email and eligible roles (the login is set up under 4.21).
+- The subjects to be offered are known from the term offering plan (4.3, GS-F-04).
+- The professor's college is the college of the program that owns the subject.
+
+#### 4.20.4 Procedure
+
+| Step | Who | What they do | Form / record | Time limit |
+|---|---|---|---|---|
+| 1† | Faculty member | Fills GS-F-47: lists the preferred subjects in order of preference (own college only), enters the weekly teaching or consultation hours, and adds dated exceptions (available or unavailable on a date or range, with an optional note). A new professor does this after the profile and login exist. | GS-F-47 | Before offering planning (proposed) |
+| 2† | GS staff | If the professor cannot enter the data, enters it on the professor's behalf from the signed GS-F-47. The record shows who entered it. | Faculty profile | — |
+| 3† | Research Coordinator | When a defense is to be scheduled, asks the panel members to enter availability for a window of dates (by default four weeks from the earliest allowed date) with an optional message. The request stays open until the professor answers. | Availability request | — |
+| 4† | Faculty member | Answers an availability request by entering hours, or by confirming that the hours already on record have not changed. The professor cannot confirm "no change" while no hours have been entered. | Availability record | — |
+| 5† | Academic Coordinator | Proposes the professor for each offered subject, considering the preferred subjects, availability, eligible role, qualifications and current load, and prepares GS-F-48 from GS-F-04 and GS-F-47. The platform refuses an assignment that would take the professor past the load limit. | GS-F-48; offering plan | During offering planning |
+| 6† | Graduate School Dean | Approves the offering plan, or returns it with a reason. The approval covers the assigned professors. | GS-F-48; plan decision (CRS-10) | — |
+| 7† | Faculty member | Acknowledges the assignment on GS-F-48 (signature or email). | GS-F-48 | Before classes begin (proposed) |
+| 8† | GS staff | Files the signed GS-F-47 and GS-F-48 and publishes the offering list. | Filed forms; published list | — |
+
+† This step rests on a rule marked Practice or Proposed in section 4.20.5, or on the group's process model; it is not described in the Handbook or the Research Protocol and is to be confirmed by the Graduate School.
+
+#### 4.20.5 Business rules
+
+| Rule | Rule statement | Source | Status |
+|---|---|---|---|
+| FAC-01 | Each faculty member has one profile with name, college or department, specialization, email, eligible roles (Faculty Adviser, Panel Member, Panel Chair, Academic Coordinator, Research Coordinator) and an Active or Inactive status. GS staff and the Academic Coordinator create and edit profiles. | Platform (current build), faculty profile | Proposed |
+| FAC-02 | A faculty member lists preferred subjects in order of preference on GS-F-47. A faculty member may change only the member's own list; GS staff and the Academic Coordinator may enter it on the member's behalf. Only subjects of the member's own college may be listed. | Platform (current build), faculty preferred subjects | Proposed |
+| FAC-03 | A preferred subject is a wish, not a promise. The Academic Coordinator weighs preference with availability, eligible role, qualification and current load, and the Academic Coordinator's assignment stands (see CRS-07 and CRS-12). | Consultation 21 July 2026, the Academic Coordinator decides which professor teaches; Platform (current build), offering setup | Proposed |
+| FAC-04 | Availability is recorded as weekly hours with dated exceptions on top. An exception "available" replaces the weekly hours for that day; an exception "unavailable" removes the day or the stated hours. A weekend needs a dated entry. | Platform (current build), faculty availability and exceptions | Proposed |
+| FAC-05 | Hours that the system filled in by itself are never counted as availability the professor entered. Until the professor or GS staff enter hours, the record reads "not entered" and the professor is not suggested for a subject. | Platform (current build), faculty availability status | Proposed |
+| FAC-06 | The Research Coordinator and GS staff may request availability from the panel members for a student's defense. A request has a date window, an optional message and a status of Open, Answered or Cancelled, and it is answered when the professor enters hours or confirms the hours on record. | Platform (current build), availability requests; Group working notes, BPM accurate flow, scheduling | Proposed |
+| FAC-07 | A professor may be assigned at most 24 teaching units in a semester. An assignment that would pass the limit is refused and the Academic Coordinator chooses another professor or changes the sections. The 24-unit value is a prototype value pending the Graduate School's answer (OQ-45). | Platform (current build), faculty teaching load limit | Proposed |
+| FAC-08 | Only an Active professor of the same college as the subject's program may be assigned to the subject. | Platform (current build), offering setup | Proposed |
+| FAC-09 | The Dean approves the offering plan, including its assigned professors, before it is published (CRS-10). GS-F-48 is the paper record of the assignment; the professor acknowledges it before classes begin. | Group working notes, BPM accurate flow, section 3; Platform (current build), offering plan decision | Proposed |
+
+#### 4.20.6 Exceptions and unusual cases
+
+- A professor has not entered any availability: the platform does not suggest the professor, but the Academic Coordinator may still choose the professor by hand and sees a caution when the chosen time falls outside the known hours (FAC-05).
+- The load limit would be passed: the platform refuses the assignment; the Academic Coordinator chooses another professor or splits the sections (FAC-07).
+- A subject needs a professor from another college: the platform does not allow it; the Academic Coordinator asks the Dean, and the question is open (OQ-45).
+- A professor becomes unavailable after approval: the Academic Coordinator records the change on a new GS-F-48 with the reason and informs the Dean (proposed).
+- A professor leaves or is set to Inactive: the login ends and past assignments stay on record (see 4.21).
+
+#### 4.20.7 Records produced and where they go
+
+**Forms of this process: GS-F-47 Faculty Course Preference and Availability; GS-F-48 Teaching Load Assignment. Appendix A gives the name each has in the Handbook or the Protocol.**
+
+| Record | Where it goes |
+|---|---|
+| GS-F-47 Faculty Course Preference and Availability | Academic Coordinator; faculty profile in the platform |
+| GS-F-48 Teaching Load Assignment | Dean's office; Academic Coordinator; offering plan in the platform |
+| Availability requests and answers | Platform; Research Coordinator and GS staff |
+
+#### 4.20.8 How the platform supports this process
+
+The platform keeps each faculty profile with preferred subjects in ranked order, weekly working hours, dated availability exceptions, and requests for availability that name a student, a date window and the person who asked. A faculty member can enter or confirm own hours and own preferred subjects. In Offering setup the Academic Coordinator picks a professor and a schedule for each subject; the platform lists only professors who are Active, in the right college and within the load limit, shows the load before and after, and refuses an assignment past the limit. Offering plans move from Draft to Submitted to Approved or Returned to Published, and record who approved.
+
+**Difference between the platform and the rule.** The platform has no field for the professor's signature on the assignment: the acknowledgement on GS-F-48 stays on paper. The 24-unit limit is a prototype value that the Graduate School has not confirmed (OQ-45), and the Handbook states no load limit for professors. The platform allows the Academic Coordinator to assign a professor who has not entered availability; the manual's rule is that such a professor is not suggested.
+
+### 4.21 Platform accounts and roles
+
+#### 4.21.1 Purpose
+
+To state who may hold an account on the platform, what each role may do, and how an account is requested, approved, set up, reviewed and removed, so that every person sees and does only what the person's office requires. The Handbook and the Protocol describe the offices but not the platform; this chapter is the group's proposal.
+
+#### 4.21.2 Who is involved
+
+- The person who needs an account
+- Head of the person's office
+- Graduate School Dean
+- GS staff
+- Platform administrator
+
+#### 4.21.3 Trigger and preconditions
+
+**Trigger.** A person joins the Graduate School or a role changes (a new staff member, coordinator, Dean or professor); a student is handed off from admission; or a person leaves.
+
+**Preconditions.**
+
+- The person's office and role are known (the seven roles in ACC-01).
+- The person has an institutional email address, which is the sign-in name.
+- For a student, the student's record is held by the Graduate School (4.1).
+
+#### 4.21.4 Procedure
+
+| Step | Who | What they do | Form / record | Time limit |
+|---|---|---|---|---|
+| 1† | The person | Fills GS-F-46: name, institutional email, office, the role asked for and the reason. Students and professors do not file GS-F-46; their accounts come from the handoff (4.1) and from the faculty profile (4.20). | GS-F-46 | — |
+| 2† | Head of office | Endorses the request: confirms that the person holds the office and needs the role. | GS-F-46 (endorsement) | — |
+| 3† | Graduate School Dean | Approves the request or declines it. The Dean's own account is approved by the officer the University names (OQ-46). | GS-F-46 (approval) | — |
+| 4† | GS staff | Sets up the account with the approved role and a temporary password, in the platform where the platform allows it, otherwise through the platform administrator, and gives the person the temporary password by a private channel. | Account record | Within 3 working days of approval (proposed) |
+| 5† | The person | Signs in, chooses a personal password of at least ten characters and accepts the Data Privacy Notice (4.23). Nothing else works until the password is changed. | Sign-in; notice acceptance | At first sign-in |
+| 6† | Graduate School Dean | Reviews, once a year, the list of active accounts and roles against the staff list and removes what is not needed. | Account review | Once a year (proposed) |
+| 7† | The person or head of office | When the person leaves or changes office, files GS-F-46 for removal or change of role. | GS-F-46 (removal) | On the last working day (proposed) |
+| 8† | GS staff | Deactivates the account. The account is not deleted: the log and the cases the person handled stay on record. | Account record | Within 5 working days of the request (proposed) |
+
+† This step rests on a rule marked Practice or Proposed in section 4.21.5, or on the group's process model; it is not described in the Handbook or the Research Protocol and is to be confirmed by the Graduate School.
+
+#### 4.21.5 Business rules
+
+| Rule | Rule statement | Source | Status |
+|---|---|---|---|
+| ACC-01 | The platform has seven roles: Graduate School Staff, Academic Coordinator, Research Coordinator, Dean, Student, Faculty Member and Administrator. One account has one role and belongs to one person. | Platform (current build), role labels | Proposed |
+| ACC-02 | Each screen and each action is open only to the roles that GS-P-05 lists for it (least privilege). A Student sees only the student's own record; a Faculty Member sees only the faculty member's own portal, panel invitations and adviser requests. | Platform (current build), role checks on every request | Proposed |
+| ACC-03 | A student account is created when the student is handed off from admission (the monitoring workbook import). Each new student account gets its own initial password, shown once to the staff member who imported the file. | Platform (current build), student handoff import | Proposed |
+| ACC-04 | A faculty account is created together with the faculty profile by GS staff or the Academic Coordinator. The email must not belong to another profile or account. | Platform (current build), faculty creation | Proposed |
+| ACC-05 | An account for GS staff, a coordinator or the Dean is requested on GS-F-46, endorsed by the head of the person's office, approved by the Dean and set up by GS staff or the platform administrator within three working days of the approval (proposed). | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| ACC-06 | A password set for someone else is temporary: the holder must choose a personal password at first sign-in before anything else works. A personal password has at least ten characters, differs from the old one and is not the email address or a shared demo password. | Platform (current build), change of password | Proposed |
+| ACC-07 | Repeated failed sign-ins slow the next attempt (after five failures within 15 minutes the wait is 2 seconds and doubles to at most 30 seconds); the account is not locked. | Platform (current build), sign-in brake | Proposed |
+| ACC-08 | An account is deactivated, not deleted, when the person leaves or changes office, within five working days of the request. A deactivated account cannot sign in. Setting a faculty profile to Inactive deactivates its login. | Platform (current build), account status; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| ACC-09 | The Dean reviews the list of active accounts and roles once a year (the interval is proposed, OQ-46). | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| ACC-10 | The Administrator account is held by the person who maintains the platform and not by an office holder. Accounts are personal: a password is never shared, and a shared demonstration login exists only in demonstration mode. | Platform (current build), administrator and demonstration accounts; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+
+#### 4.21.6 Exceptions and unusual cases
+
+- A person holds two offices (for example a professor who is also an Academic Coordinator): the faculty profile carries the eligible roles; the person asks GS-F-46 for the second role and receives a separate account for it only if the Dean approves (proposed).
+- A person forgets the password: GS staff set a new temporary password and the person must change it at the next sign-in.
+- A representative acts for the Dean: the representative signs in under the representative's own account and the decision names the authority (EAP-04).
+- A student is on leave, AWOL or withdrawn: the account stays active unless the Dean decides otherwise; the platform blocks the actions the status forbids.
+- A student graduates: the account is kept for the retention period in PRV-08 and then handled under 4.23.
+
+#### 4.21.7 Records produced and where they go
+
+**Forms of this process: GS-P-05 Platform Access and Roles Matrix; GS-F-46 Platform Account and Role Request. Appendix A gives the name each has in the Handbook or the Protocol.**
+
+| Record | Where it goes |
+|---|---|
+| GS-F-46 Platform Account and Role Request | Dean's office; GS staff |
+| GS-P-05 Platform Access and Roles Matrix | Graduate School; shown to every new account holder |
+| Account list with role and status | Platform administrator; yearly review by the Dean |
+
+#### 4.21.8 How the platform supports this process
+
+Every request to the platform checks the signed-in account and its role. A request from a signed-out browser is refused, a request from a role not listed for the screen is refused, and an account that still has a temporary password can do nothing except choose a new one. Student accounts are created by the file handoff, faculty accounts by GS staff or the Academic Coordinator, and the other accounts are set up by the administrator. A deactivated account cannot sign in. Passwords are stored only as a salted hash. The Administrator account passes every role check so that it can review all staff screens, and it acts as Graduate School staff in workflows.
+
+**Difference between the platform and the rule.** The current build has no screen to create, change the role of or deactivate a staff, coordinator or Dean account; those are set by the platform administrator in the database. Faculty accounts can be created and set to Inactive by GS staff and the Academic Coordinator. The platform does not yet ask for GS-F-46 or record the endorsement and approval of an account request; the paper form is the record. The Administrator passing every role check is broader than the least-privilege rule ACC-02 and ACC-10, and is an open question (OQ-46).
+
+### 4.22 Electronic approval and signatures
+
+#### 4.22.1 Purpose
+
+To state when an approval recorded in the platform counts as the approving officer's signature on the matching form. The Research Protocol already accepts e-signatures sent by email on the research forms; this chapter extends the same idea to approvals made inside the platform and says what each approval record must show. It rests on Republic Act No. 8792 and is the group's proposal until the University confirms it.
+
+#### 4.22.2 Who is involved
+
+- Approving officer (Dean, Associate Dean, Academic Coordinator, Research Coordinator, GS staff)
+- GS staff
+- Graduate School Dean
+- University counsel or Information Technology Services (to confirm)
+
+#### 4.22.3 Trigger and preconditions
+
+**Trigger.** An officer approves, endorses, returns or declines a request in the platform, or a form needs the signature of an officer who works in the platform.
+
+**Preconditions.**
+
+- The officer has a personal account with the matching role (4.21) and has accepted the Data Privacy Notice (4.23).
+- The request has reached the officer's step, so that the platform offers the officer the decision.
+
+#### 4.22.4 Procedure
+
+| Step | Who | What they do | Form / record | Time limit |
+|---|---|---|---|---|
+| 1† | Approving officer | Signs in under the officer's own account and opens the request. | Sign-in | — |
+| 2† | Approving officer | Reads the request and its attachments. | Request and attachments | — |
+| 3† | Approving officer | Chooses the decision (approve, endorse, return or decline) and, where the platform asks for it, enters the remarks. A one-line note beside the control says that the decision is an electronic approval under GS-P-03. | Decision in the platform | — |
+| 4† | Platform | Records the officer's name and role, the date and time, the decision, the remarks, the previous and the new status and the next owner. The record cannot be edited by the officer who benefits from it. | Approval record (transaction log) | — |
+| 5† | GS staff | Where the file needs a printed copy, prints the case record or the form with the line "Approved electronically under GS-P-03 by [name, role] on [date, time]". | Printed form or case record | — |
+| 6† | Approving officer | Where the Protocol requires the e-signature to be affixed on the form itself (for example Forms 3, 4 and 4.3), also signs the form as the Protocol says; the platform approval is recorded in addition. | Signed form | As the Protocol says |
+| 7† | Graduate School Dean | On a dispute about an approval, asks GS staff for the case record and decides. | Case record | — |
+
+† This step rests on a rule marked Practice or Proposed in section 4.22.5, or on the group's process model; it is not described in the Handbook or the Research Protocol and is to be confirmed by the Graduate School.
+
+#### 4.22.5 Business rules
+
+| Rule | Rule statement | Source | Status |
+|---|---|---|---|
+| EAP-01 | The e-signature already used on research forms by email (ADV-09, PRP-02, FIN-12) remains valid. GS-P-03 adds the approval recorded in the platform and does not replace the Protocol. | Platform (current build), approval records; Research Protocol AY2024-2025, e-signatures by email, as in ADV-09, PRP-02 and FIN-12 | Proposed |
+| EAP-02 | An electronic document and an electronic signature have legal recognition under RA 8792 (section 7, electronic documents; section 8, electronic signatures). An electronic signature equals a written signature when a method identifies the person to be bound and shows that the person had access to the document to consent or approve it, the method is dependable for its purpose, the person applied the signature to proceed, and the other party can verify it. The University must confirm that the platform's sign-in meets this test (OQ-47). | Republic Act No. 8792 (Electronic Commerce Act of 2000), s. 7 and s. 8 | Proposed |
+| EAP-03 | An approval recorded in the platform by the signed-in holder of the approving role is that officer's signature on the matching GS-F form, if the approval record shows the officer's name and role, the date and time, the decision and the remarks. | Republic Act No. 8792 (Electronic Commerce Act of 2000), s. 8; Platform (current build), approval records | Proposed |
+| EAP-04 | An officer approves only under the officer's own account and never lends a password. A representative of an officer (for example the Dean's authorised representative) signs in under the representative's own account, and the decision names the officer for whom the representative acts and the authority. | Republic Act No. 8792 (Electronic Commerce Act of 2000), s. 8; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| EAP-05 | Every approve, endorse, return or decline control in the platform shows a one-line note that the decision is an electronic approval under GS-P-03. | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| EAP-06 | The approval record is kept for as long as the case file it belongs to (PRV-08). It is not edited. A wrong approval is corrected by a new, later entry that states the reason, and both entries stay. | Platform (current build), transaction log | Proposed |
+| EAP-07 | Where the Protocol requires an e-signature on the form itself, the form keeps it. The platform approval does not take its place until the Graduate School confirms GS-P-03. | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| EAP-08 | Other offices, including the Registrar, receive a platform approval only as a printed or exported case record, or as the form carrying the line "Approved electronically under GS-P-03 by [name, role] on [date, time]". | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+
+#### 4.22.6 Exceptions and unusual cases
+
+- The officer is away and the platform cannot be reached: the form is signed on paper or by email as before and GS staff enter the decision afterwards, naming the original signer (EAP-07).
+- An officer says a decision was not made by the officer: the Dean asks GS staff for the case record; the sign-in details and the log are reviewed under 4.23; a wrong decision is corrected by a new entry (EAP-06).
+- The University decides not to accept platform approvals as signatures: the manual falls back to EAP-01 and EAP-07 and the forms are signed as the Protocol says (OQ-47).
+
+#### 4.22.7 Records produced and where they go
+
+**Forms of this process: GS-P-03 Electronic Approval and Signature Policy. Appendix A gives the name each has in the Handbook or the Protocol.**
+
+| Record | Where it goes |
+|---|---|
+| GS-P-03 Electronic Approval and Signature Policy | Dean's office; shown beside every decision control |
+| Approval record (who, role, date, time, decision, remarks) | Platform transaction log; printed or exported on request |
+
+#### 4.22.8 How the platform supports this process
+
+Every workflow decision in the platform is made by a signed-in account whose role is checked first, and each decision writes a log entry with the officer's role and name, the time, the result, the previous and new status, the next owner and any note. Decisions are not edited; a later entry follows an earlier one. The platform shows a one-line note citing GS-P-03 beside the approve and decide controls.
+
+**Difference between the platform and the rule.** The platform records the approval and the officer's identity through the officer's account; it does not use a digital certificate or a second sign-in step at the moment of approval, so whether it meets RA 8792 section 8 is for the University to confirm (OQ-47). The one-line note citing GS-P-03 was added with the forms-pack revision of the platform. The platform does not print the line "Approved electronically under GS-P-03"; GS staff add it from the case record.
+
+### 4.23 Data privacy and records retention
+
+#### 4.23.1 Purpose
+
+To state how the Graduate School protects the personal data in its records and in the platform, what each person is told and agrees to, how long records are kept, and what happens when something goes wrong. It rests on Republic Act No. 10173 (Data Privacy Act of 2012) and its Implementing Rules, with the National Privacy Commission as regulator. The Handbook and the Protocol do not cover it, so every rule is the group's proposal and the retention periods are values to be confirmed.
+
+#### 4.23.2 Who is involved
+
+- Account holder and data subject (student, faculty member, officer)
+- GS staff
+- Graduate School Dean
+- USLS Data Protection Officer (contact to be confirmed)
+- Platform administrator
+
+#### 4.23.3 Trigger and preconditions
+
+**Trigger.** A person signs in to the platform for the first time or after a new version of the notice; a person asks about or against the use of the person's data; a record reaches the end of its retention period; or a breach is suspected.
+
+**Preconditions.**
+
+- The University has named a Data Protection Officer and the officer's contact (OQ-48).
+- The Data Privacy Notice and Retention Schedule (GS-P-04) is approved and has a version number.
+
+#### 4.23.4 Procedure
+
+| Step | Who | What they do | Form / record | Time limit |
+|---|---|---|---|---|
+| 1† | Platform | At first sign-in, and again after a new notice version, shows the Data Privacy Notice (GS-P-04) and asks the account holder to accept it before anything else works. | Notice screen | At first sign-in |
+| 2† | Account holder | Reads and accepts the notice. The platform stores the date, time and notice version with the account. | Consent record | At first sign-in |
+| 3† | GS staff | For a person who has no account or prefers paper, gives GS-F-45; keeps the signed copy in the person's file and enters the date in the platform record where it applies. | GS-F-45 | — |
+| 4† | Data subject | Asks the Graduate School to give access to, correct, block or remove the person's data, or objects to its use. | Written request to the GS Office | — |
+| 5† | GS staff | Logs the request, checks the identity of the person, passes the request to the Data Protection Officer and answers within the time set in PRV-04. | Request log | Within 15 working days (proposed) |
+| 6† | GS staff | Once a year lists the case files that have passed their retention period (PRV-08) and sends the list to the Dean. | Retention list | Once a year (proposed) |
+| 7† | Graduate School Dean | Approves disposal of the listed files, or extends one with a reason. | Disposal decision | — |
+| 8† | GS staff and administrator | Dispose of the approved files securely, or remove the names and keep the counts for reports, and record what was disposed of and when. | Disposal record | — |
+| 9† | Any staff member | On a suspected breach, tells the Data Protection Officer and the Dean the same day. The officer decides whether the National Privacy Commission and the affected persons must be told. | Incident note | Same day (proposed) |
+
+† This step rests on a rule marked Practice or Proposed in section 4.23.5, or on the group's process model; it is not described in the Handbook or the Research Protocol and is to be confirmed by the Graduate School.
+
+#### 4.23.5 Business rules
+
+| Rule | Rule statement | Source | Status |
+|---|---|---|---|
+| PRV-01 | The Graduate School keeps personal data of students, faculty and officers for the lifecycle processes in this manual. The University's Data Protection Officer oversees the Graduate School's handling of that data, and the Dean is accountable for the Graduate School's records. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 21; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| PRV-02 | The Graduate School collects only the data a process in this manual needs and uses it only for that process (transparency, legitimate purpose and proportionality). Official identity, enrollment and grade data come from AIMS and are not retyped (3.3). | Republic Act No. 10173 (Data Privacy Act of 2012), s. 11 | Proposed |
+| PRV-03 | At first sign-in the platform shows the Data Privacy Notice (GS-P-04) and records the account holder's acceptance with the date, time and notice version. A person without an account, or who prefers paper, signs GS-F-45. A new version of the notice is shown again at the next sign-in. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 12; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| PRV-04 | A data subject may ask to be told what is held, to see and correct it, to object to its use, and to have it blocked or removed where the law and the retention schedule allow (rights of the data subject). The Graduate School answers within 15 working days (the period is proposed, OQ-48). | Republic Act No. 10173 (Data Privacy Act of 2012), s. 16 | Proposed |
+| PRV-05 | Personal data are shown only to the roles that need them for their step (4.21). Staff do not keep copies on personal devices or send them through personal email or chat. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 20; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| PRV-06 | The platform protects personal data with role checks on every request, hashed passwords, a sign-in brake, session cookies that scripts cannot read, an audit log of changes, and uploaded files that are only given to roles allowed to see the case. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 20; Platform (current build), security measures | Proposed |
+| PRV-07 | Any suspected breach is reported the same day to the Data Protection Officer and the Dean. The officer decides whether the National Privacy Commission and the affected persons must be notified. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 20 | Proposed |
+| PRV-08 | Retention (proposed): a student's case file, the forms, the approval records and the transaction log are kept for 5 years after graduation or after the last enrollment, whichever applies. The graduation list and the transmittals to the Registrar are kept permanently. After the period the files are disposed of securely or kept only without names for reports (OQ-49). | Republic Act No. 10173 (Data Privacy Act of 2012), s. 11; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| PRV-09 | Data go to an outside service only if GS-P-04 names the service and what it receives. The platform can use an outside search service for the policy question box and for reading documents; when it is used, text from the question, the documents or the person's own record leaves the platform. Switching it off must leave the platform working with its own documents (OQ-48). A faculty member's own calendar is linked only when the member connects it. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 11 and s. 21; Platform (current build), outside services | Proposed |
+
+#### 4.23.6 Exceptions and unusual cases
+
+- A person declines the notice: the person cannot use the platform; GS staff handle the person's business on paper under the same rules (GS-F-45 records the refusal).
+- A student asks to remove data that a rule requires the Graduate School to keep (for example a graduation record): the request is refused for that data with the reason and granted for the rest (PRV-04, PRV-08).
+- A court or a government office orders disclosure: the Dean and the Data Protection Officer decide; nothing is released by a staff member alone.
+- A record is needed after its period (for example a pending complaint): the Dean extends retention in writing for that file only.
+
+#### 4.23.7 Records produced and where they go
+
+**Forms of this process: GS-P-04 Data Privacy Notice and Records Retention Schedule; GS-F-45 Data Privacy Consent and Acknowledgement. Appendix A gives the name each has in the Handbook or the Protocol.**
+
+| Record | Where it goes |
+|---|---|
+| GS-P-04 Data Privacy Notice and Records Retention Schedule | Dean's office; shown at first sign-in |
+| GS-F-45 Data Privacy Consent and Acknowledgement | GS staff, in the person's file |
+| Consent record (date, time and notice version) | Platform account record |
+| Retention list, disposal decision and disposal record | GS staff; Dean's office |
+| Data subject requests and incident notes | GS Office; Data Protection Officer |
+
+#### 4.23.8 How the platform supports this process
+
+The platform stores the date, time and version of each account holder's acceptance of the notice and asks again when the version changes. It checks roles on every request, stores passwords only as salted hashes, sets session cookies that scripts cannot read, brakes repeated failed sign-ins, and writes a log entry for each change. Imported official data are read-only (4.24). The platform has no automatic disposal: GS staff list and dispose of files by the yearly procedure.
+
+**Difference between the platform and the rule.** The retention periods are proposed values and the platform does not enforce them. The Data Protection Officer's name and contact are not yet known (OQ-48). When the outside search service is switched on, text leaves the platform, which the notice must say; whether that use is allowed is for the University to decide. The first-sign-in notice and the consent record were added with the forms-pack revision of the platform.
+
+### 4.24 AIMS and Registrar data exchange
+
+#### 4.24.1 Purpose
+
+To specify which files come into the platform from AIMS and the Registrar, which files go out to the Registrar, who sends them, how often, and what stays read-only. AIMS is the University's system and the official record of identity, enrollment and grades; the group was told that the platform cannot be integrated with it, so the exchange is by file only. This chapter is the group's proposal and follows what the platform does; the cadence and the columns are for the AIMS and Registrar owner to confirm.
+
+#### 4.24.2 Who is involved
+
+- GS staff
+- Academic Coordinator
+- Graduate School Dean
+- University Registrar
+- Information Technology Services (ITS)
+
+#### 4.24.3 Trigger and preconditions
+
+**Trigger.** A term starts or grades are posted (inbound files); a change is made in the platform that the Registrar must apply in AIMS; the Dean approves a leave, a readmission or a graduation endorsement (outbound files).
+
+**Preconditions.**
+
+- The exporting office (the Registrar or ITS) agrees to supply the file (OQ-50).
+- For an outbound file, the case has the Dean's approval.
+- The person sending a file has a platform account with the matching role (4.21).
+
+#### 4.24.4 Procedure
+
+| Step | Who | What they do | Form / record | Time limit |
+|---|---|---|---|---|
+| 1† | Registrar or ITS | Supplies an Excel export of identity, enrollment and grades (the group was told the Graduate School can ask ITS for one). The proposed workbook has the sheets Export_Metadata, Students, Enrollment_Subjects, Grades and Subject_Offerings. | AIMS export workbook | Start of each term and after grade posting (proposed) |
+| 2† | GS staff | Uploads the Academic Coordinator's student monitoring workbook (.xlsx) at student handoff, and the Academic Coordinator or GS staff upload class lists (.csv or .xlsx with a faculty column) to tag students as enrolled or dropped. The platform checks each file, refuses rows it cannot accept, and keeps the original file. | Uploaded workbook; class list | Each term |
+| 3† | Platform | Imports identity, enrollment and grade values as read-only and reports any difference from the Graduate School's record. A difference is corrected in AIMS and a replacement export is imported; it is never overwritten in the platform. | Import result; discrepancy list | — |
+| 4† | Academic Coordinator or GS staff | Each working day opens the daily change report and applies each listed change in AIMS (or sends it to the Registrar), then marks it reflected. | Daily change report | Each working day (proposed) |
+| 5† | GS staff | Exports the Dean-approved leave and readmission cases to a CSV or Excel list for the Registrar, emails it, and marks the cases Sent to Registrar and later Acknowledged. | Registrar list; export log | After the Dean's approval |
+| 6† | Graduate School Dean | Approves the graduation endorsements, exports the endorsed list (CSV) and emails it to the Registrar by the official channel. | Endorsed graduation list | After the batch approval |
+| 7† | GS staff | Sends each outbound file with a Records Transmittal (GS-F-44) and files the transmittal and the Registrar's acknowledgement. | GS-F-44; acknowledgement | — |
+
+† This step rests on a rule marked Practice or Proposed in section 4.24.5, or on the group's process model; it is not described in the Handbook or the Research Protocol and is to be confirmed by the Graduate School.
+
+#### 4.24.5 Business rules
+
+| Rule | Rule statement | Source | Status |
+|---|---|---|---|
+| DEX-01 | AIMS stays an external system and the official record of identity, enrollment and grades. The platform has no live link, no AIMS login and no screen reading of AIMS; only files are exchanged. | Consultation 21 July 2026, the group was told the platform cannot be integrated with AIMS; Platform (current build), AIMS boundary | Proposed |
+| DEX-02 | Files come in by upload by GS staff or the Academic Coordinator: the student monitoring workbook (.xlsx or .xlsm) at handoff, and class lists (.csv or .xlsx with a faculty column) for enrollment tagging. The platform validates a file, refuses rows it cannot accept (for example a row for another semester, or for a student who is on leave, AWOL or withdrawn) and never changes grades. | Platform (current build), student handoff and class list import | Proposed |
+| DEX-03 | The proposed AIMS export contract (version PROPOSED-1.0, Documents/AIMS_Export/) is a workbook with the sheets Export_Metadata, Students, Enrollment_Subjects, Grades and Subject_Offerings. STUDENT_NUMBER is the identity key; official values are kept as exported. The exact columns, the exporting office and the cadence are for the AIMS and Registrar owner to confirm (OQ-50). The current build does not yet read this workbook. | Platform (current build), Documents/AIMS_Export | Proposed |
+| DEX-04 | The files from AIMS or the Registrar are supplied at the start of each term, after enrollment closes, and again after grades are posted (proposed). Between those dates the platform sends changes out by the daily change report (DEX-06). | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| DEX-05 | Identity, enrollment, grade and completion values imported from AIMS are read-only. If the Graduate School's record differs, the difference is flagged for follow-up and corrected in AIMS, and a replacement export is imported with its history kept. | This manual, section 3.3; Platform (current build), read-only official data | Proposed |
+| DEX-06 | Every change made in the platform that the Registrar must apply in AIMS (enrollment or subject change, withdrawal, course adjustment, leave, readmission, AWOL or residency, graduation) appears on a dated daily change report. The Academic Coordinator or GS staff apply it in AIMS and mark it reflected; the platform does not write to AIMS. | Platform (current build), daily change report | Proposed |
+| DEX-07 | Only leave and readmission cases that the Dean has approved can be exported to the Registrar list. Each export is logged with the file name, the person and the time, and a case moves from Pending Handoff to Exported - Ready to Send, then to Sent to Registrar and Acknowledged when GS staff record them (see GRD-16, OQ-32). | Platform (current build), leave and readmission Registrar export | Proposed |
+| DEX-08 | The graduation list is exported only for endorsements the Dean has approved and for students who are still eligible when the file is made. It is a CSV with batch, student number, name, program, coursework status, research status, endorsement status, the Dean's approval date and remarks, and the Registrar export status, and the Dean emails it manually (GRD-16). | Platform (current build), endorsed graduation list | Proposed |
+| DEX-09 | An outbound file holds only the columns the Registrar needs and goes by official University email, never by personal email or chat (PRV-05). | Republic Act No. 10173 (Data Privacy Act of 2012), s. 11; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| DEX-10 | Each outbound file is sent with a Records Transmittal (GS-F-44). The transmittal and the Registrar's acknowledgement, when one is given, are filed (OQ-32). | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+
+#### 4.24.6 Exceptions and unusual cases
+
+- A file is incomplete or a column is blank: the row is held and GS staff ask for a corrected file (Consultation 20 July 2026 discussion; handled as in 4.1).
+- The Registrar does not acknowledge a file: the case stays at Sent to Registrar; GS staff follow up and the platform does not record receipt unless GS staff enter it (OQ-32).
+- AIMS shows a student as enrolled while the Graduate School record says otherwise: the AIMS value is followed and the difference is flagged (DEX-05).
+- No export from AIMS is supplied in a term: the Academic Coordinator's monitoring workbook and class lists remain the working record (OQ-33).
+
+#### 4.24.7 Records produced and where they go
+
+**Forms of this process: GS-P-06 AIMS and Registrar Data Exchange Specification. Appendix A gives the name each has in the Handbook or the Protocol.**
+
+| Record | Where it goes |
+|---|---|
+| GS-P-06 AIMS and Registrar Data Exchange Specification | Graduate School; AIMS and Registrar owner |
+| Uploaded workbooks and class lists with the import result | Platform; GS staff |
+| Daily change report with the reflected mark | Platform; Academic Coordinator and GS staff |
+| Leave and readmission export log; endorsed graduation list | Platform; GS staff; Dean |
+| GS-F-44 Records Transmittal and Registrar acknowledgement | GS staff; Registrar |
+
+#### 4.24.8 How the platform supports this process
+
+GS staff upload the Academic Coordinator's monitoring workbook at handoff; GS staff and the Academic Coordinator upload class lists. The platform shows a daily change report of the changes the Registrar must apply in AIMS, with a reflected mark and the time and person. It exports Dean-approved leave and readmission cases as CSV or Excel with an export log and status changes, and the Dean exports the endorsed graduation list as CSV. Imported official data are read-only, and the proposed AIMS export workbook is kept in Documents/AIMS_Export/.
+
+**Difference between the platform and the rule.** The platform does not read the proposed AIMS export workbook (PROPOSED-1.0) yet; the working inputs are the Academic Coordinator's monitoring workbook and the class lists. The Registrar's acknowledgement of a graduation list is not recorded; the leave export records a manual acknowledgement. The cadence in DEX-04 and the exact columns are proposals (OQ-50).
+
 ## 5 Consolidated business rules register
 
 This register lists every business rule in this manual, sorted by process. The platform's rules register will be checked against this list. A machine-readable copy is saved as operations_manual_rules.json. The status column is Official (Handbook or Protocol), Practice (described by staff in consultation) or Proposed (the group's proposal); Practice and Proposed rows must be confirmed by the Graduate School.
 
-Total rules: 230 (Official 168, Practice 22, Proposed 40).
+Total rules: 278 (Official 170, Practice 22, Proposed 86).
 
 | Rule | Process | Rule | Source | Status |
 |---|---|---|---|---|
@@ -1672,6 +2100,7 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | CRS-10 | Course offering and course adjustments (change and add of subject) | The Dean approves the offering plan before it is published. | Group working notes, BPM accurate flow, section 3 | Proposed |
 | CRS-11 | Course offering and course adjustments (change and add of subject) | When the Academic Coordinator decides not to offer a subject, the platform shows which students would be delayed, so that the decision can be made with that information; the decision stays with the Academic Coordinator. | Group working notes, July 20 checklist, items 32, 33 and 86 | Proposed |
 | CRS-12 | Course offering and course adjustments (change and add of subject) | When assigning a professor the Academic Coordinator considers the professor's preferred subjects, availability, qualifications, current load and schedule conflicts; the platform only suggests. | Group working notes, July 20 checklist, items 36-40, 88-90 | Proposed |
+| CRS-13 | Course offering and course adjustments (change and add of subject) | A special class is requested by the Academic Coordinator through the Dean and addressed to the Vice Chancellor for Academic Affairs; the fees for it are computed as the Handbook describes and the class follows the Blended Learning Mode of 32 contact hours plus independent study (see also ENR-07, CRS-04). | Handbook 2022-2023, p. 48 | Official |
 | WD-01 | Withdrawal of subject | The student may withdraw subjects until the second week from the start of classes regardless of whether or not classes have been attended. | Handbook 2022-2023, p. 49 | Official |
 | WD-02 | Withdrawal of subject | Ten percent (10%) of the total amount due for the term is charged if the withdrawal is within the first week of classes, and twenty percent (20%) if within the second week, regardless of whether or not classes have been attended. | Handbook 2022-2023, p. 49; Handbook 2022-2023, p. 51 | Official |
 | WD-03 | Withdrawal of subject | The student retains the right to withdraw all subjects at any time of the semester after the second week but pays the full enrolment fees for the semester. | Handbook 2022-2023, p. 49 | Official |
@@ -1854,6 +2283,7 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | GRD-14 | Graduation application and endorsement | A student is eligible for selection into a graduation batch only after coursework, research and practicum (where applicable) are complete and the student has submitted a signed graduation application; an application with incorrect information is returned and replaced by a completely new corrected document, the original being kept. | Group working notes, Scenario notes, graduation standard and unusual cases; Platform (current build) | Proposed |
 | GRD-15 | Graduation application and endorsement | Candidates are reviewed within a graduation review window for a school year opened and closed by the Graduate School; the dates, the treatment of late applicants and the treatment of eligible students who miss the window are to be set by the Graduate School. | Group working notes, Scenario notes; Platform (current build) | Proposed |
 | GRD-16 | Graduation application and endorsement | After the Dean approves a batch, the endorsed list is exported as a file and the Dean sends it to the Registrar by the official email; the platform records the export and the status Exported — Ready to Send, and does not record that an email was sent or that the Registrar acknowledged it. | Group working notes, Scenario notes; Platform (current build) | Proposed |
+| GRD-17 | Graduation application and endorsement | A project paper, thesis or dissertation is nominated for the best thesis or dissertation award by the chairman of the committee or by the Dean; it is scored out of 100 points (format and content 15, analysis and discussion 40, findings, action plan or program 15, originality, novelty and contribution to new knowledge or applicability 30) and needs a cut-off of 96 points and the approval of the majority of the committee (see also CMP-12). | Handbook 2022-2023, pp. 76-77 | Official |
 | HND-01 | Records handoff to the Registrar | The accomplished Withdrawal Form is provided to the Registrar, the Accounting Office, and the student. | Handbook 2022-2023, p. 49 | Official |
 | HND-02 | Records handoff to the Registrar | The Dean, Associate Dean or authorized representative informs the University Registrar of a leave of absence, indicating the reasons and the amount of money refunded to the student, if any. | Handbook 2022-2023, p. 53 | Official |
 | HND-03 | Records handoff to the Registrar | The Graduate School Dean endorses a returning student's written intention to enroll to the University Registrar. | Handbook 2022-2023, p. 53 | Official |
@@ -1864,6 +2294,52 @@ Total rules: 230 (Official 168, Practice 22, Proposed 40).
 | HND-08 | Records handoff to the Registrar | There is no integration between AIMS and the Graduate School record. The Graduate School cannot pull data from AIMS and may ask the ITS for an Excel export. | Consultation 21 July 2026 | Practice |
 | HND-09 | Records handoff to the Registrar | The Graduate School keeps a log of each handoff (what, when, by whom, to which office) and of the Registrar's confirmation when one is received; the platform does not claim that the Registrar has acted until a confirmation is recorded. | Group working notes, July 20 checklist, item 57; Consultation 20 July 2026, adviser's remark that the Registrar must confirm | Proposed |
 | HND-10 | Records handoff to the Registrar | The export for the Registrar is a file (for withdrawals, an Excel list of approved withdrawals; for graduation, a CSV list of endorsed candidates) sent by the responsible person by email; column layouts are to be confirmed by the Registrar. | Group working notes, Scenario notes; Platform (current build) | Proposed |
+| FAC-01 | Faculty course preference and teaching load | Each faculty member has one profile with name, college or department, specialization, email, eligible roles (Faculty Adviser, Panel Member, Panel Chair, Academic Coordinator, Research Coordinator) and an Active or Inactive status. GS staff and the Academic Coordinator create and edit profiles. | Platform (current build), faculty profile | Proposed |
+| FAC-02 | Faculty course preference and teaching load | A faculty member lists preferred subjects in order of preference on GS-F-47. A faculty member may change only the member's own list; GS staff and the Academic Coordinator may enter it on the member's behalf. Only subjects of the member's own college may be listed. | Platform (current build), faculty preferred subjects | Proposed |
+| FAC-03 | Faculty course preference and teaching load | A preferred subject is a wish, not a promise. The Academic Coordinator weighs preference with availability, eligible role, qualification and current load, and the Academic Coordinator's assignment stands (see CRS-07 and CRS-12). | Consultation 21 July 2026, the Academic Coordinator decides which professor teaches; Platform (current build), offering setup | Proposed |
+| FAC-04 | Faculty course preference and teaching load | Availability is recorded as weekly hours with dated exceptions on top. An exception "available" replaces the weekly hours for that day; an exception "unavailable" removes the day or the stated hours. A weekend needs a dated entry. | Platform (current build), faculty availability and exceptions | Proposed |
+| FAC-05 | Faculty course preference and teaching load | Hours that the system filled in by itself are never counted as availability the professor entered. Until the professor or GS staff enter hours, the record reads "not entered" and the professor is not suggested for a subject. | Platform (current build), faculty availability status | Proposed |
+| FAC-06 | Faculty course preference and teaching load | The Research Coordinator and GS staff may request availability from the panel members for a student's defense. A request has a date window, an optional message and a status of Open, Answered or Cancelled, and it is answered when the professor enters hours or confirms the hours on record. | Platform (current build), availability requests; Group working notes, BPM accurate flow, scheduling | Proposed |
+| FAC-07 | Faculty course preference and teaching load | A professor may be assigned at most 24 teaching units in a semester. An assignment that would pass the limit is refused and the Academic Coordinator chooses another professor or changes the sections. The 24-unit value is a prototype value pending the Graduate School's answer (OQ-45). | Platform (current build), faculty teaching load limit | Proposed |
+| FAC-08 | Faculty course preference and teaching load | Only an Active professor of the same college as the subject's program may be assigned to the subject. | Platform (current build), offering setup | Proposed |
+| FAC-09 | Faculty course preference and teaching load | The Dean approves the offering plan, including its assigned professors, before it is published (CRS-10). GS-F-48 is the paper record of the assignment; the professor acknowledges it before classes begin. | Group working notes, BPM accurate flow, section 3; Platform (current build), offering plan decision | Proposed |
+| ACC-01 | Platform accounts and roles | The platform has seven roles: Graduate School Staff, Academic Coordinator, Research Coordinator, Dean, Student, Faculty Member and Administrator. One account has one role and belongs to one person. | Platform (current build), role labels | Proposed |
+| ACC-02 | Platform accounts and roles | Each screen and each action is open only to the roles that GS-P-05 lists for it (least privilege). A Student sees only the student's own record; a Faculty Member sees only the faculty member's own portal, panel invitations and adviser requests. | Platform (current build), role checks on every request | Proposed |
+| ACC-03 | Platform accounts and roles | A student account is created when the student is handed off from admission (the monitoring workbook import). Each new student account gets its own initial password, shown once to the staff member who imported the file. | Platform (current build), student handoff import | Proposed |
+| ACC-04 | Platform accounts and roles | A faculty account is created together with the faculty profile by GS staff or the Academic Coordinator. The email must not belong to another profile or account. | Platform (current build), faculty creation | Proposed |
+| ACC-05 | Platform accounts and roles | An account for GS staff, a coordinator or the Dean is requested on GS-F-46, endorsed by the head of the person's office, approved by the Dean and set up by GS staff or the platform administrator within three working days of the approval (proposed). | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| ACC-06 | Platform accounts and roles | A password set for someone else is temporary: the holder must choose a personal password at first sign-in before anything else works. A personal password has at least ten characters, differs from the old one and is not the email address or a shared demo password. | Platform (current build), change of password | Proposed |
+| ACC-07 | Platform accounts and roles | Repeated failed sign-ins slow the next attempt (after five failures within 15 minutes the wait is 2 seconds and doubles to at most 30 seconds); the account is not locked. | Platform (current build), sign-in brake | Proposed |
+| ACC-08 | Platform accounts and roles | An account is deactivated, not deleted, when the person leaves or changes office, within five working days of the request. A deactivated account cannot sign in. Setting a faculty profile to Inactive deactivates its login. | Platform (current build), account status; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| ACC-09 | Platform accounts and roles | The Dean reviews the list of active accounts and roles once a year (the interval is proposed, OQ-46). | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| ACC-10 | Platform accounts and roles | The Administrator account is held by the person who maintains the platform and not by an office holder. Accounts are personal: a password is never shared, and a shared demonstration login exists only in demonstration mode. | Platform (current build), administrator and demonstration accounts; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| EAP-01 | Electronic approval and signatures | The e-signature already used on research forms by email (ADV-09, PRP-02, FIN-12) remains valid. GS-P-03 adds the approval recorded in the platform and does not replace the Protocol. | Platform (current build), approval records; Research Protocol AY2024-2025, e-signatures by email, as in ADV-09, PRP-02 and FIN-12 | Proposed |
+| EAP-02 | Electronic approval and signatures | An electronic document and an electronic signature have legal recognition under RA 8792 (section 7, electronic documents; section 8, electronic signatures). An electronic signature equals a written signature when a method identifies the person to be bound and shows that the person had access to the document to consent or approve it, the method is dependable for its purpose, the person applied the signature to proceed, and the other party can verify it. The University must confirm that the platform's sign-in meets this test (OQ-47). | Republic Act No. 8792 (Electronic Commerce Act of 2000), s. 7 and s. 8 | Proposed |
+| EAP-03 | Electronic approval and signatures | An approval recorded in the platform by the signed-in holder of the approving role is that officer's signature on the matching GS-F form, if the approval record shows the officer's name and role, the date and time, the decision and the remarks. | Republic Act No. 8792 (Electronic Commerce Act of 2000), s. 8; Platform (current build), approval records | Proposed |
+| EAP-04 | Electronic approval and signatures | An officer approves only under the officer's own account and never lends a password. A representative of an officer (for example the Dean's authorised representative) signs in under the representative's own account, and the decision names the officer for whom the representative acts and the authority. | Republic Act No. 8792 (Electronic Commerce Act of 2000), s. 8; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| EAP-05 | Electronic approval and signatures | Every approve, endorse, return or decline control in the platform shows a one-line note that the decision is an electronic approval under GS-P-03. | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| EAP-06 | Electronic approval and signatures | The approval record is kept for as long as the case file it belongs to (PRV-08). It is not edited. A wrong approval is corrected by a new, later entry that states the reason, and both entries stay. | Platform (current build), transaction log | Proposed |
+| EAP-07 | Electronic approval and signatures | Where the Protocol requires an e-signature on the form itself, the form keeps it. The platform approval does not take its place until the Graduate School confirms GS-P-03. | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| EAP-08 | Electronic approval and signatures | Other offices, including the Registrar, receive a platform approval only as a printed or exported case record, or as the form carrying the line "Approved electronically under GS-P-03 by [name, role] on [date, time]". | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| PRV-01 | Data privacy and records retention | The Graduate School keeps personal data of students, faculty and officers for the lifecycle processes in this manual. The University's Data Protection Officer oversees the Graduate School's handling of that data, and the Dean is accountable for the Graduate School's records. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 21; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| PRV-02 | Data privacy and records retention | The Graduate School collects only the data a process in this manual needs and uses it only for that process (transparency, legitimate purpose and proportionality). Official identity, enrollment and grade data come from AIMS and are not retyped (3.3). | Republic Act No. 10173 (Data Privacy Act of 2012), s. 11 | Proposed |
+| PRV-03 | Data privacy and records retention | At first sign-in the platform shows the Data Privacy Notice (GS-P-04) and records the account holder's acceptance with the date, time and notice version. A person without an account, or who prefers paper, signs GS-F-45. A new version of the notice is shown again at the next sign-in. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 12; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| PRV-04 | Data privacy and records retention | A data subject may ask to be told what is held, to see and correct it, to object to its use, and to have it blocked or removed where the law and the retention schedule allow (rights of the data subject). The Graduate School answers within 15 working days (the period is proposed, OQ-48). | Republic Act No. 10173 (Data Privacy Act of 2012), s. 16 | Proposed |
+| PRV-05 | Data privacy and records retention | Personal data are shown only to the roles that need them for their step (4.21). Staff do not keep copies on personal devices or send them through personal email or chat. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 20; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| PRV-06 | Data privacy and records retention | The platform protects personal data with role checks on every request, hashed passwords, a sign-in brake, session cookies that scripts cannot read, an audit log of changes, and uploaded files that are only given to roles allowed to see the case. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 20; Platform (current build), security measures | Proposed |
+| PRV-07 | Data privacy and records retention | Any suspected breach is reported the same day to the Data Protection Officer and the Dean. The officer decides whether the National Privacy Commission and the affected persons must be notified. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 20 | Proposed |
+| PRV-08 | Data privacy and records retention | Retention (proposed): a student's case file, the forms, the approval records and the transaction log are kept for 5 years after graduation or after the last enrollment, whichever applies. The graduation list and the transmittals to the Registrar are kept permanently. After the period the files are disposed of securely or kept only without names for reports (OQ-49). | Republic Act No. 10173 (Data Privacy Act of 2012), s. 11; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| PRV-09 | Data privacy and records retention | Data go to an outside service only if GS-P-04 names the service and what it receives. The platform can use an outside search service for the policy question box and for reading documents; when it is used, text from the question, the documents or the person's own record leaves the platform. Switching it off must leave the platform working with its own documents (OQ-48). A faculty member's own calendar is linked only when the member connects it. | Republic Act No. 10173 (Data Privacy Act of 2012), s. 11 and s. 21; Platform (current build), outside services | Proposed |
+| DEX-01 | AIMS and Registrar data exchange | AIMS stays an external system and the official record of identity, enrollment and grades. The platform has no live link, no AIMS login and no screen reading of AIMS; only files are exchanged. | Consultation 21 July 2026, the group was told the platform cannot be integrated with AIMS; Platform (current build), AIMS boundary | Proposed |
+| DEX-02 | AIMS and Registrar data exchange | Files come in by upload by GS staff or the Academic Coordinator: the student monitoring workbook (.xlsx or .xlsm) at handoff, and class lists (.csv or .xlsx with a faculty column) for enrollment tagging. The platform validates a file, refuses rows it cannot accept (for example a row for another semester, or for a student who is on leave, AWOL or withdrawn) and never changes grades. | Platform (current build), student handoff and class list import | Proposed |
+| DEX-03 | AIMS and Registrar data exchange | The proposed AIMS export contract (version PROPOSED-1.0, Documents/AIMS_Export/) is a workbook with the sheets Export_Metadata, Students, Enrollment_Subjects, Grades and Subject_Offerings. STUDENT_NUMBER is the identity key; official values are kept as exported. The exact columns, the exporting office and the cadence are for the AIMS and Registrar owner to confirm (OQ-50). The current build does not yet read this workbook. | Platform (current build), Documents/AIMS_Export | Proposed |
+| DEX-04 | AIMS and Registrar data exchange | The files from AIMS or the Registrar are supplied at the start of each term, after enrollment closes, and again after grades are posted (proposed). Between those dates the platform sends changes out by the daily change report (DEX-06). | Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| DEX-05 | AIMS and Registrar data exchange | Identity, enrollment, grade and completion values imported from AIMS are read-only. If the Graduate School's record differs, the difference is flagged for follow-up and corrected in AIMS, and a replacement export is imported with its history kept. | This manual, section 3.3; Platform (current build), read-only official data | Proposed |
+| DEX-06 | AIMS and Registrar data exchange | Every change made in the platform that the Registrar must apply in AIMS (enrollment or subject change, withdrawal, course adjustment, leave, readmission, AWOL or residency, graduation) appears on a dated daily change report. The Academic Coordinator or GS staff apply it in AIMS and mark it reflected; the platform does not write to AIMS. | Platform (current build), daily change report | Proposed |
+| DEX-07 | AIMS and Registrar data exchange | Only leave and readmission cases that the Dean has approved can be exported to the Registrar list. Each export is logged with the file name, the person and the time, and a case moves from Pending Handoff to Exported - Ready to Send, then to Sent to Registrar and Acknowledged when GS staff record them (see GRD-16, OQ-32). | Platform (current build), leave and readmission Registrar export | Proposed |
+| DEX-08 | AIMS and Registrar data exchange | The graduation list is exported only for endorsements the Dean has approved and for students who are still eligible when the file is made. It is a CSV with batch, student number, name, program, coursework status, research status, endorsement status, the Dean's approval date and remarks, and the Registrar export status, and the Dean emails it manually (GRD-16). | Platform (current build), endorsed graduation list | Proposed |
+| DEX-09 | AIMS and Registrar data exchange | An outbound file holds only the columns the Registrar needs and goes by official University email, never by personal email or chat (PRV-05). | Republic Act No. 10173 (Data Privacy Act of 2012), s. 11; Group proposal, forms pack revision of 2026-11-04 | Proposed |
+| DEX-10 | AIMS and Registrar data exchange | Each outbound file is sent with a Records Transmittal (GS-F-44). The transmittal and the Registrar's acknowledgement, when one is given, are filed (OQ-32). | Group proposal, forms pack revision of 2026-11-04 | Proposed |
 
 ## 6 Open questions for validation
 
@@ -2482,13 +2958,14 @@ The group could not answer the following questions from the sources. Each states
 
 **Decided by / date:** ____________________
 
-### OQ-27 Defense fee amounts
+### OQ-27 Defense fee amounts and panel honoraria
 
 *Kind:* Silent.
 
 **What the sources say**
 
 - Research Protocol AY2024-2025 copy: the fee tables for title, proposal and final defense (chair, members, adviser, total) are blank; the Handbook does not state amounts.
+- Practice reported by the group on 2026-11-04 (not from a Graduate School document): panel honoraria are handed to the panel members in an envelope at the defense; no form is used. The forms pack therefore has no fee or honorarium form.
 
 **Question.** What are the fees per role (chair, panel member, adviser), per program type (project paper, thesis, dissertation) and per defense (title, proposal, closed-door final, public, re-defense)?
 
@@ -2887,6 +3364,151 @@ The group could not answer the following questions from the sources. Each states
 
 **Decided by / date:** ____________________
 
+### OQ-45 Teaching load limit and who may be assigned to teach
+
+*Kind:* Silent.
+
+**What the sources say**
+
+- Handbook 2022-2023: no limit on a professor's teaching units and no rule on assigning a professor from another college.
+- Consultation 21 July 2026: the Academic Coordinator decides which professor teaches each subject, using the faculty profile and CV.
+- Platform now: at most 24 teaching units per professor per semester (a prototype value); only an Active professor of the subject's college may be assigned.
+
+**Question.** What is the most teaching units a professor may carry in a semester, may a professor from another college teach a graduate subject, and does the Dean approve each assignment or only the offering plan?
+
+**Options**
+
+- A. 24 units, same college only, the Dean approves the offering plan (as in the platform).
+- B. A different limit, to be supplied.
+- C. Professors from other colleges may teach with the Dean's approval.
+
+**Affects rules:** FAC-07, FAC-08, FAC-09
+
+**Stakeholder's answer:** ____________________________________________
+
+**Decided by / date:** ____________________
+
+### OQ-46 Who approves platform accounts, and how are they reviewed and removed?
+
+*Kind:* Silent.
+
+**What the sources say**
+
+- Handbook 2022-2023 and Research Protocol AY2024-2025: nothing on accounts or on a platform.
+- Platform now: student accounts come from the handoff import, faculty accounts from GS staff or the Academic Coordinator; staff, coordinator and Dean accounts are set by the platform administrator; the Administrator account passes every role check and acts as Graduate School staff.
+- Group proposal: GS-F-46 with the head of office's endorsement and the Dean's approval; setting up within 3 working days; deactivation within 5 working days; a yearly review by the Dean.
+
+**Question.** Who approves the accounts of the staff, the coordinators and the Dean, who may hold the Administrator account and what may it do, and what are the time limits for setting up, reviewing and removing accounts?
+
+**Options**
+
+- A. The Dean approves all but the Dean's own, which the University names; the periods are as proposed.
+- B. Another approver or other periods, to be supplied.
+- C. Accounts are managed by the Information Technology Services, not by the Graduate School.
+
+**Affects rules:** ACC-05, ACC-08, ACC-09, ACC-10
+
+**Stakeholder's answer:** ____________________________________________
+
+**Decided by / date:** ____________________
+
+### OQ-47 Does the University accept platform approvals as signatures?
+
+*Kind:* Silent.
+
+**What the sources say**
+
+- Research Protocol AY2024-2025: e-signatures are affixed to research forms and sent by email (see ADV-09, PRP-02, FIN-12).
+- Republic Act No. 8792 (Electronic Commerce Act of 2000), sections 7 and 8: electronic documents and electronic signatures are recognised if the method identifies the signer, is dependable and can be verified.
+- Platform now: the officer's own account and password identify the officer; the log records the decision; there is no digital certificate and no second sign-in step.
+
+**Question.** Does the University accept an approval made in the platform as the officer's signature on the form, or must the e-signature still be affixed on the form? May a representative approve for the Dean, and under what written authority?
+
+**Options**
+
+- A. Accepted for all forms except those where the Protocol requires an e-signature on the form.
+- B. Accepted for all forms.
+- C. Not accepted; the platform approval is an internal record only.
+
+**Affects rules:** EAP-02, EAP-03, EAP-04, EAP-07
+
+**Stakeholder's answer:** ____________________________________________
+
+**Decided by / date:** ____________________
+
+### OQ-48 Data Protection Officer, privacy notice and outside services
+
+*Kind:* Silent.
+
+**What the sources say**
+
+- Republic Act No. 10173 (Data Privacy Act of 2012), sections 11, 12, 16, 20 and 21: principles, lawful processing, rights of the data subject, security and accountability.
+- The sources name no Data Protection Officer and no privacy notice for the Graduate School.
+- Platform now: the platform can use an outside search service for the policy question box and for reading documents; when it is on, text from the question, the documents or the person's own record leaves the platform. A faculty member may link a personal calendar.
+- Group proposal: 15 working days to answer a data subject's request; same-day report of a suspected breach.
+
+**Question.** Who is the Data Protection Officer and how is the officer reached? Is consent the basis for the platform's processing? May the outside search service be used and what may it receive? What is the period to answer a data subject?
+
+**Options**
+
+- A. The University's officer is named; consent at first sign-in; the outside service is off.
+- B. The outside service is allowed for the policy question box only.
+- C. Another arrangement, to be supplied.
+
+**Affects rules:** PRV-01, PRV-03, PRV-04, PRV-09
+
+**Stakeholder's answer:** ____________________________________________
+
+**Decided by / date:** ____________________
+
+### OQ-49 How long are student and platform records kept?
+
+*Kind:* Silent.
+
+**What the sources say**
+
+- Handbook 2022-2023 and Research Protocol AY2024-2025: no retention period for case files, forms or logs.
+- Republic Act No. 10173, section 11: personal data are kept only as long as needed for the stated purpose or as the law requires.
+- Group proposal: 5 years after graduation or last enrollment for case files, forms, approval records and logs; permanent for the graduation list and the transmittals to the Registrar.
+
+**Question.** How long must the Graduate School keep each kind of record, which are kept permanently, and who approves disposal?
+
+**Options**
+
+- A. 5 years, graduation list and transmittals permanent, the Dean approves disposal (as proposed).
+- B. The University's records schedule applies; to be supplied.
+- C. Other periods, to be supplied.
+
+**Affects rules:** PRV-08, EAP-06
+
+**Stakeholder's answer:** ____________________________________________
+
+**Decided by / date:** ____________________
+
+### OQ-50 AIMS export: which columns, which office, how often?
+
+*Kind:* Silent.
+
+**What the sources say**
+
+- Consultation 21 July 2026: the platform cannot be integrated with AIMS; the Graduate School can ask ITS for an Excel export.
+- Documents/AIMS_Export/: a proposed workbook (PROPOSED-1.0) with five sheets; the README says the exact fields, the exporting office and the cadence still need the AIMS and Registrar owner's confirmation.
+- Platform now: does not read that workbook; it reads the Academic Coordinator's monitoring workbook and class lists.
+
+**Question.** Which office supplies the AIMS export, with which columns, how often, and is the proposed workbook acceptable? Should the platform read it?
+
+**Options**
+
+- A. ITS supplies the proposed workbook at the start of each term and after grades are posted.
+- B. The Registrar supplies a different file; the format will be supplied.
+- C. No AIMS export; the monitoring workbook remains the only input.
+
+**Affects rules:** DEX-03, DEX-04, DEX-05
+
+**Stakeholder's answer:** ____________________________________________
+
+**Decided by / date:** ____________________
+
 ## 7 Validation and sign-off
 
 By signing below the reviewer confirms that they have read this manual, have corrected or confirmed every rule marked Practice or Proposed, and have answered the questions in Chapter 6 (or recorded why not). Until this page is signed by the Graduate School Dean, this manual is a draft and not an official USLS document.
@@ -2910,44 +3532,83 @@ By signing below the reviewer confirms that they have read this manual, have cor
 |---|---|---|---|---|
 | 0.1 | 2026-10-01 | Capstone group CAP-IT1 | First draft prepared from the Handbook 2022-2023, the Research Protocol AY 2024-2025, the office workbooks and the group's July 2026 consultation notes. Submitted for validation. | Not yet approved |
 | 0.2 | 2026-10-01 | Capstone group CAP-IT1 | Platform paragraphs and the open questions brought in line with the platform as it now runs, after the ruling that the Handbook 2022-2023 is in force: subject withdrawal window and fees, length of a leave of absence, leave counted toward maximum residence, panel sizes, lead times, load, drop rule, first-week window for adding and changing subjects. Rules that describe the platform were reworded where they no longer matched. No Official or Practice rule changed. | Not yet approved |
+| 0.2.1 | 2026-11-04 | Capstone group CAP-IT1 | Forms pack alignment. Five new sections, 4.20 to 4.24 (faculty course preference and teaching load, platform accounts and roles, electronic approval and signatures, data privacy and records retention, AIMS and Registrar data exchange), all rules Proposed; supplementary forms tied to their host sections (cross-enrollment, transfer between master's options, special class, approved absence, incomplete grade removal, best thesis or dissertation nomination; one rule added, CRS-13 and GRD-17); every Chapter 4 section lists its forms by code; Appendix A rebuilt as the full forms crosswalk (GS-F-01 to GS-F-54, GS-P-01 to GS-P-06); questions OQ-45 to OQ-50 added; practice note on honoraria added to OQ-27. No Official or Practice rule changed. The cover version and date are left as issued. | Not yet approved |
 |  |  |  |  |  |
 
-## Appendix A Forms named in the sources
+## Appendix A Forms crosswalk
 
-| Form | Name | Used in | Source |
+Every form and process document of the forms pack, in the order GS-P-01 and GS-P-02 (forms control), GS-F-01 to GS-F-44 (lifecycle), GS-P-03 to GS-P-06 and GS-F-45 to GS-F-48 (platform basis) and GS-F-49 to GS-F-54 (supplementary forms). Chapter is the section of Chapter 4 in which the form is used (1.4 is the forms control section of Chapter 1). "Official by name" means the Handbook or the Research Protocol names the form; the Graduate School's own template was not supplied to the group, so the group drafted it. "Proposed" means the group added the form where the sources name none. The printed forms are in Documents/Graduate_School/Forms/, one folder per chapter.
+
+| Code | Form | Protocol / Handbook name | Chapter | Status |
+|---|---|---|---|---|
+| GS-P-01 | Graduate School Forms Approval Sheet | No document named; the group's control sheet for the forms pack | 1.4 | Proposed |
+| GS-P-02 | Forms Routing Guide | No document named; the group's guide to who fills and who signs each form | 1.4 | Proposed |
+| GS-F-01 | Onboarding Report for the Dean | No form named; admission requirements and forms, Handbook 2022-2023, pp. 42-47 | 4.1 | Proposed |
+| GS-F-02 | Academic Advising and Study Plan | No form named; electronic advising at enrollment, Handbook 2022-2023, pp. 47-48 | 4.2 | Proposed |
+| GS-F-03 | Change or Add of Subject and Advice Slip | Advice Slip from the Graduate School Office (adding subjects) and Advise Slip from the Dean (returnees), Handbook 2022-2023, pp. 45, 49; change and add of subject, pp. 48-49 | 4.3 | Official by name |
+| GS-F-04 | Term Course Offering Plan | No form named; subject offering, Handbook 2022-2023, pp. 48, 51 | 4.3 | Proposed |
+| GS-F-05 | Application for Withdrawal of Subject | Withdrawal Form, Handbook 2022-2023, p. 49: accomplished after the Dean approves the student's letter; copies to the Registrar, the Accounting Office and the student. The blank form was not available to the group | 4.4 | Official by name |
+| GS-F-06 | Notice of Dropping from a Subject | No form named; dropping for absences, Handbook 2022-2023, p. 52 | 4.5 | Proposed |
+| GS-F-07 | Application for Leave of Absence | No form named; written request to the Dean, Handbook 2022-2023, p. 52 | 4.6 | Proposed |
+| GS-F-08 | Application for Readmission (Return from Leave or AWOL) | No form named; written intent endorsed by the Dean to the Registrar, Handbook 2022-2023, pp. 45, 53 | 4.7 | Proposed |
+| GS-F-09 | Notice of Absence Without Leave (AWOL) | No form named; the Handbook defines AWOL, p. 53 | 4.8 | Proposed |
+| GS-F-10 | Application for Residency Enrollment | No form named; residency enrollment, Handbook 2022-2023, pp. 48, 54-55 | 4.9 | Proposed |
+| GS-F-11 | Practicum Agreement (Memorandum of Agreement) | Memorandum of agreement with the practicum site; named in the group's process model only, no official form number (Group working notes, BPM accurate flow, section 11) | 4.17 | Proposed |
+| GS-F-12 | Practicum Hours Log and Supervisor's Certification | No form named | 4.17 | Proposed |
+| GS-F-13 | Practicum Completion Report | No form named | 4.17 | Proposed |
+| GS-F-14 | Application for Comprehensive Examination | Application for the comprehensive examination, filed with the Graduate Program Secretary at least two weeks before the examination, with the official receipt, Handbook 2022-2023, pp. 56-57 | 4.10 | Official by name |
+| GS-F-15 | Comprehensive Examination Result Sheet | No form named; result recorded in the monitoring workbook, Handbook 2022-2023, p. 57 | 4.10 | Proposed |
+| GS-F-16 | Application for Title Defense | Form 1, Application for Title Defense, Handbook 2022-2023, p. 59 | 4.11 | Official by name |
+| GS-F-17 | Panel Nomination and Invitation Reply Slip | No form named; panel nomination, Research Protocol AY2024-2025, Title Defense, Part I, step 4 | 4.11 | Proposed |
+| GS-F-18 | Report of Title Defense | Form 2, Report of Title Defense, Handbook 2022-2023, pp. 60-61 | 4.11 | Official by name |
+| GS-F-19 | Application for Designation of Research Adviser | Form 3, Handbook 2022-2023, p. 61 | 4.12 | Official by name |
+| GS-F-20 | Appointment for Research Adviser | Form 3.1, Handbook 2022-2023, p. 61 | 4.12 | Official by name |
+| GS-F-21 | Request for Change of Research Adviser | Form 3.1.1, Handbook 2022-2023, p. 62 | 4.12 | Official by name |
+| GS-F-22 | Research Timetable | Form 3.2, Handbook 2022-2023, pp. 59, 61 | 4.12 | Official by name |
+| GS-F-23 | Thesis / Dissertation Advising Contract | Form 3.3, Handbook 2022-2023, p. 61 | 4.12 | Official by name |
+| GS-F-24 | Request for Change of Title of the Study | Form 3.4, Handbook 2022-2023, p. 62 | 4.12 | Official by name |
+| GS-F-25 | Statistical Consultation Form | Form 4.1 (quantitative studies), Handbook 2022-2023, p. 63 | 4.13 | Official by name |
+| GS-F-26 | Co-authorship Information for Publication | Form 4.2, Handbook 2022-2023, pp. 63-64 | 4.13 | Official by name |
+| GS-F-27 | Endorsement for Proposal / Final Defense | Form 4, Endorsement for Proposal/Final Defense, Handbook 2022-2023, pp. 63, 65 | 4.13, 4.14 | Official by name |
+| GS-F-28 | Request for Rescheduling or Cancellation of a Defense | No form named; the sources are silent on rescheduling (OQ-28) | 4.16 | Proposed |
+| GS-F-29 | Comments Sheet for Proposal Defense | Form 5, Handbook 2022-2023, p. 64 | 4.13 | Official by name |
+| GS-F-30 | Technical Review Certificate | Form 5.1, Handbook 2022-2023, p. 65 | 4.13 | Official by name |
+| GS-F-31 | Application for Ethics Review | Form 5.2, Handbook 2022-2023, p. 65 | 4.13 | Official by name |
+| GS-F-32 | Comments Sheet for Final Defense | Form 6, Handbook 2022-2023, p. 66 | 4.14 | Official by name |
+| GS-F-33 | Evaluation Sheet for Final Defense | Form 7, Handbook 2022-2023, p. 66 | 4.14 | Official by name |
+| GS-F-34 | Settlement of Provisional Thesis / Dissertation Approval | Form 8, Handbook 2022-2023, p. 67 | 4.14 | Official by name |
+| GS-F-35 | Endorsement for Public Final Defense | Form 4.3, Endorsement for Public Defense, Handbook 2022-2023, p. 72 | 4.14 | Official by name |
+| GS-F-36 | Similarity Index (Turnitin) Certification | Turnitin scan certificate (no form number), Handbook 2022-2023, p. 68; Research Protocol AY2024-2025, Final Defense, Part III | 4.15 | Official by name |
+| GS-F-37 | Editor Certification | Form 9, Handbook 2022-2023, p. 68 | 4.15 | Official by name |
+| GS-F-38 | Approval Sheet | Form 10, Handbook 2022-2023, p. 68 | 4.15 | Official by name |
+| GS-F-39 | Formal Invitation to Co-Author Journal Article | Form 11, Handbook 2022-2023, p. 75 | 4.15 | Official by name |
+| GS-F-40 | Publication Information Form | Form 12, Handbook 2022-2023, p. 75 | 4.15 | Official by name |
+| GS-F-41 | Evidence of Publication or Acceptance | Form 13, Handbook 2022-2023, p. 75: named by number only, accomplished with the copy of the journal or certificate of publication; its title was not given in the sources | 4.15 | Official by name |
+| GS-F-42 | Application for Graduation | Signed graduation application; named in the platform only, no official form number (Platform (current build)) | 4.18 | Proposed |
+| GS-F-43 | Graduation Endorsement List | No form named; graduation requirements, Handbook 2022-2023, p. 77 | 4.18 | Proposed |
+| GS-F-44 | Records Transmittal to the University Registrar | No form named; what the Registrar receives, Handbook 2022-2023, pp. 32, 49, 53 | 4.19 | Proposed |
+| GS-P-03 | Electronic Approval and Signature Policy | No document named; basis in RA 8792 s. 7-8 and the Protocol's use of e-signatures by email | 4.22 | Proposed |
+| GS-P-04 | Data Privacy Notice and Records Retention Schedule | No document named; basis in RA 10173 s. 11, 12 and 16 | 4.23 | Proposed |
+| GS-P-05 | Platform Access and Roles Matrix | No document named; the roles of the platform | 4.21 | Proposed |
+| GS-P-06 | AIMS and Registrar Data Exchange Specification | No document named; the proposed AIMS export contract and the platform's exports | 4.24 | Proposed |
+| GS-F-45 | Data Privacy Consent and Acknowledgement | No form named; paper twin of the first-sign-in notice | 4.23 | Proposed |
+| GS-F-46 | Platform Account and Role Request | No form named | 4.21 | Proposed |
+| GS-F-47 | Faculty Course Preference and Availability | No form named; the Academic Coordinator assigns professors (Consultation 21 July 2026) | 4.20 | Proposed |
+| GS-F-48 | Teaching Load Assignment | No form named | 4.20 | Proposed |
+| GS-F-49 | Request for Approved Absence | No form named; Approved Absence granted on the Dean's approval, Handbook 2022-2023, p. 52 | 4.5 | Proposed |
+| GS-F-50 | Incomplete Grade Removal Form | Incomplete Grade Removal Form, submitted to the Graduate School Office (gsm@usls.edu.ph) within the set deadline, Handbook 2022-2023, p. 54. Grades stay outside the platform: paper only | 4.5 | Official by name |
+| GS-F-51 | Application for Cross-enrollment | No form named; the Dean's written permission is the basis of the Registrar's permit, Handbook 2022-2023, p. 50 | 4.2 | Proposed |
+| GS-F-52 | Request for a Special Class | No form named; request by the Academic Coordinator through the Dean to the VCAA, Handbook 2022-2023, p. 48 | 4.3 | Proposed |
+| GS-F-53 | Request for Transfer between Master's Options | No form named; Dean's approval on the Academic Coordinator's recommendation, Handbook 2022-2023, p. 48 | 4.2 | Proposed |
+| GS-F-54 | Nomination for Best Thesis / Dissertation | No form named; Best Thesis/Dissertation Award, Handbook 2022-2023, pp. 76-77 | 4.18 | Proposed |
+
+**Other documents named in the sources**
+
+| Document | Name and use | Used in | Source |
 |---|---|---|---|
 | Admission Application Form | Admission Application Form (with two recommendation letters, ID picture, transcript of record, transfer credentials) | 4.1 Admission handoff and onboarding | Handbook 2022-2023, p. 42 |
 | Signed Undertaking Form / Recommendation Form / Essay Questionnaire | Admission forms downloaded from the Graduate School web page | 4.1 | Handbook 2022-2023, pp. 46-47 |
-| Advice Slip | Advice Slip from the Graduate School Office (adding subjects) and Advise Slip from the Dean (returnees) | 4.3, 4.7 | Handbook 2022-2023, pp. 45, 49 |
-| Withdrawal Form | Accomplished after the Dean approves the student's letter; copies to the Registrar, the Accounting Office and the student. The blank form was not available to the group. | 4.4 | Handbook 2022-2023, p. 49 |
-| Incomplete Grade Removal Form | Submitted to the Graduate School Office (gsm mailbox) within the set deadline | 4.5 | Handbook 2022-2023, p. 54 |
-| Application for the comprehensive examination | Filed with the Graduate Program Secretary at least two weeks before the examination, with the official receipt | 4.10 | Handbook 2022-2023, pp. 56-57 |
-| Cross-enrollment permit | Issued by the Registrar on the Dean's written permission | 4.2, 4.19 | Handbook 2022-2023, p. 50 |
-| Form 1 | Application for Title Defense | 4.11 step 1 | Handbook 2022-2023, p. 59 |
-| Form 2 | Report of Title Defense | 4.11 steps 5, 8-9 | Handbook 2022-2023, pp. 60-61 |
-| Form 3 | Application for Designation of Research Adviser | 4.12 step 1 | Handbook 2022-2023, p. 61 |
-| Form 3.1 | Appointment for Research Adviser | 4.12 steps 4-5 | Handbook 2022-2023, p. 61 |
-| Form 3.1.1 | Request for Change of Research Adviser | 4.12 | Handbook 2022-2023, p. 62 |
-| Form 3.2 | Research Timetable | 4.12 | Handbook 2022-2023, pp. 59, 61 |
-| Form 3.3 | Thesis/Dissertation Advising Contract | 4.12 | Handbook 2022-2023, p. 61 |
-| Form 3.4 | Request for Change of Title of the Study | 4.12 | Handbook 2022-2023, p. 62 |
-| Form 4 | Endorsement for Proposal/Final Defense | 4.13, 4.14 | Handbook 2022-2023, pp. 63, 65 |
-| Form 4.1 | Statistical Consultation Form (quantitative studies) | 4.13 | Handbook 2022-2023, p. 63 |
-| Form 4.2 | Co-authorship Information for Publication | 4.13 | Handbook 2022-2023, pp. 63-64 |
-| Form 4.3 | Endorsement for Public Defense | 4.14 | Handbook 2022-2023, p. 72 |
-| Form 5 | Comments Sheet for Proposal Defense | 4.13 | Handbook 2022-2023, p. 64 |
-| Form 5.1 | Technical Review Certificate | 4.13 | Handbook 2022-2023, p. 65 |
-| Form 5.2 | Application for Ethics Review | 4.13 | Handbook 2022-2023, p. 65 |
-| Form 6 | Comments Sheet for Final Defense | 4.14 | Handbook 2022-2023, p. 66 |
-| Form 7 | Evaluation Sheet for Final Defense | 4.14 | Handbook 2022-2023, p. 66 |
-| Form 8 | Settlement of Provisional Thesis/Dissertation Approval | 4.14 | Handbook 2022-2023, p. 67 |
-| Form 9 | Editor Certification | 4.15 | Handbook 2022-2023, p. 68 |
-| Form 10 | Approval Sheet | 4.15 | Handbook 2022-2023, p. 68 |
-| Form 11 | Formal Invitation to Co-Author Journal Article | 4.15 | Handbook 2022-2023, p. 75 |
-| Form 12 | Publication Information Form | 4.15 | Handbook 2022-2023, p. 75 |
-| Form 13 | Named in the Handbook as the form accomplished with the copy of the journal or certificate of publication; its title was not given in the sources | 4.15, 4.18 | Handbook 2022-2023, p. 75 |
-| Practicum agreement (MOA) | Memorandum of agreement with the practicum site; named in the group's process model only, no official form number | 4.17 | Group working notes, BPM accurate flow, section 11 |
-| Graduation application | Signed graduation application; named in the platform only, no official form number | 4.18 | Platform (current build) |
+| Cross-enrollment permit | Issued by the Registrar on the Dean's written permission (the student's application is GS-F-51) | 4.2, 4.19 | Handbook 2022-2023, p. 50 |
 
 ## Appendix B Glossary
 

@@ -128,6 +128,7 @@ OFFERING = Process(
         R("CRS-10", "The Dean approves the offering plan before it is published.", N("BPM accurate flow, section 3"), PROPOSED),
         R("CRS-11", "When the Academic Coordinator decides not to offer a subject, the platform shows which students would be delayed, so that the decision can be made with that information; the decision stays with the Academic Coordinator.", N("July 20 checklist, items 32, 33 and 86"), PROPOSED),
         R("CRS-12", "When assigning a professor the Academic Coordinator considers the professor's preferred subjects, availability, qualifications, current load and schedule conflicts; the platform only suggests.", N("July 20 checklist, items 36-40, 88-90"), PROPOSED),
+        R("CRS-13", "A special class is requested by the Academic Coordinator through the Dean and addressed to the Vice Chancellor for Academic Affairs; the fees for it are computed as the Handbook describes and the class follows the Blended Learning Mode of 32 contact hours plus independent study (see also ENR-07, CRS-04).", H("p. 48"), OFFICIAL),
     ],
     exceptions=[
         "A subject is not offered because demand is too low: affected students are advised to take another subject or wait; a special class may be requested through the Dean to the Vice Chancellor for Academic Affairs (Handbook 2022-2023, p. 48).",
