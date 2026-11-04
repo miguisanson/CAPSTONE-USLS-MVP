@@ -68,7 +68,7 @@
      ]
     },
     {
-     "text": "Scroll to the table of ranked panel candidates (the screen shows the top 11 candidates; the boxes **Search faculty**, **Specialization**, **Department / program** and **Availability** above it filter the list). Read the first rows: rank 1 **Dr. Liwayway Bautista** 95.9/100 (expertise 60/60, availability 23.4/25, workload 12.5/15; 5 conflict-free windows, 1 other student panel), rank 2 **Dr. Marlon Geronimo** 67.9/100 (37.6/60, 20.3/25, 10/15), rank 3 **Dr. Patricia Salvador** 52.1/100, rank 4 Dr. Daniel Uy 46.6/100, rank 6 **Dr. Teodoro Ramos** 37.2/100 (23.1/60, 14.1/25, 0/15) with the amber flag **Overloaded** (7 other student panels). The topic chips in each row (for example feedback, learning analytics, online courses for Dr. Bautista) are the terms the paper and the faculty records share. The green rows with the tag **Suggested** are the suggested panel: Chair Bautista, Content Specialist Geronimo, Method Specialist Ramos.",
+     "text": "Scroll to the table of ranked panel candidates (the screen shows the top 11 candidates; the boxes **Search faculty**, **Specialization**, **Department / program** and **Availability** above it filter the list). Read the first rows: rank 1 **Dr. Liwayway Bautista** (about 95/100 or a little less, with expertise 60/60), rank 2 **Dr. Marlon Geronimo** (about 65 to 68/100), rank 3 **Dr. Patricia Salvador** (about 50/100), then Dr. Daniel Uy, and rank 6 **Dr. Teodoro Ramos** (about 37/100) with the amber flag **Overloaded**. The exact scores, conflict-free windows and counts of other student panels move with the seed and the clock of the day, so read them off the screen; the order of the named seats is what stays. The topic chips in each row (for example feedback, learning analytics, online courses for Dr. Bautista) are the terms the paper and the faculty records share. The green rows with the tag **Suggested** are the suggested panel: Chair Bautista, Content Specialist Geronimo, Method Specialist Ramos.",
      "shots": [
       {
        "id": "panel_matching-05",
@@ -77,7 +77,7 @@
      ]
     },
     {
-     "text": "Click **Why this score** on rank 1. Read **How the score was built** (Expertise 60 / 60, Availability 23.4 / 25, Workload 12.5 / 15, Total 95.9 / 100), the sentence on how expertise is scaled across the candidate pool, and the line \"Method: Similarity match (keyword TF-IDF) (similarity 0.4869)\". Read **Passage of the paper that matched** and **Expertise records used**: research interests and a publication, each with the words that matched and the tag **Demo data**. Click **Hide why** again.",
+     "text": "Click **Why this score** on rank 1. Read **How the score was built** (Expertise 60 / 60, then Availability and Workload, adding up to a Total of about 95 / 100), the sentence on how expertise is scaled across the candidate pool, and the line \"Method: Similarity match (keyword TF-IDF) (similarity 0.4869)\". Read **Passage of the paper that matched** and **Expertise records used**: research interests and a publication, each with the words that matched and the tag **Demo data**. Click **Hide why** again.",
      "shots": [
       {
        "id": "panel_matching-06",
@@ -91,7 +91,7 @@
    "title": "Part B - Select the panel and finalize",
    "steps": [
     {
-     "text": "Scroll to **Review and adjust the panel set**. The suggested panel is preselected in the three seat lists: **Panel Chair** #1 Dr. Liwayway Bautista - 95.9/100, **Content Specialist** #2 Dr. Marlon Geronimo, **Method Specialist** #6 Dr. Teodoro Ramos - 37.2/100. Under **Panel composition rules** every check shows a tick: all 3 seats filled, every role seated once, a different faculty member in every seat, the adviser not on the panel, Dr. Bautista chairs the panel (University-affiliated faculty), no External Panel seat for a thesis, and Dr. Ramos has recorded research-methods expertise. The badge reads **Staff review**.",
+     "text": "Scroll to **Review and adjust the panel set**. The suggested panel is preselected in the three seat lists: **Panel Chair** #1 Dr. Liwayway Bautista, **Content Specialist** #2 Dr. Marlon Geronimo, **Method Specialist** #6 Dr. Teodoro Ramos. Under **Panel composition rules** every check shows a tick: all 3 seats filled, every role seated once, a different faculty member in every seat, the adviser not on the panel, Dr. Bautista chairs the panel (University-affiliated faculty), no External Panel seat at the Title Defense (the External Panel joins from the Proposal Defense), and Dr. Ramos has recorded research-methods expertise. The badge reads **Staff review**.",
      "shots": [
       {
        "id": "panel_matching-07",
@@ -100,7 +100,7 @@
      ]
     },
     {
-     "text": "To show that staff decide, open the **Content Specialist** list and choose **#3 Dr. Patricia Salvador - 52.1/100** instead of Dr. Geronimo. Keep Dr. Bautista as **Panel Chair** (this is how the chair is appointed: the seat named Panel Chair).",
+     "text": "To show that staff decide, open the **Content Specialist** list and choose **#3 Dr. Patricia Salvador** instead of Dr. Geronimo. Keep Dr. Bautista as **Panel Chair** (this is how the chair is appointed: the seat named Panel Chair).",
      "shots": [
       {
        "id": "panel_matching-08",
