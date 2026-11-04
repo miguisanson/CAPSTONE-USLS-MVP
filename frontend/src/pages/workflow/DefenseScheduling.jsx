@@ -11,6 +11,7 @@ import {
 import { api } from "../../api";
 import { Button, Card, Field, HistoryPanel, InlineNotice, Input, SectionCard, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import SlotCheck, { useSlotCheck } from "../../components/scheduling/SlotCheck";
+import TimeSlotSelect from "../../components/scheduling/TimeSlotSelect";
 import AvailabilityRequestPanel, { InvitationChip } from "../../components/scheduling/AvailabilityRequestPanel";
 import { availabilityLabel, isAvailabilityEntered } from "../../components/scheduling/dates";
 import { AvailabilityWorkspace } from "./AvailabilityWorkspace";
@@ -47,6 +48,12 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
   const [actionMessage, setActionMessage] = useState("");
   const [actionError, setActionError] = useState("");
   const [window, setWindow] = useState({ start: "", end: "" });
+  // Rooms already used for a defense (same list the calendar filter offers); a new room can still be typed.
+  const [usedVenues, setUsedVenues] = useState([]);
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    api.calendar({ start: today, end: today }).then((res) => setUsedVenues((res.filters?.venues || []).filter((v) => !/^https?:/i.test(v)))).catch(() => {});
+  }, []);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const panel = context.assigned_panel || [];
   const requiredPanelCount = context.panel_roles?.length || 4;
@@ -365,10 +372,10 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
             <Input type="date" value={form.preferred_date} min={availability.today || window.start} max={window.end} onChange={set("preferred_date")} required />
           </Field>
           <Field label="Start time" required>
-            <Input type="time" value={form.selected_start} onChange={set("selected_start")} required />
+            <TimeSlotSelect value={form.selected_start} onChange={(e) => setForm((f) => ({ ...f, selected_start: e.target.value, selected_end: f.selected_end && f.selected_end <= e.target.value ? "" : f.selected_end }))} required />
           </Field>
           <Field label="End time" required>
-            <Input type="time" value={form.selected_end} min={form.selected_start} onChange={set("selected_end")} required />
+            <TimeSlotSelect value={form.selected_end} after={form.selected_start} onChange={set("selected_end")} required />
           </Field>
           <Field label="Defense type" required>
             {schedulableTypes.length > 1 ? (
@@ -388,7 +395,8 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
           <Field label="Venue / meeting link">
             <div className="relative">
               <MapPin className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-500" aria-hidden="true" />
-              <Input className="pl-9" value={form.venue} onChange={set("venue")} placeholder="GS Conference Room / Zoom link" />
+              <Input className="pl-9" value={form.venue} onChange={set("venue")} placeholder="GS Conference Room / Zoom link" list="defense-venues" autoComplete="off" />
+              <datalist id="defense-venues">{usedVenues.map((room) => <option key={room} value={room} />)}</datalist>
             </div>
           </Field>
         </div>

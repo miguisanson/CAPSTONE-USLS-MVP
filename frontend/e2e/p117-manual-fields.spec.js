@@ -144,3 +144,42 @@ test.describe("Monitoring Sheet: no typed school year, checked ID and email", ()
     expect(resolves[0].edited.academic_year_entry).toBe("24-25");
   });
 });
+
+test.describe("Defense scheduling: venue pick, time slots, mode", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+  test.describe.configure({ timeout: 180_000 });
+
+  test("B-40 / B-41 / B-42: times are 30-minute slots, venue offers the rooms already used, mode is three choices", async ({ page }) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const calendar = await okJson(await page.request.get(`/api/calendar?start=${today}&end=${today}`), "calendar");
+    const rooms = (calendar.filters?.venues || []).filter((v) => !/^https?:/i.test(v));
+    await page.goto("/workflow/defense-scheduling?student_id=146");
+    const main = page.locator("main");
+    const start = main.getByLabel(/Start time/);
+    const end = main.getByLabel(/End time/);
+    expect(await start.evaluate((el) => el.tagName)).toBe("SELECT");
+    expect(await end.evaluate((el) => el.tagName)).toBe("SELECT");
+    const startValues = await start.locator("option").evaluateAll((os) => os.map((o) => o.value).filter(Boolean));
+    expect(startValues[0]).toBe("08:00");
+    expect(startValues).toContain("08:30");
+    expect(startValues.at(-1)).toBe("16:30");
+    await start.selectOption("09:00");
+    const endValues = await end.locator("option").evaluateAll((os) => os.map((o) => o.value).filter(Boolean));
+    expect(endValues[0]).toBe("09:30");
+    expect(endValues.at(-1)).toBe("17:00");
+    await end.selectOption("11:00");
+    await start.selectOption("11:30"); // a start later than the chosen end clears the end
+    await expect(end).toHaveValue("");
+    // mode: three choices only
+    const mode = main.getByLabel(/^Mode/);
+    expect(await mode.locator("option").allTextContents()).toEqual(["On-site", "Online", "Hybrid"]);
+    // venue: free text still allowed, but the rooms already used are offered
+    const venue = main.getByLabel(/Venue/);
+    const listId = await venue.getAttribute("list");
+    expect(listId, "venue input has a datalist").toBeTruthy();
+    const offered = await page.locator(`datalist#${listId} option`).evaluateAll((os) => os.map((o) => o.value));
+    expect(offered).toEqual(rooms);
+    await venue.fill("A brand new room");
+    await expect(venue).toHaveValue("A brand new room");
+  });
+});
