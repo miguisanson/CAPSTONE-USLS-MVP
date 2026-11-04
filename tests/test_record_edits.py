@@ -26,6 +26,7 @@ from app import (  # noqa: E402
     LeaveCaseEvent,
     Program,
     RecordEdit,
+    ResearchCase,
     ScheduleRequest,
     Student,
     UserAccount,
@@ -366,7 +367,17 @@ class RecordEditTests(unittest.TestCase):
         with app.app_context():
             verdict = db.session.get(DefenseVerdict, verdict_id)
             self.assertEqual(verdict.remarks, "Good work")
-            verdict.revision_status = app_module.REVISION_SUBMITTED
+        with app.app_context():
+            db.session.add(ResearchCase(student_id=self.student_id, case_type="Thesis", title="Wrng title",
+                                        current_gate="Title Defense", status="Open"))
+            verdict = db.session.get(DefenseVerdict, verdict_id)
+            verdict.selected_title = "Wrng title"
+            db.session.commit()
+        title = self.patch(chair, "defense_verdict", verdict_id, "selected_title", "Wrong title fixed", "typo")
+        self.assertEqual(title.status_code, 200, title.get_json())
+        with app.app_context():
+            self.assertEqual(ResearchCase.query.filter_by(student_id=self.student_id).one().title, "Wrong title fixed")
+            db.session.get(DefenseVerdict, verdict_id).revision_status = app_module.REVISION_SUBMITTED
             db.session.commit()
         refused = self.patch(chair, "defense_verdict", verdict_id, "remarks", "Again", "typo")
         self.assertEqual(refused.status_code, 409)

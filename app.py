@@ -5372,6 +5372,14 @@ def _apply_leave_target(case, term):
     case.target_term_id, case.target_label = term.id, term.label
 
 
+def _apply_verdict_title(verdict, text):
+    """The panel's chosen title is also the study's title, so a corrected pick follows it there."""
+    case = ResearchCase.query.filter_by(student_id=verdict.student_id).first()
+    if case and case.title == verdict.selected_title:
+        case.title = text
+    verdict.selected_title = verdict.research_title = text
+
+
 def _term_options(*_):
     return [term.label for term in AcademicTerm.query.order_by(AcademicTerm.start_date).all()]
 
@@ -5440,6 +5448,10 @@ def _build_editable() -> dict:
                 "dean_remarks": _note("Dean remarks", ("dean",)),
             },
         },
+        "residency_enrollment": {
+            "model": ResidencyEnrollment, "student": lambda r: r.student_id, "slug": lambda r: "awol",
+            "request": lambda r: r.id, "fields": {"staff_notes": _note("Staff notes")},
+        },
         "withdrawal_application": {
             "model": WithdrawalApplication, "student": lambda r: r.student_id, "slug": lambda r: "withdrawal",
             "request": lambda r: r.id,
@@ -5493,7 +5505,8 @@ def _build_editable() -> dict:
             "request": lambda r: r.schedule_request_id,
             "fields": {
                 "remarks": _f("verdict", label="Panel remarks", check=_edit_text(blank=True)),
-                "selected_title": _f("verdict", label="Title selected by the panel", multiline=False, check=_edit_text(220)),
+                "selected_title": _f("verdict", label="Title selected by the panel", multiline=False, check=_edit_text(220),
+                                    apply=_apply_verdict_title),
             },
         },
     }
@@ -5629,6 +5642,16 @@ def apply_record_edit(account, entity: str, row_id: int, field: str, value, reas
             notes=f"{account.full_name} changed the {fspec['label'].lower()}." + (f" Reason: {reason}" if reason else ""),
         ))
     return edit
+
+
+def attach_row_edits(rows: list[dict], entity: str, record, fields: dict) -> list[dict]:
+    """Give summary rows an `edit` reference: {row label: field name}."""
+    marks = record_edit_marks(entity, record.id)
+    for row in rows:
+        field = fields.get(row["label"])
+        if field:
+            row["edit"] = record_edit_ref(entity, record, field, marks)
+    return rows
 
 
 def record_edit_dict(item: RecordEdit) -> dict:
@@ -9382,10 +9405,13 @@ def withdrawal_process_case(application: WithdrawalApplication, role: str = "sta
         {"label": "Filed", "value": iso(application.created_at), "date": True},
         {"label": "Dean decided", "value": iso(application.decided_at), "date": True},
         {"label": "Staff notes", "value": application.staff_remarks or "None", "full": True},
+        {"label": "Dean remarks", "value": application.dean_remarks or "None", "full": True},
     ]
+    attach_row_edits(payload["summary_rows"], "withdrawal_application", application,
+                     {"Reason": "reason", "Staff notes": "staff_remarks", "Dean remarks": "dean_remarks"})
     student_view = _lw.role_key(role) == "student"
     if student_view:
-        payload["summary_rows"] = [row for row in payload["summary_rows"] if row["label"] != "Staff notes"]
+        payload["summary_rows"] = [row for row in payload["summary_rows"] if row["label"] not in {"Staff notes", "Dean remarks"}]
     checks = []
     if window:
         checks.append({"label": "Withdrawal window", "status": "Pass" if window["eligible"] else "Needs Review",
@@ -9506,10 +9532,14 @@ def awol_process_case(item: AwolCase, role: str = "staff", detail: bool = False)
         {"label": "Dean decision", "value": item.dean_decision},
         {"label": "Dean decided", "value": iso(item.decided_at), "date": True},
         {"label": "Staff notes", "value": item.staff_notes or "None", "full": True},
+        {"label": "Dean remarks", "value": item.dean_remarks or "None", "full": True},
     ]
+    attach_row_edits(payload["summary_rows"], "awol_case", item,
+                     {"Student's written intention": "return_intent", "Reason for return": "return_reason",
+                      "Staff notes": "staff_notes", "Dean remarks": "dean_remarks"})
     student_view = _lw.role_key(role) == "student"
     if student_view:
-        payload["summary_rows"] = [row for row in payload["summary_rows"] if row["label"] != "Staff notes"]
+        payload["summary_rows"] = [row for row in payload["summary_rows"] if row["label"] not in {"Staff notes", "Dean remarks"}]
     if not student_view:
         review = awol_policy_review(student, {
             "workflow_action": "return_from_awol",
@@ -9598,6 +9628,7 @@ def residency_process_case(item: ResidencyEnrollment, role: str = "staff", detai
         {"label": "Closed", "value": iso(item.ended_at), "date": True},
         {"label": "Staff notes", "value": item.staff_notes or "None", "full": True},
     ]
+    attach_row_edits(payload["summary_rows"], "residency_enrollment", item, {"Staff notes": "staff_notes"})
     if _lw.role_key(role) == "student":
         payload["summary_rows"] = [row for row in payload["summary_rows"] if row["label"] != "Staff notes"]
     else:
