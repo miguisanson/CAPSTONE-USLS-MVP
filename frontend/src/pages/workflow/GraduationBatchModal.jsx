@@ -26,6 +26,13 @@ function defaultGraduationBatchForm(rows = [], allRows = rows) {
   };
 }
 
+// The batch year is one of the two calendar years of the graduation school year ("AY 2026-2027"); a year already saved stays offered.
+function batchYears(schoolYear, current) {
+  const match = /(\d{4})\s*-\s*(\d{4})/.exec(schoolYear || "");
+  const years = match ? [match[1], match[2]] : [String(new Date().getFullYear())];
+  return current && !years.includes(String(current)) ? [String(current), ...years] : years;
+}
+
 function graduationBatchName(form) {
   return `Batch ${form.batch_no || "1"} ${form.batch_month || GRADUATION_BATCH_MONTHS[new Date().getMonth()]} ${form.batch_year || new Date().getFullYear()}`;
 }
@@ -145,7 +152,7 @@ export function GraduationBatchModal({ rows, allRows, accountRole, reviewWindows
             <div className="grid gap-3 sm:grid-cols-4">
               <Field label="Batch No."><Input value={form.batch_no} onChange={update("batch_no")} inputMode="numeric" /></Field>
               <Field label="Month"><select value={form.batch_month} onChange={update("batch_month")} className="field-input cursor-pointer">{GRADUATION_BATCH_MONTHS.map((month) => <option key={month}>{month}</option>)}</select></Field>
-              <Field label="Year"><Input value={form.batch_year} onChange={update("batch_year")} inputMode="numeric" /></Field>
+              <Field label="Year"><Select value={form.batch_year} onChange={update("batch_year")} options={batchYears(activeReviewWindow, form.batch_year)} placeholder="" /></Field>
               {activeReviewWindow ? (
                 <Field label="Graduation school year" hint="Only the current school year can be used."><p aria-label="Graduation school year" className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">{activeReviewWindow}</p></Field>
               ) : (

@@ -19,6 +19,10 @@ function scheduleMeetings(value) {
 // Course Offering Setup (Sir Eddie, 2026-07-21): the Academic Coordinator declares which
 // subjects are offered for a program + semester, assigns faculty and schedule, and those
 // offerings are what students get tagged/enrolled into on the Enrollment screen.
+// Sections are letters A to Z; a section already saved in another form stays offered so nothing is lost.
+const LETTERS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
+const sectionLetters = (current) => (current && !LETTERS.includes(current) ? [current, ...LETTERS] : LETTERS);
+
 export default function CourseOfferings() {
   const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -193,7 +197,7 @@ export default function CourseOfferings() {
       key: "section",
       header: "Section",
       cell: (o) => canManage
-        ? <Input disabled={Boolean(busy)} value={editOf(o).section} onChange={(ev) => setEdit(o.id, "section", ev.target.value)} placeholder="A" aria-label={`Section for ${o.code}`} className="max-w-20" />
+        ? <Select disabled={Boolean(busy)} value={editOf(o).section} onChange={(ev) => setEdit(o.id, "section", ev.target.value)} options={sectionLetters(editOf(o).section)} placeholder="—" aria-label={`Section for ${o.code}`} className="max-w-24" />
         : (o.section || <span className="text-slate-500">—</span>),
     },
     { key: "enrolled", header: "Enrolled", align: "center", cell: (o) => <span className="font-semibold text-ink">{o.enrolled_count}</span> },

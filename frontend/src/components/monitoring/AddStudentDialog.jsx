@@ -3,7 +3,7 @@ import { UserPlus } from "lucide-react";
 import { api } from "../../api";
 import { Button, Field, InlineNotice, Input, Modal, Select } from "../ui/index.js";
 import AyEntrySelect from "./AyEntrySelect";
-import { emailProblem, facultyOptions, studentIdWarning, useActiveFaculty } from "./knownData";
+import { emailProblem, nameProblem, facultyOptions, studentIdWarning, useActiveFaculty } from "./knownData";
 
 const EMPTY = {
   student_number: "",
@@ -37,6 +37,8 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
 
   const idWarning = studentIdWarning(form.student_number);
   const emailError = emailProblem(form.email);
+  const firstError = nameProblem(form.first_name);
+  const lastError = nameProblem(form.last_name);
 
   async function submit(event, confirmDuplicate = false, idOk = false) {
     event?.preventDefault();
@@ -63,7 +65,7 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
   }
 
   const ready = form.student_number.trim() && form.first_name.trim() && form.last_name.trim()
-    && form.program_id && form.academic_year_entry.trim() && !emailError;
+    && form.program_id && form.academic_year_entry.trim() && !emailError && !firstError && !lastError;
 
   // Two states in one window: the form, then the result (login and first password) once the student is created.
   const footer = created ? (
@@ -110,10 +112,10 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
             <Field label="Program" required>
               <Select value={form.program_id} onChange={set("program_id")} required options={programs.map((p) => ({ value: String(p.id), label: `${p.code} — ${p.name}` }))} placeholder="Choose program" />
             </Field>
-            <Field label="First name" required>
+            <Field label="First name" required error={firstError || undefined}>
               <Input value={form.first_name} onChange={set("first_name")} required maxLength={80} autoComplete="off" />
             </Field>
-            <Field label="Last name" required>
+            <Field label="Last name" required error={lastError || undefined}>
               <Input value={form.last_name} onChange={set("last_name")} required maxLength={80} autoComplete="off" />
             </Field>
             <Field label="School year / AY entry" required hint="Starts as the current semester's school year.">

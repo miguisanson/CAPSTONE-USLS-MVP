@@ -36,6 +36,9 @@ import DetailsDrawer from "./courseAdjustments/DetailsDrawer";
 const STEPS = ["Draft", "Submitted", "Approved", "Published"];
 
 // The page's title, tabs and rules block belong to CoursePlanning; this is the "Demand & adjustments" screen.
+// No course here runs more than six sections; a larger suggestion from the demand count is still allowed.
+const MOST_SECTIONS = 6;
+
 export default function CourseAdjustments() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProgramId = searchParams.get("program_id") || "";
@@ -306,6 +309,8 @@ export default function CourseAdjustments() {
             <Input
               type="number"
               min="0"
+              max={Math.max(MOST_SECTIONS, Number(row.suggested_sections) || 0)}
+              step="1"
               value={s.sections}
               onChange={(e) => updateSections(row, e.target.value)}
               disabled={!canEdit}

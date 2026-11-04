@@ -57,6 +57,12 @@ export function studentIdWarning(value) {
   return !text || /^\d{7}$/.test(text) ? "" : "Student IDs are 7 digits, for example 1860101.";
 }
 
+/** "" when blank or only letters, spaces, hyphens, apostrophes and full stops, else a message. */
+export function nameProblem(value) {
+  const text = (value || "").trim();
+  return !text || /^[\p{L}\p{M}][\p{L}\p{M}\s.'’-]*$/u.test(text) ? "" : "Use letters only (spaces, hyphens and apostrophes are fine).";
+}
+
 /** "" when blank or shaped like name@domain.tld, else a message. Stricter than the old "@" check. */
 export function emailProblem(value) {
   const text = (value || "").trim();

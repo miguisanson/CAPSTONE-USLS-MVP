@@ -481,7 +481,7 @@ function ExpertiseEditor({ faculty, onChanged }) {
             <form key={item.id} onSubmit={saveEdit} className="grid gap-2 rounded-lg border border-brand-200 bg-brand-50/40 p-3 sm:grid-cols-[170px_1fr_100px_auto]">
               <Select aria-label="Kind of record" placeholder="" value={editDraft.kind} onChange={(event) => setEditDraft({ ...editDraft, kind: event.target.value })} options={kindOptions} />
               <Textarea aria-label="Record text" rows={2} value={editDraft.text} onChange={(event) => setEditDraft({ ...editDraft, text: event.target.value })} />
-              <Input aria-label="Year" type="number" placeholder="Year" value={editDraft.year} onChange={(event) => setEditDraft({ ...editDraft, year: event.target.value })} />
+              <Input aria-label="Year" type="number" min="1950" max={new Date().getFullYear()} placeholder="Year" value={editDraft.year} onChange={(event) => setEditDraft({ ...editDraft, year: event.target.value })} />
               <div className="flex items-start gap-2"><Button type="submit" size="sm" icon={Save} disabled={busy}>Save</Button><Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>Cancel</Button></div>
             </form>
           ) : (
@@ -505,7 +505,7 @@ function ExpertiseEditor({ faculty, onChanged }) {
           <form onSubmit={add} className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[170px_1fr_100px_auto]">
             <Select aria-label="Kind of new record" placeholder="" value={draft.kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value })} options={kindOptions} />
             <Input aria-label="Text of new record" value={draft.text} onChange={(event) => setDraft({ ...draft, text: event.target.value })} placeholder={EXPERTISE_KIND_HINTS[draft.kind] || "Describe the expertise"} required minLength={5} maxLength={600} />
-            <Input aria-label="Year of new record" type="number" min="1950" value={draft.year} onChange={(event) => setDraft({ ...draft, year: event.target.value })} placeholder="Year" />
+            <Input aria-label="Year of new record" type="number" min="1950" max={new Date().getFullYear()} value={draft.year} onChange={(event) => setDraft({ ...draft, year: event.target.value })} placeholder="Year" />
             <Button type="submit" icon={Plus} disabled={busy || draft.text.trim().length < 5}>Add record</Button>
           </form>
         </div>

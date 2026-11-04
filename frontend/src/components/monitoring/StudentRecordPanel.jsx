@@ -9,7 +9,7 @@ import { formatDateTime } from "../../lib/format";
 import ProvenanceBadge from "./ProvenanceBadge";
 import ReasonDialog from "./ReasonDialog";
 import AyEntrySelect from "./AyEntrySelect";
-import { emailProblem, facultyOptions, normalizeAyEntry, studentIdWarning, useActiveFaculty } from "./knownData";
+import { emailProblem, nameProblem, facultyOptions, normalizeAyEntry, studentIdWarning, useActiveFaculty } from "./knownData";
 
 const TABS = [
   { id: "subjects", label: "Subjects", icon: ListChecks },
@@ -561,7 +561,7 @@ function DetailsTab({ data, canEdit, termLabels, studentValues, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const idWarning = studentIdWarning(form.student_number);
-  const emailError = emailProblem(form.email);
+  const emailError = emailProblem(form.email) || nameProblem(form.first_name) || nameProblem(form.last_name);
   const dirty = !emailError && (adviserChanged || Object.keys(initial).some((key) => form[key] !== initial[key]));
   const stopEditing = () => { setEditing(false); setForm(initial); setAdviserPick(null); };
 
@@ -621,8 +621,8 @@ function DetailsTab({ data, canEdit, termLabels, studentValues, onChanged }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Student ID" required hint={idWarning || undefined}><Input autoFocus value={form.student_number} onChange={set("student_number")} required maxLength={40} inputMode="numeric" autoComplete="off" /></Field>
         <Field label="School year / AY entry" required><AyEntrySelect value={form.academic_year_entry} onChange={set("academic_year_entry")} termLabels={termLabels} studentValues={studentValues} required /></Field>
-        <Field label="First name" required><Input value={form.first_name} onChange={set("first_name")} required maxLength={80} /></Field>
-        <Field label="Last name" required><Input value={form.last_name} onChange={set("last_name")} required maxLength={80} /></Field>
+        <Field label="First name" required error={nameProblem(form.first_name) || undefined}><Input value={form.first_name} onChange={set("first_name")} required maxLength={80} /></Field>
+        <Field label="Last name" required error={nameProblem(form.last_name) || undefined}><Input value={form.last_name} onChange={set("last_name")} required maxLength={80} /></Field>
         <Field label="Email (student login)" required error={emailError || undefined}><Input type="email" value={form.email} onChange={set("email")} required maxLength={160} /></Field>
         <Field label="Adviser" hint={loaded && !matched && student.adviser_name ? `${student.adviser_name} is not a faculty record. Choose one, or leave it as it is.` : undefined}>
           <Select value={adviserPick ?? matchedId} onChange={(e) => setAdviserPick(e.target.value)} options={facultyOptions(faculty)} placeholder="No adviser yet" />

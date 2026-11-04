@@ -9,7 +9,7 @@ import {
 import { api } from "../../api";
 import { Button, Field, InlineNotice, Input, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
-import { formatDate } from "../../lib/format";
+import { formatDate, tomorrowISO } from "../../lib/format";
 import { PAGE } from "../../lib/labels.js";
 import { BOOKABLE_DEFENSES, defenseScheduleDone, defenseToRequest } from "../../lib/studentHome.js";
 import { ErrorSummary, useFormErrors, useSubmitRequest, SubmitState, isLiveSchedule } from "./shared";
@@ -83,7 +83,7 @@ export function ResearchRequestForm({ data, onSaved }) {
       </div>
       {askTitle && (
         <Field label="Research title from uploaded Form 1" required hint="This fills automatically after the Form 1 application PDF is uploaded below." error={messageFor("research-title")}>
-          <Input id="research-title" value={form.research_title} onChange={set("research_title")} placeholder="Upload Form 1 below to auto-fill" />
+          <Input id="research-title" maxLength={220} value={form.research_title} onChange={set("research_title")} placeholder="Upload Form 1 below to auto-fill" />
           {prefillNote && <p className="meta mt-1 font-medium text-brand-700">{prefillNote}</p>}
         </Field>
       )}
@@ -419,7 +419,7 @@ export function ScheduleRequestForm({ data, onSaved }) {
         <fieldset disabled={closed} className="space-y-4 disabled:opacity-60">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Preferred date" required error={messageFor("schedule-date")}>
-              <Input id="schedule-date" type="date" value={form.preferred_date} onChange={set("preferred_date")} />
+              <Input id="schedule-date" type="date" min={tomorrowISO()} value={form.preferred_date} onChange={set("preferred_date")} />
             </Field>
             <div className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
               <p className="eyebrow">Defense type</p>

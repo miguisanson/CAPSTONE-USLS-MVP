@@ -51,7 +51,11 @@ test.describe("Monitoring Sheet: no typed school year, checked ID and email", ()
 
     const program = add.locator("select").first();
     if (!(await program.inputValue())) await program.selectOption({ index: 1 });
+    await add.getByLabel("First name").fill("Sp3c");
+    await expect(add.getByText("Use letters only")).toBeVisible(); // B-03
+    await expect(add.getByRole("button", { name: "Add student", exact: true })).toBeDisabled();
     await add.getByLabel("First name").fill("Spec");
+    await expect(add.getByText("Use letters only")).toHaveCount(0);
     await add.getByLabel("Last name").fill("Picker");
     await year.selectOption(`${String(oldest).slice(2)}-${String(oldest + 1).slice(2)}`);
 
@@ -239,5 +243,91 @@ test.describe("Student practicum hours", () => {
     await expect(page.getByRole("dialog", { name: "Send this request?" })).toBeVisible();
     await context.unrouteAll({ behavior: "ignoreErrors" });
     await context.close();
+  });
+});
+
+async function studentFormPage(browser, mutate) {
+  const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width: 1366, height: 768 } });
+  const res = await context.request.post("/api/auth/login", { data: { email: "student@usls.edu.ph", password: PASSWORD } });
+  expect(res.ok()).toBeTruthy();
+  await context.route("**/api/student-portal/context", async (route) => {
+    const response = await route.fetch();
+    const d = await response.json();
+    mutate(d);
+    await route.fulfill({ response, json: d });
+  });
+  const page = await context.newPage();
+  return { context, page };
+}
+
+test.describe("Student forms: no wrong date, no over-long title", () => {
+  test("B-18: the preferred defense date cannot be today or earlier", async ({ browser }) => {
+    const { context, page } = await studentFormPage(browser, (d) => {
+      d.research_case = { ...(d.research_case || {}), id: 1, title: "Spec Saved Title", status: "Pending" };
+      d.panel = [{ id: 1, faculty_name: "Dr. Panel One", panel_role: "Panel Chair", specialization: "Spec" }];
+      const stages = [{ name: "Title Defense", gate: "Form 1 - Title Defense", complete: true, status: "Passed" }, { name: "Proposal Defense", gate: "Form 4", complete: false, status: "Pending" }];
+      d.research_progress = { gate: "Form 4", stage: "Proposal Defense", stage_index: 1, status: "Pending", stages, milestone: { value: "Form 4", label: "Spec", short_label: "Spec", description: "Spec.", student_uploads_ready: true, student_missing_count: 0, overall_complete: false, requirements: [] } };
+      d.schedules = [];
+      d.defense_follow_up = null;
+    });
+    await page.goto("/student/defense-schedule");
+    const date = page.locator("#schedule-date");
+    const tomorrow = await page.evaluate(() => { const d = new Date(Date.now() + 86400000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; });
+    await expect(date).toHaveAttribute("min", tomorrow);
+    await context.unrouteAll({ behavior: "ignoreErrors" });
+    await context.close();
+  });
+
+  test("B-15: the research title box stops at 220 characters (the length the record keeps)", async ({ browser }) => {
+    const { context, page } = await studentFormPage(browser, (d) => {
+      d.research_case = { ...(d.research_case || {}), id: 1, title: "Research title pending Form 1 submission", status: "Pending" };
+      d.panel = [];
+      const stages = [{ name: "Title Defense", gate: "Form 1 - Title Defense", complete: false, status: "Pending" }];
+      d.research_progress = { gate: "Form 1 - Title Defense", stage: "Title Defense", stage_index: 0, status: "Pending", stages, milestone: { value: "Form 1 - Title Defense", label: "Spec", short_label: "Spec", description: "Spec.", student_uploads_ready: true, student_missing_count: 0, overall_complete: false, requirements: [] } };
+    });
+    await page.goto("/student/research");
+    await expect(page.locator("#research-title")).toHaveAttribute("maxlength", "220");
+    await context.unrouteAll({ behavior: "ignoreErrors" });
+    await context.close();
+  });
+});
+
+test.describe("Staff pages: sections, years, colleges", () => {
+  test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+  test.describe.configure({ timeout: 180_000 });
+
+  test("B-38: an offering's section is a pick, A to Z", async ({ browser }) => {
+    const context = await browser.newContext({ storageState: authFile("academic-coordinator"), baseURL: BASE_URL, viewport: { width: 1366, height: 768 } });
+    const page = await context.newPage();
+    await page.goto("/course-offerings");
+    const section = page.locator('[aria-label^="Section for "]').first();
+    await expect(section).toBeVisible();
+    expect(await section.evaluate((el) => el.tagName)).toBe("SELECT");
+    const values = await section.locator("option").evaluateAll((os) => os.map((o) => o.value).filter(Boolean));
+    expect(values.slice(0, 3)).toEqual(["A", "B", "C"]);
+    expect(values.at(-1)).toBe("Z");
+    await context.close();
+  });
+
+  test("B-39: sections per course are whole numbers with an upper limit", async ({ page }) => {
+    await page.goto("/course-adjustments");
+    const sections = page.locator('input[aria-label^="Sections for "]').first();
+    await expect(sections).toBeVisible();
+    await expect(sections).toHaveAttribute("max", /^\d+$/);
+    await expect(sections).toHaveAttribute("step", "1");
+  });
+
+  test("B-50: the panel-matching department filter is a pick of the colleges listed", async ({ page }) => {
+    await page.goto("/workflow/panel-matching?student_id=146");
+    const college = page.locator("main").getByLabel("Department / program");
+    await expect(college).toBeVisible();
+    expect(await college.evaluate((el) => el.tagName)).toBe("SELECT");
+  });
+
+  test("B-68: an expertise record's year cannot be after this year", async ({ page }) => {
+    await page.goto("/faculty");
+    await page.locator("main table tbody tr").first().getByRole("button").first().click();
+    const year = page.getByLabel("Year of new record");
+    await expect(year).toHaveAttribute("max", String(new Date().getFullYear()));
   });
 });
