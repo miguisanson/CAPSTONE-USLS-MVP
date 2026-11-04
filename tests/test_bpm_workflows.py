@@ -898,6 +898,26 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertNotEqual(endorsement.registrar_status, "Exported - Ready to Send")
             self.assertFalse(endorsement.dean_remarks)
 
+    def test_dean_single_graduation_decision_needs_the_dean_step(self):
+        with app.app_context():
+            application_file = self._attachment("graduation", "audit-research2-03")
+            record = GraduationEndorsement(
+                student_id=self.student_id,
+                request_attachment_id=application_file.id,
+                batch_name="Batch audit",
+                review_window="AY 2026-2027",
+                endorsement_status="Coursework Review",
+            )
+            db.session.add(record)
+            db.session.commit()
+            record_id = record.id
+            for decision in ("approve", "return"):
+                response = self._dean_client().post(
+                    f"/api/approvals/workflow/graduation/{record_id}/decide", json={"decision": decision, "note": "x"})
+                self.assertEqual(response.status_code, 400, response.get_json())
+                self.assertIn("not ready for Dean review", response.get_json()["error"])
+            self.assertEqual(db.session.get(GraduationEndorsement, record_id).endorsement_status, "Coursework Review")
+
     def test_graduation_incomplete_coursework_and_research_are_routed_to_staff(self):
         with app.app_context():
             staff = self._staff_client()

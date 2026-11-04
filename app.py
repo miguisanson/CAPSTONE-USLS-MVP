@@ -18467,6 +18467,8 @@ def register_routes(app: Flask) -> None:
 
         elif case_type == "graduation":
             endorsement = GraduationEndorsement.query.get_or_404(item_id)
+            if endorsement.endorsement_status != "Ready for Dean Review":
+                return jsonify({"error": "Candidate is not ready for Dean review."}), 400
             if not graduation_eligibility(endorsement.student)["eligible"]:
                 return jsonify({"error": "Only students who completed every graduation requirement can be reviewed here."}), 400
             previous_status = endorsement.endorsement_status
