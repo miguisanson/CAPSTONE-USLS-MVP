@@ -375,6 +375,16 @@ class AwolRegistrarHandoffTests(Audit4Base):
             self.assertEqual(step.get_json()["case"]["registrar_status"], target)
 
 
+    def test_the_board_row_carries_the_registrar_status_for_the_registrar_list(self):
+        # The AWOL board's Registrar list (same component as LOA / readmission) reads row["registrar"].
+        from app import AwolCase, awol_process_case
+        case_id = self.approved_case()
+        self.client("staff").get(f"/api/awol/{case_id}/registrar-report")
+        with app.app_context():
+            row = awol_process_case(db.session.get(AwolCase, case_id), "staff")
+            self.assertEqual(row["registrar"]["status"], "Exported - Ready to Send")
+            self.assertTrue(row["registrar"]["exported_at"])
+
 class DemoDataAgeNoticeTests(Audit4Base):
     """I-332: staff are told when the demo data is old (the withdrawal window closes about 11 days after a seed)."""
 

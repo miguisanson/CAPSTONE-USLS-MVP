@@ -9721,7 +9721,10 @@ def awol_process_case(item: AwolCase, role: str = "staff", detail: bool = False)
         "flags": flags,
         "reason_category": "",
         "batch_name": None,
-        "registrar": {"status": "", "exported_at": None, "sent_at": None, "acknowledged_at": None},
+        "registrar": {  # I-296: the AWOL board's Registrar list reads this, like LOA and readmission
+            "status": item.registrar_status or "", "exported_at": iso(item.registrar_exported_at),
+            "sent_at": iso(item.registrar_sent_at), "acknowledged_at": iso(item.registrar_acknowledged_at),
+        },
         "actions": process_actions_for("awol", _sp.KIND_AWOL, item.status, role, item),
         "timeline": _sp.timeline_steps("awol", _sp.KIND_AWOL, item.status, {row["new_status"] for row in logs if row.get("new_status")}),
         "unresolved_messages": open_messages,
