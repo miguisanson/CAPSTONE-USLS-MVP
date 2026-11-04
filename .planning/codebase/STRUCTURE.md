@@ -45,9 +45,9 @@ CAPSTONE-USLS-MVP/
 | `outputs/` | **Not referenced by the app; tracked scratch** | 124 tracked files, 27 MB: screenshots, `.ndjson` workbook dumps, a `~$` Word/Excel lock file (`outputs/class-list-demo-miguel-sanson/~$MAED_Class_List_Demo_Miguel_Sanson.xlsx`), GUID-named folders. Only generators write to it: `scripts/build_class_list_demo.mjs:5` (`outputs/class-list-demo-miguel-sanson`) and `scripts/capture_walkthrough_screenshots.py:36` (`outputs/walkthrough_screenshots`). `app.py`, `tests/`, `package.json` do not reference it. Candidate to untrack and ignore. |
 | `.codex/` | **Obsolete** | Holds copies of two skills (`.codex/skills/intelligence-layer`, `.codex/skills/ui-ux-pro-max`, 30 tracked files) plus `.codex/local-server.pid` (tracked, `git check-ignore` says not ignored). No reference in `app.py`, `scripts/`, `tests/`, `package.json`, `AGENTS.md` or `CLAUDE.md`. Codex is no longer used by the owner; the live copies are in `.claude/skills/`. |
 | `__pycache__/` (root, `scripts/`, `tests/`) | Generated, gitignored | Root holds both `app.cpython-312.pyc` and `app.cpython-314.pyc` (two Python versions have run here). |
-| `Documents/CAPSTONE_ONLY/CAPRIT2 OLD/` | Archive, do not use as spec | AGENTS.md line 23; do not edit. |
+| `Documents/Archive/CAPRIT2 OLD/` | Archive, do not use as spec | AGENTS.md line 23; do not edit. |
 | `uploads/monitoring_sheets/*`, `uploads/policy_documents/*` | Live path, partly committed | `MONITORING_UPLOAD_ROOT`, `POLICY_DOCUMENT_UPLOAD_ROOT` (`app.py:68-83`); 17 + 2 tracked files (the committed seed library); `.gitignore` covers only `research_evidence/` and `student_requests/`. |
-| `~$*.xlsx` lock files | Junk lock files tracked | e.g. `Documents/Faculty_Sheet/~$Faculty_Roster.xlsx` is present; remove from git. |
+| `~$*.xlsx` lock files | Junk lock files tracked | e.g. `Documents/Sample_Data/Faculty_Sheet/~$Faculty_Roster.xlsx` is present; remove from git. |
 
 ## Directory Purposes
 
@@ -83,7 +83,7 @@ CAPSTONE-USLS-MVP/
 
 **Tests:** `tests/test_<area>.py`; set `DATABASE_URL`, `POLICY_DOCUMENT_UPLOAD_DIR`, `RAG_INDEX_DIR` to temp values before `import app` (copy the header of `tests/test_bpm_workflows.py`).
 
-**Seed/demo data:** static data in `panel_demo_data.py`; spreadsheets in `Documents/Monitoring_Sheets` or `Documents/Faculty_Sheet`; code in the `seed_*`/`ensure_demo_*` block `app.py:34480-37340`.
+**Seed/demo data:** static data in `panel_demo_data.py`; spreadsheets in `Documents/Sample_Data/Monitoring_Sheets` or `Documents/Sample_Data/Faculty_Sheet`; code in the `seed_*`/`ensure_demo_*` block `app.py:34480-37340`.
 
 ## Special Directories
 

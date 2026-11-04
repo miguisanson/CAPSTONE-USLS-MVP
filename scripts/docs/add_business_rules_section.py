@@ -14,7 +14,7 @@ Content is read, never typed:
   * business_rules_catalog.py (repository root)           -> Section 5.14 (proposed = what the portal
                                                               enforces or records, enforced vs documented only,
                                                               rules awaiting validation)
-  * Documents/CAPSTONE_ONLY/operations_manual_rules.json  -> Section 4.5 (existing rules: Official and Practice)
+  * Documents/Graduate_School/Operations_Manual/operations_manual_rules.json  -> Section 4.5 (existing rules: Official and Practice)
                                                               and the further Proposed rules in Section 5.14.3
 
 Idempotent: every block is wrapped by a pair of zero-width bookmarks (BizRules<Part>_begin /
@@ -49,7 +49,7 @@ sys.path.insert(0, str(HERE))
 import business_rules_catalog as catalog  # noqa: E402
 from opsmanual import questions as manual_questions  # noqa: E402
 
-RULES_JSON = ROOT / "Documents" / "CAPSTONE_ONLY" / "operations_manual_rules.json"
+RULES_JSON = ROOT / "Documents" / "Graduate_School" / "Operations_Manual" / "operations_manual_rules.json"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 NS = {"w": W}
@@ -494,7 +494,7 @@ def build_appendix(data, ids):
         "The draft awaits validation by the Graduate School Dean and Associate Dean; until the sign-off page is signed it "
         "is not an official University document."))
     out.append(body_para(
-        "Files, in the folder Documents/CAPSTONE_ONLY of the project repository: "
+        "Files, in the folder Documents/Graduate_School/Operations_Manual of the project repository: "
         + "; ".join(MANUAL_FILES[:3]) + " (the same manual in Word, PDF and plain text); and "
         + MANUAL_FILES[3] + " (the rules register in machine-readable form)."))
     out.append(spacer(marker("BizRulesAppendix_end", ids[1], "pair")))

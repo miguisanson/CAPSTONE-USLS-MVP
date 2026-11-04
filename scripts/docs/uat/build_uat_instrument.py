@@ -1,10 +1,10 @@
 """Build the revised UAT instrument (Word) for the USLS Graduate School stakeholder meeting.
 
 Run:  E:/Temp/claude/docs-venv/Scripts/python.exe scripts/docs/uat/build_uat_instrument.py
-Out:  Documents/CAPSTONE_ONLY/UAT/[CAP-IT2] UAT Instrument - Revised.docx
+Out:  Documents/Capstone/UAT/[CAP-IT2] UAT Instrument - Revised.docx
 
 Every design choice (size, font, scale, wording) and its source is listed in
-Documents/CAPSTONE_ONLY/UAT/UAT-REVIEW-NOTES.md. Change questions in SECTIONS below,
+Documents/Capstone/UAT/UAT-REVIEW-NOTES.md. Change questions in SECTIONS below,
 not in the layout code. Set INCLUDE_SUS = False to drop the one-page SUS.
 """
 from pathlib import Path
@@ -18,7 +18,7 @@ from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 
 INCLUDE_SUS = True
-OUT = Path(__file__).resolve().parents[3] / "Documents/CAPSTONE_ONLY/UAT/[CAP-IT2] UAT Instrument - Revised.docx"
+OUT = Path(__file__).resolve().parents[3] / "Documents/Capstone/UAT/[CAP-IT2] UAT Instrument - Revised.docx"
 
 FONT = "Arial"          # in every Word/LibreOffice install; sans serif per plain-language form guides
 SYM = "Segoe UI Symbol"  # carries the tick-box glyphs; Word falls back by itself where it is missing
@@ -32,7 +32,7 @@ TEXT_W = sum(GRID)
 
 # ---------------------------------------------------------------- content
 ROLES = ["Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean",
-         "Faculty (adviser / panel)", "Student"]
+         "Associate Dean", "Administrator", "Faculty (adviser / panel)", "Student"]
 
 
 def yn(text):
@@ -50,7 +50,7 @@ SECTIONS = [
         yn("Does the system clearly show which records are official (imported from AIMS) and which were added in the portal for monitoring and coordination?"),
         yn("Are the student statuses and lifecycle stages easy to understand?"),
         yn("Does the system give enough information to tell where a student currently is in the Graduate School process?"),
-        yn("Does the system show who a student\u2019s case is waiting on and why?"),
+        yn("Does the system show who a student\u2019s case is currently waiting on?"),
         rate("How easy was it to sign in and reach the functions needed for your role?", "Very difficult", "Very easy"),
     ], comment="Comments:"),
     dict(id="B", title="STUDENT RECORDS, COURSE MONITORING, AND ENROLLMENT",
@@ -59,7 +59,7 @@ SECTIONS = [
         yn("Does the Monitoring Sheet show each student\u2019s coursework and progress clearly?"),
         yn("Is it appropriate that Graduate School staff can add or correct student and subject records directly in the Monitoring Sheet?"),
         yn("Is the information kept with each entry (imported or manual entry, who made it, when, and the reason) enough to trust the record?"),
-        yn("Is it appropriate that values imported from AIMS cannot be overwritten silently?"),
+        yn("Is it appropriate that a manual entry cannot overwrite a value imported from AIMS?"),
         yn("Is it acceptable that the portal does not record grades and takes course completion only from the AIMS export?"),
         yn("Does the Course Adjustments screen give enough information (which students still need which subjects) to decide what to offer?"),
         yn("Is the approval route for the offering plan appropriate: the Academic Coordinator prepares it, the Dean approves it, then it is published?"),
@@ -73,19 +73,21 @@ SECTIONS = [
     dict(id="C", title="STANDING CHANGES AND EXCEPTION CASES",
          who="Graduate School Staff, Dean, Academic Coordinator, Student", items=[
         yn("Is the Subject Withdrawal workflow (student request, staff, Dean decision, subject tagged Withdrawn) consistent with the Graduate School\u2019s actual process?"),
-        yn("Are the withdrawal window (until the end of the second week of classes) and the fee rule (10% in week 1, 20% in week 2) shown by the system correct?"),
+        yn("Is the withdrawal window shown by the system (until the end of the second week of classes) correct?"),
+        yn("Is the withdrawal fee rule shown by the system (10% in week 1, 20% in week 2) correct?"),
         yn("Is the distinction between withdrawing (a student request the Dean approves) and dropping (recorded by the Academic Coordinator when unexcused absences exceed 20%) represented correctly?"),
         yn("Is the Leave of Absence workflow, including staff review, the policy check and the Dean\u2019s decision, appropriate?"),
         yn("Is the Readmission workflow, including the return checklist and the Dean\u2019s approval, appropriate?"),
         yn("Are AWOL, Return from AWOL, and residency handled by the appropriate roles and processes?"),
-        yn("Is handing changes to the Registrar as a file that staff download, e-mail themselves and mark as sent an acceptable way to work?"),
+        yn("Is handing changes to the Registrar as a file that staff download, e-mail and mark as sent an acceptable way to work?"),
         yn("Are unusual or incomplete cases clearly prevented from moving forward until the required action is completed?"),
     ], comment="Comments:"),
     dict(id="D", title="RESEARCH GATE", who="Graduate School Staff, Research Coordinator, Academic Coordinator, Faculty (adviser), Student", items=[
         yn("Does the Research Gate correctly show the student\u2019s current research stage and requirements?"),
         yn("Are the requirements for Title Defense, Proposal Defense, and Final Defense represented correctly?"),
         yn("Are student-submitted documents visible to the appropriate Graduate School users?"),
-        yn("Is it helpful that the system reads the uploaded Form 1 to take the research title and checks the concept papers against the guidelines?"),
+        yn("Is it appropriate that the system reads the research title from the uploaded Form 1?"),
+        yn("Is it appropriate that the system checks the concept papers against the guidelines?"),
         yn("Is document verification assigned to the correct role (Graduate School staff)?"),
         yn("Are the adviser\u2019s signature, the Academic Coordinator\u2019s endorsement, and the Research Coordinator\u2019s ethics clearance assigned to the correct roles?"),
         yn("Does the system prevent a student from moving forward when a required document, signature, clearance, or approval is missing?"),
@@ -96,7 +98,7 @@ SECTIONS = [
          note="The faculty expertise records in this demonstration are sample data, not the real records.", items=[
         yn("Are the faculty members recommended by the system reasonably related to the student\u2019s research topic?"),
         yn("Are the faculty specialization, matching keywords, availability, and match score useful when selecting panel members?"),
-        yn("Is the score breakdown (expertise 60, availability 25, workload 15 out of 100) a sensible way to rank panel candidates?"),
+        yn("Is the score breakdown (expertise 60, availability 25, workload 15 out of 100) appropriate for ranking panel candidates?"),
         yn("Is the reason behind each faculty recommendation understandable?"),
         yn("Is it appropriate that the system recommends panel candidates but an authorized user makes the final selection?"),
         yn("Does the ability to search and choose other faculty members give enough flexibility for actual panel assignment?"),
@@ -106,16 +108,16 @@ SECTIONS = [
     dict(id="F", title="DEFENSE SCHEDULING AND DEFENSE OUTCOME",
          who="Graduate School Staff, Research Coordinator, Faculty (panel), Student", items=[
         yn("Does the system correctly check the student\u2019s readiness before defense scheduling?"),
-        yn("Are the finalized panel members, their invitation answers, and their availability presented clearly?"),
+        yn("Are the finalized panel members, the invitation answers, and the availability of each panelist presented clearly?"),
         yn("Are the Best Shared Options useful for finding an appropriate common schedule?"),
         yn("Are the scheduling stops that cannot be overridden appropriate (double-booked panelist or room, declined invitation, date in the past, outside a panelist\u2019s hours)?"),
         yn("Is it appropriate that booking less than 14 days ahead gives a warning that staff can override only with a written reason?"),
-        yn("Is it appropriate that authorized staff can reschedule or cancel a defense when they record the reason?"),
+        yn("Is it appropriate that authorized staff can reschedule or cancel a defense when the reason is recorded?"),
         yn("Does each role\u2019s calendar (staff, faculty, student) show the booked defenses correctly?"),
-        yn("Is the optional Google Calendar connection for faculty (shows busy times, adds booked defenses to their calendar) appropriate?"),
+        yn("Is the optional Google Calendar connection for faculty (shows busy times, adds booked defenses to the faculty member\u2019s calendar) appropriate?"),
         yn("Is the Panel Chair or Panel Lead the appropriate person to record the official defense verdict?"),
         yn("Is it appropriate that a verdict can be recorded only after the defense has started?"),
-        yn("Are the available verdicts (Passed; Passed with minor revisions; Provisional pass \u2013 revisions or re-defense; Deferred; Failed) and their follow-up steps appropriate?"),
+        yn("Are the available verdicts (Passed; Passed with minor revisions; Provisional pass \u2013 revisions or re-defense; Deferred; Failed) appropriate?"),
         yn("Does the system correctly handle a failed defense by keeping the student in the same research stage and requiring resubmission?"),
         yn("At the Final Defense, is it correct that a score below 85 (thesis) or 90 (dissertation) cannot be recorded as a plain pass?"),
         rate("How useful is the scheduling module for coordinating student and panel availability?", "Not useful", "Very useful"),
@@ -136,11 +138,11 @@ SECTIONS = [
         yn("Are the Policy Assistant responses useful for finding relevant Graduate School policies or guidelines?"),
         yn("Is it clear that Policy Assistant responses support decisions and are not official rulings?"),
         yn("Is showing the source document and page useful for checking a Policy Assistant response?"),
-        yn("Is the Business Rules register (each rule with its value, its handbook page, and a label such as Enforced, Documented only, or Needs review) clear and useful?"),
+        yn("Is the Business Rules register (each rule with its value, its handbook page, and a label such as Enforced, Documented only, or Needs review) easy to understand?"),
         yn("Is it appropriate that staff can add, replace, and keep versions of the policy documents the Policy Assistant uses?"),
         yn("Are the summary numbers at the top of Reports & Analytics (active students, behind schedule, requests waiting, days to decide, defenses held, endorsements) useful for monitoring Graduate School operations?"),
         yn("Are the report tabs (needs attention, where students get stuck, office speed, records to fix, cohorts, graduation candidates, overdue and pending, defenses, Registrar changes) useful for the work of your office?"),
-        yn("Is being able to open the list of students behind any number useful for checking the figures?"),
+        yn("Did opening the list of students behind a number help in checking the figures?"),
         yn("Are the filters and the Excel and PDF downloads on the reports practical?"),
         yn("Are the presented indicators and analytics easy to understand?"),
         yn("Are the presented indicators and analytics relevant to Graduate School decision-making?"),
@@ -153,14 +155,15 @@ SECTIONS = [
         yn("Is navigation between the different Graduate School modules easy to understand?"),
         yn("Is important information easy to find without unnecessary searching?"),
         yn("Do the process boards (Leave of Absence, Readmission, AWOL, Withdrawal, Practicum, Graduation) work the same way?"),
-        yn("When the system stopped an action, was the reason and the next step clear?"),
+        yn("When the system stopped an action, was the reason clear?"),
+        yn("When the system stopped an action, was the next step clear?"),
         rate("How easy was it to understand and move around the system overall?", "Very difficult", "Very easy"),
     ], comment="Comments:"),
     dict(id="J", title="ACCESS, RELIABILITY, AND SYSTEM BEHAVIOR", who="Everyone", items=[
-        yn("Does each user have access only to the functions appropriate to their role?"),
+        yn("Does each role give access only to the functions appropriate to that role?"),
         yn("Are important actions such as submissions, approvals, signatures, scheduling, and verdicts clearly recorded (what, who, when)?"),
         yn("Did the system behave as expected when incorrect, incomplete, or unusual cases were shown?"),
-        yn("Were the statuses and information shown correct and complete?"),
+        yn("Were the statuses and information shown correct?"),
         yn("Did the system work without unexpected results or error messages?"),
         yn("Was the system responsive enough during the session?"),
         yn("Are the in-system notifications (bell, messages, panel invitations) enough, given that the portal sends no e-mail?"),
@@ -475,7 +478,7 @@ def evaluator_block(doc):
         cell_text(r.cells[0], lab, bold=True, size=SMALL)
         row_flags(r, min_h=0.34)
         r.cells[1].vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-    tick_line(t.rows[2].cells[1], [ROLES[0:2], ROLES[2:4], ROLES[4:6], ["Other: ______________"]], size=SMALL + 0.5, tab_in=2.35)
+    tick_line(t.rows[2].cells[1], [ROLES[0:2], ROLES[2:4], ROLES[4:6], ROLES[6:8], ["Other: ______________"]], size=SMALL + 0.5, tab_in=2.35)
     tick_line(t.rows[3].cells[1], [["I watched the demonstration", "I used the system myself"], ["Both"]], size=SMALL + 0.5, tab_in=2.35)
     for r in t.rows[2:4]:
         r.height = None
@@ -504,7 +507,7 @@ def intro(doc):
                             ("No", "The function did not work as expected or requires improvement. Please explain in Comments."),
                             ("N/A", "The function was not shown or tested, or does not apply to your role.")]),
         ("Rating questions", [("1\u20135", "Under each rating question, the scale is printed with its own words. 1 is the lowest and 5 the highest. Generally: 1 Very poor / Very difficult, 2 Poor / Difficult, 3 Acceptable, 4 Good / Easy, 5 Excellent / Very easy.")]),
-        ("Which sections?", [("", "Answer Sections A, I and J, and the sections marked \u201cMainly for\u201d your role. You may skip the others.")]),
+        ("Which sections?", [("", "Everyone answers Sections A, I, J and K and the User Acceptance page, plus the sections marked \u201cMainly for\u201d your role. The SUS page is optional. You may skip the other sections.")]),
         ("Ticking", [("", "TICK")]),
     ]
     for r, (lab, items) in zip(t.rows, rows):
@@ -530,12 +533,12 @@ def intro(doc):
         if r is not t.rows[-1]:
             keep_row_with_next(r)
     p = fmt(doc.add_paragraph(), before=6)
-    run(p, "Privacy: your name, position, and signature are used only to record this evaluation for the CAP-2521-IT capstone. They are not shared outside the project team and the Graduate School (Data Privacy Act of 2012, RA 10173).",
+    run(p, "Privacy: your name, position, and signature are used only to record this evaluation for the CAP-2521-IT capstone. These details are not shared outside the project team and the Graduate School (Data Privacy Act of 2012, RA 10173). Taking part is voluntary, and you may skip any question.",
         size=SMALL, italic=True, color=GREY)
 
 
 def section_bar(doc, sec, title, who, note=None):
-    p = doc.add_paragraph(f"SECTION {sec} \u2013 {title}" if len(sec) == 1 else title, style="Heading 1")
+    h = p = doc.add_paragraph(f"SECTION {sec} \u2013 {title}" if len(sec) == 1 else title, style="Heading 1")
     fmt(p, before=12, after=0, keep_next=True, keep_lines=True)
     shade_par(p, GREEN)
     if who:
@@ -545,6 +548,7 @@ def section_bar(doc, sec, title, who, note=None):
     if note:
         q = fmt(doc.add_paragraph(), after=3, keep_next=True)
         run(q, note, size=SMALL, italic=True, color=GREY)
+    return h
 
 
 def header_row(t, lab_q="Question", lab_a="Your answer (tick one)"):
@@ -603,6 +607,8 @@ def matrix(doc, sec):
             rate_cells(r)
         if i == 1:  # keep the heading row with the first item, the last item with its comment box
             keep_row_with_next(r)
+    for r in t.rows[-3:-1]:  # last two items stay with the comment box
+        keep_row_with_next(r)
     last = t.rows[-1]
     row_flags(last, min_h=0.6)
     c = merge(last, 0, 7)
@@ -611,8 +617,7 @@ def matrix(doc, sec):
 
 
 def process_validation(doc):
-    section_bar(doc, "K", "PROCESS VALIDATION AND POSSIBLE ERRORS", None)
-    doc.paragraphs[-1].paragraph_format.page_break_before = True
+    section_bar(doc, "K", "PROCESS VALIDATION AND POSSIBLE ERRORS", "Everyone").paragraph_format.page_break_before = True
     p = fmt(doc.add_paragraph(), after=4, keep_next=True)
     run(p, "Please answer based on your knowledge of the actual Graduate School process. ", size=BODY)
     run(p, "In this part, Yes means you found a problem.", size=BODY, bold=True)
@@ -621,7 +626,7 @@ def process_validation(doc):
     for i, (q, prompt) in enumerate(VALIDATION, 1):
         r = t.rows[i]
         row_flags(r, min_h=0.95)
-        cell_text(r.cells[0], f"P{i}", bold=True, size=SMALL + 0.5, align=WD_ALIGN_PARAGRAPH.CENTER, valign="top")
+        cell_text(r.cells[0], f"K{i}", bold=True, size=SMALL + 0.5, align=WD_ALIGN_PARAGRAPH.CENTER, valign="top")
         c = r.cells[1]
         fmt(c.paragraphs[0])
         run(c.paragraphs[0], q)
@@ -664,7 +669,10 @@ def acceptance(doc):
     keep_row_with_next(t.rows[0])
     cell_text(t.rows[0].cells[0], "Reason for assessment:", bold=True, size=SMALL, valign="top")
     cell_text(t.rows[1].cells[0], "The most important changes needed before the Graduate School could use the system:", bold=True, size=SMALL, valign="top")
-    p = fmt(doc.add_paragraph(), before=8, keep_next=True)
+    p = fmt(doc.add_paragraph(), before=8, after=2, keep_next=True)
+    box(p, 13)
+    run(p, " I agree that my answers on this form may be used in the CAP-2521-IT capstone paper. Taking part is voluntary.", size=SMALL + 0.5)
+    p = fmt(doc.add_paragraph(), before=6, keep_next=True)
     run(p, "Evaluator", size=TABLE, bold=True)
     t = table_base(doc, 2, [1.7, TEXT_W / 2 - 1.7, 1.2, TEXT_W / 2 - 1.2])
     cells = [("Printed name", "Position / office"), ("Signature", "Date")]
@@ -684,7 +692,7 @@ def sus_page(doc):
     shade_par(p, GREEN)
     q = fmt(doc.add_paragraph(), after=3, keep_next=True)
     shade_par(q, GREEN)
-    run(q, "Mainly for: anyone who used the system themselves during the session", size=SMALL, color="FFFFFF")
+    run(q, "Mainly for: anyone who used the system during the session", size=SMALL, color="FFFFFF")
     p = fmt(doc.add_paragraph(), before=4, after=6)
     run(p, "Think about the system as a whole. Give your first reaction to each statement; do not think about it for long. If you cannot decide, tick the middle box (3). If you only watched the demonstration, you may skip this page.", size=TABLE)
     grid = [0.5, 3.1, 0.66, 0.66, 0.66, 0.66, 0.66]

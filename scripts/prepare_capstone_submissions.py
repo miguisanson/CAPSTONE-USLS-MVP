@@ -10,7 +10,7 @@ from docx.opc.constants import RELATIONSHIP_TYPE as RT
 
 
 WORKSPACE = Path(r"E:\Github_Projects\CAPSTONE-USLS-MVP")
-SOURCE_DIR = WORKSPACE / "Documents" / "CAPSTONE_ONLY"
+SOURCE_DIR = WORKSPACE / "Documents" / "Capstone" / "Proposal"
 SUBMISSIONS_DIR = SOURCE_DIR / "Submissions"
 CAPSTONE_DOCUMENT_DIR = SUBMISSIONS_DIR / "CAPSTONE DOCUMENT"
 

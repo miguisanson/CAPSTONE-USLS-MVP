@@ -11,7 +11,7 @@ from .common import Runtime
 from .helpers_a1 import asc, goto_nav, scroll_to, scroll_top, wait_loaded, safe_notes
 
 SLUG = "student-handoff"
-SAMPLE = "Documents/Monitoring_Sheets/Ready_To_Import/MSN_Monitoring_Sheet.xlsx"
+SAMPLE = "Documents/Sample_Data/Monitoring_Sheets/Ready_To_Import/MSN_Monitoring_Sheet.xlsx"
 
 
 def s(n: int) -> str:

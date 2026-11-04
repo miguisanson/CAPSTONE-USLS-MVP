@@ -5,7 +5,7 @@ One script, one engine: every form is a plain data spec (see FORMS below) render
 by the same functions, so layout, fonts and control fields stay identical.
 
 Run:  E:/Temp/claude/docs-venv/Scripts/python.exe scripts/docs/forms/build_forms.py
-Output: Documents/USLS_Forms/GS-F-XX <Name>.docx, GS-P-01 ..., GS-P-02 ...
+Output: Documents/Graduate_School/Forms/GS-F-XX <Name>.docx, GS-P-01 ..., GS-P-02 ...
 Needs python-docx only. Pass form numbers (for example 07 12) to rebuild only those; P rebuilds the two GS-P documents.
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 ROOT = Path(__file__).resolve().parents[3]
-OUT = ROOT / "Documents" / "USLS_Forms"
+OUT = ROOT / "Documents" / "Graduate_School" / "Forms"
 
 FONT = "Arial"
 BODY = 10.5      # body text, pt

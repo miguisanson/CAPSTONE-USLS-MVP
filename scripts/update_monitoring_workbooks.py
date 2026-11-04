@@ -19,7 +19,7 @@ from openpyxl import load_workbook
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-WORKBOOK_ROOT = PROJECT_ROOT / "Documents" / "Monitoring_Sheets"
+WORKBOOK_ROOT = PROJECT_ROOT / "Documents" / "Sample_Data" / "Monitoring_Sheets"
 LEGACY_ID = re.compile(r"GS-2026-(\d{4})", re.IGNORECASE)
 SEVEN_DIGIT_ID = re.compile(r"\d{7}")
 

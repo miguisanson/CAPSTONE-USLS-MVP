@@ -1,11 +1,11 @@
 # Defense revisions — what the panel required and what is still open
 
-**Source:** `Documents/CAPSTONE_ONLY/CAP-2521-IT-CAP1DEF.docx` — Stage 1 defense,
+**Source:** `Documents/Capstone/Proposal/CAP-2521-IT-CAP1DEF.docx` — Stage 1 defense,
 2026-08-07, verdict **Conditional Pass**, revisions were due 2026-08-14, to be
 checked by the Adviser (Sir Oliver Malabanan). Panel: Arcilla (lead), Magpantay.
 
 **Written:** 2026-09-30, from reading the defense form, the four documents in
-`Documents/CAPSTONE_ONLY/`, the handbook and research protocol in
+`Documents/Graduate_School/Operations_Manual/`, the handbook and research protocol in
 `USLS_Documents/`, and the code on branch `v5-myrine-revisions` (HEAD `9f0a182`).
 "Verified" below means checked in the file or code; "inferred" means reasoned.
 
@@ -22,7 +22,7 @@ answers — skip them and remind the owner.
   revisions are done in our own file (settles E0).
 - **The Graduate School has no Operations Manual.** The panel suggested we write
   it and have the stakeholder correct/validate it. We draft it (settles G1:
-  `Documents/CAPSTONE_ONLY/USLS GS Operations Manual - DRAFT for Validation.docx`).
+  `Documents/Graduate_School/Operations_Manual/USLS GS Operations Manual - DRAFT for Validation.docx`).
 - **Monitoring Sheet needs CRUD in the portal** — adding records directly, not
   only uploading a sheet. "The biggest mistake."
 - **LOA and Readmission** are weak compared with Graduation (staged board, drag
@@ -70,7 +70,7 @@ by the Policy Assistant.
 
 - [x] **B1. Fix the built-in document folder path.** `RAG_DOCUMENT_PATHS`
       (`app.py:54-58`) points at `Documents/USLS_Documents` and `data`; neither
-      exists. The real folder is `Documents/CAPSTONE_ONLY/USLS_Documents`. Today
+      exists. The real folder is `Documents/Graduate_School/Policy_Sources`. Today
       the only corpus is the two files committed in `uploads/policy_documents/`.
       *Accept:* a test proves the handbook is found from the real folder and is
       not indexed twice.
@@ -179,7 +179,7 @@ page 378 is the API list — so the page numbers on the defense form refer to a
 
 - [x] **E0. Settled (owner, 2026-10-01: ignore the other copy) — — owner: get the revised document.** Khloe marked D2 and
       D3 "done" on 2026-08-14. Ask her (or check the shared Google Doc) for that
-      version and put it in `Documents/CAPSTONE_ONLY/`. If it does not exist,
+      version and put it in `Documents/Graduate_School/Operations_Manual/`. If it does not exist,
       E1–E3 must be done from scratch.
 - [x] **E1. Pagination:** no page number on the TOC; chapters numbered
       chapter-page (1-1, 1-2 … 2-1 …). Needs a section break per chapter.

@@ -2,7 +2,7 @@
 reschedule/cancel, panel changes, task closing.
 
 Ground truth is the Graduate School research protocol
-(Documents/CAPSTONE_ONLY/USLS_Documents/Complete-GS-Research-Protocol-...docx).
+(Documents/Graduate_School/Policy_Sources/Complete-GS-Research-Protocol-...docx).
 Set-up pattern copied from tests/test_bpm_workflows.py: a temp SQLite database
 whose URL is set before `app` is imported.
 """

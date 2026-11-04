@@ -1,66 +1,66 @@
 1
 00:00:00,900 --> 00:00:08,200
-That was leaving properly. Readmission is the other end: coming back from an approved leave.
+That was leaving properly. Readmission is the return from an approved leave.
 
 2
 00:00:09,400 --> 00:00:20,800
-I sign in as Therese Lacson, who is already on an approved leave.
+Therese Lacson, a student already on approved leave, signs in.
 
 3
 00:00:22,500 --> 00:00:35,399
-Her Readmission page says she is on leave and that enrollment stays closed until a readmission is approved. The leave she is ending is filled in for her.
+The Readmission page says Therese is on leave and enrollment stays closed until readmission is approved. The leave being ended is pre-filled.
 
 4
 00:00:36,399 --> 00:00:45,199
-The rule behind this page: a returning student writes an intent to enroll, from the Handbook, page fifty-three.
+The rule: a returning student writes an intent to enroll, Handbook page fifty-three.
 
 5
 00:00:54,500 --> 00:01:02,399
-She picks the semester she wants to return in, explains why she is ready, and confirms the four checklist items.
+Therese picks the return semester, gives a reason for returning, and confirms the four checklist items.
 
 6
 00:01:03,700 --> 00:01:09,899
-Again, a summary to check before sending.
+Again, a summary to check first.
 
 7
 00:01:10,099 --> 00:01:19,099
-Submitted, with a four-step tracker: staff review, Dean decision, and back in the program.
+Submitted. The request goes to Graduate School staff, then to the Dean.
 
 8
 00:01:19,299 --> 00:01:25,899
-Staff side again.
+Graduate School staff signs in.
 
 9
 00:01:29,900 --> 00:01:37,200
-The Readmission board: the same board, with its own columns. Therese's card is in Submitted.
+The Readmission board: same layout, own columns. Therese's card is in Submitted.
 
 10
 00:01:40,299 --> 00:01:44,000
-I drag it to In staff review.
+Graduate School staff drags it to review.
 
 11
 00:01:46,000 --> 00:01:53,299
-The request shows the return semester, her intention, and the linked leave of absence.
+The request shows the return semester, the intention, and the linked leave.
 
 12
 00:01:53,500 --> 00:02:07,299
-The return checklist shows what the student ticked, not yet verified by staff. Below, her history: one year in the program and two of four leave semesters already used.
+The checklist shows what the student ticked, not yet verified. Below, the history: one year in the program, two of four leave semesters already approved.
 
 13
 00:02:07,500 --> 00:02:20,000
-The policy check flags one thing: she wants to return before her leave ends. That is allowed only if the Dean agrees, so it says Needs review.
+The policy check flags an early return, before the leave ends. Only the Dean can allow that, so it shows Needs review.
 
 14
 00:02:27,900 --> 00:02:40,400
-When I forward, I tick the checklist items I verified myself. Anything I leave unticked reaches the Dean as Needs review.
+Forwarding, Graduate School staff ticks the items verified. Anything unticked reaches the Dean as Needs review.
 
 15
 00:02:40,599 --> 00:02:45,300
-Forwarded, and locked: waiting for the Dean.
+Forwarded, locked, waiting for the Dean.
 
 16
 00:02:45,500 --> 00:02:52,000
-The Dean decides.
+The Dean signs in to decide.
 
 17
 00:02:57,300 --> 00:03:09,700
@@ -68,28 +68,28 @@ The Dean finds Therese's request in With the Dean.
 
 18
 00:03:09,900 --> 00:03:19,400
-The Dean drags it to Approved, back in the program, with a note.
+The Dean approves it, back in the program, with a note.
 
 19
 00:03:19,599 --> 00:03:30,700
-She is active again. Note that readmission restores her standing; it does not enroll her in subjects. That is the Academic Coordinator's next step.
+Therese is active again. Readmission restores standing but does not enroll the student in subjects. The Academic Coordinator does that next.
 
 20
 00:03:31,800 --> 00:03:43,800
-Staff side again.
+Graduate School staff signs in.
 
 21
 00:03:44,000 --> 00:03:54,900
-On the staff board, the card now says the next owner is the Academic Coordinator, and it is flagged for the Registrar.
+The staff board now shows the Academic Coordinator as next owner, flagged for the Registrar.
 
 22
 00:03:55,099 --> 00:04:02,300
-The Registrar list works exactly as before: download, send it yourself, mark sent, mark acknowledged.
+Same Registrar list: Graduate School staff downloads, sends, marks sent, then acknowledged.
 
 23
 00:04:03,400 --> 00:04:18,000
-I sign in as Therese Lacson, who is already on an approved leave.
+Finally, Therese signs back in.
 
 24
 00:04:18,199 --> 00:04:26,100
-And Therese sees her readmission approved, with the messages from staff and the Dean.
+Therese sees the approval, with messages from staff and the Dean.

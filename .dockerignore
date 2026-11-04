@@ -23,10 +23,8 @@ frontend/dist
 frontend/e2e
 frontend/e2e-artifacts
 # Documents: only what the seed and the Policy Assistant read at run time
-Documents/CAPSTONE_ONLY/CAPRIT2 OLD
-Documents/CAPSTONE_ONLY/Demo_Migui
-Documents/CAPSTONE_ONLY/UAT
-Documents/CAPSTONE_ONLY/walkthrough_screenshots
-Documents/CAPSTONE_ONLY/*.docx
-Documents/CAPSTONE_ONLY/*.pdf
-!Documents/CAPSTONE_ONLY/USLS GS Operations Manual - DRAFT for Validation.docx
+Documents/Archive
+Documents/Capstone
+Documents/Graduate_School/Operations_Manual/*.docx
+Documents/Graduate_School/Operations_Manual/*.pdf
+!Documents/Graduate_School/Operations_Manual/USLS GS Operations Manual - DRAFT for Validation.docx

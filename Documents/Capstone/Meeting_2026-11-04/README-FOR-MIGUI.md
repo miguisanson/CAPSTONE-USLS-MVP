@@ -4,11 +4,12 @@
 
 | You asked for | Where |
 |---|---|
-| 1. Demo recording of your parts (slow, no audio) | `Documents/CAPSTONE_ONLY/Demo_Migui/videos/` — 2d Monitoring Sheet (4:29), 2h-1 Leave of Absence (6:36), 2h-2 Readmission (4:26), 2h-3 AWOL (5:06), 2l Reports (4:23). The videos are on this PC only (too big for GitHub). |
+| 1. Demo recording of your parts (slow, no audio) | `Documents/Capstone/Meeting_2026-11-04/videos/` — 2d Monitoring Sheet (4:30), 2h-1 Leave of Absence (6:37), 2h-2 Readmission (4:28), 2h-3 AWOL (5:08), 2l Reports (4:19, after the trim). The videos are on this PC only (too big for GitHub). |
 | Script for your voice-over | `NARRATION-SCRIPT.docx` / `.pdf` — each line with its start time. Each video also has a `.srt` file with the same lines: load it next to the video in CapCut/Clipchamp as a teleprompter, delete the subtitle track before export if you don't want captions. 2m Best Features is a spoken closing (no video), at the end of the script. |
+| Short sheet for the Zoom meeting |  `ZOOM-CHEAT-SHEET.docx` / `.pdf`: forms first, then the UAT, then the walkthrough of your parts, with the part videos and their lengths. |
 | Cheat sheet for the meeting | `MEETING-CHEAT-SHEET.docx` / `.pdf` (6 pages): your parts step by step, rules with Handbook pages, likely questions with answers, open questions for the Graduate School, what to hand over, what to do if something breaks. |
-| 2. UAT instrument reviewed | `Documents/CAPSTONE_ONLY/UAT/[CAP-IT2] UAT Instrument - Revised.docx` / `.pdf`, and `UAT-REVIEW-NOTES.md` (every change, why, and the source: ISO/IEC 25010, ISO 9241-11, SUS, Likert and form-design guides). |
-| 3. USLS forms to be signed | `Documents/USLS_Forms/` — 44 forms (GS-F-01 … GS-F-44) + `GS-P-01 Forms Approval Sheet` (the page they sign) + `GS-P-02 Forms Routing Guide`. Print `USLS-GS-Forms-Pack.pdf` (approval sheet first). Every statement was checked against the Handbook and Research Protocol; open questions are at the end of `00-INVENTORY.md`. |
+| 2. UAT instrument reviewed | `Documents/Capstone/UAT/[CAP-IT2] UAT Instrument - Revised.docx` / `.pdf`, and `UAT-REVIEW-NOTES.md` (every change, why, and the source: ISO/IEC 25010, ISO 9241-11, SUS, Likert and form-design guides). |
+| 3. USLS forms to be signed | `Documents/Graduate_School/Forms/` — 44 forms (GS-F-01 … GS-F-44) + `GS-P-01 Forms Approval Sheet` (the page they sign) + `GS-P-02 Forms Routing Guide`. Print `USLS-GS-Forms-Pack.pdf` (approval sheet first). Every statement was checked against the Handbook and Research Protocol; open questions are at the end of `00-INVENTORY.md`. |
 | 4. Natalie's e-mail question | See "Google Calendar" below. |
 | 5. Server for miguisanson.dev | `deploy/DOCKER.md` (Docker) and `deploy/START-SITE.cmd` (no Docker). See "Put the site online" below. |
 

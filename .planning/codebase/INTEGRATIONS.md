@@ -22,7 +22,7 @@ All integrations are optional; the app starts and the gate runs with none config
 
 **Email / SMS:** Not detected (no SMTP, SendGrid, etc.). Notifications are in-app only (`Notification` model `app.py:1611`, routes `/api/notifications` `app.py:19705`, `NotificationBell.jsx`).
 
-**AIMS (Registrar system):** Not integrated. Contract is file export/import only: `Documents/AIMS_Export/`, `scripts/generate_aims_export_template.py`, monitoring sheet importer `app.py:24244-25472`, Registrar handoff list export/ack in the leave engine (`app.py:7680`).
+**AIMS (Registrar system):** Not integrated. Contract is file export/import only: `Documents/Sample_Data/AIMS_Export/`, `scripts/generate_aims_export_template.py`, monitoring sheet importer `app.py:24244-25472`, Registrar handoff list export/ack in the leave engine (`app.py:7680`).
 
 ## Document processing
 
@@ -40,7 +40,7 @@ All integrations are optional; the app starts and the gate runs with none config
 - `uploads/student_requests/` - `REQUEST_UPLOAD_ROOT` (`StudentRequestAttachment`), gitignored.
 - `uploads/monitoring_sheets/` - `MONITORING_UPLOAD_ROOT` (`MonitoringSheetUpload`); **17 files are tracked in git** (not ignored).
 - `uploads/policy_documents/` - `POLICY_DOCUMENT_UPLOAD_ROOT` (override `POLICY_DOCUMENT_UPLOAD_DIR`); 2 tracked seed documents (GS Handbook PDF, Research Protocol docx); the runtime Operations Manual copy is ignored.
-- `Documents/CAPSTONE_ONLY/USLS_Documents/` and `Documents/RAG_Source/Concept_Paper` - committed built-in RAG sources (`RAG_DOCUMENT_PATHS`, `CONCEPT_PAPER_RAG_SOURCE`, `app.py:85-89`; extra dirs via `RAG_DOCUMENT_DIRS`).
+- `Documents/Graduate_School/Policy_Sources/` and `Documents/Sample_Data/Concept_Paper_Guidelines` - committed built-in RAG sources (`RAG_DOCUMENT_PATHS`, `CONCEPT_PAPER_RAG_SOURCE`, `app.py:85-89`; extra dirs via `RAG_DOCUMENT_DIRS`).
 - `.rag_index/` - `RAG_INDEX_DIR` cache (`chunks.json`, `corpus.json`, `sections/`, vectors), gitignored, regenerable.
 
 **Caching:** in-process only (`_RAG_RESPONSE_CACHE`, `_RAG_TERMS_CACHE`, `_RAG_VECTOR_STATE` globals, `app.py:92-100`; guarded by `threading.Lock`s). No Redis.

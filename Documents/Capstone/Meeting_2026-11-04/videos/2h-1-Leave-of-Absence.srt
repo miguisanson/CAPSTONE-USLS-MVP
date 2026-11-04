@@ -1,111 +1,111 @@
 1
 00:00:00,900 --> 00:00:16,500
-Now Leave of Absence, Readmission and AWOL. These three run on the same kind of board, so once you have seen one, you know all of them. First, a student asks for a leave.
+Now Leave of Absence, Readmission and AWOL. All three run on the same kind of board, so seeing one means seeing all three. First, a student asks for a leave.
 
 2
 00:00:17,800 --> 00:00:32,699
-I sign in as Daniel Fernandez, a Master of Arts in Education student who has accepted a work assignment in another city.
+Daniel Fernandez, a Master of Arts in Education student, signs in. The student accepted a work assignment in another city.
 
 3
 00:00:34,399 --> 00:00:49,000
-Under Requests, he opens Leave of Absence. The form tells him the limits straight away: up to two semesters at a time, renewable once, and never more than four semesters in total.
+Under Requests, the student opens Leave of Absence. The form shows the limits: two semesters at a time, renewable once, four semesters in total at most.
 
 4
 00:00:50,100 --> 00:01:11,000
-He can open 'Rules applied on this screen'. These are the same rules the staff will apply, each with its Handbook page. The ones marked Needs review are prototype values the Graduate School still has to confirm.
+'Rules applied on this screen' lists the same rules Graduate School staff applies, each with its Handbook page. Needs review marks prototype values the Graduate School must still confirm.
 
 5
 00:01:19,400 --> 00:01:29,500
-He chooses when the leave starts and ends, the system tells him that is two semesters, and he gives the reason and a short explanation.
+The student picks the start and end dates. The system says two semesters. The student adds a reason and short explanation.
 
 6
 00:01:30,700 --> 00:01:40,399
-Before anything is sent, he sees a summary to check: from, to, and the reason.
+Before sending, the student checks a summary: from, to, and the reason.
 
 7
 00:01:40,599 --> 00:01:53,500
-It is submitted. He can see the tracker: staff review, Dean decision, the leave begins, and his return. He always knows who has his request right now.
+Submitted. The request now waits for Graduate School staff review.
 
 8
 00:01:53,700 --> 00:02:01,299
-Now the Graduate School staff side.
+Graduate School staff signs in.
 
 9
 00:02:05,200 --> 00:02:19,400
-This is the Leave of Absence board. Each column is a stage, and each card is a request. I search for Daniel: his card is in Submitted, flagged 'awaiting your review'.
+Leave of Absence board: columns are stages, cards are requests. Graduate School staff finds Daniel's card in Submitted, flagged 'awaiting your review'.
 
 10
 00:02:22,599 --> 00:02:38,500
-I drag the card to In staff review. Dragging does exactly the same as the buttons, and the server still checks every move, so a card cannot be dragged somewhere the rules do not allow.
+Graduate School staff drags the card to In staff review. Dragging equals the buttons, and the server checks every move, so no card moves where the rules forbid.
 
 11
 00:02:40,199 --> 00:02:47,800
-The same requests can be read as a table, if staff prefer a list.
+Graduate School staff can read the same requests as a table.
 
 12
 00:02:50,400 --> 00:02:58,600
-I open the request. It shows the leave period, the reason, and what the student wrote.
+Graduate School staff opens the request: leave period, reason, and the student's explanation.
 
 13
 00:02:58,800 --> 00:03:14,300
-Below that is the policy check, advice for staff. Each rule shows Pass or Needs review. Minimum residency says Needs review because it is a prototype rule. The check never decides: the Dean does.
+The policy check below advises staff. Each rule shows Pass or Needs review; minimum residency shows Needs review, a prototype rule. The check never decides. The Dean does.
 
 14
 00:03:24,300 --> 00:03:33,300
-I forward it to the Dean with a note explaining what I checked.
+Graduate School staff forwards it to the Dean, noting the checks.
 
 15
 00:03:33,500 --> 00:03:45,100
-The card moves to With the Dean and is locked for staff. The board says 'Waiting for: Dean' instead of hiding the card.
+The card moves to With the Dean, locked for staff. The board shows 'Waiting for: Dean', not a hidden card.
 
 16
 00:03:45,300 --> 00:03:53,300
-Now I sign in as the Dean.
+The Dean signs in.
 
 17
 00:03:58,500 --> 00:04:13,300
-The Dean sees the same board, with the requests waiting for a decision.
+The Dean sees the same board, with requests awaiting decision.
 
 18
 00:04:13,500 --> 00:04:27,300
-The Dean drags the card to Leave scheduled. The approval window opens, and the Dean can add a note the student will read.
+The Dean drags the card to Leave scheduled. The approval window opens for a note the student will read.
 
 19
 00:04:27,500 --> 00:04:40,800
-Approved. The card is in Leave scheduled and is flagged for the Registrar. The Dean could also have returned it for revision or denied it, both with a comment.
+Approved. The card sits in Leave scheduled, flagged for the Registrar. The Dean could instead return it for revision or deny it, with a comment.
 
 20
 00:04:41,899 --> 00:04:54,800
-Now the Graduate School staff side.
+Graduate School staff signs in.
 
 21
 00:04:55,000 --> 00:05:04,000
-Back as staff, the card waits in Leave scheduled. Normally the leave starts by itself on its first day.
+Graduate School staff sees the card in Leave scheduled. Normally the leave starts by itself on day one.
 
 22
 00:05:07,300 --> 00:05:17,199
-For the demonstration, I start the leave now by dragging the card to On leave.
+For the demo, Graduate School staff drags the card to On leave now.
 
 23
 00:05:17,399 --> 00:05:24,600
-Daniel is now on leave, and enrollment is closed for him while he is away.
+Daniel is now on leave, and enrollment is closed for the student.
 
 24
 00:05:25,399 --> 00:05:38,300
-Further down is the Registrar list. The portal sends no e-mail: staff download the list, send it through the official channel, then mark it sent and later acknowledged.
+Below is the Registrar list. The portal sends no e-mail. Graduate School staff downloads it, sends it through the official channel, marks it sent, then acknowledged.
 
 25
 00:05:40,300 --> 00:05:47,900
-I download the list. The system reminds me that no e-mail was sent by the portal.
+Graduate School staff downloads the list; the system notes no e-mail was sent.
 
 26
 00:05:51,500 --> 00:06:03,100
-I tick Daniel and mark the list as sent to the Registrar, so the office always knows what was handed over and what was not.
+Graduate School staff ticks Daniel and marks the list sent to the Registrar, so the office knows what was handed over.
 
 27
 00:06:04,199 --> 00:06:22,199
-I sign in as Daniel Fernandez, a Master of Arts in Education student who has accepted a work assignment in another city.
+Finally, Daniel signs back in to see the decision.
 
 28
 00:06:22,399 --> 00:06:31,800
-And on the student's side, Daniel sees that he is on leave, with every message he received along the way.
+On the student side, Daniel sees the status On leave and every message along the way.

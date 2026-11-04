@@ -17,16 +17,16 @@ subagents, and the local model. Do not restate them here.
   `.planning/BOARD.md`; owner decisions are `.planning/DECISIONS.md`
   (IM1–IM15); bugs and findings are rows in `.planning/ISSUES.md`; the
   unattended loop is `.planning/IMPROVE.md`. Code map: `.planning/codebase/`.
-- **`Documents/CAPSTONE_ONLY/CAPRIT2 OLD/` is archived pre-defense material** —
+- **`Documents/Archive/CAPRIT2 OLD/` is archived pre-defense material** —
   do not use it as a spec, do not edit it.
 - **Load `ui-ux-pro-max`** (`.claude/skills/ui-ux-pro-max/`) before planning
   or reviewing anything under `frontend/src/**`.
 - **Load `intelligence-layer`** (`.claude/skills/intelligence-layer/`) for a
   large multi-step job that benefits from architect/QA + cheaper-model
   delegation, beyond the Claude/Sonnet-subagent/Ollama split AGENTS.md already defines.
-- **Stakeholder policy sources** in `Documents/CAPSTONE_ONLY/USLS_Documents/`
+- **Stakeholder policy sources** in `Documents/Graduate_School/Policy_Sources/`
   (Graduate School Handbook, Research Protocol) and the proposal
-  `Documents/CAPSTONE_ONLY/Final Proposal Document - CAP-IT1.docx` are the
+  `Documents/Capstone/Proposal/Final Proposal Document - CAP-IT1.docx` are the
   ground truth for what a workflow should do — read the relevant policy text
   before changing or extending a workflow's behavior. The Word files have no
   `pandoc` here; read them with a small stdlib `zipfile` + XML script.

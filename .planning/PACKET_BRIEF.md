@@ -8,7 +8,7 @@ choice, write it down in your report, keep going.
 ## Read first
 - `AGENTS.md` (rules), `DEFENSE_REVISIONS.md` (what the defense panel required).
 - Only the parts of `app.py` you need — it is ~25,000 lines. Use Grep.
-- `Documents/CAPSTONE_ONLY/CAPRIT2 OLD/` is an archive. Never use or edit it.
+- `Documents/Archive/CAPRIT2 OLD/` is an archive. Never use or edit it.
 
 ## Hard rules
 1. **Work only inside your worktree directory.** Never touch
@@ -35,7 +35,7 @@ choice, write it down in your report, keep going.
 7. No new heavy dependencies. Python: only what is in `requirements.txt`.
    Frontend: only what is in `frontend/package.json` (React 18, Vite, Tailwind,
    lucide-react etc. — check the file).
-8. The handbook (`Documents/CAPSTONE_ONLY/USLS_Documents/GRADUATE-SCHOOL-
+8. The handbook (`Documents/Graduate_School/Policy_Sources/GRADUATE-SCHOOL-
    HANDBOOK-22-23.pdf`) **is in force**. Where the system and the handbook
    disagree, the handbook wins.
 

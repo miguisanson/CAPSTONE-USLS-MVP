@@ -15,7 +15,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "Documents" / "CAPSTONE_ONLY" / "Demo_Migui"
+OUT = ROOT / "Documents" / "Capstone" / "Meeting_2026-11-04"
 GREEN = RGBColor(0x0F, 0x5C, 0x3F)
 SOFFICE = "E:/LibreOffice/program/soffice.exe"
 
@@ -118,11 +118,11 @@ table([
     ["2m", "Best Features (closing)", "no sign-in, slides", "2 min", "—"],
 ], [1.2, 5.4, 3.6, 2.4, 4.8])
 bullets([
-    "Password: every demo account uses the shared demo password (DemoPass123! on a local copy). The sign-in page lists the demo accounts under 'Demo accounts' — one click fills them in.",
+    "Password: every demo account uses the same shared demo password. The sign-in page lists the demo accounts under 'Demo accounts' — one click fills them in.",
     "Student demo logins: loa.daniel@usls.edu.ph (LOA), readmission.therese@usls.edu.ph (Readmission), awol.maya@usls.edu.ph (AWOL).",
-    "Site: https://miguisanson.dev (runs on my PC through Cloudflare). Backup: run it locally with npm run dev and open http://127.0.0.1:5000.",
+    "Site: https://miguisanson.dev (runs on my PC through Cloudflare). Backup: this PC runs the same site without Docker (deploy/START-SITE.cmd); open http://127.0.0.1:5000.",
     "If a drag and drop does not go through: use 'Move to…' on the card. It is the same step, checked by the same rules.",
-    "Recorded videos of every part are in Documents/CAPSTONE_ONLY/Demo_Migui/ — play them if the live site misbehaves.",
+    "Recorded videos of every part are in Documents/Capstone/Meeting_2026-11-04/ — play them if the live site misbehaves.",
 ])
 
 doc.add_heading("2. The one-sentence story", 1)
@@ -160,7 +160,7 @@ bullets([
 ])
 doc.add_heading("Readmission (Therese Lacson, MAED, on leave)", 3)
 bullets([
-    "Student: Requests > Readmission → the leave she is ending is pre-filled → return semester → why ready → tick 4 checklist items → Send.",
+    "Student: Requests > Readmission → the leave the student is ending is pre-filled → return semester → why ready → tick 4 checklist items → Send.",
     "Staff: drag to In staff review → View details (return semester, linked leave, checklist 'not verified by staff yet', history: 2 of 4 leave semesters used) → Policy check: 'Return semester after the leave' = Needs review (early return: Dean decides) → Forward, ticking what staff verified (unticked items reach the Dean as Needs review).",
     "Dean: drag to Approved – back in the program. Student is active again; the Academic Coordinator plans the subjects next (readmission does not enroll).",
     "Rule (Handbook p. 53): a returnee declares the intention to enroll in writing to the Registrar through the Dean. p. 45: clearance, interview, evaluation, Advise Slip.",
@@ -217,7 +217,7 @@ qa([
     ("Who can see what?", "Each account has one role: Student, Faculty, GS Staff, Academic Coordinator, Research Coordinator, Dean, Administrator. The server decides which portal opens and checks the role on every action, not only in the menu."),
     ("Is it secure enough for real data?", "It was built and tested as a demo: password sign-in with lockout, role checks on every request, audit log, security headers, uploads size-limited. Before real data it would need the university's sign-in (e.g. Google Workspace), hosting by the university's IT, backups and a data-privacy review under the Data Privacy Act of 2012."),
     ("What technology is it?", "Python (Flask) back end with a SQLite database, React front end. It runs on one computer; for the demo it is published through a Cloudflare Tunnel at miguisanson.dev."),
-    ("How was it tested?", "About 875 automated back-end tests and about 700 browser walkthrough tests that click through every role's screens, plus 'persona' test runs imitating a rushed staff member, a new student and a Dean on a phone."),
+    ("How was it tested?", "Automated tests run on every change, and the screens of every role were clicked through in a browser before the demo."),
     ("Where did the processes come from?", "The Graduate School Handbook 2022-2023, the Research Protocol AY 2024-2025, the AC monitoring sheets, the defense panel's comments, and our draft Operations Manual, which we ask the Graduate School to validate. Each rule on screen names its source."),
     ("What do you need from us?", "Validation of the Operations Manual and the forms pack (signatures), confirmation of the rules marked Needs review, the UAT evaluation forms, and answers to three open questions (below)."),
     ("Does it replace AIMS?", "No. AIMS stays the official system for identity, enrollment and grades. The portal reads AIMS exports and prepares lists for the Registrar to apply in AIMS."),
@@ -238,22 +238,22 @@ bullets([
 
 doc.add_heading("9. Documents to hand over and get signed", 1)
 bullets([
-    "Forms pack (Documents/USLS_Forms/USLS-GS-Forms-Pack.pdf, print it): 44 Graduate School forms GS-F-01 to GS-F-44 in lifecycle order, plus GS-P-01 Forms Approval Sheet (first page) and GS-P-02 Forms Routing Guide.",
+    "Forms pack (Documents/Graduate_School/Forms/USLS-GS-Forms-Pack.pdf, print it): 44 Graduate School forms GS-F-01 to GS-F-44 in lifecycle order, plus GS-P-01 Forms Approval Sheet (first page) and GS-P-02 Forms Routing Guide.",
     "How to present it: \"The panel asked for the school's forms. Apart from the Handbook and the Research Protocol, most were never written down, so we drafted them from those two documents, keeping the Protocol's form numbers. Each form cites its rule. Please review, mark changes on the Approval Sheet, and sign it; once signed with an effectivity date they are the official forms, and the portal already asks for the same information.\"",
-    "Open questions for the forms are listed at the end of Documents/USLS_Forms/00-INVENTORY.md (e.g. whether the office already has templates for Forms 1-13, defense fees, ethics committee forms). Ask them while they sign.",
-    "UAT form (Documents/CAPSTONE_ONLY/UAT/[CAP-IT2] UAT Instrument - Revised.pdf): one per evaluator, after the demo. Sections A, I, J for everyone plus the sections of their own role. Allow about 20-25 minutes.",
-    "Operations Manual (Documents/CAPSTONE_ONLY/USLS GS Operations Manual - DRAFT for Validation): the process descriptions the forms follow; ask for validation the same way.",
+    "Open questions for the forms are listed at the end of Documents/Graduate_School/Forms/00-INVENTORY.md (e.g. whether the office already has templates for Forms 1-13, defense fees, ethics committee forms). Ask these questions while the Dean signs.",
+    "UAT form (Documents/Capstone/UAT/[CAP-IT2] UAT Instrument - Revised.pdf): one per evaluator, after the demo. Sections A, I, J for everyone plus the sections marked for the evaluator's own role. Allow about 20-25 minutes.",
+    "Operations Manual (PDF: Documents/Graduate_School/Operations_Manual/USLS GS Operations Manual - DRAFT for Validation.pdf): the process descriptions the forms follow; ask for validation the same way.",
 ])
 
 doc.add_heading("10. If something goes wrong", 1)
 table([
     ["Problem", "Do this"],
-    ["Site does not load", "Check the PC is on and Docker Desktop is running (docker compose ps). Fall back to the local copy: npm run dev → http://127.0.0.1:5000, or play the recorded video."],
+    ["Site does not load", "Check the PC is on and the window called 'USLS site - keep open' is still open. If not, double-click deploy/START-SITE.cmd and leave both windows it opens; after a minute https://miguisanson.dev/api/health should say status ok. Docker is not used on this PC. Or play the recorded video."],
     ["A demo student is already used up", "Sign-in page > Demo accounts > Student workflow demos > Reset next to that student."],
     ["Drag and drop does not move the card", "Use 'Move to…' on the card, or the button in View details. Same step."],
     ["Numbers differ from the rehearsal", "Expected: reports are live measurements. Read them off the screen."],
     ["Policy Assistant says \"Offline answer\"", "Expected today: Gemini was failing (HTTP 503) on 4 Nov, so the site runs without it. The answer is still quoted and cited from the Handbook / Protocol."],
-    ["Withdrawal window is closed", "The demo semester is dated from the day of the seed; re-seed in the morning (docker compose exec app python app.py --seed, or npm run seed locally)."],
+    ["Withdrawal window is closed", "The demo semester is dated from the day of the seed; reset in the morning: close the 'USLS site' window, double-click deploy/RESET-DEMO-DATA.cmd, then deploy/START-SITE.cmd again."],
     ["Someone asks for a feature we do not have", "Write it down, say it goes into the improvement list, and ask which office would use it and how often."],
 ], [5.0, 12.4])
 

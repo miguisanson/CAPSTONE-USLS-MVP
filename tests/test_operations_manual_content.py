@@ -140,7 +140,7 @@ class OperationsManualContentTest(unittest.TestCase):
 
 class OperationsManualJsonTest(unittest.TestCase):
     def test_generated_json_matches_content_when_present(self):
-        path = ROOT / "Documents" / "CAPSTONE_ONLY" / "operations_manual_rules.json"
+        path = ROOT / "Documents" / "Graduate_School" / "Operations_Manual" / "operations_manual_rules.json"
         if not path.exists():
             self.skipTest("run scripts/docs/build_operations_manual.py first")
         data = json.loads(path.read_text(encoding="utf-8"))

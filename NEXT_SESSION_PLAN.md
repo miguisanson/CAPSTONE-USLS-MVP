@@ -19,9 +19,9 @@ re-deriving the gaps — they were verified against the running system, not assu
 | Withdrawal | Subject-level (client) not program-level (adviser). Already built correctly. |
 
 ### Source of truth files
-- BPMNs: `Documents/CAPSTONE_ONLY/References_Context/FINAL BPMS/*.png`
-- Proposal (live copy, contains Ch4–6): `Documents/CAPSTONE_ONLY/Final Proposal Document - CAP-IT1.docx`
-- Walkthrough: `Documents/CAPSTONE_ONLY/USLS GS Portal Demo Walkthrough.docx`
+- BPMNs: `Documents/Graduate_School/Operations_Manual/References_Context/FINAL BPMS/*.png`
+- Proposal (live copy, contains Ch4–6): `Documents/Capstone/Proposal/Final Proposal Document - CAP-IT1.docx`
+- Walkthrough: `Documents/Graduate_School/Operations_Manual/USLS GS Portal Demo Walkthrough.docx`
 
 ### Environment
 See the `windows-dev-setup` memory. Short version: `.venv/Scripts/python.exe`, MySQL
@@ -182,7 +182,7 @@ The Dean-facing report does not exist.
 
 ## 4. Document updates
 
-Target: `Documents/CAPSTONE_ONLY/Final Proposal Document - CAP-IT1.docx`
+Target: `Documents/Capstone/Proposal/Final Proposal Document - CAP-IT1.docx`
 (the live copy — it already contains Ch4–6). Build scripts are in the session scratchpad
 pattern: unpack → edit `word/document.xml` → rezip → validate → render via Word COM.
 
@@ -205,7 +205,7 @@ pattern: unpack → edit `word/document.xml` → rezip → validate → render v
    now false; the Module 4/5/7 KPIs are computed live. Keep DEF-001 unless it gets fixed.
 5. **Regenerate Appendix V** (test case matrix) from the new run, and add screenshots of the
    analytics tabs to Appendix U.
-6. Also refresh `Documents/CAPSTONE_ONLY/USLS GS Portal Demo Walkthrough.docx` with an
+6. Also refresh `Documents/Graduate_School/Operations_Manual/USLS GS Portal Demo Walkthrough.docx` with an
    analytics scenario.
 
 ---

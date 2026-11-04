@@ -18,6 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_PATH = (
     PROJECT_ROOT
     / "Documents"
+    / "Sample_Data"
     / "AIMS_Export"
     / "PROPOSED_USLS_AIMS_Export_Template.xlsx"
 )

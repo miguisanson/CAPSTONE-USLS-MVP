@@ -114,9 +114,9 @@ BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 # Built-in policy library: the stakeholder documents committed with the project.
 # (Staff uploads are added on top of this list at run time, see _rag_document_sources.)
 RAG_DOCUMENT_PATHS = [
-    BASE_DIR / "Documents" / "CAPSTONE_ONLY" / "USLS_Documents",
+    BASE_DIR / "Documents" / "Graduate_School" / "Policy_Sources",
 ]
-CONCEPT_PAPER_RAG_SOURCE = BASE_DIR / "Documents" / "RAG_Source" / "Concept_Paper"
+CONCEPT_PAPER_RAG_SOURCE = BASE_DIR / "Documents" / "Sample_Data" / "Concept_Paper_Guidelines"
 RAG_INDEX_DIR = Path(os.getenv("RAG_INDEX_DIR", str(BASE_DIR / ".rag_index")))
 _RAG_DOCUMENT_CHUNKS = None
 _RAG_DOCUMENT_VECTORS = None
@@ -10167,7 +10167,7 @@ def _load_rag_document_index() -> list[dict]:
             # Not cached: the library may be filled before the next question.
             raise PolicyPassageNotFound(
                 "No policy documents found. Add PDF or DOCX files to "
-                "Documents/CAPSTONE_ONLY/USLS_Documents/ or upload them on the Policy Documents page."
+                "Documents/Graduate_School/Policy_Sources/ or upload them on the Policy Documents page."
             )
 
         signature = _rag_index_signature(sources)
@@ -10317,7 +10317,7 @@ def create_policy_document(
     return document
 
 
-OPERATIONS_MANUAL_FILE = BASE_DIR / "Documents" / "CAPSTONE_ONLY" / "USLS GS Operations Manual - DRAFT for Validation.docx"
+OPERATIONS_MANUAL_FILE = BASE_DIR / "Documents" / "Graduate_School" / "Operations_Manual" / "USLS GS Operations Manual - DRAFT for Validation.docx"
 OPERATIONS_MANUAL_VALUES = {
     "title": "USLS Graduate School Operations Manual (draft for validation)",
     "description": (
@@ -37269,12 +37269,12 @@ def migrate_research_vocabulary() -> None:
     db.session.commit()
 
 
-MONITORING_SHEET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Documents", "Monitoring_Sheets")
+MONITORING_SHEET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Documents", "Sample_Data", "Monitoring_Sheets")
 
 
 def import_program_monitoring_sheets() -> int:
     """Seed the student roster by importing the per-program registrar monitoring
-    sheets in Documents/Monitoring_Sheets. These .xlsx files are the single source
+    sheets in Documents/Sample_Data/Monitoring_Sheets. These .xlsx files are the single source
     of truth for who is enrolled and their coursework completion."""
     if not os.path.isdir(MONITORING_SHEET_DIR):
         return 0
@@ -37294,12 +37294,12 @@ def import_program_monitoring_sheets() -> int:
     return created
 
 
-FACULTY_SHEET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Documents", "Faculty_Sheet")
+FACULTY_SHEET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Documents", "Sample_Data", "Faculty_Sheet")
 
 
 def import_faculty_sheets() -> int:
     """Create the faculty roster from the imported faculty sheet(s) in
-    Documents/Faculty_Sheet. Faculty are a real, sheet-sourced roster and are never
+    Documents/Sample_Data/Faculty_Sheet. Faculty are a real, sheet-sourced roster and are never
     randomly generated. Header columns: NAME, COLLEGE, ROLE, EMAIL, SPECIALIZATION."""
     import openpyxl
     if not os.path.isdir(FACULTY_SHEET_DIR):
@@ -38102,7 +38102,7 @@ def seed_maed_personas() -> None:
     The workbook owns student identity and cumulative subject completion. This
     fixture adds only the workflow state needed to exercise each transaction.
     Every persona is keyed by the stable student number from
-    Documents/Monitoring_Sheets/MAED_Monitoring_Sheet.xlsx.
+    Documents/Sample_Data/Monitoring_Sheets/MAED_Monitoring_Sheet.xlsx.
     """
 
     def by_num(number: str) -> Student | None:

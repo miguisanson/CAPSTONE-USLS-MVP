@@ -217,7 +217,7 @@ Establish a trustworthy AIMS export/import foundation before any dependent workf
 - `docs/process/FEATURE_LOGIC_REGISTER.md`
 - `docs/process/AIMS_EXPORT_IMPORT_CONTRACT.md`
 - `docs/process/DECISION_REGISTER.md`
-- `Documents/AIMS_Export/PROPOSED_USLS_AIMS_Export_Template.xlsx`
+- `Documents/Sample_Data/AIMS_Export/PROPOSED_USLS_AIMS_Export_Template.xlsx`
 - Versioned AIMS workbook parser, validator, preview, and atomic import boundary
 - Official-value provenance and immutable revision storage
 - Exception-reporting workflow

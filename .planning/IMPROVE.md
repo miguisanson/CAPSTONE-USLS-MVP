@@ -22,7 +22,7 @@ work (IM11); every commit can be reverted on its own.
 6. **Bug-hunt findings with evidence** (below).
 
 Not inputs: "could be better" with no evidence, new features that are not cheap (they go to
-`IDEAS.md`), anything in `Documents/CAPSTONE_ONLY/CAPRIT2 OLD/`, stakeholder-blocked items.
+`IDEAS.md`), anything in `Documents/Archive/CAPRIT2 OLD/`, stakeholder-blocked items.
 
 ## The cast and the limits
 

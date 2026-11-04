@@ -265,7 +265,7 @@ def build_scenarios_1_to_4(
             ["Field", "Value / instruction"],
             [
                 "Monitoring workbook",
-                r"Documents\Monitoring_Sheets\MAED_Monitoring_Sheet.xlsx",
+                r"Documents\Sample_Data\Monitoring_Sheets\MAED_Monitoring_Sheet.xlsx",
             ],
             ["Program", "MAED — Master of Arts in Education"],
             [

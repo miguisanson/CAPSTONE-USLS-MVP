@@ -3,7 +3,7 @@ import path from "node:path";
 import { FileBlob, SpreadsheetFile } from "@oai/artifact-tool";
 
 const projectRoot = process.cwd();
-const sourcePath = path.join(projectRoot, "Documents", "Faculty_Sheet", "Faculty_Roster.xlsx");
+const sourcePath = path.join(projectRoot, "Documents", "Sample_Data", "Faculty_Sheet", "Faculty_Roster.xlsx");
 const outputDir = path.join(projectRoot, "archive", "outputs", "faculty-roster-dba");
 const outputPath = path.join(outputDir, "Faculty_Roster.xlsx");
 const previewPath = path.join(outputDir, "Faculty_Roster.png");

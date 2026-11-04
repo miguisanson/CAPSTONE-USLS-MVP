@@ -5,7 +5,7 @@
 
 Inputs : front.json (front and back matter), cases/NN_*.json (one per case, in
          running order), shots/*.png (from capture_walkthrough.py)
-Output : Documents/CAPSTONE_ONLY/CAP-2521-IT-WALKTHROUGH.docx
+Output : Documents/Capstone/Walkthrough/CAP-2521-IT-WALKTHROUGH.docx
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from docx.shared import Inches, Pt, RGBColor
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent.parent
-OUT = REPO / "Documents" / "CAPSTONE_ONLY" / "CAP-2521-IT-WALKTHROUGH.docx"
+OUT = REPO / "Documents" / "Capstone" / "Walkthrough" / "CAP-2521-IT-WALKTHROUGH.docx"
 SHOTS = REPO / "archive" / "scripts-docs" / "walkthrough" / "shots"
 GREEN = RGBColor(0x0F, 0x6B, 0x3E)
 GREY = RGBColor(0x55, 0x5B, 0x63)
@@ -519,7 +519,7 @@ def main() -> int:
     # keep a copy of the screenshots next to the document (used later to refresh the proposal's screenshot appendix)
     import shutil
 
-    dest = REPO / "Documents" / "CAPSTONE_ONLY" / "walkthrough_screenshots"
+    dest = REPO / "Documents" / "Capstone" / "Walkthrough" / "walkthrough_screenshots"
     dest.mkdir(parents=True, exist_ok=True)
     count = 0
     for old in dest.glob("*.png"):

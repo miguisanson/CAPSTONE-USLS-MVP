@@ -64,7 +64,7 @@ scheduled resume task) picks it up.
    `CHECKLIST_PHASE_PLAN.md` (numbered, phase-gated, items 1–92) and
    `NEXT_SESSION_PLAN.md` (BPMN-compliance gaps) are what to build
    and in what order — closed in numerical/phase order, one phase at a time.
-   Never use `Documents/CAPSTONE_ONLY/CAPRIT2 OLD/` as a spec (archive).
+   Never use `Documents/Archive/CAPRIT2 OLD/` as a spec (archive).
    `.planning/STATE.md` is where the work stands right now. `.planning/`
    holds only the current phase's working plan and must never become a
    second, drifting roadmap — if it disagrees with the checklist/plan docs,

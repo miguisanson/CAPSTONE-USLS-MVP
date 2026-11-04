@@ -38,7 +38,7 @@ from opsmanual.p_end import GRADUATION, HANDOFF, PRACTICUM  # noqa: E402
 from opsmanual.p_leave_to_compre import AWOL, COMPRE, LOA, READMISSION, RESIDENCY  # noqa: E402
 from opsmanual.p_research import ADVISER, COMPLETION, FINAL, PROPOSAL, SCHEDULING, TITLE  # noqa: E402
 
-OUT_DIR = ROOT / "Documents" / "CAPSTONE_ONLY"
+OUT_DIR = ROOT / "Documents" / "Graduate_School" / "Operations_Manual"
 STEM = front.FILE_STEM
 SOFFICE = Path("E:/LibreOffice/program/soffice.exe")
 LO_PROFILE = os.environ.get("OPSMAN_LO_PROFILE", "file:///E:/Temp/claude/lo-profile-opsman")

@@ -33,7 +33,7 @@
   ],
   [
    "Class list file",
-   "MAED_Class_List_Walkthrough.csv, built from the repository template Documents/Stakeholder_Meeting_Prep/Enrollment_Class_List_Template.csv (same columns) with real codes and numbers read in the app; the capture script writes it. The team's own ready files are in Documents/Class_Lists."
+   "MAED_Class_List_Walkthrough.csv, built from the repository template Documents/Archive/Stakeholder_Meeting_Prep/Enrollment_Class_List_Template.csv (same columns) with real codes and numbers read in the app; the capture script writes it. The team's own ready files are in Documents/Sample_Data/Class_Lists."
   ],
   [
    "Class list rows",
@@ -244,7 +244,7 @@
  "notes": [
   "A class list does not go through the add-after-the-first-week rule; it is the Registrar's record of who is enrolled, so it is read against the official offering list, the program and the student records instead. Rows that do not match are skipped and named, never guessed.",
   "The class list must include a Faculty column. A row marked Dropped in a class list is accepted only with an Unexcused Absence Percent above the handbook limit of 20% or a Drop Exception Reason; the page says so under its title.",
-  "The team's ready demo files are in Documents/Class_Lists (for example MAED_Class_List_Demo_MAJ2_3_Students.xlsx: Daniel Cruz and Grace Reyes show Ready to import; Miguel Sanson shows Student was not found unless he was added in Student Handoff first). The preview was checked with that file on the current screen; it was not confirmed.",
+  "The team's ready demo files are in Documents/Sample_Data/Class_Lists (for example MAED_Class_List_Demo_MAJ2_3_Students.xlsx: Daniel Cruz and Grace Reyes show Ready to import; Miguel Sanson shows Student was not found unless he was added in Student Handoff first). The preview was checked with that file on the current screen; it was not confirmed.",
   "Enrollment Class List is an output screen: changes are made in Enrollment or through a confirmed import, never on the roster.",
   "Enrolling a student records the enrollment in the platform; it does not perform official enrollment, which stays with the Registrar. Grades and the course-completion status come from the official export.",
   "The portal does not check student schedule conflicts or faculty double-booking.",

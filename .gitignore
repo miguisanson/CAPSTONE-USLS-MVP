@@ -81,7 +81,7 @@ frontend/test-results/
 instance/
 
 # Recorded demo videos (large; kept on this PC, rebuilt with scripts/demo/record_demo.py)
-Documents/CAPSTONE_ONLY/Demo_Migui/videos/*.mp4
+Documents/Capstone/Meeting_2026-11-04/videos/*.mp4
 
 # Isolated agent development worktrees
 .worktrees/

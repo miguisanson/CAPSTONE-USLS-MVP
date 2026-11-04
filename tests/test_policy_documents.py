@@ -242,7 +242,7 @@ class BuiltInLibraryTests(PolicyTestBase):
             appmod._reset_rag_indexes()
             files = appmod._rag_document_files()
             chunks = appmod._load_rag_document_index()
-        self.assertTrue(any("CAPSTONE_ONLY" in str(path) for path in files), files)
+        self.assertTrue(any("Policy_Sources" in str(path) for path in files), files)
         self.assertEqual(len([p for p in files if "HANDBOOK" in p.name.upper()]), 1, files)
         self.assertEqual(len([p for p in files if "RESEARCH-PROTOCOL" in p.name.upper()]), 1, files)
         self.assertEqual(len({chunk["title"] for chunk in chunks}), 2, {chunk["title"] for chunk in chunks})
@@ -260,7 +260,7 @@ class BuiltInLibraryTests(PolicyTestBase):
             with self.assertRaises(RuntimeError) as caught:
                 appmod._load_rag_document_index()
         message = str(caught.exception)
-        self.assertIn("CAPSTONE_ONLY", message)
+        self.assertIn("Policy_Sources", message)
         self.assertNotIn("data/", message)
 
     def test_handbook_questions_get_short_cited_answers(self):

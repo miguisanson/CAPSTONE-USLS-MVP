@@ -32,10 +32,10 @@ what order.** `.planning/` (GSD Core) holds only the current phase's working
 plan and must never drift from them — if GSD's plan disagrees with them, they
 win.
 
-**`Documents/CAPSTONE_ONLY/CAPRIT2 OLD/` is an archive of the pre-defense
+**`Documents/Archive/CAPRIT2 OLD/` is an archive of the pre-defense
 material. Do not read it as a spec and do not edit it.** Current documents are
-the four `.docx` files directly in `Documents/CAPSTONE_ONLY/`; current
-stakeholder sources are in `Documents/CAPSTONE_ONLY/USLS_Documents/`. The BPMN
+the four `.docx` files directly in `Documents/Graduate_School/Operations_Manual/`; current
+stakeholder sources are in `Documents/Graduate_School/Policy_Sources/`. The BPMN
 diagrams now exist only inside the archive (`CAPRIT2 OLD/References_Context/
 FINAL BPMS/`) — they may be opened as pictures of the intended flow, but where
 they disagree with `DEFENSE_REVISIONS.md` or a stakeholder document, those win.
@@ -49,7 +49,7 @@ A test written after the code passes that code and proves nothing.
 1. Read the goal of the item — a `DEFENSE_REVISIONS.md` item, a
    `CHECKLIST_PHASE_PLAN.md` "Required closure" row, a `NEXT_SESSION_PLAN.md`
    acceptance-criteria bullet, or the policy text it cites in
-   `Documents/CAPSTONE_ONLY/USLS_Documents/`.
+   `Documents/Graduate_School/Policy_Sources/`.
 2. Write the test from that goal.
 3. **Run it and watch it fail** for the right reason — a wrong value or
    `AttributeError`/`ImportError` for something not implemented yet, not a
@@ -322,7 +322,7 @@ uploads/            user-submitted files at runtime — gitignored, never commit
   machines only after both ran the same seed command.
 - **AIMS is external and read-only by design** (Phase 1 decision). Never
   build a live AIMS integration, login, or scraper — only the approved
-  file export/import contract in `Documents/AIMS_Export/`.
+  file export/import contract in `Documents/Sample_Data/AIMS_Export/`.
 - **The `Documents/` folder holds the real specs.** BPMN diagrams and the
   proposal document are the ground truth for what a workflow should do —
   check them before trusting a screen's current behavior or an assumption
