@@ -174,7 +174,7 @@ async function mockPracticum(page) {
   await page.route(/\/api\/transactions\/practicum\/context/, async (route) => {
     const response = await route.fetch();
     const body = await response.json();
-    const row = body.roster.find((item) => item.student.student_number === "GS-2026-PRAC-01");
+    const row = body.roster.find((item) => item.student.student_number === "2690201");
     row.record = {
       id: 9100, student_id: row.student.id, status: "MOA Submitted", moa_status: "Uploaded", moa_uploaded: true,
       practicum_site: "Community Counselling Center", supervisor_name: "Ms. Rina Lopez", required_hours: 200, completed_hours: 40,
