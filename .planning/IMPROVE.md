@@ -5,7 +5,7 @@ shelf-and-sword (2026-10-17) and adjusted to this web app and the owner's decisi
 `DECISIONS.md` (IM1–IM15).
 
 **Plain version:** the owner opens a session, types `/continue_CAPSTONE-USLS-MVP`, and leaves
-it running. Agents work on branch `v5.2-migui_again`, one small commit per fix or feature,
+it running. Agents work on the current branch (`v6.1-migui`; earlier `v5.2-migui_again`), one small commit per fix or feature,
 each with its test and, for anything visual, screenshots. The owner reviews `BOARD.md` when
 free and says which commits to merge into `v5.1-migui_clean`. There is no cap on unreviewed
 work (IM11); every commit can be reverted on its own.
@@ -48,7 +48,7 @@ Not inputs: "could be better" with no evidence, new features that are not cheap 
 One fix or feature per pass.
 
 0. **Preflight.** Read `STATE.md`, `BOARD.md`, `ISSUES.md`. Confirm the gate is green on
-   `v5.2-migui_again`, no `.planning/IMPROVE_STOP` file exists, and usage is below 90% of the
+   the current branch, no `.planning/IMPROVE_STOP` file exists, and usage is below 90% of the
    5-hour window. If not, stop and report in 5 lines.
 1. **Pick** the top input. A question only the owner can answer becomes a `QUESTION` row in
    `ISSUES.md` and a line under "Waiting on you" in `BOARD.md`; pick the next input.
@@ -68,7 +68,7 @@ One fix or feature per pass.
       the two nearest areas.
    8. Diff hygiene: no stray `console.log`/`print`, no secrets, nothing outside the packet's file list.
    9. Fix small findings in the same pass; bigger ones become new `ISSUES.md` rows.
-5. **Merge** to `v5.2-migui_again` as one commit: code, test, `REGRESSION.md` row.
+5. **Merge** to the current branch as one commit: code, test, `REGRESSION.md` row.
 6. **After every merge** (not once after several): re-run the gate on the merged tree. If red,
    revert at once and log it in `ISSUES.md`.
 7. **Record.** Update `STATE.md`, `BOARD.md` and `ISSUES.md`. For a visual change, add the

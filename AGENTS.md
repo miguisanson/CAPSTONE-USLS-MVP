@@ -12,8 +12,8 @@ runs is [`.planning/IMPROVE.md`](.planning/IMPROVE.md); the owner's tracker is
 [`.planning/BOARD.md`](.planning/BOARD.md); every bug or finding is a row in
 [`.planning/ISSUES.md`](.planning/ISSUES.md); every fixed bug adds a row to
 [`.planning/REGRESSION.md`](.planning/REGRESSION.md); ideas wait in
-[`.planning/IDEAS.md`](.planning/IDEAS.md). All work lands on branch
-`v5.2-migui_again`; only the owner merges it into `v5.1-migui_clean` (IM9).
+[`.planning/IDEAS.md`](.planning/IDEAS.md). All work lands on
+the current branch: **`v6.1-migui`** since November 2026 (earlier `v5.2-migui_again`); the owner allows pushing it and decides merges into the main line (IM9).
 `.planning/ROADMAP.md` orders *how the code is made right* (data → walkthroughs
 → section J bugs → backend split → design system → performance). What the app
 must *do* still comes from the files below. The work queue for behaviour is,
@@ -179,7 +179,7 @@ the checker still sees problems). Details: `frontend/e2e/README.md`. Run only th
 while working; all roles once before merging a packet that touches
 `frontend/src/**` or a route the frontend calls.
 
-Before the owner merges `v5.2-migui_again` into `v5.1-migui_clean`, every
+Before the owner merges the current branch (`v6.1-migui`) into the main line, every
 automated row in `.planning/REGRESSION.md` runs on that commit.
 
 ## How the team splits work
@@ -220,7 +220,7 @@ git worktree add -b <branch> E:/Github_Projects/CAPSTONE-USLS-MVP-wt/<short> HEA
 
 Then one `Agent` call per packet with `model: "sonnet"`, telling it to work
 only in `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/<short>`. Independent packets go out in
-parallel, each in its own worktree, branched from `v5.2-migui_again`.
+parallel, each in its own worktree, branched from the current branch (`v6.1-migui`).
 
 - **At most 3 implementer subagents at once** (owner, IM10), and only if their
   file sets do not overlap. While `app.py` is still one file, only **one**

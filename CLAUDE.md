@@ -13,7 +13,7 @@ subagents, and the local model. Do not restate them here.
   are the single source of truth for what the app must do — `.planning/` must
   never drift from them.
 - **Improvement mode (v5.2, from 2026-10-17):** work lands on
-  `v5.2-migui_again` in the order of `.planning/ROADMAP.md`. The owner reads
+  the current branch `v6.1-migui` (earlier `v5.2-migui_again`) in the order of `.planning/ROADMAP.md`. The owner reads
   `.planning/BOARD.md`; owner decisions are `.planning/DECISIONS.md`
   (IM1–IM15); bugs and findings are rows in `.planning/ISSUES.md`; the
   unattended loop is `.planning/IMPROVE.md`. Code map: `.planning/codebase/`.
