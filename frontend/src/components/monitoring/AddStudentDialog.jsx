@@ -2,7 +2,8 @@ import { useId, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { api } from "../../api";
 import { Button, Field, InlineNotice, Input, Modal, Select } from "../ui/index.js";
-import { facultyOptions, useActiveFaculty } from "./knownData";
+import AyEntrySelect from "./AyEntrySelect";
+import { emailProblem, facultyOptions, studentIdWarning, useActiveFaculty } from "./knownData";
 
 const EMPTY = {
   student_number: "",
@@ -16,24 +17,30 @@ const EMPTY = {
 };
 
 // "Add student" form: same required fields and duplicate checks as the sheet import.
-export default function AddStudentDialog({ programs = [], defaultProgramId = "", defaultAyEntry = "", onClose, onCreated }) {
+export default function AddStudentDialog({ programs = [], defaultProgramId = "", defaultAyEntry = "", termLabels = [], studentValues = [], onClose, onCreated }) {
   const [form, setForm] = useState({ ...EMPTY, program_id: String(defaultProgramId || ""), academic_year_entry: defaultAyEntry });
   const { faculty } = useActiveFaculty();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [possible, setPossible] = useState(null);
   const [created, setCreated] = useState(null);
+  const [askId, setAskId] = useState(false);
   const formId = useId();
 
   function set(field) {
     return (event) => {
       setForm((current) => ({ ...current, [field]: event.target.value }));
       setPossible(null);
+      setAskId(false);
     };
   }
 
-  async function submit(event, confirmDuplicate = false) {
+  const idWarning = studentIdWarning(form.student_number);
+  const emailError = emailProblem(form.email);
+
+  async function submit(event, confirmDuplicate = false, idOk = false) {
     event?.preventDefault();
+    if (idWarning && !idOk) { setAskId(true); return; }
     setBusy(true);
     setError("");
     try {
@@ -56,7 +63,7 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
   }
 
   const ready = form.student_number.trim() && form.first_name.trim() && form.last_name.trim()
-    && form.program_id && form.academic_year_entry.trim();
+    && form.program_id && form.academic_year_entry.trim() && !emailError;
 
   // Two states in one window: the form, then the result (login and first password) once the student is created.
   const footer = created ? (
@@ -97,7 +104,7 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
       ) : (
         <form id={formId} onSubmit={submit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Student ID" required>
+            <Field label="Student ID" required hint={idWarning || undefined}>
               <Input data-autofocus="" value={form.student_number} onChange={set("student_number")} required maxLength={40} autoComplete="off" inputMode="numeric" placeholder="e.g. 1860101" />
             </Field>
             <Field label="Program" required>
@@ -109,13 +116,13 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
             <Field label="Last name" required>
               <Input value={form.last_name} onChange={set("last_name")} required maxLength={80} autoComplete="off" />
             </Field>
-            <Field label="School year / AY entry" required hint="Starts as the current semester's school year. Format 26-27 (or 2026-2027).">
-              <Input value={form.academic_year_entry} onChange={set("academic_year_entry")} required maxLength={20} placeholder="26-27" autoComplete="off" />
+            <Field label="School year / AY entry" required hint="Starts as the current semester's school year.">
+              <AyEntrySelect value={form.academic_year_entry} onChange={set("academic_year_entry")} termLabels={termLabels} studentValues={studentValues} required />
             </Field>
             <Field label="Enrollment status">
               <Select value={form.enrollment_tag} onChange={set("enrollment_tag")} options={["Enrolled", "Not Enrolled"]} placeholder="" />
             </Field>
-            <Field label="Email" hint="Leave blank to generate the school address.">
+            <Field label="Email" hint={emailError ? undefined : "Leave blank to generate the school address."} error={emailError || undefined}>
               <Input type="email" value={form.email} onChange={set("email")} maxLength={160} autoComplete="off" />
             </Field>
             <Field label="Adviser (optional)">
@@ -123,10 +130,16 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
             </Field>
           </div>
 
+          {askId && !possible && (
+            <InlineNotice tone="warning" icon role="alert">
+              <p className="font-normal">{idWarning} Check the number before going on.</p>
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => submit(null, false, true)} className="mt-2">Use this ID anyway</Button>
+            </InlineNotice>
+          )}
           {possible && (
             <InlineNotice tone="warning" icon role="alert">
               <p className="font-normal">{possible}</p>
-              <Button variant="secondary" size="sm" disabled={busy} onClick={() => submit(null, true)} className="mt-2">Add as a separate student</Button>
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => submit(null, true, true)} className="mt-2">Add as a separate student</Button>
             </InlineNotice>
           )}
           {error && !possible && <InlineNotice tone="danger">{error}</InlineNotice>}

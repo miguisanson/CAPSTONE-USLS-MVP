@@ -19,6 +19,8 @@ import HandoffResult from "../../components/HandoffResult";
 import { formatDate } from "../../lib/format";
 import { toneOf } from "../../lib/tone";
 import { WorkflowCaseModal } from "./shared";
+import AyEntrySelect from "../../components/monitoring/AyEntrySelect";
+import { normalizeAyEntry, studentIdWarning } from "../../components/monitoring/knownData";
 
 // ---------------------------------------------------------------------------
 // Student Handoff — AIMS export import & reconciliation (no manual student creation).
@@ -472,7 +474,7 @@ function MonitoringIssueModal({ issue, busy, error, onClose, onResolve }) {
     student_number: uploaded.student_number || "",
     first_name: uploaded.first_name || "",
     last_name: uploaded.last_name || "",
-    academic_year_entry: uploaded.academic_year_entry || "",
+    academic_year_entry: normalizeAyEntry(uploaded.academic_year_entry) || uploaded.academic_year_entry || "",
     subjects: { ...(uploaded.subjects || {}) },
   });
   const subjectRows = issue.subject_comparison || [];
@@ -538,8 +540,12 @@ function MonitoringIssueModal({ issue, busy, error, onClose, onResolve }) {
             <h3 className="card-title flex items-center gap-2"><Pencil className="h-4 w-4 text-brand-700" aria-hidden="true" /> Edit uploaded values</h3>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {[["student_number", "Student ID"], ["first_name", "First name"], ["last_name", "Last name"], ["academic_year_entry", "School Year / AY Entry"]].map(([key, label]) => (
-                <Field key={key} label={label}>
-                  <Input value={edited[key]} onChange={(event) => setEdited((current) => ({ ...current, [key]: event.target.value }))} />
+                <Field key={key} label={label} hint={key === "student_number" ? studentIdWarning(edited[key]) || undefined : undefined}>
+                  {key === "academic_year_entry" ? (
+                    <AyEntrySelect value={edited[key]} onChange={(event) => setEdited((current) => ({ ...current, [key]: event.target.value }))} />
+                  ) : (
+                    <Input value={edited[key]} onChange={(event) => setEdited((current) => ({ ...current, [key]: event.target.value }))} inputMode={key === "student_number" ? "numeric" : undefined} />
+                  )}
                 </Field>
               ))}
             </div>
