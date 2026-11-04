@@ -323,3 +323,88 @@ class AssistantDeanCountTests(Audit4Base):
             self.assertEqual(home, 2)
             self.assertEqual(queue["total"] + len(queue["extras"]), home)
             self.assertIn("2 item(s)", queue_answer(queue))
+
+
+class AwolRegistrarHandoffTests(Audit4Base):
+    """I-296: an approved AWOL return is tracked to the Registrar like a leave: Pending Handoff, a task, Exported, Sent, Acknowledged."""
+
+    TASK = "Send the approved AWOL return to the Registrar"
+
+    def approved_case(self):
+        from app import AwolCase
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.standing, student.enrollment_tag, student.current_stage = "AWOL", "AWOL", "AWOL"
+            case = AwolCase(student_id=student.id, status="Dean Review", dean_decision="Pending", prior_stage="Coursework",
+                            awol_effective_date=date.today() - timedelta(days=200), return_intent="I wish to return.",
+                            target_return_term="Term One")
+            db.session.add(case)
+            db.session.commit()
+            case_id = case.id
+        response = self.client("dean").post(f"/api/approvals/workflow/awol-return/{case_id}/decide",
+                                            json={"decision": "approve", "note": "Endorsed."})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        return case_id
+
+    def task_status(self):
+        from app import Task
+        with app.app_context():
+            row = Task.query.filter_by(student_id=self.student_id, title=self.TASK).first()
+            return row.status if row else None
+
+    def test_dean_approval_starts_the_registrar_handoff_with_a_task(self):
+        from app import AwolCase
+        case_id = self.approved_case()
+        with app.app_context():
+            self.assertEqual(db.session.get(AwolCase, case_id).registrar_status, "Pending Handoff")
+        self.assertEqual(self.task_status(), "Pending")
+
+    def test_the_registrar_report_marks_it_exported_and_closes_the_task_then_staff_advance_it(self):
+        case_id = self.approved_case()
+        staff = self.client("staff")
+        self.assertEqual(staff.get(f"/api/awol/{case_id}/registrar-report").status_code, 200)
+        from app import AwolCase
+        with app.app_context():
+            self.assertEqual(db.session.get(AwolCase, case_id).registrar_status, "Exported - Ready to Send")
+        self.assertEqual(self.task_status(), "Done")
+        skip = staff.post(f"/api/awol/{case_id}/registrar-handoff", json={"target": "Acknowledged"})
+        self.assertEqual(skip.status_code, 409, skip.get_json())
+        for target in ("Sent to Registrar", "Acknowledged"):
+            step = staff.post(f"/api/awol/{case_id}/registrar-handoff", json={"target": target})
+            self.assertEqual(step.status_code, 200, step.get_json())
+            self.assertEqual(step.get_json()["case"]["registrar_status"], target)
+
+
+class DemoDataAgeNoticeTests(Audit4Base):
+    """I-332: staff are told when the demo data is old (the withdrawal window closes about 11 days after a seed)."""
+
+    def age_the_seed(self, days):
+        from datetime import datetime
+        with app.app_context():
+            for account in UserAccount.query.all():
+                account.created_at = datetime.utcnow() - timedelta(days=days)
+            db.session.commit()
+
+    def notice(self, role):
+        return self.client(role).get("/api/auth/me").get_json().get("demo_notice")
+
+    def test_old_seed_shows_staff_a_reset_notice(self):
+        self.age_the_seed(9)
+        for role in ("staff", "admin"):
+            notice = self.notice(role)
+            self.assertIsNotNone(notice, role)
+            self.assertEqual(notice["age_days"], 9)
+            self.assertIn("npm run seed", notice["message"])
+            self.assertIn("9 days", notice["message"])
+
+    def test_fresh_seed_and_other_roles_get_no_notice(self):
+        self.age_the_seed(2)
+        self.assertIsNone(self.notice("staff"))
+        self.age_the_seed(30)
+        for role in ("student", "faculty"):
+            self.assertIsNone(self.notice(role), role)
+
+    def test_no_notice_outside_demo_mode(self):
+        self.age_the_seed(30)
+        with patch.dict(os.environ, {"DEMO_MODE": "0"}):
+            self.assertIsNone(self.notice("staff"))

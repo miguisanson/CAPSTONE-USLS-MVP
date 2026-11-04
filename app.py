@@ -385,6 +385,34 @@ def demo_skip_date_waits() -> bool:
     return os.getenv("DEMO_SKIP_DATE_WAITS", "1").strip().lower() not in {"0", "false", "no", "off"}
 
 
+DEMO_STALE_AFTER_DAYS = 7  # the withdrawal window closes 14 days after the semester start, which the seed dates 3 days back
+
+
+def demo_data_age_notice(account: UserAccount | None) -> dict | None:
+    """For staff and admin in demo mode: a notice once the seeded demo data is older than DEMO_STALE_AFTER_DAYS.
+
+    The seed day is the oldest account's creation date (the seed creates every account), so no
+    schema or setting is needed.
+    """
+    if not account or account.role not in {"staff", "admin"} or not demo_mode_enabled():
+        return None
+    seeded = db.session.query(db.func.min(UserAccount.created_at)).scalar()
+    if not seeded:
+        return None
+    age = (now_utc().replace(tzinfo=None) - seeded.replace(tzinfo=None)).days
+    if age < DEMO_STALE_AFTER_DAYS:
+        return None
+    return {
+        "age_days": age,
+        "seeded_on": seeded.date().isoformat(),
+        "message": (
+            f"The demo data was built {age} days ago. Steps that wait on dates (for example the withdrawal window, "
+            "which closes 14 days after the semester starts) can be closed now. Reset the demo data by running "
+            "`npm run seed` on the server."
+        ),
+    }
+
+
 def demo_accounts_listing_enabled() -> bool:
     """DEMO_SHOW_ACCOUNTS (default ON, needs DEMO_MODE): may the public sign-in page list the demo
     logins and the shared password? A public UAT site turns this OFF and hands logins out privately."""
@@ -883,6 +911,11 @@ class AwolCase(db.Model):
     staff_notes = db.Column(db.Text)
     dean_remarks = db.Column(db.Text)
     decided_at = db.Column(db.DateTime)
+    # Registrar handoff of the approved return, same states as a leave (LEAVE_REGISTRAR_STATUSES).
+    registrar_status = db.Column(db.String(40), nullable=False, default="Not Ready")
+    registrar_exported_at = db.Column(db.DateTime)
+    registrar_sent_at = db.Column(db.DateTime)
+    registrar_acknowledged_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=now_utc)
     updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
 
@@ -8738,6 +8771,9 @@ def leave_export_log_dict(item: LeaveExportLog) -> dict:
     }
 
 
+AWOL_REGISTRAR_TASK = "Send the approved AWOL return to the Registrar"
+
+
 def leave_registrar_advance(case: LeaveCase, target: str, account: UserAccount) -> None:
     """Exported -> Sent to Registrar -> Acknowledged, one step at a time."""
     order = {"Exported - Ready to Send": "Sent to Registrar", "Sent to Registrar": "Acknowledged"}
@@ -9310,6 +9346,10 @@ def awol_case_dict(item: AwolCase, include_student: bool = True) -> dict:
         "created_at": iso(item.created_at),
         "updated_at": iso(item.updated_at),
         "registrar_report_url": f"/api/awol/{item.id}/registrar-report",
+        "registrar_status": item.registrar_status,
+        "registrar_exported_at": iso(item.registrar_exported_at),
+        "registrar_sent_at": iso(item.registrar_sent_at),
+        "registrar_acknowledged_at": iso(item.registrar_acknowledged_at),
     }
     if include_student:
         payload["student"] = student_brief(item.student)
@@ -13708,7 +13748,11 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/auth/me")
     def auth_me():
         account = current_account()
-        return no_store(jsonify({"user": account_dict(account) if account else None}))
+        payload = {"user": account_dict(account) if account else None}
+        notice = demo_data_age_notice(account)
+        if notice:
+            payload["demo_notice"] = notice
+        return no_store(jsonify(payload))
 
     @app.route("/api/auth/login", methods=["POST"])
     def auth_login():
@@ -15409,12 +15453,35 @@ def register_routes(app: Flask) -> None:
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
+    @app.route("/api/awol/<int:case_id>/registrar-handoff", methods=["POST"])
+    @require_api_login("staff", "academic_coordinator")
+    def awol_registrar_handoff(case_id: int):
+        """Exported -> Sent to Registrar -> Acknowledged, one step at a time (same as a leave)."""
+        item = AwolCase.query.get_or_404(case_id)
+        target = str((request.get_json(silent=True) or {}).get("target") or "")
+        order = {"Exported - Ready to Send": "Sent to Registrar", "Sent to Registrar": "Acknowledged"}
+        if order.get(item.registrar_status) != target:
+            return jsonify({"error": f"The AWOL return is \"{item.registrar_status}\"; it cannot move to \"{target}\" now."}), 409
+        previous, item.registrar_status = item.registrar_status, target
+        if target == "Sent to Registrar":
+            item.registrar_sent_at = now_utc()
+        else:
+            item.registrar_acknowledged_at = now_utc()
+        add_log("awol", item.student_id, workflow_actor_label(current_account()), "Registrar handoff",
+                f"AWOL return handoff: {target}", "Graduate School Staff", f"Handoff status: {previous} to {target}.",
+                previous_status=item.status, new_status=item.status, visibility="internal")
+        db.session.commit()
+        return jsonify({"ok": True, "case": awol_case_dict(item)})
+
     @app.route("/api/awol/<int:case_id>/registrar-report")
     @require_api_login("staff", "academic_coordinator")
     def awol_registrar_report(case_id: int):
         item = AwolCase.query.get_or_404(case_id)
         if not str(item.dean_decision or "").startswith("Approved"):
             return jsonify({"error": "The Dean must endorse the AWOL return before a Registrar report is generated."}), 400
+        if item.registrar_status == "Pending Handoff":
+            item.registrar_status, item.registrar_exported_at = "Exported - Ready to Send", now_utc()
+            close_research_tasks(item.student_id, AWOL_REGISTRAR_TASK)
         add_log(
             "awol",
             item.student_id,
@@ -19235,6 +19302,9 @@ def register_routes(app: Flask) -> None:
                 add_task(student.id, "Revise structured return declaration from AWOL", "Student", 5, 55)
             else:
                 return jsonify({"error": "AWOL return decisions must be approve, deny, or return."}), 400
+            if decision == "approve":  # I-296: the Dean's endorsement goes to the Registrar like an approved leave
+                item.registrar_status = "Pending Handoff"
+                add_task(student.id, AWOL_REGISTRAR_TASK, "Graduate School Staff", 3, 40)
             recompute_risk(student)
             item.decided_at = now_utc()
             item.updated_at = now_utc()
@@ -22052,7 +22122,10 @@ def register_routes(app: Flask) -> None:
             )
             run_google_calendar_hook(sync_defense_google_events, schedule)
             db.session.commit()
-        return jsonify({"ok": True, "venue": schedule.venue, "venue_history": defense_venue_history(schedule)})
+        return jsonify({
+            "ok": True, "venue": schedule.venue, "venue_history": defense_venue_history(schedule),
+            "message": "Venue saved. The student and the panel were told.",
+        })
 
     @app.route("/api/faculty-portal/defense-schedules/<int:schedule_id>/cannot-attend", methods=["POST"])
     @require_api_login("faculty")
@@ -41030,7 +41103,7 @@ def seed_report_history(today: date | None = None) -> int:
                         last_enrolled_term=older_term.label, target_return_term=term.label,
                         return_intent="Seeded history: written intention to return.",
                         detection_source="Seeded history", policy_classification="Within Maximum Residence",
-                        updated_at=decided,
+                        updated_at=decided, registrar_status="Acknowledged" if approved else "Not Ready",
                     ))
                 elif process == "withdrawal":
                     courses = Course.query.filter_by(program_id=student.program_id).order_by(Course.id).all()
