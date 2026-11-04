@@ -8,6 +8,7 @@ import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters"
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
 import { useOpenFilters } from "../leave/useOpenFilter";
 import { formatDate } from "../../lib/format";
+import { CaseCardFacts, CaseCardShell, MessageNote, NextOwner, ProcessScopeNote, ReadyMark } from "../../components/process";
 import { CaseMessageHistory, DemoResetButton, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, uniqueValues, useDemoCaseReset } from "./shared";
 
 // The confirm window of a practicum step: the one StepDialog. `onConfirm(payload)` throws to refuse (the message is shown inside).
@@ -66,30 +67,38 @@ function practicumReadyForDeanReview(row) {
   return row.record?.status === "Report Sent to Dean";
 }
 
-function PracticumBoardCard({ row, onOpen }) {
+// Khloe's practicum card: name and number, a green card and "Ready for Dean review" when the report is with the Dean (a grey
+// "Waiting for documents" before any file), a facts grid, the amber message box, "Next:", then View and Message.
+function PracticumBoardCard({ row, onOpen, onMessage }) {
   const record = row.record;
   const readyForDean = practicumReadyForDeanReview(row);
   const ready = Boolean(row.has_submitted_documents) || readyForDean;
-  const latestMessage = row.messages?.[0];
   const updated = row.last_activity_at || record?.updated_at;
   return (
-    <article className={`rounded-xl border bg-white p-3 shadow-sm transition-colors ${ready ? "border-brand-300 hover:border-brand-500" : "border-slate-200 hover:border-slate-300"}`}>
-      <p className="text-sm font-semibold text-ink">{row.student.name}</p>
-      <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
-      {readyForDean ? <StatusChip className="mt-2" status="Ready for Dean review" size="sm" dot={false} /> : !ready && <StatusChip className="mt-2" status="Waiting for documents" tone="muted" size="sm" dot={false} />}
-      <p className="mt-2.5 text-xs font-medium text-slate-700">{record?.practicum_site || "Site pending"}</p>
-      <p className="mt-0.5 text-xs text-slate-500">{record ? `${record.completed_hours}/${record.required_hours} hrs` : "No hours yet"} · {row.eligibility.status}</p>
-      <p className="mt-0.5 text-xs text-slate-500">{record ? `Submitted ${formatDate(record.created_at)}` : "No practicum documents submitted"}</p>
-      {updated && <p className="mt-0.5 text-xs text-slate-500">Updated {formatDate(updated)}</p>}
-      {row.messages?.length > 0 && (
-        <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
-          <p className="eyebrow !text-amber-800">{row.messages.length} visible message{row.messages.length === 1 ? "" : "s"}</p>
-          <p className="mt-1 line-clamp-2 text-xs text-amber-900">{latestMessage?.comment || latestMessage?.template}</p>
+    <CaseCardShell ready={ready}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="break-words text-sm font-semibold text-ink">{row.student.name}</p>
+          <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
         </div>
-      )}
-      <p className="mt-2.5 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || (record ? "Awaiting review" : "Student")}</p>
-      <Button variant="secondary" size="sm" icon={Eye} onClick={onOpen} className="mt-3 w-full" aria-label={`View details for ${row.student.name}`}>View details</Button>
-    </article>
+        <ReadyMark ready={readyForDean} waiting={!ready} />
+      </div>
+      <CaseCardFacts
+        facts={[
+          record?.practicum_site || "Site pending",
+          record ? `${record.completed_hours}/${record.required_hours} hrs` : "No hours yet",
+          row.eligibility.status,
+          updated ? `Updated ${formatDate(updated)}` : "",
+          { text: record ? `Submitted ${formatDate(record.created_at)}` : "No practicum documents submitted", wide: true },
+        ]}
+      />
+      <MessageNote messages={row.messages} />
+      <NextOwner owner={row.next_action_owner || (record ? "Awaiting review" : "Student")} />
+      <div className="mt-3 flex gap-2">
+        <Button variant="secondary" size="sm" icon={Eye} onClick={onOpen} className="flex-1" aria-label={`View details for ${row.student.name}`}>View</Button>
+        {record && <Button variant="secondary" size="sm" icon={MessageSquare} onClick={onMessage} className="flex-1" aria-label={`Message ${row.student.name}`}>Message</Button>}
+      </div>
+    </CaseCardShell>
   );
 }
 
@@ -205,6 +214,9 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
 
   return (
     <div className="page-stack">
+      <ProcessScopeNote title="Program scope: Psychology and MSGC only">
+        {context.practicum_program_scope?.description || "This roster includes only Psychology programs and the Master of Science in Guidance and Counseling (MSGC)."} Students from every other program are excluded from the practicum roster and actions.
+      </ProcessScopeNote>
       <BoardSummary line={summaryLine} windowName="case window" />
       <BoardFilterRow toggle={<ViewToggle value={viewMode} onChange={setViewMode} />}>
         <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={filteredRows.length} total={rows.length} noun="students" />
@@ -216,7 +228,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
           items={filteredRows}
           getItemId={practicumBoardItemId}
           getColumnKey={practicumBoardColumnKey}
-          renderCard={(row) => <PracticumBoardCard key={row.student.id} row={row} onOpen={() => openCase(row.student.id)} />}
+          renderCard={(row) => <PracticumBoardCard key={row.student.id} row={row} onOpen={() => openCase(row.student.id)} onMessage={() => setMessageRow(row)} />}
           canDrag={(row) => Boolean(practicumMoveFor(row))}
           lockReason={practicumLockReason}
           checkMove={practicumCheckMove}

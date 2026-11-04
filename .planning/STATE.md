@@ -271,6 +271,14 @@ README-FOR-MIGUI if they cite "44 forms".
 
 Done, not merged: privacy consent (GS-P-04) backend + PrivacyConsent page, seeded accounts pre-accepted, lib/formRefs.js + PageHeader `forms`, EApprovalNote in DecisionPanel and faculty decisions, e2e p112. Full e2e: 822 passed, 3 failed (p110, p84 offering setup, p79 pictures flaked in the shared run; p110 and p84 still fail alone and look unrelated: they expect a Course Adjustments Schedule tab / Save button that the page does not have).
 
+## Packet khloe-ui (2026-11-04, branch `pkt/khloe-ui`, worktree `CAPSTONE-USLS-MVP-wt/kkhloe`)
+
+- Khloe's Graduation Endorsement and Practicum layout restored on today's API. Shared pieces: `frontend/src/components/process/`
+  (StageCheck, StageCheckStrip, RequirementBoxes, StageColumnHeader, GroupCard, MemberList, GroupOverview, CaseCard parts,
+  ProcessScopeNote). Notes and design rules: `.planning/khloe-ui/COMPARE.md`. Test: `frontend/e2e/p119-khloe-graduation-practicum.spec.js`.
+- Next packet: apply the same pieces to LOA, readmission, AWOL, withdrawal, residency (Practicum columns stay 248 px until the
+  Withdrawal board moves too: p78 I-089 pins equal widths).
+
 ## Current Position — 2026-11-04: owner-requested teaching scheduling
 
 - **Branch:** `v6.1-migui`. Local commits `e7d7176` (Dean review context) and

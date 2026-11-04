@@ -15,6 +15,10 @@
 //   - the filters are one toolbar (search, program, stage/status, completed course), no extra "Completed course cohort" card;
 //   - every action still works: select students, create a batch, forward a batch, Dean approve/return, export (and its
 //     "Exported - Ready to Send" chip), the lock reasons, "Move to...".
+// CHANGED BY khloe-ui (2026-11-04, owner: "i want khloe's work back"): Khloe's layout came back, so the lines marked
+// CHANGED BY khloe-ui below no longer pin the stripped card: columns are 320 px wide, a candidate card carries the four
+// requirement boxes and the completed-courses line, a batch card has Students, the stage strip, View students, Select batch
+// and the step button (and Export for the Dean). The same facts are pinned in p119.
 // Demo data read only: Bianca Santos, Carlo Mendoza, Hector Ong (eligible, MAED), Isabel Flores ("Batch 1 October 2026").
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
@@ -102,7 +106,7 @@ for (const [role, path] of ROLES) {
         expect(item.label, `"${item.label}" is numbered`).not.toMatch(/^\d+\s*·/);
         expect(item.label, `"${item.label}" is a sentence, not a stage name`).not.toMatch(/—/);
         expect(item.titleClipped, `${item.label}: title is cut off`).toBe(false);
-        expect(item.width, `${item.label}: column is as wide as the other boards' columns`).toBeLessThanOrEqual(300);
+        expect(item.width, `${item.label}: column width`).toBeLessThanOrEqual(330); // CHANGED BY khloe-ui: 320 px (was 300) so a batch card has room for its stage strip
         expect(item.description.length, `${item.label}: one short line, not a paragraph`).toBeGreaterThan(0);
         expect(item.description.length, `${item.label}: one short line, not a paragraph`).toBeLessThanOrEqual(60);
       }
@@ -125,8 +129,10 @@ for (const [role, path] of ROLES) {
       for (let i = 0; i < (await cards.count()); i++) {
         const text = (await cards.nth(i).textContent()) || "";
         expect(text, `card ${i} shows the cohort list`).not.toContain("Completed subjects:");
-        await expect(cards.nth(i).locator('[aria-label="Completed graduation requirements"]'), `card ${i}: requirement tiles`).toHaveCount(0);
-        await expect(cards.nth(i).locator("span.rounded-full.ring-1"), `card ${i}: exactly one status chip`).toHaveCount(1);
+        // CHANGED BY khloe-ui: a candidate card shows the four requirement boxes; a batch card shows them in its student list (View students) and a stage strip with its own counter chip.
+        const isBatch = (text).includes("Stage check");
+        await expect(cards.nth(i).locator('[aria-label="Completed graduation requirements"]'), `card ${i}: requirement boxes`).toHaveCount(isBatch ? 0 : 1);
+        await expect(cards.nth(i).locator("span.rounded-full.ring-1").first(), `card ${i}: a status chip`).toBeVisible();
         await expect(cards.nth(i).getByText(/^Next:/), `card ${i}: who is next`).toHaveCount(1);
         await expect(cards.nth(i).getByRole("button", { name: /^View details for / }), `card ${i}: View button`).toHaveCount(1);
       }
@@ -234,7 +240,8 @@ test.describe("P7.7 Graduation actions as staff", () => {
     await expect(dialog.getByText("Isabel Flores")).toBeVisible();
     await expect(dialog.getByRole("button", { name: /Message \/ Return/ })).toBeVisible();
     // CHANGED BY conC (I-126): the step is a button in this window, not on the card (the card has "View details" only).
-    await expect(batch.getByRole("button", { name: "Forward to Academic Coordinator" })).toHaveCount(0);
+    // CHANGED BY khloe-ui: Khloe's batch card has the step button again (the window keeps it too).
+    await expect(batch.getByRole("button", { name: "Forward to Academic Coordinator" })).toBeVisible();
     await dialog.getByRole("button", { name: "Forward to Academic Coordinator" }).click();
     // CHANGED BY p98 (I-152): the step dialog opens over the batch window (the batch window stays, so the focus can go back to its button).
     dialog = page.getByRole("dialog").last();
@@ -281,7 +288,8 @@ test.describe("P7.7 Graduation actions as the Dean", () => {
     await expect(batch).toHaveAttribute("draggable", "true");
     await expect(batch.getByText("Next: Dean")).toBeVisible();
     // CHANGED BY conC (I-126): the Dean's step is a button in the batch window, not on the card.
-    await expect(batch.getByRole("button", { name: "Approve endorsement list" })).toHaveCount(0);
+    // CHANGED BY khloe-ui: the step button is on the Dean's batch card again, and in the window.
+    await expect(batch.getByRole("button", { name: "Approve endorsement list" })).toBeVisible();
     await batch.getByRole("button", { name: `View details for ${BATCH}` }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Approve endorsement list" }).click();
     // CHANGED BY p98 (I-152): the Dean's decision is the one step dialog over the batch window, with two buttons (approve, or
@@ -305,7 +313,9 @@ test.describe("P7.7 Graduation actions as the Dean", () => {
     await expect(batch).toHaveCount(1);
     // CHANGED BY conC (I-126): Export is in the batch window; the card says where ("Open View details to export the list.").
     await expect(batch.getByRole("button", { name: "Export approved list" })).toHaveCount(0);
-    await expect(batch.getByText("Open View details to export the list.", { exact: true })).toBeVisible();
+    // CHANGED BY khloe-ui: the card has its own Export batch button and says so.
+    await expect(batch.getByRole("button", { name: "Export batch", exact: true })).toBeVisible();
+    await expect(batch.getByText("Approved. Export it from this card.", { exact: true })).toBeVisible();
     await batch.getByRole("button", { name: `View details for ${BATCH}` }).click();
     await expect(page.getByRole("dialog").getByRole("button", { name: "Export approved list", exact: true })).toBeVisible();
     await page.getByRole("dialog").getByRole("button", { name: "Close details" }).first().click();
