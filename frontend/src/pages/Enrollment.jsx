@@ -8,6 +8,7 @@ import {
   Card,
   DataTable,
   EmptyState,
+  EnrollmentBanner,
   Field,
   InlineNotice,
   Input,
@@ -17,6 +18,7 @@ import {
   Select,
   Spinner,
   StatusChip,
+  useEnrollmentPeriod,
 } from "../components/ui/index.js";
 import PolicyRules from "../components/PolicyRules";
 import { StudyPlanPanel } from "../components/ProcessGates";
@@ -292,6 +294,9 @@ export default function Enrollment() {
 
   if (loading && !data) return <Spinner label="Loading enrollment workspace…" />;
 
+  const period = useEnrollmentPeriod(data?.term);
+  const closed = Boolean(period?.closed); // I-355: subjects are added or changed only in the enrollment period
+
   const programOptions = (data?.programs || []).map((program) => ({ value: String(program.id), label: `${program.code} — ${program.name}` }));
   const termOptions = (data?.terms || []).map((term) => ({
     value: String(term.id),
@@ -308,7 +313,7 @@ export default function Enrollment() {
     const active = selected.has(course.course_id);
     const alreadyEnrolled = course.enrollment_state === "enrolled_current";
     const completed = course.enrollment_state === "completed";
-    const canToggle = course.selectable && !alreadyEnrolled;
+    const canToggle = course.selectable && !alreadyEnrolled && !closed;
     const actionLabel = completed
       ? "Completed"
       : alreadyEnrolled
@@ -329,7 +334,7 @@ export default function Enrollment() {
         onClick={() => toggleCourse(course.course_id)}
         aria-pressed={active}
         disabled={!canToggle}
-        title={course.status_reason}
+        title={closed ? period.reason : course.status_reason}
       >
         {actionLabel}
       </Button>
@@ -415,16 +420,19 @@ export default function Enrollment() {
               variant="secondary"
               icon={ClipboardCheck}
               loading={busy === "classlist-preview"}
-              disabled={Boolean(busy) && busy !== "classlist-preview"}
+              disabled={closed || (Boolean(busy) && busy !== "classlist-preview")}
+              title={closed ? period.reason : undefined}
               className="cursor-pointer focus-within:ring-2 focus-within:ring-brand-500"
             >
               {busy === "classlist-preview" ? "Reading class list…" : "Upload class list"}
-              <input type="file" accept=".csv,.xlsx,.xlsm" className="sr-only" onChange={previewClassList} disabled={Boolean(busy)} />
+              <input type="file" accept=".csv,.xlsx,.xlsm" className="sr-only" onChange={previewClassList} disabled={closed || Boolean(busy)} />
             </Button>
             <Button as={Link} to="/course-adjustments?view=offerings" variant="secondary" icon={BookOpenCheck}>Offering list</Button>
           </>
         }
       />
+
+      <EnrollmentBanner term={data?.term} />
 
       <div className="grid gap-3 lg:grid-cols-2">
         <PolicyRules process="enrollment" title="Enrollment and academic load: rules applied" />
@@ -562,6 +570,8 @@ export default function Enrollment() {
                             variant="icon"
                             icon={X}
                             onClick={() => toggleCourse(course.id)}
+                            disabled={closed}
+                            title={closed ? period.reason : undefined}
                             aria-label={`Remove ${course.code}`}
                           />
                         )}
@@ -587,7 +597,8 @@ export default function Enrollment() {
                   className="w-full"
                   icon={ShieldCheck}
                   onClick={() => confirmEnrollment()}
-                  disabled={!dirty || Boolean(busy)}
+                  disabled={closed || !dirty || Boolean(busy)}
+                  title={closed ? period.reason : undefined}
                   loading={busy === "save"}
                 >
                   {busy === "save" ? "Checking and saving…" : "Confirm enrollment"}

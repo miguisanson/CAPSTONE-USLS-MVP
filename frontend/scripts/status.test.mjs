@@ -7,7 +7,7 @@ import { SERVER_TONE, STATUS_GROUPS, STATUS_TONE, statusLabel, statusTone } from
 test("known statuses map to the tone the spec gives them", () => {
   assert.equal(statusTone("Approved"), "success");
   assert.equal(statusTone("On Track"), "success");
-  assert.equal(statusTone("Returned for Revision"), "warning");
+  assert.equal(statusTone("Returned for Revision"), "attention");
   assert.equal(statusTone("At Risk of Delay"), "warning");
   assert.equal(statusTone("Denied"), "danger");
   assert.equal(statusTone("Overdue"), "danger");
@@ -17,16 +17,26 @@ test("known statuses map to the tone the spec gives them", () => {
   assert.equal(statusTone("Archived"), "neutral");
 });
 
-test("every Returned... status is warning (owner-side decision AD2), never danger", () => {
+test("every Returned... status is attention (orange: a person must act; AD2 and I-358), never danger", () => {
   for (const s of ["Returned", "Returned for Revision", "Returned for Clarification", "Returned to student"]) {
-    assert.equal(statusTone(s), "warning", s);
+    assert.equal(statusTone(s), "attention", s);
   }
+});
+
+test("Approved and Passed are different colours (I-358): a decision is green, a result or a finish is teal", () => {
+  assert.equal(statusTone("Approved"), "success");
+  assert.equal(statusTone("Dean Approved"), "success");
+  for (const s of ["Passed", "Pass", "Completed", "Complete", "Graduated", "Verified"]) assert.equal(statusTone(s), "done", s);
+  assert.notEqual(statusTone("Approved"), statusTone("Passed"));
+  assert.equal(statusTone("Failed"), "danger");
+  assert.equal(statusTone("Withdrawn"), "neutral");
+  assert.equal(statusTone("Under Review"), "warning");
 });
 
 test("lookup ignores case and surrounding spaces", () => {
   assert.equal(statusTone("active"), "success");
   assert.equal(statusTone("  ACTIVE  "), "success");
-  assert.equal(statusTone("returned FOR revision"), "warning");
+  assert.equal(statusTone("returned FOR revision"), "attention");
 });
 
 test("an unknown string is neutral, and the server tone is used only for such a string", () => {
@@ -42,7 +52,7 @@ test("an unknown string is neutral, and the server tone is used only for such a 
 test("the client map wins over a server tone for a known status", () => {
   assert.equal(statusTone("Approved", "bad"), "success");
   assert.equal(statusTone("Denied", "good"), "danger");
-  assert.equal(statusTone("Returned to student", "bad"), "warning");
+  assert.equal(statusTone("Returned to student", "bad"), "attention");
 });
 
 test("empty and non-string values are neutral and do not throw", () => {
@@ -68,8 +78,8 @@ test("a status appears in exactly one group (no silent last-one-wins)", () => {
   assert.equal(Object.keys(STATUS_TONE).length, seen.size);
 });
 
-test("the five tone groups are exactly the five tones", () => {
-  assert.deepEqual(Object.keys(STATUS_GROUPS).sort(), ["danger", "info", "neutral", "success", "warning"]);
+test("the tone groups are exactly the seven tones of the colour legend", () => {
+  assert.deepEqual(Object.keys(STATUS_GROUPS).sort(), ["attention", "danger", "done", "info", "neutral", "success", "warning"]);
 });
 
 test("an Open item is blue, not the green of Approved (Fable F-24)", () => {

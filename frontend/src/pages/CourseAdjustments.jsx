@@ -7,6 +7,7 @@ import {
   Card,
   DataTable,
   EmptyState,
+  EnrollmentBanner,
   Field,
   InlineNotice,
   Input,
@@ -17,6 +18,7 @@ import {
   StatCard,
   StatusChip,
   Stepper,
+  useEnrollmentPeriod,
 } from "../components/ui/index.js";
 import { useConfirm } from "../components/confirm";
 import { formatDate as formatSharedDate } from "../lib/format";
@@ -96,9 +98,11 @@ export default function CourseAdjustments() {
   const status = data?.latest_plan?.status || null;
   const stepIndex = status ? STEPS.indexOf(status) : -1;
   const canManage = data?.permissions?.can_manage === true;
+  const period = useEnrollmentPeriod(data?.term); // I-355: subjects are added or changed only in the enrollment period
   const canEdit = canManage
     && (status === null || status === "Draft" || status === "Returned")
-    && data?.planning_window_open !== false;
+    && data?.planning_window_open !== false
+    && !period?.closed;
 
   async function saveDraft(showMessage = true) {
     if (!programId) return;
@@ -385,6 +389,8 @@ export default function CourseAdjustments() {
         <EmptyState icon={AlertTriangle} title="Could not load course adjustments" hint={error} />
       ) : (
         <>
+          <EnrollmentBanner term={data?.term} />
+
           <SectionCard
             title="Adjustments and subject demand"
             subtitle="Demand is recalculated automatically from the current student records. The coordinator remains responsible for every offering and faculty decision."
@@ -422,10 +428,10 @@ export default function CourseAdjustments() {
                 Demand numbers are guidance. Every curriculum subject remains available for a manual offering decision.
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" loading={busy === "draft"} onClick={() => planAction("draft")} icon={Settings2} disabled={!canEdit}>
+                <Button variant="secondary" loading={busy === "draft"} onClick={() => planAction("draft")} icon={Settings2} disabled={!canEdit} title={period?.closed ? period.reason : undefined}>
                   {status === "Draft" || status === "Returned" ? "Update draft" : "Save draft"} ({offeredCount} offered)
                 </Button>
-                <Button variant={canEdit ? "primary" : "secondary"} loading={busy === "submit"} onClick={() => planAction("submit")} icon={Send} disabled={!canEdit}>
+                <Button variant={canEdit ? "primary" : "secondary"} loading={busy === "submit"} onClick={() => planAction("submit")} icon={Send} disabled={!canEdit} title={period?.closed ? period.reason : undefined}>
                   Submit for approval
                 </Button>
                 <Button variant={canManage && status === "Approved" ? "primary" : "secondary"} loading={busy === "publish"} onClick={() => planAction("publish")} icon={CheckCircle2} disabled={!canManage || status !== "Approved"}>

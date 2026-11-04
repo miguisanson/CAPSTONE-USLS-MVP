@@ -3,7 +3,7 @@ import { formatDate, formatDateTime } from "../../lib/format";
 import { ProgressBar } from "../../components/ui/ProgressBar.jsx";
 import { Button, EditableText, HistoryPanel, StatusChip } from "../../components/ui/index.js";
 import { Block } from "./leaveUi";
-import { plural, whenDates, whenText } from "./leaveHelpers";
+import { keyFact, plural, restLines, whenDates, whenText } from "./leaveHelpers";
 
 function Row({ label, children, full = false }) {
   return (
@@ -34,6 +34,27 @@ function SummaryRows({ item, onEdited }) {
         ))}
       </dl>
     </Block>
+  );
+}
+
+// The first thing in the details window (I-356): why, and for how long. Plain ink on white - the colours below belong to
+// statuses, so this block carries none.
+export function CaseHeadline({ item }) {
+  const leave = item.kind === "LOA" || item.kind === "LOA_EXTENSION";
+  const first = leave ? { label: "Reason", value: keyFact(item) } : { label: item.kind === "READMISSION" ? "Returning in" : "About", value: keyFact(item) };
+  const second = leave ? { label: "Leave period", value: whenText(item), sub: whenDates(item) } : restLines(item)[0] ? { label: "Details", value: restLines(item)[0] } : null;
+  return (
+    <dl data-testid="case-summary-top" className="grid gap-x-6 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2">
+      {[first, second].filter(Boolean).map((row) => (
+        <div key={row.label} className="min-w-0">
+          <dt className="eyebrow">{row.label}</dt>
+          <dd className="mt-0.5 text-base font-semibold text-ink">
+            {row.value}
+            {row.sub && <span className="block text-xs font-normal text-slate-500">{row.sub}</span>}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

@@ -5,6 +5,8 @@ export * from "./Button.jsx";
 export * from "./Card.jsx";
 export * from "./Field.jsx";
 export * from "./StatusChip.jsx";
+export * from "./StatusLegend.jsx";
+export * from "./EnrollmentBanner.jsx";
 export * from "./Modal.jsx";
 export * from "./DataTable.jsx";
 export * from "./Feedback.jsx";

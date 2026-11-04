@@ -4,7 +4,7 @@ import { Button, InlineNotice, Modal, Spinner } from "../../components/ui/index.
 import { LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus";
 import { ActionButton } from "./leaveUi";
 import CaseConversation from "./CaseConversation";
-import { CaseHistory, CaseSummary, ChecklistView, EarlierCases, FileList, FollowUpBlock, PolicyCheck, StudentSummary } from "./CaseSections";
+import { CaseHeadline, CaseHistory, CaseSummary, ChecklistView, EarlierCases, FileList, FollowUpBlock, PolicyCheck, StudentSummary } from "./CaseSections";
 
 /**
  * The full window for one request, the same in all four standalone processes: timeline, the
@@ -64,6 +64,7 @@ export default function CaseDetailModal({ caseId, slug, vocabulary, version, onC
       {detail && (
         <div className="space-y-4">
           {error && <InlineNotice tone="danger">{error}</InlineNotice>}
+          <CaseHeadline item={detail} />
           <LeaveTimeline steps={detail.timeline} />
           <CaseSummary item={detail} onEdited={() => setEdited((n) => n + 1)} />
           <PolicyCheck detail={detail} />

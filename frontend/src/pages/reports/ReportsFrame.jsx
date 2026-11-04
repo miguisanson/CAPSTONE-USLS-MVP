@@ -7,7 +7,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, Minus, SlidersHorizontal } from "luc
 import { useSearchParams } from "react-router-dom";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, EmptyState, Field, PageHeader, Select, Skeleton, Tabs } from "../../components/ui/index.js";
+import { Button, Card, EmptyState, Field, PageHeader, Select, Skeleton, StatusLegend, Tabs } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import ListDialog from "./ListDialog.jsx";
 import { DEFAULT_PERIOD, FRAME_KEYS, PERIODS, apiScope, scopeKey } from "./scope.js";
@@ -83,7 +83,8 @@ function scopeSentence(summary, programs, scope) {
 
 export default function ReportsFrame({ title, description, icon, actions, tabs, label = "Reports", children }) {
   const [params, setParams] = useSearchParams();
-  const active = tabs.find((tab) => tab.id === params.get("report")) || tabs[0];
+  const requested = params.get("report");
+  const active = tabs.find((tab) => tab.id === requested || tab.aliases?.includes(requested)) || tabs[0]; // an alias is an older address of the same tab (?report=graduation)
   const scope = useMemo(() => apiScope(params), [params]);
   const key = scopeKey(scope);
   const { data: meta } = useApi(() => api.meta(), []);
@@ -99,12 +100,14 @@ export default function ReportsFrame({ title, description, icon, actions, tabs, 
     const next = new URLSearchParams(params);
     next.delete("workflow_type");
     next.set("report", active.id);
+    if (requested && requested !== active.id && name !== "view" && !next.get("view")) next.set("view", requested); // keep the view an alias asked for
     if (value && !(name === "period" && value === DEFAULT_PERIOD)) next.set(name, value);
     else next.delete(name);
     setParams(next, { replace: true });
   }
   function clearFilters() {
-    setParams(new URLSearchParams({ report: active.id }), { replace: true });
+    const keep = params.get("view") || (requested !== active.id ? requested : ""); // Clear filters stays on the same view of the tab
+    setParams(new URLSearchParams({ report: active.id, ...(keep ? { view: keep } : {}) }), { replace: true });
   }
   // Program, cohort and period mean the same on every tab, so they stay; a filter only the old tab had is dropped
   // (a hidden filter would narrow rows with no way to see why).
@@ -162,6 +165,8 @@ export default function ReportsFrame({ title, description, icon, actions, tabs, 
           </div>
         )
       )}
+
+      <StatusLegend />
 
       <Tabs label={label} tabs={tabs.map((tab) => ({ key: tab.id, label: tab.label, icon: tab.icon }))} value={active.id} onChange={chooseTab} />
       {active.render(ctx)}

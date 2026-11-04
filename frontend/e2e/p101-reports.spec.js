@@ -35,7 +35,7 @@ test.afterEach(async () => {
 
 const STAFF_TABS = [
   "Needs attention", "Where students get stuck", "Office speed", "Records to fix",
-  "By year started", "Graduation candidates", "Overdue and pending", "Defenses", "Registrar changes",
+  "By year started", "Overdue and pending", "Registrar changes", // CHANGED BY p118 (I-357): Graduation candidates and Defenses moved under By year started
 ];
 const RESEARCH_TABS = ["Needs attention", "Where students get stuck", "Records to fix"];
 const DEAN_TABS = ["Waiting for my decision", "How fast decisions are made", "Outcomes", "Graduation pipeline", "Students by stage"]; // I-189 added the last

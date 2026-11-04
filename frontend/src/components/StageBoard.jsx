@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Inbox, Loader2, Lock, Move } from "lucide-react";
 import { useIsPhone } from "../hooks";
-import { EmptyState, InlineNotice } from "./ui/index.js";
+import { EmptyState, InlineNotice, StatusLegend } from "./ui/index.js";
 
 /**
  * A staged board with real drag and drop (native HTML5, no dependency).
@@ -309,6 +309,7 @@ export default function StageBoard({
     return (
       <div data-testid="stage-board">
         <BoardNotice notice={activeNotice.notice} onDismiss={activeNotice.dismiss} />
+        <StatusLegend className="mb-3" />
         <div ref={regionRef} role="region" aria-label={phoneAriaLabel} className="space-y-5">
           {groups.length ? (
             groups.map(({ column, columnItems }) => (
@@ -334,6 +335,7 @@ export default function StageBoard({
   return (
     <div data-testid="stage-board">
       <BoardNotice notice={activeNotice.notice} onDismiss={activeNotice.dismiss} />
+      <StatusLegend className="mb-3" />
       {(hidden.left > 0 || hidden.right > 0) && (
         <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
           <p data-testid="board-scroll-hint" className="meta font-medium text-slate-600">
