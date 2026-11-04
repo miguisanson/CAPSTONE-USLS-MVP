@@ -1,5 +1,20 @@
 # State
 
+## 2026-11-04 evening - Demo Guide autopilot (packet `pkt/autopilot`, worktree `CAPSTONE-USLS-MVP-wt/kauto`, branch from v6.2-migui; not merged, not pushed)
+
+- A started demo (sign-in "Start a guided demo" or a demo picked in the panel) locks into a slideshow bar: Back / **Next** / Take over /
+  Stop, "Step n of N", progress bar, `aria-live` caption. Next signs in as the step's person when needed, opens the page, plays the
+  step's `actions` (fake cursor, ring, typed text, click-shield), asks `/api/demo/guide-state` and only then moves on. Take over / Esc
+  hands the page back; Next carries on from the step the record shows. Code: `frontend/src/lib/demoGuide/{autopilot,useAutopilot}.js`,
+  `components/DemoAutopilotBar.jsx`, `components/DemoGuide.jsx`; one file per guide in `lib/demoGuide/guides/`.
+- All 8 guides have `actions` (main path from the `case_*.py` capture scripts; return/deny side steps get a plain resend or a pause).
+  Spec `frontend/e2e/p115-autopilot.spec.js` plays each guide from the sign-in page to the last step and reads the final record.
+  p115 has its own Playwright project (`autopilot`, after `sweep`, `section-j`, `pages`) because it shares demo students with p32,
+  p114 and section-j (see `e2e/DATA-OWNERSHIP.md`).
+- Monitoring Sheet autopilot adds a NEW student each run (`{stamp}` = time of day in the Student ID and last name), so reruns work.
+- Not tested: the return/deny branch actions (resend, denied) and the Hours Incomplete detour of Practicum (autopilot takes the
+  200-hours path).
+
 **Current branch: `v6.2-migui`** (made 2026-11-04 13:3x from `v6.1-migui` 9bf95ac, identical code). Natalie works here: `git fetch` then `git switch v6.2-migui`, `npm run seed` once, `/continue_CAPSTONE-USLS-MVP`.
 
 ## 2026-11-04 13:25 — demo videos re-recorded (session "redo videos"; not committed)

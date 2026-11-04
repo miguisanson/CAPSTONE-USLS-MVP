@@ -384,7 +384,7 @@ export function SubmitState({ busy, error, message, label, disabled = false, dis
     <div className="space-y-3">
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       {message && <InlineNotice tone="success" icon={CheckCircle2}>{message}</InlineNotice>}
-      <Button type="submit" icon={Send} loading={busy} disabled={disabled} className="w-full sm:w-auto">
+      <Button type="submit" icon={Send} loading={busy} disabled={disabled} data-demo="submit" className="w-full sm:w-auto">
         {busy ? "Submitting…" : label}
       </Button>
       {disabledHint && <p className="meta font-medium">{disabledHint}</p>}

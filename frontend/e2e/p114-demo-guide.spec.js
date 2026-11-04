@@ -15,7 +15,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ARTIFACTS_DIR, BASE_URL, REPO_ROOT } from "./support/paths.mjs";
 import { PASSWORD } from "./support/accounts.js";
-import { GUIDES, RESET_KEYS } from "../src/lib/demoGuide/guides.js";
+import { GUIDES, RESET_KEYS } from "../src/lib/demoGuide/guides/index.js";
 import { caseStatus, isDone, offScript, resolveStep, routeMatches, writeMatches } from "../src/lib/demoGuide/engine.js";
 
 const SHOTS = join(ARTIFACTS_DIR, "screens", "p114");
@@ -514,9 +514,12 @@ test.describe("screens", () => {
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "no sideways scroll").toBe(true);
         if (width < 640) {
           // a bottom sheet: full width, on the bottom edge, never taller than 60% of the screen
-          expect(Math.round(box.width)).toBe(width);
-          expect(Math.round(box.y + box.height)).toBe(height);
-          expect(box.height).toBeLessThanOrEqual(height * 0.6 + 1);
+          // (p115: choosing a demo starts the slideshow, which lifts the panel above its bar; Stop gives the plain sheet back)
+          await page.getByTestId("autopilot-bar").getByRole("button", { name: "Stop" }).click();
+          const sheet = await panel.boundingBox();
+          expect(Math.round(sheet.width)).toBe(width);
+          expect(Math.round(sheet.y + sheet.height)).toBe(height);
+          expect(sheet.height).toBeLessThanOrEqual(height * 0.6 + 1);
           await panel.getByRole("button", { name: "Collapse" }).click();
           expect((await panel.boundingBox()).height).toBeLessThan(90);
           await panel.getByRole("button", { name: "Expand" }).click();
