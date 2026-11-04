@@ -57,3 +57,7 @@ export const DENIED = (id, route, page, say) => ({
   doneWhen: "manual",
   ifAsked: [{ q: "What can the student do after a denial?", a: "Graduate School staff tell the student what to do next. A new request can be filed if the reason no longer applies." }],
 });
+
+// Guides for a screen or a process that keeps no case row ask the server for no record: GET /api/demo/guide-state only knows the
+// slug "reports" for that (it answers `case: null`), and every step says when it is done by route or by the write that came back 2xx.
+export const NO_CASE = "reports";

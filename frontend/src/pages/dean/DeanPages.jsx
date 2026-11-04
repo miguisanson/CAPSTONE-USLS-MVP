@@ -252,6 +252,7 @@ function PlanCards() {
             return (
               <SectionCard
                 key={plan.id}
+                data-demo={`course-plan-${plan.program_code}`}
                 title={`Course offerings · ${plan.program_code}`}
                 subtitle={`${plan.term_label} · ${offered.length} subject(s) proposed · submitted ${formatDate(plan.submitted_at)}`}
                 action={<StatusChip status={plan.status} dot={false} />}

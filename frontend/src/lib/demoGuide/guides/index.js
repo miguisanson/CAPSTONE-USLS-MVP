@@ -7,8 +7,9 @@ import reports from "./reports.js";
 import withdrawal from "./withdrawal.js";
 import practicum from "./practicum.js";
 import graduation from "./graduation.js";
+import courseAdjustments from "./course-adjustments.js";
 
-export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, withdrawal, practicum, graduation];
+export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, withdrawal, practicum, graduation, courseAdjustments];
 
 // The ready-made demo students that the existing reset (POST /api/auth/demo-students/<key>/reset) knows, by student number.
 export const RESET_KEYS = {
