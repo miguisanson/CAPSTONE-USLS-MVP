@@ -1,7 +1,7 @@
 import { Eye } from "lucide-react";
 import { Button, DataTable, StatusChip } from "../../components/ui/index.js";
 import { leaveCaseStatusBadge } from "../../components/leaveStatus";
-import { caseFlags, cardLines, whenDates } from "./leaveHelpers";
+import { caseFlags, cardLines, keyFact, restLines, whenDates } from "./leaveHelpers";
 
 export function FlagList({ item, role }) {
   const flags = caseFlags(item, role);
@@ -48,8 +48,9 @@ export default function CaseCard({ item, role, selectable, selected, onToggleSel
         {item.kind === "LOA_EXTENSION" && <StatusChip label="Extension" tone="muted" size="sm" dot={false} />}
       </div>
 
-      {cardLines(item).map((line, index) => (
-        <p key={index} className={index === 0 ? "mt-2.5 text-xs font-medium text-slate-700" : "meta mt-0.5"}>{line}</p>
+      <p data-testid="case-key-fact" className="mt-2 text-sm font-semibold text-ink">{keyFact(item)}</p>
+      {restLines(item).map((line, index) => (
+        <p key={index} className="meta mt-0.5">{line}</p>
       ))}
 
       <p className="mt-2.5 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">{ownerText(item)}</p>

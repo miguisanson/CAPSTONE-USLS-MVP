@@ -21,6 +21,9 @@ const TONE_COLORS = {
   danger: { bg: "rgb(254, 242, 242)", fg: "rgb(185, 28, 28)" },
   info: { bg: "rgb(239, 246, 255)", fg: "rgb(29, 78, 216)" },
   neutral: { bg: "rgb(241, 245, 249)", fg: "rgb(51, 65, 85)" },
+  // CHANGED BY p118 (I-358): two more families, each with its own colour.
+  done: { bg: "rgb(204, 251, 241)", fg: "rgb(17, 94, 89)" },
+  attention: { bg: "rgb(255, 237, 213)", fg: "rgb(154, 52, 18)" },
 };
 
 for (const viewport of VIEWPORTS) {
@@ -43,7 +46,7 @@ for (const viewport of VIEWPORTS) {
     // --- StatusChip: every tone, both sizes, the server-tone fallback, long text, empty ------------------------
     const chipCases = {
       "chip-approved": "success",
-      "chip-returned": "warning",
+      "chip-returned": "attention", // CHANGED BY p118 (I-358): Returned is orange, not amber
       "chip-denied": "danger",
       "chip-submitted": "info",
       "chip-notstarted": "neutral",
@@ -66,8 +69,8 @@ for (const viewport of VIEWPORTS) {
     await expect(one("chip-label")).toHaveText("Approved by Dean");
     expect((await style("chip-approved", ["font-size"]))["font-size"]).toBe(px(12));
     expect((await style("chip-sm-approved", ["font-size"]))["font-size"]).toBe(px(11));
-    await expect(one("chip-approved").locator("span")).toHaveCount(1); // the dot
-    await expect(one("chip-nodot").locator("span")).toHaveCount(0);
+    await expect(one("chip-approved").locator("svg")).toHaveCount(1); // CHANGED BY p118 (I-358): the tone icon replaces the dot; every chip has one
+    await expect(one("chip-nodot").locator("svg")).toHaveCount(1);
     const longBox = await one("chip-long").boundingBox();
     expect(longBox.height, "a long status stays on one line").toBeLessThan(28);
     expect(longBox.x + longBox.width, "a long status stays inside the viewport").toBeLessThanOrEqual(viewport.width);

@@ -37,12 +37,15 @@ test.afterEach(async () => {
 });
 
 const NEW_TABS = ["Needs attention", "Where students get stuck", "Office speed", "Records to fix"];
+// CHANGED BY p118 (I-357): "Graduation candidates" and "Defenses" are no longer tabs; they sit under "By year started" (the old
+// addresses ?report=graduation / ?report=defenses open that tab with the view chosen). `inTab` is the tab that is selected.
 const REPORTS = [
-  { id: "cohorts", tab: "By year started" },
-  { id: "graduation", tab: "Graduation candidates" },
-  { id: "overdue", tab: "Overdue and pending" },
-  { id: "defenses", tab: "Defenses" },
+  { id: "cohorts", tab: "By year started", inTab: "By year started" },
+  { id: "graduation", tab: "Graduation candidates", inTab: "By year started" },
+  { id: "overdue", tab: "Overdue and pending", inTab: "Overdue and pending" },
+  { id: "defenses", tab: "Defenses", inTab: "By year started" },
 ];
+const TABS_AFTER_NEW = ["By year started", "Overdue and pending", "Registrar changes"];
 const OLD_TABS = [
   "Dashboard summary", "Daily changes", "Missing requirements", "Practicum monitoring", "Withdrawal requests",
   "LOA/readmission", "At-risk", "Open/overdue tasks", "Research completion", "Queue aging & backlog",
@@ -68,7 +71,7 @@ async function api(context, id, params = {}) {
 async function open(page, report) {
   await page.goto(`/reports?report=${report.id}`);
   await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
-  await expect(tab(page, report.tab)).toHaveAttribute("aria-selected", "true");
+  await expect(tab(page, report.inTab)).toHaveAttribute("aria-selected", "true");
   await page.waitForLoadState("networkidle");
 }
 
@@ -79,7 +82,7 @@ test.describe("staff Reports", () => {
     await page.goto("/reports");
     await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
     const tabs = (await page.getByRole("tab").allTextContents()).map((text) => text.trim());
-    expect(tabs, "the report tabs").toEqual([...NEW_TABS, ...REPORTS.map((r) => r.tab), "Registrar changes"]);
+    expect(tabs, "the report tabs").toEqual([...NEW_TABS, ...TABS_AFTER_NEW]);
     await expect(tab(page, NEW_TABS[0]), "the first view opens").toHaveAttribute("aria-selected", "true");
     for (const old of OLD_TABS) {
       await expect(page.getByRole("button", { name: new RegExp(`^${old.replace(/[/&]/g, (c) => `\\${c}`)}( ·|$)`) }), `old tab "${old}"`).toHaveCount(0);
@@ -249,8 +252,9 @@ test.describe("academic coordinator Reports", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Reports" })).toBeVisible();
     await page.waitForLoadState("networkidle");
     const tabs = (await page.getByRole("tab").allTextContents()).map((text) => text.trim());
-    expect(tabs).toEqual([...NEW_TABS, ...REPORTS.map((r) => r.tab), "Registrar changes"]);
-    await tab(page, "Graduation candidates").click();
+    expect(tabs).toEqual([...NEW_TABS, ...TABS_AFTER_NEW]);
+    await tab(page, "By year started").click();
+    await page.getByRole("group", { name: "More detail" }).getByRole("button", { name: "Graduation candidates" }).click(); // CHANGED (I-357): a view under By year started, not a tab
     await expect(page.getByRole("heading", { level: 2, name: "Graduation candidates", exact: true })).toBeVisible();
     await page.waitForLoadState("networkidle");
     await shot(page, "reports-academic-coordinator-1366.png");

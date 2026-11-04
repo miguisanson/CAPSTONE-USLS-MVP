@@ -51,6 +51,21 @@ export function cardLines(item) {
   return lines;
 }
 
+// The one fact a person scans a card for, shown right under the student's name on every board (I-356, IM24): the reason for a
+// leave, the semester a student returns, the residency result of an AWOL case, the subject of a withdrawal. The rest of the
+// card (`restLines`) is the detail under it.
+export function keyFact(item) {
+  if (item.kind === "LOA" || item.kind === "LOA_EXTENSION") return item.reason_category || "Reason not given";
+  if (item.kind === "READMISSION") return whenText(item);
+  return cardLines(item)[0] || "";
+}
+
+export function restLines(item) {
+  if (item.kind === "LOA" || item.kind === "LOA_EXTENSION") return [whenText(item)];
+  if (item.kind === "READMISSION") return [];
+  return cardLines(item).slice(1);
+}
+
 function nothingToDoReason(item, vocabulary) {
   if (item.owner === "Dean") return "A request with the Dean can only be moved by the Dean.";
   if (item.owner === "Student") return "This request is waiting for the student. Only the student can move it.";
