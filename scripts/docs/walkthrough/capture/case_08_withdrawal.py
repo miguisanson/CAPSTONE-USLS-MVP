@@ -331,4 +331,4 @@ def run(rt: Runtime) -> None:
     rt.step("Elena sees the same result", student_after)
 
     # ---- restore the semester start date ---------------------------------------------------------------
-    rt.step("Restore the semester start date", lambda: _set_term_start(rt, staff, ORIGINAL_START, shots=(s(30), s(31))))
+    rt.step("Restore the semester start date", lambda: _set_term_start(rt, staff, start_inside, shots=(s(30), s(31))))

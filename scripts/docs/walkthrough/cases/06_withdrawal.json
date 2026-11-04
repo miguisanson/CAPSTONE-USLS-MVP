@@ -8,7 +8,7 @@
  "duration": "10 min",
  "story": [
   "A student may withdraw from one subject until the end of the second week of classes (14 calendar days from the start of classes). It is not free: 10% of the term's total due is charged in the first week and 20% in the second, and after the window a single subject can no longer be withdrawn. The request needs the Dean's approval. Elena Navarro, an Active MAED student enrolled in three subjects, asks to withdraw from one of them, MAED-MAJ1. The platform judges the request against the dates of the semester, routes it to the Dean through Graduate School staff, and tags the subject as Withdrawn. Her other subjects and her program standing do not change.",
-  "The window is counted from the semester start date kept under Academic Semesters, so the case starts with the rule saying no. On the day of the walkthrough the current semester began on 1 August, so every subject of every student is already outside the window: Joshua Lim, an enrolled student, cannot send a request. Staff then correct the recorded start date to three days before the walkthrough, the way they would if the recorded date were wrong, and Elena's request goes through. The start date is restored at the end. This date change is the demonstration setup, not part of the product's normal flow.",
+  "The window is counted from the semester start date kept under Academic Semesters, so the case starts with the rule saying no. The demo database starts the current semester three days before the day of the run, so the window is open. To show the rule saying no, staff first move the recorded start date back to 1 August (the same Edit dates dialog as Part B): every subject of every student is then outside the window and Joshua Lim, an enrolled student, cannot send a request. Staff then correct the recorded start date to three days before the walkthrough, the way they would if the recorded date were wrong, and Elena's request goes through. The start date is set back to its seeded value at the end. These date changes are the demonstration setup, not part of the product's normal flow.",
   "On the Graduate School and Dean sides, Subject Withdrawal is the same board page as Leave of Absence, Readmission and AWOL & Residency: the same header, the same Board and Table views, the same request window and the same step dialogs. Once you know one of them you know all four."
  ],
  "accounts": [
@@ -53,7 +53,7 @@
   ],
   [
    "Semester",
-   "AY 2026-2027 1st Semester (Current); recorded start 2026-08-01, set for the demonstration to three days before the day of the run and restored afterwards"
+   "AY 2026-2027 1st Semester (Current); seeded start is three days before the day of the run; moved to 2026-08-01 for Part A, back to three days before the day of the run in Part B, and restored to that seeded date at the end"
   ],
   [
    "Rule values (Business Rules)",
@@ -69,7 +69,7 @@
    "title": "Part A - The rule says no (Joshua Lim, window closed)",
    "steps": [
     {
-     "text": "Sign in as Joshua Lim and open **Subject Withdrawal** under **Requests** in the sidebar. The header carries the chip **Not submitted** and the line: Withdraw from one enrolled subject until the end of the second week of classes (fees apply). A blue notice, **Subject withdrawal is closed right now**, quotes the handbook rule (14 calendar days, 10% first week, 20% second week, p. 49) and lists each of his three subjects (MAED-COG2, MAED-MAJ2, MAED-MAJ4) with **Withdrawal window closed** and the deadline of Aug 14, 2026. It ends: If the recorded semester dates look wrong, ask Graduate School staff to correct them. There is no form and no Send button: outside the window the page shows only the reason.",
+     "text": "With the start date at 1 August (staff set it in the Edit dates dialog before this part), sign in as Joshua Lim and open **Subject Withdrawal** under **Requests** in the sidebar. The header carries the chip **Not submitted** and the line: Withdraw from one enrolled subject until the end of the second week of classes (fees apply). A blue notice, **Subject withdrawal is closed right now**, quotes the handbook rule (14 calendar days, 10% first week, 20% second week, p. 49) and lists each of his three subjects (MAED-COG2, MAED-MAJ2, MAED-MAJ4) with **Withdrawal window closed** and the deadline of Aug 14, 2026. It ends: If the recorded semester dates look wrong, ask Graduate School staff to correct them. There is no form and no Send button: outside the window the page shows only the reason.",
      "shots": [
       {
        "id": "withdrawal-01",
@@ -89,7 +89,7 @@
    ]
   },
   {
-   "title": "Part B - Staff correct the semester start date (setup for the demo)",
+   "title": "Part B - Staff move the semester start date to three days ago (setup for the demo)",
    "steps": [
     {
      "text": "Sign in as **staff@usls.edu.ph**, open **Academic Semesters** (under Overview) and select **Edit dates** on the row **AY 2026-2027 1st Semester**, marked **Current**. The dialog **Edit dates: AY 2026-2027 1st Semester** says: Only the dates change; the semester name stays as it is. Set **Start date** to three days before today (the capture used 10/30/2026). **End date**, **Planning opens (optional)** and **Planning closes (optional)** stay as they are.",
@@ -351,7 +351,7 @@
      ]
     },
     {
-     "text": "Last, as staff, restore the semester start date: **Academic Semesters**, **Edit dates** on the current semester, **Start date** back to 08/01/2026, **Save dates**.",
+     "text": "Last, as staff, restore the semester start date: **Academic Semesters**, **Edit dates** on the current semester, **Start date** back to three days before the day of the run (the seeded date), **Save dates**.",
      "shots": [
       {
        "id": "withdrawal-30",
