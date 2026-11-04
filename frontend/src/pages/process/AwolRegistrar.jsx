@@ -1,16 +1,10 @@
 import { useMemo } from "react";
-import { Download, FileSpreadsheet } from "lucide-react";
+import { Download } from "lucide-react";
 import { Button, DataTable, StatusChip } from "../../components/ui/index.js";
+import RegistrarPanel from "../leave/RegistrarPanel";
 import { plural } from "../leave/leaveHelpers";
 
-const REPORT_STATUSES = [
-  "Return Approved",
-  "Extension Approved - Refresher Required",
-  "Re-enrollment Required",
-  "Re-enrollment Completed",
-  "Residency",
-  "Residency Completed",
-];
+const REPORT_STATUSES = ["Residency", "Residency Completed"];
 
 const COLUMNS = [
   {
@@ -32,7 +26,7 @@ const COLUMNS = [
     cell: (item) => (
       <Button
         as="a"
-        href={`/api/${item.kind === "RESIDENCY" ? "residency" : "awol"}/${item.record_id}/registrar-report`}
+        href={`/api/residency/${item.record_id}/registrar-report`}
         variant="secondary"
         size="sm"
         icon={Download}
@@ -44,35 +38,26 @@ const COLUMNS = [
 ];
 
 /**
- * The AWOL & Residency page's Registrar follow-up, in the same place and with the same heading
- * as the Registrar list on the Leave and Withdrawal pages: approved returns and residency
- * semesters, each with its report to download and send through the official channel.
+ * The AWOL & Residency page's Registrar follow-up. Approved AWOL returns use the same Registrar list as Leave of Absence
+ * and Readmission (download, mark as sent, mark as acknowledged). Residency semesters have no handoff steps: each has its
+ * report to download and send through the official channel.
  */
 export default function AwolRegistrar({ ctx }) {
-  const rows = useMemo(() => ctx.cases.filter((item) => REPORT_STATUSES.includes(item.status) && item.record_id), [ctx.cases]);
+  const residency = useMemo(() => ctx.cases.filter((item) => REPORT_STATUSES.includes(item.status) && item.record_id), [ctx.cases]);
   if (!ctx.isStaff) return null;
   return (
-    <section aria-labelledby="registrar-heading" className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
-          <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 id="registrar-heading" className="card-title">Registrar list</h3>
+    <div className="space-y-4">
+      <RegistrarPanel slug="awol" cases={ctx.cases} onChanged={() => ctx.reload()} />
+      {residency.length > 0 && (
+        <section aria-labelledby="residency-reports-heading" className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 id="residency-reports-heading" className="card-title">Residency reports</h3>
           <p className="mt-0.5 text-sm text-slate-600">
-            Approved returns and residency semesters go to the Registrar. The portal does not send any email: download the report and
-            email it through the official channel. Enrollment itself stays a separate Academic Coordinator step.
+            Recorded residency semesters go to the Registrar. Download the report and email it through the official channel.
           </p>
-          {rows.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-500">Nothing to send to the Registrar yet. Approved returns and recorded residency appear here.</p>
-          ) : (
-            <>
-              <p className="meta mt-3">{plural(rows.length, "report")} available.</p>
-              <DataTable className="mt-2" caption="Reports for the Registrar" columns={COLUMNS} rows={rows} minWidth="sm" pageSize={0} />
-            </>
-          )}
-        </div>
-      </div>
-    </section>
+          <p className="meta mt-3">{plural(residency.length, "report")} available.</p>
+          <DataTable className="mt-2" caption="Residency reports for the Registrar" columns={COLUMNS} rows={residency} minWidth="sm" pageSize={0} />
+        </section>
+      )}
+    </div>
   );
 }

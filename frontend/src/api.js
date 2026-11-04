@@ -485,6 +485,24 @@ export const api = {
   leaveExportLog: (slug) => request(`/leave-cases/export-log?slug=${encodeURIComponent(slug)}`),
   leaveHandoff: (caseIds, status) =>
     request("/leave-cases/handoff", { method: "POST", body: JSON.stringify({ case_ids: caseIds, status }) }),
+  awolRegistrarHandoff: (recordId, target) =>
+    request(`/awol/${recordId}/registrar-handoff`, { method: "POST", body: JSON.stringify({ target }) }),
+  awolRegistrarReport: async (recordId) => {
+    const res = await announced(`${BASE}/awol/${recordId}/registrar-report`, { credentials: "same-origin" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Download failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const filename = (res.headers.get("Content-Disposition") || "").match(/filename="?([^";]+)"?/)?.[1] || `awol-registrar-${recordId}.csv`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    return { filename };
+  },
   exportLeaveRegistrarList: async (slug, format = "csv", caseIds = []) => {
     const res = await announced(`${BASE}/leave-cases/registrar-export`, {
       method: "POST",

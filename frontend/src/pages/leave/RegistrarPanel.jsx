@@ -39,6 +39,27 @@ function ExportHistory({ slug }) {
   );
 }
 
+async function downloadAwolReports(items) {
+  const files = [];
+  for (const item of items) files.push(await api.awolRegistrarReport(item.record_id));
+  return { filename: files.map((file) => file.filename).join(", ") };
+}
+
+// One request per case: a refused step (409) is listed as skipped, like the leave list does.
+async function advanceAwol(items, status) {
+  const updated = [];
+  const skipped = [];
+  for (const item of items) {
+    try {
+      await api.awolRegistrarHandoff(item.record_id, status);
+      updated.push(item.id);
+    } catch (error) {
+      skipped.push({ case_id: item.id, student_name: item.student.name, reason: error.message });
+    }
+  }
+  return { updated, skipped, message: updated.length ? `${plural(updated.length, "request")} marked as ${status === "Acknowledged" ? "acknowledged" : "sent"}.` : "No request was moved." };
+}
+
 /**
  * The Registrar list: Dean-approved requests, one step at a time
  * (list downloaded -> sent by email -> Registrar acknowledged).
@@ -54,6 +75,7 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
   const selectedRows = rows.filter((item) => selected.has(item.id));
   const allSelected = rows.length > 0 && selectedRows.length === rows.length;
   const readmission = slug === "readmission";
+  const awol = slug === "awol"; // the server hands AWOL returns over one case at a time and has no export log
 
   function toggle(item) {
     setSelected((current) => {
@@ -78,7 +100,9 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
     setBusy(format);
     setMessage(null);
     try {
-      const result = await api.exportLeaveRegistrarList(slug, format, ticked.map((item) => item.id));
+      const result = awol
+        ? await downloadAwolReports(ticked.length ? ticked : rows.filter((item) => EXPORTABLE.includes(item.registrar.status)))
+        : await api.exportLeaveRegistrarList(slug, format, ticked.map((item) => item.id));
       setFollowUp({ filename: result.filename });
       setHistoryKey((value) => value + 1);
       setSelected(new Set());
@@ -98,10 +122,12 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
     setBusy(status);
     setMessage(null);
     try {
-      const result = await api.leaveHandoff(
-        selectedRows.map((item) => item.id),
-        status,
-      );
+      const result = awol
+        ? await advanceAwol(selectedRows, status)
+        : await api.leaveHandoff(
+            selectedRows.map((item) => item.id),
+            status,
+          );
       setMessage({ tone: result.updated?.length ? "success" : "error", text: result.message, skipped: result.skipped || [] });
       setSelected(new Set());
       await onChanged();
@@ -147,7 +173,11 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
         </>
       ),
     },
-    { key: "period", header: readmission ? "Return semester" : "Leave period", cell: (item) => whenText(item) },
+    {
+      key: "period",
+      header: awol ? "Return" : readmission ? "Return semester" : "Leave period",
+      cell: (item) => (awol ? item.card_lines?.[1] || "" : whenText(item)),
+    },
     { key: "decided", header: "Dean decision", cell: (item) => formatDate(item.decided_at) },
     {
       key: "handoff",
@@ -198,10 +228,12 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <Button icon={Download} loading={busy === "xlsx"} onClick={() => download("xlsx")} disabled={Boolean(busy)}>
-                {busy === "xlsx" ? "Preparing…" : "Download list (Excel)"}
-              </Button>
-              <Button variant="secondary" icon={Download} loading={busy === "csv"} onClick={() => download("csv")} disabled={Boolean(busy)}>
+              {!awol && (
+                <Button icon={Download} loading={busy === "xlsx"} onClick={() => download("xlsx")} disabled={Boolean(busy)}>
+                  {busy === "xlsx" ? "Preparing…" : "Download list (Excel)"}
+                </Button>
+              )}
+              <Button variant={awol ? "primary" : "secondary"} icon={Download} loading={busy === "csv"} onClick={() => download("csv")} disabled={Boolean(busy)}>
                 {busy === "csv" ? "Preparing…" : "Download list (CSV)"}
               </Button>
               <Button variant="secondary" icon={Send} onClick={() => advance("Sent to Registrar")} disabled={Boolean(busy) || !selectedRows.length}>
@@ -221,9 +253,11 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
           </>
         )}
 
-        <HistoryPanel label="Export history" hideLabel="Hide export history">
-          <ExportHistory key={historyKey} slug={slug} />
-        </HistoryPanel>
+        {!awol && (
+          <HistoryPanel label="Export history" hideLabel="Hide export history">
+            <ExportHistory key={historyKey} slug={slug} />
+          </HistoryPanel>
+        )}
       </div>
 
       {followUp && (
@@ -232,7 +266,7 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
           title="Registrar list downloaded"
           filename={followUp.filename}
           actorLabel="Graduate School staff"
-          fileLabel={readmission ? "readmission list" : "leave of absence list"}
+          fileLabel={awol ? "AWOL return report" : readmission ? "readmission list" : "leave of absence list"}
           onClose={() => setFollowUp(null)}
         />
       )}
