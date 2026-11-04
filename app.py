@@ -847,6 +847,7 @@ class AwolCase(db.Model):
     prior_stage = db.Column(db.String(60))  # the stage before AWOL, restored when the student returns
     dean_decision = db.Column(db.String(40), nullable=False, default="Not Submitted")
     staff_notes = db.Column(db.Text)
+    dean_remarks = db.Column(db.Text)
     decided_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=now_utc)
     updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
@@ -1150,6 +1151,28 @@ class MonitoringEdit(db.Model):
     course = db.relationship("Course")
 
 
+class RecordEdit(db.Model):
+    """One correction to a text or value someone typed (a message, a remark, a request field).
+
+    Append-only. It records the typo fix, never a status move (that is LeaveCaseEvent / TransactionLog).
+    The edited column itself is updated, so every reader sees the corrected text; this table keeps
+    what it said before, who changed it, when and why.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    entity = db.Column(db.String(40), nullable=False)
+    entity_id = db.Column(db.Integer, nullable=False)
+    field = db.Column(db.String(60), nullable=False)
+    old_value = db.Column(db.Text)
+    new_value = db.Column(db.Text)
+    reason = db.Column(db.Text)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    actor_role = db.Column(db.String(40))
+    actor_name = db.Column(db.String(160))
+    created_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+
+    __table_args__ = (db.Index("ix_record_edit_target", "entity", "entity_id"),)
+
+
 class StudentMonitoringFlag(db.Model):
     """Typed, auditable monitoring exception without editing official source values."""
     id = db.Column(db.Integer, primary_key=True)
@@ -1310,6 +1333,7 @@ class WithdrawalApplication(db.Model):
     requirement_status = db.Column(db.String(40), nullable=False, default="Pending")
     dean_decision = db.Column(db.String(40), nullable=False, default="Pending")
     staff_remarks = db.Column(db.Text)
+    dean_remarks = db.Column(db.Text)
     academic_coordinator_remarks = db.Column(db.Text)
     registrar_status = db.Column(db.String(80), nullable=False, default="Pending")
     registrar_reference = db.Column(db.String(160))
@@ -2951,6 +2975,7 @@ def defense_verdict_dict(verdict: DefenseVerdict | None) -> dict | None:
         "chair_name": verdict.chair_name,
         "result": verdict.result,
         "remarks": verdict.remarks,
+        "edits": record_edit_info("defense_verdict", verdict),
         "defense_date": iso(verdict.defense_date),
         "submitted_at": iso(verdict.submitted_at),
         "label": verdict_label_for_gate(verdict.result, verdict.gate),
@@ -3185,6 +3210,7 @@ def practicum_record_dict(record: PracticumRecord | None, include_student: bool 
         "moa_uploaded": bool(record.moa_uploaded),
         "practicum_site": record.practicum_site,
         "supervisor_name": record.supervisor_name,
+        "edits": record_edit_info("practicum_record", record),
         "required_hours": record.required_hours or 0,
         "completed_hours": record.completed_hours or 0,
         "document_status": record.document_status,
@@ -3244,6 +3270,8 @@ def withdrawal_application_dict(application: WithdrawalApplication | None, inclu
         "requirement_status": application.requirement_status,
         "dean_decision": application.dean_decision,
         "staff_remarks": application.staff_remarks,
+        "dean_remarks": application.dean_remarks,
+        "edits": record_edit_info("withdrawal_application", application),
         "academic_coordinator_remarks": application.academic_coordinator_remarks,
         "registrar_status": application.registrar_status,
         "registrar_reference": application.registrar_reference,
@@ -3297,6 +3325,7 @@ def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, inclu
         # list it is "Exported - Ready to Send", not still "Dean Approved" (I-010 / J10).
         "display_status": graduation_display_status(endorsement),
         "dean_remarks": endorsement.dean_remarks,
+        "edits": record_edit_info("graduation_endorsement", endorsement),
         "registrar_status": endorsement.registrar_status,
         "request_attachment": attachment_dict(endorsement.request_attachment),
         "attachments": workflow_attachments(
@@ -3317,6 +3346,7 @@ def graduation_endorsement_dict(endorsement: GraduationEndorsement | None, inclu
 
 
 def workflow_message_dict(message: WorkflowMessage) -> dict:
+    edit_ref = record_edit_ref("workflow_message", message, "comment")
     record = workflow_case_record(message.transaction_slug, message.student_id)
     request_id = message.workflow_request_id or (record.id if record else None)
     return {
@@ -3336,6 +3366,9 @@ def workflow_message_dict(message: WorkflowMessage) -> dict:
         "visibility": message.visibility,
         "template": message.template,
         "comment": message.comment,
+        "edit": edit_ref,
+        "edit_count": edit_ref["count"],
+        "edited_at": edit_ref["last_at"],
         "action_type": message.action_type,
         "previous_status": message.previous_status,
         "new_status": message.new_status,
@@ -5270,6 +5303,342 @@ def require_workflow_actor(*roles) -> UserAccount:
 
 def workflow_actor_label(account: UserAccount) -> str:
     return f"{ROLE_LABELS.get(account.role, account.role)} · {account.full_name}"
+
+
+# ---------------------------------------------------------------------------
+# Edit anything, with history (owner request 2026-11-04). One whitelist, one endpoint.
+# ---------------------------------------------------------------------------
+RECORD_EDIT_GRACE = timedelta(minutes=15)  # an author fixing a chat message needs no reason this soon
+EDIT_STAFF_ROLES = ("staff", "academic_coordinator", "research_coordinator")
+
+
+class EditRefused(Exception):
+    def __init__(self, message: str, status: int = 400):
+        super().__init__(message)
+        self.status = status
+
+
+def _edit_text(limit: int = 4000, blank: bool = False):
+    def check(value, row):
+        text = str(value if value is not None else "").strip()
+        if not text and not blank:
+            raise EditRefused("The text cannot be empty.")
+        if len(text) > limit:
+            raise EditRefused(f"Keep this to {limit} characters or fewer.")
+        return text
+    return check
+
+
+def _leave_reason_check(value, row):
+    text = str(value or "").strip()
+    if text not in LOA_ALLOWED_REASONS:
+        raise EditRefused("Choose one of the allowed Leave of Absence reasons.")
+    return text
+
+
+def _leave_period_check(side: str):
+    def check(value, row):
+        term = leave_term(str(value or ""))
+        if not term:
+            raise EditRefused("Choose a valid semester.")
+        start = term if side == "start" else row.start_term
+        end = term if side == "end" else row.end_term
+        duration = leave_semester_count(start, end)
+        max_period = rule_value("loa.max_period_semesters", 2)
+        if duration is None or duration < 1 or duration > max_period:
+            raise EditRefused(
+                f"A Leave of Absence may run up to {max_period} consecutive semesters at a time, "
+                "and cannot end before it starts."
+            )
+        return term
+    return check
+
+
+def _leave_target_check(value, row):
+    term = leave_term(str(value or ""))
+    if not term or term.start_date <= ph_today():
+        raise EditRefused("Choose a valid future return semester.")
+    return term
+
+
+def _apply_leave_term(side: str):
+    def apply(case, term):
+        setattr(case, f"{side}_term_id", term.id)
+        setattr(case, f"{side}_label", term.label)
+    return apply
+
+
+def _apply_leave_target(case, term):
+    case.target_term_id, case.target_label = term.id, term.label
+
+
+def _term_options(*_):
+    return [term.label for term in AcademicTerm.query.order_by(AcademicTerm.start_date).all()]
+
+
+_NOTE_STAFF = ("staff", "academic_coordinator", "research_coordinator")
+
+
+def _f(kind, *, roles=_NOTE_STAFF, check=None, get=None, apply=None, applies=None, options=None,
+       label="", multiline=True):
+    return {"kind": kind, "roles": roles, "check": check or _edit_text(), "get": get, "apply": apply,
+            "applies": applies, "options": options, "label": label, "multiline": multiline}
+
+
+def _note(label, roles=_NOTE_STAFF, limit=4000):
+    return _f("note", roles=roles, label=label, check=_edit_text(limit, blank=True))
+
+
+def _build_editable() -> dict:
+    """Every editable field, who may edit it and until when. Anything not listed is refused."""
+    not_readmission = lambda r: r.kind != KIND_READMISSION  # noqa: E731
+    return {
+        "workflow_message": {
+            "model": WorkflowMessage, "student": lambda r: r.student_id,
+            "author": lambda r: r.sender_user_id, "slug": lambda r: r.transaction_slug,
+            "request": lambda r: r.workflow_request_id,
+            "visible_to_student": lambda r: r.visibility == "student_visible",
+            "fields": {"comment": _f("message", label="Message")},
+        },
+        "leave_case_event": {
+            "model": LeaveCaseEvent, "student": lambda r: r.case.student_id,
+            "author": lambda r: r.actor_user_id, "slug": lambda r: SLUG_FOR_KIND[r.case.kind],
+            "request": lambda r: r.case_id,
+            "fields": {"comment": _f("message", label="Comment")},
+        },
+        "leave_case": {
+            "model": LeaveCase, "student": lambda r: r.student_id,
+            "slug": lambda r: SLUG_FOR_KIND[r.kind], "request": lambda r: r.id,
+            "open": lambda r: r.status in {"Submitted", "Returned"},
+            "fields": {
+                "reason_category": _f("request", check=_leave_reason_check, label="Reason for leave", multiline=False,
+                                      applies=not_readmission, options=lambda r: list(LOA_ALLOWED_REASONS)),
+                "reason_text": _f("request", label="Circumstances", applies=not_readmission),
+                "start_term": _f("request", check=_leave_period_check("start"), label="First semester", multiline=False,
+                                 get=lambda r: r.start_term.label if r.start_term else r.start_label,
+                                 apply=_apply_leave_term("start"), applies=not_readmission, options=_term_options),
+                "end_term": _f("request", check=_leave_period_check("end"), label="Last semester", multiline=False,
+                               get=lambda r: r.end_term.label if r.end_term else r.end_label,
+                               apply=_apply_leave_term("end"), applies=not_readmission, options=_term_options),
+                "return_intent": _f("request", label="Written intention", applies=lambda r: r.kind == KIND_READMISSION),
+                "target_term": _f("request", check=_leave_target_check, label="Return semester", multiline=False,
+                                  get=lambda r: r.target_term.label if r.target_term else r.target_label,
+                                  apply=_apply_leave_target, applies=lambda r: r.kind == KIND_READMISSION,
+                                  options=_term_options),
+                "staff_notes": _note("Staff notes"),
+                "dean_remarks": _note("Dean remarks", ("dean",)),
+                "closed_reason": _note("Reason closed", _NOTE_STAFF + ("dean",), 160),
+            },
+        },
+        "awol_case": {
+            "model": AwolCase, "student": lambda r: r.student_id, "slug": lambda r: "awol", "request": lambda r: r.id,
+            "open": lambda r: r.status in {"Return Submitted", "Returned for Revision"},
+            "fields": {
+                "return_intent": _f("request", label="Written intention"),
+                "return_reason": _f("request", label="Reason for return"),
+                "staff_notes": _note("Staff notes"),
+                "dean_remarks": _note("Dean remarks", ("dean",)),
+            },
+        },
+        "withdrawal_application": {
+            "model": WithdrawalApplication, "student": lambda r: r.student_id, "slug": lambda r: "withdrawal",
+            "request": lambda r: r.id,
+            "open": lambda r: r.status in {"Submitted to GS Staff", "Returned", "Returned for Clarification"},
+            "fields": {
+                "reason": _f("request", label="Reason"),
+                "staff_remarks": _note("Staff notes"),
+                "academic_coordinator_remarks": _note("Academic Coordinator remarks", ("academic_coordinator",)),
+                "dean_remarks": _note("Dean remarks", ("dean",)),
+                "registrar_reference": _note("Registrar reference", _NOTE_STAFF, 160),
+            },
+        },
+        "graduation_endorsement": {
+            "model": GraduationEndorsement, "student": lambda r: r.student_id, "slug": lambda r: "graduation",
+            "request": lambda r: r.id,
+            "fields": {"dean_remarks": _note("Dean remarks", ("dean",))},
+        },
+        "practicum_record": {
+            "model": PracticumRecord, "student": lambda r: r.student_id, "slug": lambda r: "practicum",
+            "request": lambda r: r.id, "open": lambda r: r.status in {"MOA Received", "Returned"},
+            "fields": {
+                "practicum_site": _f("request", label="Practicum site", multiline=False, check=_edit_text(180)),
+                "supervisor_name": _f("request", label="Supervisor", multiline=False, check=_edit_text(160)),
+                "remarks": _note("Remarks", _NOTE_STAFF + ("dean",)),
+            },
+        },
+        "onboarding_review": {
+            "model": OnboardingReview, "student": lambda r: None, "slug": lambda r: None, "request": lambda r: r.id,
+            "fields": {"dean_remarks": _note("Dean remarks", ("dean",))},
+        },
+        "study_plan_draft": {
+            "model": StudyPlanDraft, "student": lambda r: r.student_id, "slug": lambda r: None, "request": lambda r: r.id,
+            "fields": {"coordinator_remarks": _note("Coordinator remarks", ("academic_coordinator",))},
+        },
+        "coursework_report": {
+            "model": CourseworkReport, "student": lambda r: None, "slug": lambda r: None, "request": lambda r: r.id,
+            "fields": {"dean_remarks": _note("Dean remarks", ("dean",))},
+        },
+        "adviser_appointment": {
+            "model": AdviserAppointment, "student": lambda r: r.student_id, "slug": lambda r: None,
+            "request": lambda r: r.id, "open": lambda r: r.status == ADVISER_STATUS_APPLIED,
+            "fields": {
+                "student_note": _f("request", label="Note to the adviser", check=_edit_text(500, blank=True)),
+                "reason": _f("request", label="Reason for the change"),
+                "ac_note": _note("Coordinator note", ("academic_coordinator", "research_coordinator"), 600),
+                "decision_note": _note("Dean note", ("dean",)),
+            },
+        },
+        "defense_verdict": {
+            "model": DefenseVerdict, "student": lambda r: r.student_id, "slug": lambda r: "research-gate",
+            "request": lambda r: r.schedule_request_id,
+            "fields": {
+                "remarks": _f("verdict", label="Panel remarks", check=_edit_text(blank=True)),
+                "selected_title": _f("verdict", label="Title selected by the panel", multiline=False, check=_edit_text(220)),
+            },
+        },
+    }
+
+
+_EDITABLE_CACHE: dict = {}
+
+
+def editable_map() -> dict:
+    if not _EDITABLE_CACHE:
+        _EDITABLE_CACHE.update(_build_editable())
+    return _EDITABLE_CACHE
+
+
+def record_edit_rule(account, entity: str, row, field: str) -> dict:
+    """What this account may do with one field right now: {'reason_required': bool}.
+
+    Raises EditRefused with the right status and a plain-English reason when it may not.
+    """
+    spec = editable_map()[entity]
+    fspec = spec["fields"][field]
+    if fspec["applies"] and not fspec["applies"](row):
+        raise EditRefused("This field cannot be edited on this request.")
+    kind = fspec["kind"]
+    role = "staff" if account.role == "admin" else account.role  # admin acts as Graduate School staff
+    if kind == "message":
+        if spec["author"](row) != account.id:
+            raise EditRefused("Only the author can edit this.", 403)
+        created = getattr(row, "created_at", None)
+        return {"reason_required": not (created and now_utc() - created <= RECORD_EDIT_GRACE)}
+    if kind == "verdict":
+        if role != "faculty" or not account.faculty_id or account.faculty_id != row.faculty_id:
+            raise EditRefused("Only the panel chair who recorded this verdict can edit it.", 403)
+        if verdict_is_acted_on(row):
+            raise EditRefused("Later steps already rest on this verdict. Return or reopen the request instead.", 409)
+        return {"reason_required": True}
+    if kind == "note":
+        if role not in fspec["roles"]:
+            raise EditRefused("Only " + " or ".join(ROLE_LABELS[r] for r in fspec["roles"]) + " can edit this.", 403)
+        return {"reason_required": True}
+    # A field the student filled in on the request.
+    if account.role == "student":
+        if not account.student_id or account.student_id != spec["student"](row):
+            raise EditRefused("This is not your request.", 403)
+        if spec.get("open") and not spec["open"](row):
+            raise EditRefused(
+                "Graduate School staff have already acted on this request. Ask Graduate School staff to correct it.", 409)
+        return {"reason_required": True}
+    if role in EDIT_STAFF_ROLES:
+        return {"reason_required": True}
+    raise EditRefused("Only the student or Graduate School staff can edit this.", 403)
+
+
+def record_edit_marks(entity: str, row_id: int) -> dict:
+    """{field: {'count': n, 'last_at': iso}} for one row, from the history table."""
+    marks: dict = {}
+    for item in RecordEdit.query.filter_by(entity=entity, entity_id=row_id).order_by(RecordEdit.id).all():
+        mark = marks.setdefault(item.field, {"count": 0, "last_at": None})
+        mark["count"] += 1
+        mark["last_at"] = iso(item.created_at)
+    return marks
+
+
+def record_edit_ref(entity: str, row, field: str, marks: dict | None = None) -> dict:
+    """What a screen needs to show an Edit button and an Edited chip for one field."""
+    fspec = editable_map()[entity]["fields"][field]
+    account = current_account() if has_request_context() else None
+    can, reason_required = False, True
+    if account:
+        try:
+            reason_required, can = record_edit_rule(account, entity, row, field)["reason_required"], True
+        except EditRefused:
+            pass
+    mark = (record_edit_marks(entity, row.id) if marks is None else marks).get(field, {})
+    ref = {
+        "entity": entity, "id": row.id, "field": field, "label": fspec["label"], "can": can,
+        "reason_required": reason_required, "multiline": fspec["multiline"],
+        "count": mark.get("count", 0), "last_at": mark.get("last_at"),
+    }
+    if can and fspec["options"]:
+        ref["options"] = fspec["options"](row)
+    return ref
+
+
+def record_edit_info(entity: str, row) -> dict:
+    """The refs for every field of one row that applies to it: {field: ref}."""
+    marks = record_edit_marks(entity, row.id)
+    return {
+        field: record_edit_ref(entity, row, field, marks)
+        for field, fspec in editable_map()[entity]["fields"].items()
+        if not fspec["applies"] or fspec["applies"](row)
+    }
+
+
+def apply_record_edit(account, entity: str, row_id: int, field: str, value, reason: str) -> RecordEdit:
+    spec = editable_map().get(entity)
+    if not spec or field not in spec["fields"]:
+        raise EditRefused("That cannot be edited.")
+    row = db.session.get(spec["model"], row_id)
+    if row is None:
+        raise EditRefused("That record was not found.", 404)
+    fspec = spec["fields"][field]
+    rule = record_edit_rule(account, entity, row, field)
+    reason = (reason or "").strip()
+    if rule["reason_required"] and len(reason) < 3:
+        raise EditRefused("Give a short reason for the change.")
+    if len(reason) > 2000:
+        raise EditRefused("Keep the reason to 2000 characters or fewer.")
+    cleaned = fspec["check"](value, row)
+    old = fspec["get"](row) if fspec["get"] else getattr(row, field)
+    new_text = cleaned.label if isinstance(cleaned, AcademicTerm) else cleaned
+    if (old or "") == (new_text or ""):
+        raise EditRefused("Nothing was changed.")
+    if fspec["apply"]:
+        fspec["apply"](row, cleaned)
+    else:
+        setattr(row, field, cleaned or None)
+    if hasattr(row, "updated_at"):
+        row.updated_at = now_utc()
+    edit = RecordEdit(
+        entity=entity, entity_id=row_id, field=field, old_value=old, new_value=new_text, reason=reason or None,
+        actor_user_id=account.id, actor_role=account.role, actor_name=account.full_name,
+    )
+    db.session.add(edit)
+    slug, student_id = spec["slug"](row), spec["student"](row)
+    if slug and student_id:
+        shown = fspec["kind"] in {"message", "request"} and spec.get("visible_to_student", lambda r: True)(row)
+        db.session.add(TransactionLog(
+            transaction_slug=slug, student_id=student_id, workflow_request_id=spec["request"](row),
+            actor_user_id=account.id, action_type="edit", visibility="student_visible" if shown else "internal",
+            actor_role=ROLE_LABELS.get(account.role, account.role), source_reference="Edit with history",
+            result=f"{fspec['label']} edited",
+            notes=f"{account.full_name} changed the {fspec['label'].lower()}." + (f" Reason: {reason}" if reason else ""),
+        ))
+    return edit
+
+
+def record_edit_dict(item: RecordEdit) -> dict:
+    fspec = (editable_map().get(item.entity) or {}).get("fields", {}).get(item.field) or {}
+    return {
+        "id": item.id, "entity": item.entity, "entity_id": item.entity_id, "field": item.field,
+        "label": fspec.get("label") or item.field, "old_value": item.old_value, "new_value": item.new_value,
+        "reason": item.reason, "actor_role": item.actor_role, "actor_name": item.actor_name,
+        "created_at": iso(item.created_at),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -7817,6 +8186,7 @@ def leave_case_dict(case: LeaveCase, role: str = "staff", detail: bool = False) 
         "eligibility_result": case.eligibility_result,
         "staff_notes": case.staff_notes,
         "dean_remarks": case.dean_remarks,
+        "edits": record_edit_info("leave_case", case),
         "batch_name": case.batch_name,
         "prior_stage": case.prior_stage,
         "prior_enrollment_tag": case.prior_enrollment_tag,
@@ -7896,6 +8266,7 @@ def leave_case_dict(case: LeaveCase, role: str = "staff", detail: bool = False) 
             "actor_role": event.actor_role,
             "actor_name": event.actor_name,
             "comment": event.comment,
+            "edit": record_edit_ref("leave_case_event", event, "comment"),
             "created_at": iso(event.created_at),
         }
         for event in events
@@ -8736,6 +9107,8 @@ def awol_case_dict(item: AwolCase, include_student: bool = True) -> dict:
         "full_reenrollment_required": bool(item.full_reenrollment_required),
         "dean_decision": item.dean_decision,
         "staff_notes": item.staff_notes,
+        "dean_remarks": item.dean_remarks,
+        "edits": record_edit_info("awol_case", item),
         "decided_at": iso(item.decided_at),
         "created_at": iso(item.created_at),
         "updated_at": iso(item.updated_at),
@@ -18365,7 +18738,7 @@ def register_routes(app: Flask) -> None:
                 "Dean",
             )
             if note:
-                application.staff_remarks = "\n".join([part for part in [application.staff_remarks, f"Dean: {note}"] if part])
+                application.dean_remarks = note
                 add_transition_comment_message(
                     "withdrawal", application.student, account, next_owner,
                     result, note, previous_status, application.status,
@@ -18450,7 +18823,7 @@ def register_routes(app: Flask) -> None:
                     flag.resolved_at = now_utc()
                     flag.updated_at = now_utc()
             if note:
-                item.staff_notes = "\n".join(part for part in [item.staff_notes, f"Dean: {note}"] if part)
+                item.dean_remarks = note
             resolve_standing_change_tasks(student.id, "AWOL", "Dean")
             if decision == "approve" and student.enrollment_tag != "AWOL":
                 resolve_standing_change_tasks(student.id, "Review automatic AWOL policy alert", "Academic Coordinator")
@@ -21333,6 +21706,36 @@ def register_routes(app: Flask) -> None:
     # <<CALENDAR-ROUTES-END>>
 
 
+    @app.route("/api/edits/<entity>/<int:row_id>", methods=["GET"])
+    @require_api_login()
+    def record_edit_history(entity: str, row_id: int):
+        account = current_account()
+        spec = editable_map().get(entity)
+        row = db.session.get(spec["model"], row_id) if spec else None
+        if row is None:
+            return jsonify({"error": "That record was not found."}), 404
+        if account.role == "student":
+            hidden = spec.get("visible_to_student") and not spec["visible_to_student"](row)
+            if hidden or not account.student_id or spec["student"](row) != account.student_id:
+                return jsonify({"error": "This is not your record."}), 403
+        items = RecordEdit.query.filter_by(entity=entity, entity_id=row_id).order_by(
+            RecordEdit.created_at.desc(), RecordEdit.id.desc()).all()
+        return jsonify({"items": [record_edit_dict(item) for item in items]})
+
+    @app.route("/api/edits/<entity>/<int:row_id>", methods=["PATCH"])
+    @require_api_login()
+    def record_edit_apply(entity: str, row_id: int):
+        account = current_account()
+        data = request.get_json(silent=True) or {}
+        try:
+            edit = apply_record_edit(account, entity, row_id, str(data.get("field") or ""), data.get("value"),
+                                     data.get("reason") or "")
+            db.session.commit()
+        except EditRefused as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), exc.status
+        return jsonify({"ok": True, "message": "Saved. The change is in the history.", "edit": record_edit_dict(edit)})
+
     @app.route("/api/transactions/<slug>/messages", methods=["POST"])
     @require_api_login(*BACKOFFICE_ROLES, "dean", "student")
     def transaction_message(slug: str):
@@ -23830,6 +24233,7 @@ def onboarding_review_dict(item: OnboardingReview) -> dict:
         "dean_decision": item.dean_decision,
         "dean_decision_at": iso(item.dean_decision_at),
         "dean_remarks": item.dean_remarks,
+        "edits": record_edit_info("onboarding_review", item),
         "admission_completed_at": iso(item.admission_completed_at),
         "source_file": item.upload.original_name if item.upload else None,
     }
@@ -23992,6 +24396,7 @@ def study_plan_dict(item: StudyPlanDraft) -> dict:
         "sent_at": iso(item.sent_at),
         "reviewed_at": iso(item.reviewed_at),
         "coordinator_remarks": item.coordinator_remarks,
+        "edits": record_edit_info("study_plan_draft", item),
     }
 
 
@@ -24047,6 +24452,7 @@ def coursework_report_dict(item: CourseworkReport) -> dict:
         "dean_decision": item.dean_decision,
         "dean_decision_at": iso(item.dean_decision_at),
         "dean_remarks": item.dean_remarks,
+        "edits": record_edit_info("coursework_report", item),
     }
 
 
@@ -30675,6 +31081,7 @@ def adviser_appointment_dict(row: AdviserAppointment, role: str | None = None) -
         "student_note": row.student_note,
         "applied_at": iso(row.applied_at),
         "ac_note": row.ac_note,
+        "edits": record_edit_info("adviser_appointment", row),
         "ac_noted_by": row.ac_noted_by,
         "ac_noted_at": iso(row.ac_noted_at),
         "forwarded_by": row.forwarded_by,
