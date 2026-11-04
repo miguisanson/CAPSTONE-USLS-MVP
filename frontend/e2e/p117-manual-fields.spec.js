@@ -267,11 +267,29 @@ test.describe("Student forms: no wrong date, no over-long title", () => {
       d.research_progress = { gate: "Form 4", stage: "Proposal Defense", stage_index: 1, status: "Pending", stages, milestone: { value: "Form 4", label: "Spec", short_label: "Spec", description: "Spec.", student_uploads_ready: true, student_missing_count: 0, overall_complete: false, requirements: [] } };
       d.schedules = [];
       d.defense_follow_up = null;
+      d.defense_earliest = null; // no lead-time date from the server: tomorrow is the floor
     });
     await page.goto("/student/defense-schedule");
     const date = page.locator("#schedule-date");
     const tomorrow = await page.evaluate(() => { const d = new Date(Date.now() + 86400000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; });
     await expect(date).toHaveAttribute("min", tomorrow);
+    await context.unrouteAll({ behavior: "ignoreErrors" });
+    await context.close();
+  });
+
+  test("I-312: with a lead time on record, the earliest date the server allows is the date picker's floor and is named", async ({ browser }) => {
+    const { context, page } = await studentFormPage(browser, (d) => {
+      d.research_case = { ...(d.research_case || {}), id: 1, title: "Spec Saved Title", status: "Pending" };
+      d.panel = [{ id: 1, faculty_name: "Dr. Panel One", panel_role: "Panel Chair", specialization: "Spec" }];
+      const stages = [{ name: "Title Defense", gate: "Form 1 - Title Defense", complete: true, status: "Passed" }, { name: "Proposal Defense", gate: "Form 4", complete: false, status: "Pending" }];
+      d.research_progress = { gate: "Form 4", stage: "Proposal Defense", stage_index: 1, status: "Pending", stages, milestone: { value: "Form 4", label: "Spec", short_label: "Spec", description: "Spec.", student_uploads_ready: true, student_missing_count: 0, overall_complete: false, requirements: [] } };
+      d.schedules = [];
+      d.defense_follow_up = null;
+      d.defense_earliest = { date: "2099-12-01", days: 14, label: "the panel received the manuscript" };
+    });
+    await page.goto("/student/defense-schedule");
+    await expect(page.locator("#schedule-date")).toHaveAttribute("min", "2099-12-01");
+    await expect(page.getByText(/Earliest date: .*14 days after the panel received the manuscript/)).toBeVisible();
     await context.unrouteAll({ behavior: "ignoreErrors" });
     await context.close();
   });
