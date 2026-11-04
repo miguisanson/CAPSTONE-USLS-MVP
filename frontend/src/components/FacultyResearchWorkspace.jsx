@@ -4,6 +4,7 @@ import { api } from "../api";
 import { Card, EditableText, EmptyState, SectionTitle, StatusChip } from "./ui/index.js";
 import { formatClock, formatDate, formatDateTime } from "../lib/format";
 import SignaturePad from "./SignaturePad";
+import { PanelStamp } from "./process";
 
 const TITLE_GATE = "Form 1 - Title Defense";
 const FINAL_GATE = "Final Defense";
@@ -92,6 +93,7 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
       <SectionTitle title="Revisions to confirm" subtitle="After a pass with minor revisions the student submits the revised manuscript; you confirm it and the stage completes" icon={CheckCircle2} />
       <div className="mt-4 space-y-3">{revisionReviews.map((verdict) => <div key={verdict.id} className="rounded-xl border border-slate-200 p-4">
         <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{verdict.student.name}</p><p className="text-xs text-slate-500">{verdict.defense_type} · {verdict.label}</p></div><StatusChip status={verdict.revision_status || "Awaiting revisions"} dot={false} /></div>
+        <PanelStamp verdict={verdict} />
         {verdict.remarks && <p className="mt-2 text-sm text-slate-700">Panel remarks: {verdict.remarks}</p>}
         {verdict.revision_note && <p className="mt-2 text-sm text-slate-700">Student note: {verdict.revision_note}</p>}
         {verdict.revision_status === "Revisions submitted"
@@ -117,6 +119,7 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
           {verdict && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
             <p className="text-sm font-semibold text-emerald-800">Verdict: {verdict.label || verdict.result}{verdict.selected_title ? ` · ${verdict.selected_title}` : ""}</p>
             <p className="mt-1 text-xs text-emerald-700">Submitted by {verdict.chair_name} · {formatDateTime(verdict.submitted_at)}{verdict.revision_status ? ` · ${verdict.revision_status}` : ""}</p>
+            <PanelStamp verdict={verdict} className="mt-1" />
             {verdict.follow_up && <p className="mt-1 text-xs text-emerald-700">{verdict.follow_up}</p>}
             {verdict.remarks && <div className="mt-2 text-sm text-slate-700"><EditableText edit={verdict.edits?.remarks} value={verdict.remarks} /></div>}
             {verdict.correction_reason && <p className="mt-2 text-xs text-slate-600">Corrected from {verdict.original_result}: {verdict.correction_reason}</p>}

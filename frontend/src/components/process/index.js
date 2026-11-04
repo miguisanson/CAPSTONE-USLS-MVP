@@ -9,3 +9,4 @@ export * from "./GroupCard.jsx";
 export * from "./MemberList.jsx";
 export * from "./GroupOverview.jsx";
 export * from "./ProcessScopeNote.jsx";
+export * from "./PanelStamp.jsx";

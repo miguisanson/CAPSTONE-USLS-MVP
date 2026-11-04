@@ -1,11 +1,19 @@
 import { useMemo, useState } from "react";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Eye, Gavel } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Card, DataTable, Field, InlineNotice, SectionTitle, Select, StatusChip } from "../../components/ui/index.js";
+import { useAuth } from "../../auth";
+import { Button, Card, DataTable, InlineNotice, SectionTitle, StatusChip } from "../../components/ui/index.js";
+import StageBoard, { BoardNotice, useBoardNotice } from "../../components/StageBoard";
+import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
+import { EMPTY_FILTERS } from "../leave/leaveHelpers";
+import { CaseCardFacts, CaseCardShell, NextOwner, PanelStamp, RequirementBoxes, StageColumnHeader } from "../../components/process";
+import { formatClock, formatDate } from "../../lib/format";
+import RecordForPanelDialog from "./RecordForPanelDialog";
 
-// I-205 / I-158 (AD12): the Research Gate opens on a list of who is ready, blocked or waiting, and why, like the other
-// workflow pages; choosing a row opens the per-student record below.
+// The Research Gate as a board (I-205, I-362): three numbered columns, one card per student. A student sits in the column of the
+// stage they are at; the stage moves by itself when its requirements are complete, so the board is read-only (no dragging).
+// Staff and the Research Coordinator can record, correct and confirm for the panel from a card (I-361).
 const STATE_LABEL = { ready: "Ready", blocked: "Blocked", waiting: "Waiting", done: "Done" };
 const STATE_HELP = {
   ready: "Documents are in; the next step is the Research Coordinator's.",
@@ -13,17 +21,86 @@ const STATE_HELP = {
   waiting: "Someone else has to review, sign or record a verdict.",
   done: "The stage is complete.",
 };
+const COLUMNS = [
+  { key: "1", label: "Title Defense", description: "Form 1 is endorsed, the panel is matched and the title is defended." },
+  { key: "2", label: "Proposal Defense", description: "The proposal is prepared, signed by the adviser and defended." },
+  { key: "3", label: "Completion", description: "Final defense and completion evidence, up to graduation." },
+];
+const SHOWN = 8; // cards a column shows before "Show all"; the title column holds most of the students
+const STATUS_OPTIONS = Object.entries(STATE_LABEL).map(([value, label]) => ({ value, label }));
+
+function defenseFact(row) {
+  const defense = row.next_defense;
+  if (row.verdict) return `${defense?.defense_type || row.stage} verdict: ${row.verdict.label || row.verdict.result}`;
+  if (defense) return `${defense.defense_type}: ${formatDate(defense.date)}${defense.start_time ? `, ${formatClock(defense.start_time)}` : ""}`;
+  return "No defense booked yet";
+}
+
+function GateCard({ row, canAct, onOpen, onAct }) {
+  const ready = row.state === "ready";
+  return (
+    <CaseCardShell ready={ready}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="break-words text-sm font-semibold text-ink">{row.student.name}</p>
+          <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
+        </div>
+        <span title={STATE_HELP[row.state]}><StatusChip status={STATE_LABEL[row.state]} size="sm" dot={false} /></span>
+      </div>
+      <CaseCardFacts
+        facts={[
+          row.adviser_name ? `Adviser: ${row.adviser_name}` : "No adviser yet",
+          { text: row.research_title || "Title not submitted yet", wide: true },
+          { text: defenseFact(row), wide: true },
+          { text: row.missing.length ? `Missing: ${row.missing.join("; ")}` : "Nothing missing", wide: true },
+        ]}
+      />
+      <PanelStamp verdict={row.verdict} />
+      <RequirementBoxes items={row.requirements} ariaLabel={`Requirements of ${row.student.name} for ${row.stage}`} />
+      <NextOwner owner={row.waiting_on || "No one, this stage is complete"} />
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button variant="secondary" size="sm" icon={Eye} onClick={() => onOpen(row.student)} className="flex-1" aria-label={`Open the Research Gate record of ${row.student.name}`}>View</Button>
+        {canAct && row.can_record_verdict && <Button size="sm" icon={Gavel} onClick={() => onAct("record", row)} className="flex-1" aria-label={`Record the verdict for the panel for ${row.student.name}`}>Record for the panel</Button>}
+        {canAct && row.can_confirm_revisions && <Button size="sm" icon={Gavel} onClick={() => onAct("confirm", row)} className="flex-1" aria-label={`Confirm the revisions for the panel for ${row.student.name}`}>Confirm revisions</Button>}
+        {canAct && row.can_correct_verdict && <Button variant="secondary" size="sm" onClick={() => onAct("correct", row)} className="flex-1" aria-label={`Correct the verdict for the panel for ${row.student.name}`}>Correct verdict</Button>}
+      </div>
+    </CaseCardShell>
+  );
+}
 
 export default function ResearchGateOverview({ onOpen, selectedId }) {
-  const { data, loading, error } = useApi(() => api.researchGateOverview(), []);
-  const [state, setState] = useState("");
-  const [stage, setStage] = useState("");
-  const rows = useMemo(
-    () => (data?.items || []).filter((row) => (!state || row.state === state) && (!stage || row.stage === stage)),
-    [data, state, stage],
+  const { user } = useAuth();
+  const canAct = ["staff", "research_coordinator", "admin"].includes(user?.role);
+  const { data, loading, error, refetch } = useApi(() => api.researchGateOverview(), []);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [view, setView] = useState("board");
+  const [dialog, setDialog] = useState(null); // { mode, row }
+  const [expanded, setExpanded] = useState({});
+  const boardNotice = useBoardNotice();
+  const allRows = data?.items || [];
+  const programs = useMemo(() => [...new Set(allRows.map((row) => row.student.program_code))].sort(), [allRows]);
+  const statusOptions = useMemo(
+    () => STATUS_OPTIONS.map((option) => ({ ...option, label: `${option.label} (${data?.counts?.[option.value] ?? 0})` })),
+    [data],
   );
+  const rows = useMemo(() => allRows.filter((row) => {
+    const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.research_title || ""}`.toLowerCase();
+    return (!filters.query || haystack.includes(filters.query.toLowerCase()))
+      && (!filters.program || row.student.program_code === filters.program)
+      && (!filters.status || row.state === filters.status);
+  }), [allRows, filters]);
 
-  const columns = [
+  const countOf = (key) => rows.filter((row) => String(row.column) === key).length;
+  const shownRows = useMemo(() => {
+    const taken = {};
+    return rows.filter((row) => {
+      const key = String(row.column);
+      taken[key] = (taken[key] || 0) + 1;
+      return expanded[key] || taken[key] <= SHOWN;
+    });
+  }, [rows, expanded]);
+
+  const tableColumns = [
     {
       key: "name",
       header: "Student",
@@ -41,63 +118,74 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
       ),
     },
     { key: "stage", header: "Stage", hideBelow: "sm" },
-    {
-      key: "state",
-      header: "Status",
-      sortValue: (row) => STATE_LABEL[row.state],
-      cell: (row) => (
-        <span title={STATE_HELP[row.state]}>
-          <StatusChip status={STATE_LABEL[row.state]} dot={false} />
-        </span>
-      ),
-    },
+    { key: "state", header: "Status", sortValue: (row) => STATE_LABEL[row.state], cell: (row) => <span title={STATE_HELP[row.state]}><StatusChip status={STATE_LABEL[row.state]} dot={false} /></span> },
     { key: "waiting_on", header: "Waiting on", hideBelow: "md", cell: (row) => row.waiting_on || "—" },
     { key: "reason", header: "Why", hideBelow: "md", cell: (row) => <span className="text-sm text-slate-700">{row.reason}</span> },
   ];
+
+  function done(message) {
+    setDialog(null);
+    boardNotice.show("success", message);
+    refetch();
+  }
+
+  const summary = COLUMNS.map((column) => `${allRows.filter((row) => String(row.column) === column.key).length} in ${column.label}`).join(", ");
 
   return (
     <Card pad="lg" id="research-gate-overview">
       <SectionTitle
         title="Who is at the Research Gate"
-        subtitle="Every active student with a research case, the stage they are at, and what they are waiting for. Choose a student to open their record."
+        subtitle={canAct
+          ? "Every active student with a research case, in the column of the stage they are at. Graduate School staff and the Research Coordinator can record the panel's verdict from a card if the panel chair cannot."
+          : "Every active student with a research case, in the column of the stage they are at."}
         icon={ClipboardList}
       />
       {error && !data ? (
         <InlineNotice tone="danger" className="mt-3">{error}</InlineNotice>
       ) : (
-        <div className="mt-3">
-          <DataTable
-            caption="Students at each Research Gate stage, with their status and what they are waiting for"
-            columns={columns}
-            rows={rows}
-            rowKey={(row) => row.student.id}
-            minWidth="md"
-            pageSize={10}
-            loading={loading && !data}
-            searchable="Search students"
-            empty={{ icon: ClipboardList, title: "No students match", hint: "Change the status or stage filter." }}
-            toolbar={
-              <>
-                <div className="w-full sm:w-48">
-                  <Field label="Status">
-                    <Select
-                      value={state}
-                      onChange={(event) => setState(event.target.value)}
-                      placeholder="All statuses"
-                      options={Object.entries(STATE_LABEL).map(([value, label]) => ({ value, label: `${label} (${data?.counts?.[value] ?? 0})` }))}
-                    />
-                  </Field>
-                </div>
-                <div className="w-full sm:w-48">
-                  <Field label="Stage">
-                    <Select value={stage} onChange={(event) => setStage(event.target.value)} placeholder="All stages" options={data?.stages || []} />
-                  </Field>
-                </div>
-              </>
-            }
-          />
+        <div className="mt-3 space-y-3">
+          {data && <p className="meta" data-testid="research-gate-summary">{allRows.length} students: {summary}.</p>}
+          <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
+            <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={rows.length} total={allRows.length} noun="students" />
+          </BoardFilterRow>
+          {view === "board" ? (
+            <StageBoard
+              ariaLabel="Research Gate board"
+              phoneAriaLabel="Research Gate students by stage"
+              columns={COLUMNS}
+              items={loading && !data ? [] : shownRows}
+              getItemId={(row) => row.student.id}
+              getColumnKey={(row) => String(row.column)}
+              renderCard={(row) => <GateCard key={row.student.id} row={row} canAct={canAct} onOpen={onOpen} onAct={(mode, target) => setDialog({ mode, row: target })} />}
+              renderColumnHeader={(column, items) => <StageColumnHeader column={column} count={countOf(column.key)} number={Number(column.key)} />}
+              renderColumnFooter={(column) => countOf(column.key) > SHOWN && (
+                <Button variant="secondary" size="sm" className="mt-3" aria-expanded={Boolean(expanded[column.key])} onClick={() => setExpanded((current) => ({ ...current, [column.key]: !current[column.key] }))}>
+                  {expanded[column.key] ? "Show fewer" : `Show all ${countOf(column.key)}`}
+                </Button>
+              )}
+              columnClassName="w-[320px]"
+              emptyText="No students at this stage"
+              readOnly
+              boardNotice={boardNotice}
+            />
+          ) : (
+            <>
+              <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />
+              <DataTable
+                caption="Students at each Research Gate stage, with their status and what they are waiting for"
+                columns={tableColumns}
+                rows={rows}
+                rowKey={(row) => row.student.id}
+                minWidth="md"
+                pageSize={10}
+                loading={loading && !data}
+                empty={{ icon: ClipboardList, title: "No students match", hint: "Change the filters above." }}
+              />
+            </>
+          )}
         </div>
       )}
+      {dialog && <RecordForPanelDialog mode={dialog.mode} row={dialog.row} onClose={() => setDialog(null)} onDone={done} />}
     </Card>
   );
 }

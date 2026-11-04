@@ -237,7 +237,7 @@ test.describe("Research Gate (research coordinator)", () => {
     await expect(main(page).getByText("Pending adviser signature")).toBeVisible();
     await expect(main(page).getByText("Student upload · 1/1 files").first()).toBeVisible();
     await expect(main(page).getByRole("link", { name: /Proposal manuscript\.pdf/ })).toBeVisible();
-    await expect(main(page).getByText("Panel assignment", { exact: true })).toBeVisible();
+    await expect(main(page).locator("form").getByText("Panel assignment", { exact: true })).toBeVisible();
     await expect(main(page).getByText("Upload required").first()).toBeVisible();
     await expect(main(page).getByRole("button", { name: /Record clearance/ })).toBeVisible();
     await expect(main(page).getByRole("button", { name: /Record ethics clearance/ })).toBeVisible();
