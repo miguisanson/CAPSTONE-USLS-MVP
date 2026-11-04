@@ -55,14 +55,22 @@ buttons do it: **USLS site - Start** (`deploy\site-start.ps1`: starts Docker Des
 and the tunnel, and keeps the PC awake while the site runs) and **USLS site - Stop** (`deploy\site-stop.ps1`).
 Keep-awake does not change any power setting; on a laptop, closing the lid can still put it to sleep.
 
+Two more buttons (double-click in the `deploy` folder, no typing):
+
+- **`UPDATE-SITE.cmd`**: gets the latest code (`git pull`), rebuilds the site, waits until it answers, resets the
+  demo data by itself if the new version needs it, and restarts the tunnel if https://miguisanson.dev does not answer.
+  It stops with a message if this folder has unsaved changes or the pull fails.
+- **`RESET-DEMO-DATA.cmd`**: rebuilds the demo data after you type `YES`. It resets the Docker site when Docker runs it
+  (otherwise the local file; close the local site first).
+
 | Do this | Command |
 |---|---|
 | Start everything | `docker compose --profile tunnel up -d` |
 | Stop everything | `docker compose --profile tunnel stop` |
 | See what runs | `docker compose --profile tunnel ps` |
 | Watch the site log | `docker compose logs -f app` |
-| Reset the demo data | `docker compose stop app` then `docker compose run --rm --no-deps app python app.py --seed` then `docker compose start app` |
-| Update after `git pull` | `docker compose --profile tunnel up -d --build` |
+| Reset the demo data | double-click `deploy\RESET-DEMO-DATA.cmd` |
+| Update to the latest code | double-click `deploy\UPDATE-SITE.cmd` |
 
 Reset removes everything testers entered (the app is stopped while the database is rebuilt). Reset on the morning of the meeting.
 Containers restart by themselves with Docker Desktop. To also wipe uploads and the session secret: `docker compose --profile tunnel down -v` (deletes the volume).
@@ -99,6 +107,6 @@ Until then the same site runs directly on Windows, with the same Cloudflare rout
    already running, and the Cloudflare tunnel with your token (the official connector is already downloaded to
    `E:\DevCache\cloudflared\`; no install or admin rights needed). Leave both windows open.
 3. To reset the demo data: close the "USLS site" window, double-click **`deploy\RESET-DEMO-DATA.cmd`**, then
-   `START-SITE.cmd` again.
+   `START-SITE.cmd` again. (If the Docker site exists, that same button resets the Docker database instead.)
 
 Do not run the Docker app and `START-SITE.cmd` at the same time with the tunnel: both would answer for the domain.
