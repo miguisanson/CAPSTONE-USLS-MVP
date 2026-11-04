@@ -1619,6 +1619,19 @@ class ScheduleRequest(db.Model):
     student = db.relationship("Student")
 
 
+class DefenseScheduleAsk(db.Model):
+    """What the student asked for when requesting a defense schedule (date, mode, venue, constraints).
+    Staff see it on the booking form, prefilled, so nothing the student already said is typed again."""
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False, index=True)
+    defense_type = db.Column(db.String(60), nullable=False)
+    preferred_date = db.Column(db.Date)
+    mode = db.Column(db.String(40))
+    venue = db.Column(db.String(160))
+    constraints = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+
+
 class DefenseVerdict(db.Model):
     """Schedule-bound verdict submitted only by the assigned panel chair/lead."""
     id = db.Column(db.Integer, primary_key=True)
@@ -15537,6 +15550,11 @@ def register_routes(app: Flask) -> None:
         if data.get("constraints"):
             notes.append(f"Constraints: {data.get('constraints')}.")
 
+        db.session.add(DefenseScheduleAsk(
+            student_id=student.id, defense_type=defense_type, preferred_date=day if preferred_date else None,
+            mode=(data.get("mode") or "").strip()[:40] or None, venue=source[:160] or None,
+            constraints=(data.get("constraints") or "").strip() or None,
+        ))
         ensure_open_task(student.id, f"Review student {defense_type} schedule request", "Research Coordinator", 4, 45)
         add_log(
             "defense-scheduling",
@@ -15558,6 +15576,8 @@ def register_routes(app: Flask) -> None:
         doc = DocumentCheck.query.filter_by(id=document_id, student_id=student.id).first_or_404()
         if doc.gate.endswith("(archived)"):
             return jsonify({"error": "This is superseded evidence kept for the record; upload to the current requirement instead."}), 400
+        if doc.gate in RESEARCH_MILESTONES:  # the Research Gate has its own route and rules (current stage, source, locks)
+            return jsonify({"error": "Research Gate documents are uploaded from the Research Gate page, which checks the stage and the rules."}), 409
         if doc.gate == "Form 1 - Title Defense" and doc.item_name in {"Form 1 - Application for Title Defense", "Three concept papers"} and title_uploads_locked(student):
             return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
         uploaded = request.files.get("file")
@@ -15576,8 +15596,6 @@ def register_routes(app: Flask) -> None:
             student.id,
             "Student",
             evidence.original_name,
-        if doc.gate in RESEARCH_MILESTONES:  # the Research Gate has its own route and rules (current stage, source, locks)
-            return jsonify({"error": "Research Gate documents are uploaded from the Research Gate page, which checks the stage and the rules."}), 409
             f"{doc.item_name} submitted",
             "Research Coordinator",
             f"Student uploaded a supporting document for {doc.gate}. Staff must verify before marking it complete.",
@@ -27332,6 +27350,17 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 else []
             )
             context["verdict_outcome"] = stage_outcome
+            # The student's latest request for this defense, unless a booking was made after it.
+            ask = DefenseScheduleAsk.query.filter_by(
+                student_id=selected_student.id, defense_type=stage_defense_type,
+            ).order_by(DefenseScheduleAsk.id.desc()).first() if stage_defense_type else None
+            last_booking = ScheduleRequest.query.filter_by(
+                student_id=selected_student.id, defense_type=stage_defense_type,
+            ).order_by(ScheduleRequest.id.desc()).first() if ask else None
+            context["student_request"] = None if not ask or (last_booking and last_booking.created_at >= ask.created_at) else {
+                "defense_type": ask.defense_type, "preferred_date": iso(ask.preferred_date), "mode": ask.mode,
+                "venue": ask.venue, "constraints": ask.constraints, "requested_at": iso(ask.created_at),
+            }
             context["lead_reference"] = {"date": iso(lead_reference), "label": lead_reference_label, "days": lead_days}
             context["change_requesters"] = list(SCHEDULE_CHANGE_REQUESTERS)
             current_booking = ScheduleRequest.query.filter(
