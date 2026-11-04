@@ -1,6 +1,6 @@
 """Case 15 - Defense Scheduling: shared availability, conflict warnings, set the schedule, panel invitations.
 
-Uses the demonstration student Gab Tolentino (GS-2026-UD-03, MBA, Proposal Defense, four-person panel
+Uses the demonstration student Gab Tolentino (2691203, MBA, Proposal Defense, four-person panel
 plus the research adviser). Every step is a real action on the real screens; the state that the run
 needs (an active booking to cancel, an invited panelist) is read first so the module can be re-run
 while those records are still in the same state.
@@ -44,7 +44,7 @@ def run(rt: Runtime) -> None:
     state = h.sched_state(staff_api, gab)
     if any(x.get("verdict") for x in state["schedules"] if x["defense_type"] == "Proposal Defense"):
         def _stop():
-            raise RuntimeError("NEEDS A FRESH DATABASE: Gab Tolentino (GS-2026-UD-03) already holds a Proposal Defense verdict "
+            raise RuntimeError("NEEDS A FRESH DATABASE: Gab Tolentino (2691203) already holds a Proposal Defense verdict "
                                "(case 17 ran on this database); case 15 is skipped and the earlier screenshots are kept.")
         rt.step("precondition: demo student Gab Tolentino still unscored", _stop)
         return

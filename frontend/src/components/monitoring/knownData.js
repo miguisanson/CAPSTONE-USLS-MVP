@@ -51,7 +51,7 @@ export function ayEntryOptions(termLabels = [], studentValues = [], keep = "") {
   return options;
 }
 
-/** Student IDs the registrar issues are exactly 7 digits. A warning (not a block): demo IDs differ. "" = fine or blank. */
+/** Student IDs are exactly 7 digits everywhere (the server refuses anything else). "" = fine or blank. */
 export function studentIdWarning(value) {
   const text = (value || "").trim();
   return !text || /^\d{7}$/.test(text) ? "" : "Student IDs are 7 digits, for example 1860101.";

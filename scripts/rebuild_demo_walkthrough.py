@@ -270,7 +270,7 @@ def build_scenarios_1_to_4(
             ["Program", "MAED — Master of Arts in Education"],
             [
                 "Verification record",
-                "Sofia Reyes — GS-2026-HO-01",
+                "Sofia Reyes — 2690601",
             ],
         ]
     )
@@ -371,7 +371,7 @@ def build_scenarios_1_to_4(
     builder.step(
         14,
         "Open Students. Use the search box to find Sofia Reyes by student number "
-        "GS-2026-HO-01 so the identity match is unambiguous.",
+        "2690601 so the identity match is unambiguous.",
     )
     builder.step(
         15,
@@ -608,7 +608,7 @@ def build_scenarios_1_to_4(
             ],
             [
                 "Single-student example",
-                "Clarissa Dela Cruz — GS-2026-ENR-01",
+                "Clarissa Dela Cruz — 2690501",
             ],
         ]
     )
@@ -1434,7 +1434,7 @@ def build_scenarios_13_to_16(
     builder.table(
         [
             ["Field", "Value / instruction"],
-            ["Student", "Nicolas Valdez — GS-2026-RES-01"],
+            ["Student", "Nicolas Valdez — 2691101"],
             ["Semester", "Current active planning semester"],
             [
                 "Purpose",

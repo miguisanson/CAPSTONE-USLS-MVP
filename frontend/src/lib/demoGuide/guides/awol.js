@@ -5,7 +5,7 @@ export default {
   process: "awol",
   title: "AWOL return",
   summary: "The system flags a student as AWOL, the student files a return, staff forward it, the Dean decides.",
-  studentNumber: "GS-2026-AWOL-01",
+  studentNumber: "2691001",
   walkthrough: "11_awol",
   accounts: {
     student: { who: "the student", label: "Maya Torres", email: "awol.maya@usls.edu.ph" },

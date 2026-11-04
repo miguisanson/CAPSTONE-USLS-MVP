@@ -518,7 +518,7 @@ test.describe("Case discussion", () => {
 
     async function openCase(page, messages) {
       await editGet(page, /\/api\/transactions\/practicum\/context/, (body) => {
-        const row = body.roster.find((item) => item.student.student_number === "GS-2026-PRAC-01");
+        const row = body.roster.find((item) => item.student.student_number === "2690201");
         row.record = {
           id: 9100, student_id: row.student.id, status: "MOA Submitted", moa_status: "Uploaded", moa_uploaded: true, practicum_site: "Community Counselling Center",
           supervisor_name: "Ms. Rina Lopez", required_hours: 200, completed_hours: 0, document_status: "Missing", certificate_count: 0, remarks: "MOA for review.",

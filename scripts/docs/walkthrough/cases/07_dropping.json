@@ -30,7 +30,7 @@
   ],
   [
    "Student",
-   "Joshua Lim, GS-2026-WD-02 (demo key withdrawal-joshua, reset first)"
+   "Joshua Lim, 2690402 (demo key withdrawal-joshua, reset first)"
   ],
   [
    "Subject",
@@ -126,7 +126,7 @@
    "title": "Part B - The same record in the Monitoring Sheet",
    "steps": [
     {
-     "text": "Open **Monitoring Sheet** (under Records), choose **MAED** in **Program** and the current semester in **Semester**, and find the row of Joshua Lim (GS-2026-WD-02). The MAED-MAJ2 cell now shows **D** (Dropped, in the legend) while MAED-MAJ4 and MAED-COG2 still show **R** (Enrolled). A yellow bar above the legend may report enrollment/profile inconsistency items for MAED: that is the sheet's own consistency check on other seeded students, not caused by this drop.",
+     "text": "Open **Monitoring Sheet** (under Records), choose **MAED** in **Program** and the current semester in **Semester**, and find the row of Joshua Lim (2690402). The MAED-MAJ2 cell now shows **D** (Dropped, in the legend) while MAED-MAJ4 and MAED-COG2 still show **R** (Enrolled). A yellow bar above the legend may report enrollment/profile inconsistency items for MAED: that is the sheet's own consistency check on other seeded students, not caused by this drop.",
      "shots": [
       {
        "id": "dropping-08",

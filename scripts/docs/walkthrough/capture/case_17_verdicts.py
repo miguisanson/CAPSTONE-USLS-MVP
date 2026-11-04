@@ -6,10 +6,10 @@ a coordinator would do on the day: staff reschedule three of them to a slot a fe
 reason), the chair tries the verdict form early (blocked), then submits the verdict once the start time
 has passed.
 
-    Nico Barrientos (GS-2026-UD-01)  chair Dr. Marco Villanueva     -> Passed with minor revisions
-    Bea Salonga     (GS-2026-UD-02)  chair Dr. Angela Cruz          -> Deferred, rebooked, Provisional pass - re-defense required,
+    Nico Barrientos (2691201)  chair Dr. Marco Villanueva     -> Passed with minor revisions
+    Bea Salonga     (2691202)  chair Dr. Angela Cruz          -> Deferred, rebooked, Provisional pass - re-defense required,
                                                                        re-defense booked, then cancelled with a reason
-    Gab Tolentino   (GS-2026-UD-03)  chair Dr. Marco Villanueva     -> Failed
+    Gab Tolentino   (2691203)  chair Dr. Marco Villanueva     -> Failed
 
 The three students are not resettable, so this module works on the state it finds: a student who already
 has the verdict is skipped. Panelists' entered hours are 08:00-17:00, and the booking form refuses a slot
@@ -80,14 +80,14 @@ def run(rt: Runtime) -> None:
         return n
 
     if len(ids) < 3:
-        rt.step("precondition: demo students GS-2026-UD-01..03 exist", lambda: (_ for _ in ()).throw(
-            RuntimeError("The demonstration students GS-2026-UD-01..03 are missing: start the app in demo mode on a fresh database.")))
+        rt.step("precondition: demo students 2691201..03 exist", lambda: (_ for _ in ()).throw(
+            RuntimeError("The demonstration students 2691201..03 are missing: start the app in demo mode on a fresh database.")))
         return
     _bea = h.sched_state(api, ids["bea"])
     _bea_resumable = (not _bea["active"]) and (_bea["outcome"] or {}).get("effect") == "reschedule"  # Deferred, not yet rebooked
     if _verdict_count() == 3 and not _bea_resumable:
         rt.step("precondition: fresh demo database", lambda: (_ for _ in ()).throw(
-            RuntimeError("NEEDS A FRESH DATABASE: Nico, Bea and Gab (GS-2026-UD-01..03) already hold their verdicts, so case 17 "
+            RuntimeError("NEEDS A FRESH DATABASE: Nico, Bea and Gab (2691201..03) already hold their verdicts, so case 17 "
                          "cannot be repeated. Restart the demo on a new SQLite file; the existing verdicts-*.png are kept.")))
         return
     outside_hours = now.hour < 8 or (now + timedelta(minutes=70)).time() > datetime.strptime("17:00", "%H:%M").time()

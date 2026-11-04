@@ -132,7 +132,7 @@ for (const [role, path] of ROLES) {
       }
       const bianca = cards.filter({ hasText: "Bianca Santos" });
       await expect(bianca).toHaveCount(1);
-      await expect(bianca).toContainText("GS-2026-GRAD-01 · MAED");
+      await expect(bianca).toContainText("2690301 · MAED");
       await expect(bianca.getByText("Next: Student")).toBeVisible();
       await expect(bianca.getByText("Waiting for: Student (signed application)", { exact: true })).toBeVisible();
       await expect(bianca).toHaveAttribute("draggable", "false");

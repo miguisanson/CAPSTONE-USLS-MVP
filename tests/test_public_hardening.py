@@ -233,7 +233,7 @@ class SeededLeaveTests(unittest.TestCase):
     def test_item8_therese_lacson_is_on_leave_not_return_due(self):
         from datetime import date, timedelta
         with app.app_context():
-            student = Student.query.filter_by(student_number="GS-2026-READ-01").one()
+            student = Student.query.filter_by(student_number="2690901").one()
             case = app_module.LeaveCase.query.filter_by(
                 student_id=student.id, kind=app_module.KIND_LOA, source="demo").one()
             due_days = int(app_module.rule_value("leave.return_due_days", 30) or 30)

@@ -79,15 +79,15 @@ const ISSUE = {
   row_number: 4,
   student_id: null,
   student: null,
-  incoming_student_number: "GS-FIX-001",
+  incoming_student_number: "9900201",
   incoming_name: "Testa Fixture",
   issue: "Conflict with existing record",
   summary: "Completed subjects differ",
   details: [],
   discrepancies: [{ type: "Completed subjects regressed", messages: ["MIT 201 was Completed and is now Missing"] }],
   discrepancy_count: 1,
-  existing: { name: "Testa Fixture", student_number: "GS-FIX-001", academic_year_entry: "22-23", completed_count: 2 },
-  uploaded: { first_name: "Testa", last_name: "Fixture", student_number: "GS-FIX-001", academic_year_entry: "22-23", subjects: { "MIT 201": false, "MIT 202": true } },
+  existing: { name: "Testa Fixture", student_number: "9900201", academic_year_entry: "22-23", completed_count: 2 },
+  uploaded: { first_name: "Testa", last_name: "Fixture", student_number: "9900201", academic_year_entry: "22-23", subjects: { "MIT 201": false, "MIT 202": true } },
   edited: null,
   subject_comparison: [
     { code: "MIT 201", existing: "Completed", uploaded: "Missing", different: true, regression: true },
@@ -170,7 +170,7 @@ test.describe("Student Handoff (staff)", () => {
     await main(page).getByText("MIT_Monitoring_Fixture.xlsx").click(); // opens the <details>
     const row = main(page).getByRole("row", { name: /Testa Fixture/ });
     await expect(row).toBeVisible();
-    await expect(row).toContainText("GS-FIX-001");
+    await expect(row).toContainText("9900201");
     await expect(row).toContainText("Completed subjects regressed");
     await expect(row).toContainText("Unresolved");
     await expect(row.getByRole("checkbox", { name: "Select Testa Fixture" })).toBeEnabled();
@@ -223,7 +223,7 @@ test.describe("Research Gate (research coordinator)", () => {
     await openFromSidebar(page, /5 · Research Gate/, "/workflow/research-gate?student_id=146");
     await expect(main(page).getByRole("heading", { level: 1, name: "Research Gate" })).toBeVisible();
     await expect(main(page).getByRole("heading", { level: 2, name: "Research Gate record" })).toBeVisible();
-    for (const text of ["Nico Barrientos", "GS-2026-UD-01", "Dr. Paolo Navarro", "Reorder Point Policies and Service Levels for a Regional Hardware Distributor"]) {
+    for (const text of ["Nico Barrientos", "2691201", "Dr. Paolo Navarro", "Reorder Point Policies and Service Levels for a Regional Hardware Distributor"]) {
       await expect(main(page).getByText(text).first(), text).toBeVisible();
     }
     await expect(main(page).getByText("Automatic research progress")).toBeVisible();

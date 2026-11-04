@@ -33,9 +33,9 @@ FAC = {
 }
 # The three demonstration students with an upcoming Proposal Defense (seeded in demo mode).
 UD = {
-    "nico": ("GS-2026-UD-01", "Barrientos"),
-    "bea": ("GS-2026-UD-02", "Salonga"),
-    "gab": ("GS-2026-UD-03", "Tolentino"),
+    "nico": ("2691201", "Barrientos"),
+    "bea": ("2691202", "Salonga"),
+    "gab": ("2691203", "Tolentino"),
 }
 
 
@@ -66,7 +66,7 @@ class Api:
 
 def student_ids(staff: Api) -> dict[str, int]:
     out = {}
-    res = staff.call("/api/students?q=GS-2026-UD&page_size=50")
+    res = staff.call("/api/students?q=26912&page_size=50")
     for item in res.get("items", []):
         for key, (number, _name) in UD.items():
             if item["student_number"] == number:

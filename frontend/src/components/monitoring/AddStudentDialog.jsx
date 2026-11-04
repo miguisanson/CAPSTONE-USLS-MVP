@@ -24,25 +24,22 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
   const [error, setError] = useState("");
   const [possible, setPossible] = useState(null);
   const [created, setCreated] = useState(null);
-  const [askId, setAskId] = useState(false);
   const formId = useId();
 
   function set(field) {
     return (event) => {
       setForm((current) => ({ ...current, [field]: event.target.value }));
       setPossible(null);
-      setAskId(false);
     };
   }
 
-  const idWarning = studentIdWarning(form.student_number);
+  const idError = studentIdWarning(form.student_number);
   const emailError = emailProblem(form.email);
   const firstError = nameProblem(form.first_name);
   const lastError = nameProblem(form.last_name);
 
-  async function submit(event, confirmDuplicate = false, idOk = false) {
+  async function submit(event, confirmDuplicate = false) {
     event?.preventDefault();
-    if (idWarning && !idOk) { setAskId(true); return; }
     setBusy(true);
     setError("");
     try {
@@ -65,7 +62,7 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
   }
 
   const ready = form.student_number.trim() && form.first_name.trim() && form.last_name.trim()
-    && form.program_id && form.academic_year_entry.trim() && !emailError && !firstError && !lastError;
+    && form.program_id && form.academic_year_entry.trim() && !idError && !emailError && !firstError && !lastError;
 
   // Two states in one window: the form, then the result (login and first password) once the student is created.
   const footer = created ? (
@@ -106,7 +103,7 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
       ) : (
         <form id={formId} onSubmit={submit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Student ID" required hint={idWarning || undefined}>
+            <Field label="Student ID" required error={idError || undefined}>
               <Input data-autofocus="" value={form.student_number} onChange={set("student_number")} required maxLength={40} autoComplete="off" inputMode="numeric" placeholder="e.g. 1860101" />
             </Field>
             <Field label="Program" required>
@@ -132,16 +129,10 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
             </Field>
           </div>
 
-          {askId && !possible && (
-            <InlineNotice tone="warning" icon role="alert">
-              <p className="font-normal">{idWarning} Check the number before going on.</p>
-              <Button variant="secondary" size="sm" disabled={busy} onClick={() => submit(null, false, true)} className="mt-2">Use this ID anyway</Button>
-            </InlineNotice>
-          )}
           {possible && (
             <InlineNotice tone="warning" icon role="alert">
               <p className="font-normal">{possible}</p>
-              <Button variant="secondary" size="sm" disabled={busy} onClick={() => submit(null, true, true)} className="mt-2">Add as a separate student</Button>
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => submit(null, true)} className="mt-2">Add as a separate student</Button>
             </InlineNotice>
           )}
           {error && !possible && <InlineNotice tone="danger">{error}</InlineNotice>}

@@ -8,7 +8,7 @@
  "duration": "8 min",
  "story": [
   "Second of the six research cases of one demo slot ({case:research_title} before it, {case:defense-scheduling} after it). Miguel Yu's Form 1 and concept papers have been verified and endorsed. Panel Matching now reads the body text of the three concept papers and compares it with what the Graduate School has recorded about each faculty member: research interests, publications, past advisee and panel titles, degrees and the profile specialization. The research title and the file names are shown for reference but are left out of the comparison.",
-  "The point for the panel: the recommendation is explained, not a black box. Every candidate gets a score out of 100 made of three visible parts (expertise 60 points, availability 25, workload 15), the screen names the method used, shows the topics in common, and the student's adviser (Dr. Celeste Tan) is excluded from the panel. To show that the ranking follows the paper, the same screen is then opened for the seven demo papers GS-2026-PM-01 to PM-07, which belong to different fields, and each one produces a different top of the list."
+  "The point for the panel: the recommendation is explained, not a black box. Every candidate gets a score out of 100 made of three visible parts (expertise 60 points, availability 25, workload 15), the screen names the method used, shows the topics in common, and the student's adviser (Dr. Celeste Tan) is excluded from the panel. To show that the ranking follows the paper, the same screen is then opened for the seven demo papers 2690101 to PM-07, which belong to different fields, and each one produces a different top of the list."
  ],
  "accounts": [
   [
@@ -24,7 +24,7 @@
   ],
   [
    "Demo papers compared",
-   "GS-2026-PM-01 Camille Dizon (MSN), PM-02 Rafael Ocampo (MAPSY), PM-03 Jasper Lorenzo (MSCS), PM-04 Bea Fontanilla (MBA), PM-05 Miko Almario (MBA), PM-06 Liza Marquez (DBA), PM-07 Nico Baltazar (MBA)"
+   "2690101 Camille Dizon (MSN), PM-02 Rafael Ocampo (MAPSY), PM-03 Jasper Lorenzo (MSCS), PM-04 Bea Fontanilla (MBA), PM-05 Miko Almario (MBA), PM-06 Liza Marquez (DBA), PM-07 Nico Baltazar (MBA)"
   ],
   [
    "Seat changed by staff",
@@ -133,7 +133,7 @@
    "intro": "Open Panel Matching again, clear the selected student (the x on the selected student) and pick each student by student number. Every demo paper has its own endorsed Form 1 and its own paper text; every one shows the same badge Similarity match (keyword TF-IDF). The numbers below are read from the screens.",
    "steps": [
     {
-     "text": "Select **GS-2026-PM-01** Camille Dizon (MSN, Text-Message Reminders and Medication Adherence among Adults with Hypertension). Scroll to the table. Rank 1 is **Dr. Adriana Santos** 95.3/100 (expertise 60/60, availability 20.3/25, workload 15/15), rank 2 Dr. Paolo Navarro 38.8/100, rank 3 Dr. Celeste Tan 38.2/100. Dr. Teodoro Ramos is listed under **Not eligible for this student's panel**: adviser of this student.",
+     "text": "Select **2690101** Camille Dizon (MSN, Text-Message Reminders and Medication Adherence among Adults with Hypertension). Scroll to the table. Rank 1 is **Dr. Adriana Santos** 95.3/100 (expertise 60/60, availability 20.3/25, workload 15/15), rank 2 Dr. Paolo Navarro 38.8/100, rank 3 Dr. Celeste Tan 38.2/100. Dr. Teodoro Ramos is listed under **Not eligible for this student's panel**: adviser of this student.",
      "shots": [
       {
        "id": "panel_matching-13",
@@ -142,7 +142,7 @@
      ]
     },
     {
-     "text": "Select **GS-2026-PM-02** Rafael Ocampo (MAPSY, Academic Burnout, Coping, and Psychological Well-Being of Working Graduate Students). Rank 1 is **Dr. Celeste Tan** 86.6/100 (60/60, 14.1/25, 12.5/15); rank 2 is Dr. Paolo Navarro 37.4/100 and rank 3 Dr. Adriana Santos 36.5/100. Dr. Liwayway Bautista is excluded as adviser.",
+     "text": "Select **2690102** Rafael Ocampo (MAPSY, Academic Burnout, Coping, and Psychological Well-Being of Working Graduate Students). Rank 1 is **Dr. Celeste Tan** 86.6/100 (60/60, 14.1/25, 12.5/15); rank 2 is Dr. Paolo Navarro 37.4/100 and rank 3 Dr. Adriana Santos 36.5/100. Dr. Liwayway Bautista is excluded as adviser.",
      "shots": [
       {
        "id": "panel_matching-15",
@@ -151,7 +151,7 @@
      ]
     },
     {
-     "text": "Select **GS-2026-PM-03** Jasper Lorenzo (MSCS, Vibration-Based Predictive Maintenance of CNC Machine Tools using Machine Learning). Rank 1 is **Dr. Daniel Uy** 98.4/100 (60/60, 23.4/25, 15/15); rank 2 Dr. Paolo Navarro 34.6/100, rank 3 Dr. Marco Villanueva 26.9/100. Dr. Marlon Geronimo is excluded as adviser.",
+     "text": "Select **2690103** Jasper Lorenzo (MSCS, Vibration-Based Predictive Maintenance of CNC Machine Tools using Machine Learning). Rank 1 is **Dr. Daniel Uy** 98.4/100 (60/60, 23.4/25, 15/15); rank 2 Dr. Paolo Navarro 34.6/100, rank 3 Dr. Marco Villanueva 26.9/100. Dr. Marlon Geronimo is excluded as adviser.",
      "shots": [
       {
        "id": "panel_matching-17",
@@ -160,7 +160,7 @@
      ]
     },
     {
-     "text": "Select **GS-2026-PM-04** Bea Fontanilla (MBA, Trust, Perceived Risk, and E-Wallet Adoption among Young Working Adults). Rank 1 is **Dr. Benjamin Reyes** 84.7/100 (60/60, 17.2/25, 7.5/15); rank 2 Dr. Adriana Santos 40.0/100, rank 3 Dr. Liwayway Bautista 35.2/100. Dr. Angela Cruz is excluded as adviser.",
+     "text": "Select **2690104** Bea Fontanilla (MBA, Trust, Perceived Risk, and E-Wallet Adoption among Young Working Adults). Rank 1 is **Dr. Benjamin Reyes** 84.7/100 (60/60, 17.2/25, 7.5/15); rank 2 Dr. Adriana Santos 40.0/100, rank 3 Dr. Liwayway Bautista 35.2/100. Dr. Angela Cruz is excluded as adviser.",
      "shots": [
       {
        "id": "panel_matching-19",
@@ -169,7 +169,7 @@
      ]
     },
     {
-     "text": "Select **GS-2026-PM-05** Miko Almario (MBA, Demand Forecasting and Safety Stock Policy for a Consumer Goods Distributor). This is a proposal-stage paper, so the panel needs 4 members including an External Panel seat. Rank 1 is **Dr. Marco Villanueva** 82.2/100 (60/60, 17.2/25, 5/15); rank 2 Dr. Daniel Uy 39.5/100, rank 3 Dr. Adriana Santos 36.6/100. Dr. Paolo Navarro is excluded as adviser.",
+     "text": "Select **2690105** Miko Almario (MBA, Demand Forecasting and Safety Stock Policy for a Consumer Goods Distributor). This is a proposal-stage paper, so the panel needs 4 members including an External Panel seat. Rank 1 is **Dr. Marco Villanueva** 82.2/100 (60/60, 17.2/25, 5/15); rank 2 Dr. Daniel Uy 39.5/100, rank 3 Dr. Adriana Santos 36.6/100. Dr. Paolo Navarro is excluded as adviser.",
      "shots": [
       {
        "id": "panel_matching-21",
@@ -178,7 +178,7 @@
      ]
     },
     {
-     "text": "Select **GS-2026-PM-06** Liza Marquez (DBA, Succession Planning and Firm Continuity in Philippine Family Enterprises). The panel needs 5 members (Panel Chair, Content Specialist 1 and 2, Method Specialist, External Panel). Rank 1 is **Dr. Angela Cruz** 85.3/100 (60/60, 20.3/25, 5/15); rank 2 Dr. Paolo Navarro 42.2/100, rank 3 Dr. Marlon Geronimo 31.7/100. Dr. Benjamin Reyes is excluded as adviser.",
+     "text": "Select **2690106** Liza Marquez (DBA, Succession Planning and Firm Continuity in Philippine Family Enterprises). The panel needs 5 members (Panel Chair, Content Specialist 1 and 2, Method Specialist, External Panel). Rank 1 is **Dr. Angela Cruz** 85.3/100 (60/60, 20.3/25, 5/15); rank 2 Dr. Paolo Navarro 42.2/100, rank 3 Dr. Marlon Geronimo 31.7/100. Dr. Benjamin Reyes is excluded as adviser.",
      "shots": [
       {
        "id": "panel_matching-23",
@@ -187,7 +187,7 @@
      ]
     },
     {
-     "text": "Select **GS-2026-PM-07** Nico Baltazar (MBA, Influencer Credibility and Purchase Intention on Short-Video Platforms). Rank 1 is **Dr. Teresa Lim** 84.1/100 (60/60, 14.1/25, 10/15); rank 2 Dr. Liwayway Bautista 37.1/100, rank 3 Dr. Adriana Santos 36.4/100. Dr. Angela Cruz is excluded as adviser.",
+     "text": "Select **2690107** Nico Baltazar (MBA, Influencer Credibility and Purchase Intention on Short-Video Platforms). Rank 1 is **Dr. Teresa Lim** 84.1/100 (60/60, 14.1/25, 10/15); rank 2 Dr. Liwayway Bautista 37.1/100, rank 3 Dr. Adriana Santos 36.4/100. Dr. Angela Cruz is excluded as adviser.",
      "shots": [
       {
        "id": "panel_matching-25",
@@ -202,7 +202,7 @@
    "title": "Part D - Faculty expertise records (the data behind the scores)",
    "steps": [
     {
-     "text": "Before changing anything, select **GS-2026-PM-04** in Panel Matching again and read the row of **Dr. Teresa Lim**: rank 6, score 30/100, expertise 5.9/60.",
+     "text": "Before changing anything, select **2690104** in Panel Matching again and read the row of **Dr. Teresa Lim**: rank 6, score 30/100, expertise 5.9/60.",
      "shots": [
       {
        "id": "panel_matching-26",
@@ -233,7 +233,7 @@
      ]
     },
     {
-     "text": "Return to Panel Matching, select **GS-2026-PM-04** and read **Dr. Teresa Lim** again: she has moved from rank 6 to rank 3, score 35.6/100, expertise 11.5/60 (it was 5.9). The other scores move slightly because expertise is scaled across the pool (Dr. Santos 40.0 becomes 39.9).",
+     "text": "Return to Panel Matching, select **2690104** and read **Dr. Teresa Lim** again: she has moved from rank 6 to rank 3, score 35.6/100, expertise 11.5/60 (it was 5.9). The other scores move slightly because expertise is scaled across the pool (Dr. Santos 40.0 becomes 39.9).",
      "shots": [
       {
        "id": "panel_matching-30",

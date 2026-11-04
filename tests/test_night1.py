@@ -78,7 +78,7 @@ class Night1Tests(unittest.TestCase):
             "subject_titles": {},
             "issues": [],
             "rows": [{
-                "row": 5, "idno": "GS-N1-001", "first_name": "Nora", "last_name": "Night", "course": "MAED",
+                "row": 5, "idno": "9900331", "first_name": "Nora", "last_name": "Night", "course": "MAED",
                 "year": "1", "ay_entry": "26-27", "subjects": {}, "milestones": {},
                 "comprehensive_exam_passed": False, "note": "",
             }],

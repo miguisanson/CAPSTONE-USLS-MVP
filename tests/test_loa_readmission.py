@@ -1223,7 +1223,7 @@ class LeaveCaseTests(unittest.TestCase):
         self.assertEqual(again["student"]["standing"], "On Leave")
         self.assertEqual(again["leave_overview"]["cases"][0]["status"], "Submitted")
         with app.app_context():
-            gabriel = Student.query.filter_by(student_number="GS-2026-READ-02").one()
+            gabriel = Student.query.filter_by(student_number="2690902").one()
             leave = LeaveCase.query.filter_by(student_id=gabriel.id, kind="LOA").one()
             self.assertEqual((leave.status, leave.start_label, leave.end_label),
                              ("On Leave", "AY 2026-2027 1st Semester", "AY 2026-2027 2nd Semester"))
@@ -1236,7 +1236,7 @@ class LeaveCaseTests(unittest.TestCase):
         reset = staff.post("/api/auth/demo-students/readmission-therese/reset")
         self.assertEqual(reset.status_code, 200, reset.get_json())
         with app.app_context():
-            therese = Student.query.filter_by(student_number="GS-2026-READ-01").one()
+            therese = Student.query.filter_by(student_number="2690901").one()
             self.assertEqual(LeaveCase.query.filter_by(student_id=therese.id, kind="READMISSION").count(), 0)
             self.assertEqual(LeaveCase.query.filter_by(student_id=therese.id, kind="LOA").one().status, "On Leave")
             self.assertEqual((therese.standing, therese.enrollment_tag), ("On Leave", "LOA"))
@@ -1250,7 +1250,7 @@ class LeaveCaseTests(unittest.TestCase):
         client = app.test_client()
         client.post("/api/auth/login", json={"email": maureen["email"], "password": maureen["password"]})
         with app.app_context():
-            student = Student.query.filter_by(student_number="GS-2026-LOA-01").one()
+            student = Student.query.filter_by(student_number="2690801").one()
             student_id = student.id
             enrolled_before = SubjectEnrollment.query.filter_by(student_id=student_id, status="Enrolled").count()
             self.assertGreater(enrolled_before, 0)

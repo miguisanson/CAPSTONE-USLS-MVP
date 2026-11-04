@@ -85,8 +85,8 @@ test.describe("I-001 Enrollment: Record dropped subject dialog", () => {
     await pickByText(selects.nth(0), "MAED");
     await expect(selects.nth(1).locator("option", { hasText: "(Current)" }).first()).toBeAttached();
     await pickByText(selects.nth(1), "(Current)");
-    await expect(selects.nth(2).locator("option", { hasText: "GS-2026-WD-02" }).first()).toBeAttached();
-    await pickByText(selects.nth(2), "GS-2026-WD-02");
+    await expect(selects.nth(2).locator("option", { hasText: "2690402" }).first()).toBeAttached();
+    await pickByText(selects.nth(2), "2690402");
 
     await page.getByRole("button", { name: "Change MAED-MAJ2 student status" }).click();
     const dialog = page.getByRole("dialog", { name: "Record dropped subject" });

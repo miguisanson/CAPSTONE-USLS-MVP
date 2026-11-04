@@ -528,7 +528,7 @@ test.describe("Defense Schedule", () => {
     // seed dates are relative to the seed day (IM16): pin the format, not one calendar date
     await expect(first).toContainText(/[A-Z][a-z]{2} \d{1,2}, \d{4} · \d{1,2}:\d{2} (AM|PM)/);
     await expect(first).toContainText("Philippine time");
-    await expect(first).toContainText("In person");
+    await expect(first).toContainText("On-site");
     await expect(first).toContainText("Graduate School Conference Room");
     await expect(first).toContainText("Content Specialist");
     await expect(first).toContainText("Finished");

@@ -37,7 +37,7 @@
   ],
   [
    "Class list rows",
-   "GS-2026-ENR-01 Clarissa Dela Cruz and GS-2026-ENR-02 Martin Gonzales, both MAED-MAJ2 with Dr. Marlon Geronimo, status Enrolled; 2670001 Miguel Sanson (not a student of record); 2560001 Daniel Cruz with MAED-XYZ9 (not a curriculum subject)"
+   "2690501 Clarissa Dela Cruz and 2690502 Martin Gonzales, both MAED-MAJ2 with Dr. Marlon Geronimo, status Enrolled; 2670001 Miguel Sanson (not a student of record); 2560001 Daniel Cruz with MAED-XYZ9 (not a curriculum subject)"
   ],
   [
    "Demo students reset",
@@ -111,7 +111,7 @@
      ]
     },
     {
-     "text": "Open **Monitoring Sheet**, select MAED and the current semester, and find the row of Clarissa Dela Cruz (GS-2026-ENR-01). Only the MAED-MAJ2 cell is marked Enrolled (R), matching the class list. The banner above the grid reports the consistency check between enrollment and student profiles; on the demo data it lists 2 inconsistency items that belong to another student (2360006, subject MAED-COG10 in the current semester), not to Clarissa.",
+     "text": "Open **Monitoring Sheet**, select MAED and the current semester, and find the row of Clarissa Dela Cruz (2690501). Only the MAED-MAJ2 cell is marked Enrolled (R), matching the class list. The banner above the grid reports the consistency check between enrollment and student profiles; on the demo data it lists 2 inconsistency items that belong to another student (2360006, subject MAED-COG10 in the current semester), not to Clarissa.",
      "shots": [
       {
        "id": "enrollment-15",

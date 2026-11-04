@@ -5,7 +5,7 @@ export default {
   process: "leave-of-absence",
   title: "Leave of Absence",
   summary: "A student asks for a leave, staff check it, the Dean approves, staff start the leave.",
-  studentNumber: "GS-2026-LOA-02",
+  studentNumber: "2690802",
   walkthrough: "09_leave_of_absence",
   accounts: {
     student: { who: "the student", label: "Daniel Fernandez", email: "loa.daniel@usls.edu.ph" },

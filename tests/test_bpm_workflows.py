@@ -21,6 +21,7 @@ os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 import app as app_module  # noqa: E402
 
 from app import (  # noqa: E402
+    DEMO_STUDENT_NUMBERS,
     AcademicTerm,
     AdviserDocumentApproval,
     AwolCase,
@@ -150,7 +151,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.course = Course(program_id=self.program.id, code="BPM-501", title="Completion Course", units=3, category="Major")
             db.session.add(self.course)
             self.student = Student(
-                student_number="GS-2026-TEST",
+                student_number="9900101",
                 first_name="Workflow",
                 last_name="Student",
                 email="workflow@example.test",
@@ -1296,7 +1297,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(row["demand_status"], "meets_minimum")
             self.assertEqual(row["affected_count"], 1)
             self.assertEqual(row["delayed_count"], 1)
-            self.assertEqual(row["affected_students"][0]["student_number"], "GS-2026-TEST")
+            self.assertEqual(row["affected_students"][0]["student_number"], "9900101")
             self.assertTrue(row["affected_students"][0]["will_be_delayed"])
 
     def test_subject_needs_report_uses_active_students_without_future_enrollment(self):
@@ -1542,7 +1543,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertTrue(payload["read_only"])
             self.assertEqual(payload["selected_offering"]["course_code"], "BPM-501")
             self.assertEqual(payload["summary"]["students_in_selected_class"], 1)
-            self.assertEqual(payload["students"][0]["student_number"], "GS-2026-TEST")
+            self.assertEqual(payload["students"][0]["student_number"], "9900101")
             all_response = academic.get(
                 f"/api/monitoring/class-list?program_id={self.program_id}"
                 f"&term_id={current_term.id}&view=all"
@@ -2221,7 +2222,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 status="Completed",
             ))
             earlier = Student(
-                student_number="GS-2018-EARLY",
+                student_number="9900113",
                 first_name="Earlier",
                 last_name="Entry",
                 email="earlier@example.test",
@@ -2829,7 +2830,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 category="Major",
             )
             completed_student = Student(
-                student_number="GS-2026-COMPLETED",
+                student_number="9900102",
                 first_name="Completed",
                 last_name="Student",
                 email="completed-student@example.test",
@@ -2885,10 +2886,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
             csv_body = (
                 "Student ID,Subject Code,Faculty\n"
-                "GS-2026-TEST,BPM-501,Dr. Offering Test\n"
-                "GS-2026-COMPLETED,BPM-501,Dr. Offering Test\n"
+                "9900101,BPM-501,Dr. Offering Test\n"
+                "9900102,BPM-501,Dr. Offering Test\n"
                 "GS-UNKNOWN,BPM-501,Dr. Offering Test\n"
-                "GS-2026-TEST,BPM-599,Dr. Offering Test\n"
+                "9900101,BPM-599,Dr. Offering Test\n"
             ).encode("utf-8")
             preview = academic.post(
                 "/api/enrollment/class-list-preview",
@@ -3806,8 +3807,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         with app.app_context():
             seed_database()
             maed = Program.query.filter_by(code="MAED").one()
-            andrea = Student.query.filter_by(student_number="GS-2026-PRAC-01").one()
-            paolo = Student.query.filter_by(student_number="GS-2026-PRAC-02").one()
+            andrea = Student.query.filter_by(student_number="2690201").one()
+            paolo = Student.query.filter_by(student_number="2690202").one()
             andrea.program_id = maed.id
             paolo.program_id = maed.id
             db.session.commit()
@@ -4824,7 +4825,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             students = {
                 student_number: student
                 for student_number, student in all_students.items()
-                if re.fullmatch(r"\d{7}", student_number)
+                if student_number not in DEMO_STUDENT_NUMBERS.values()  # the sheet students; the personas are in the table
             }
             self.assertEqual(len(students), 11)
             self.assertTrue(all(
@@ -4842,7 +4843,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             )
             withdrawal_demo_enrollments = (
                 SubjectEnrollment.query.join(Student)
-                .filter(Student.student_number.in_(["GS-2026-WD-01", "GS-2026-WD-02"]))
+                .filter(Student.student_number.in_(["2690401", "2690402"]))
                 .all()
             )
             self.assertEqual(len(withdrawal_demo_enrollments), 6)
@@ -4852,7 +4853,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 withdrawal_enrollments_by_student.setdefault(item.student.student_number, []).append(item)
             self.assertEqual(
                 {key: len(value) for key, value in withdrawal_enrollments_by_student.items()},
-                {"GS-2026-WD-01": 3, "GS-2026-WD-02": 3},
+                {"2690401": 3, "2690402": 3},
             )
 
             expected_completed = {
@@ -5200,7 +5201,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.add_all([out_of_scope_program, msgc_program])
             db.session.flush()
             out_of_scope_student = Student(
-                student_number="GS-2026-NON-PRAC",
+                student_number="9900103",
                 first_name="Outside",
                 last_name="Scope",
                 email="outside-practicum@example.test",
@@ -5337,7 +5338,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             student_account = self._account("student", "student-files@example.test")
             student_account.student_id = self.student_id
             other_record = Student(
-                student_number="GS-2026-OTHER-FILE",
+                student_number="9900104",
                 first_name="Other",
                 last_name="File Student",
                 email="other-file@example.test",
@@ -5403,7 +5404,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             student_account = self._account("student", "student-inbox@example.test")
             student_account.student_id = self.student_id
             other_record = Student(
-                student_number="GS-2026-OTHER-INBOX",
+                student_number="9900105",
                 first_name="Other",
                 last_name="Inbox Student",
                 email="other-inbox@example.test",
@@ -5685,7 +5686,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(dean_item["record"]["batch_name"], "Batch 2 July 2026")
 
             blocked_student = Student(
-                student_number="GS-2026-BATCH-BLOCKED",
+                student_number="9900106",
                 first_name="Blocked",
                 last_name="Candidate",
                 email="batch-blocked@example.test",
@@ -5792,7 +5793,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 evidence_reference="Prior monitoring sheet",
             ))
             additive_student = Student(
-                student_number="GS-ADD-001",
+                student_number="9900322",
                 first_name="Additive",
                 last_name="Update",
                 email="additive@example.test",
@@ -5824,20 +5825,20 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "issues": [],
                 "rows": [
                     {
-                        "row": 10, "idno": "GS-2026-TEST",
+                        "row": 10, "idno": "9900101",
                         "first_name": "Workflow Changed", "last_name": "Student",
                         "course": "BPM", "year": "2", "ay_entry": "24-25",
                         "subjects": {"BPM-501": False}, "milestones": {},
                         "comprehensive_exam_passed": False, "note": "",
                     },
                     {
-                        "row": 11, "idno": "GS-NEW-001", "first_name": "New", "last_name": "Student",
+                        "row": 11, "idno": "9900321", "first_name": "New", "last_name": "Student",
                         "course": "BPM", "year": "1", "ay_entry": "26-27",
                         "subjects": {"BPM-501": True}, "milestones": {},
                         "comprehensive_exam_passed": False, "note": "",
                     },
                     {
-                        "row": 15, "idno": "GS-ADD-001", "first_name": "Additive", "last_name": "Update",
+                        "row": 15, "idno": "9900322", "first_name": "Additive", "last_name": "Update",
                         "course": "BPM", "year": "1", "ay_entry": "26-27",
                         "subjects": {"BPM-501": True}, "milestones": {},
                         "comprehensive_exam_passed": False, "note": "",
@@ -5849,13 +5850,13 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                         "comprehensive_exam_passed": False, "note": "",
                     },
                     {
-                        "row": 13, "idno": "GS-DUP-001", "first_name": "Duplicate", "last_name": "One",
+                        "row": 13, "idno": "9900323", "first_name": "Duplicate", "last_name": "One",
                         "course": "BPM", "year": "1", "ay_entry": "26-27",
                         "subjects": {"BPM-501": False}, "milestones": {},
                         "comprehensive_exam_passed": False, "note": "",
                     },
                     {
-                        "row": 14, "idno": "GS-DUP-001", "first_name": "Duplicate", "last_name": "Two",
+                        "row": 14, "idno": "9900323", "first_name": "Duplicate", "last_name": "Two",
                         "course": "BPM", "year": "1", "ay_entry": "26-27",
                         "subjects": {"BPM-501": False}, "milestones": {},
                         "comprehensive_exam_passed": False, "note": "",
@@ -5872,13 +5873,13 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertTrue(any("Subject mismatch" in value for value in issue_types))
             self.assertTrue(any("Missing required fields" in value for value in issue_types))
             self.assertTrue(any("Duplicate student ID in upload" in value for value in issue_types))
-            multi_issue = next(item for item in result["validation_issues"] if item["incoming_student_number"] == "GS-2026-TEST")
+            multi_issue = next(item for item in result["validation_issues"] if item["incoming_student_number"] == "9900101")
             self.assertGreaterEqual(multi_issue["discrepancy_count"], 3)
             self.assertEqual(
                 {item["type"] for item in multi_issue["discrepancies"]},
                 {"Existing ID with different name", "School year mismatch", "Subject mismatch"},
             )
-            new_student = Student.query.filter_by(student_number="GS-NEW-001").one()
+            new_student = Student.query.filter_by(student_number="9900321").one()
             self.assertTrue(new_student.monitoring_new_student)
             self.assertEqual(new_student.monitoring_upload_id, upload.id)
             self.assertEqual(
@@ -5901,10 +5902,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             ).one()
             edited = staff.patch(f"/api/monitoring/issues/{missing_issue.id}/resolve", json={
                 "action": "edit",
-                "edited": {"student_number": "GS-EDIT-001"},
+                "edited": {"student_number": "9900324"},
             })
             self.assertEqual(edited.status_code, 200, edited.get_json())
-            edited_student = Student.query.filter_by(student_number="GS-EDIT-001").one()
+            edited_student = Student.query.filter_by(student_number="9900324").one()
             self.assertTrue(edited_student.monitoring_new_student)
             self.assertTrue(TransactionLog.query.filter_by(student_id=edited_student.id, new_status="Resolved").first())
 
@@ -5921,7 +5922,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
         with app.app_context():
             second_student = Student(
-                student_number="GS-BULK-002",
+                student_number="9900325",
                 first_name="Second",
                 last_name="Student",
                 email="second-bulk@example.test",
@@ -5956,8 +5957,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "subject_titles": {"BPM-501": "Completion Course"},
                 "issues": [],
                 "rows": [
-                    {"row": 5, "idno": "GS-2026-TEST", "first_name": "Wrong", "last_name": "Name", "course": "BPM", "year": "2", "ay_entry": "24-25", "subjects": {"BPM-501": False}, "milestones": {}, "comprehensive_exam_passed": False, "note": ""},
-                    {"row": 6, "idno": "GS-BULK-002", "first_name": "Also Wrong", "last_name": "Name", "course": "BPM", "year": "2", "ay_entry": "24-25", "subjects": {"BPM-501": False}, "milestones": {}, "comprehensive_exam_passed": False, "note": ""},
+                    {"row": 5, "idno": "9900101", "first_name": "Wrong", "last_name": "Name", "course": "BPM", "year": "2", "ay_entry": "24-25", "subjects": {"BPM-501": False}, "milestones": {}, "comprehensive_exam_passed": False, "note": ""},
+                    {"row": 6, "idno": "9900325", "first_name": "Also Wrong", "last_name": "Name", "course": "BPM", "year": "2", "ay_entry": "24-25", "subjects": {"BPM-501": False}, "milestones": {}, "comprehensive_exam_passed": False, "note": ""},
                 ],
             }
             result = import_ac_monitoring(parsed, upload=source_upload)
@@ -5972,8 +5973,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             sheet.append([])
             sheet.append(["", "IDNO", "COURSE", "YR", "BASIC", "", "", "NOTE"])
             sheet.append(["AY ENTRY", "", "", "", "BPM-501", "SN", "FN", ""])
-            sheet.append(["25-26", "GS-2026-TEST", "BPM", "1", "X", "Student", "Workflow", ""])
-            sheet.append(["25-26", "GS-BULK-002", "BPM", "1", "X", "Student", "Second", ""])
+            sheet.append(["25-26", "9900101", "BPM", "1", "X", "Student", "Workflow", ""])
+            sheet.append(["25-26", "9900325", "BPM", "1", "X", "Student", "Second", ""])
             corrected_file = BytesIO()
             workbook.save(corrected_file)
             corrected_file.seek(0)
@@ -6059,7 +6060,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             report = residency_watchlist_report([student])
             self.assertEqual(report["count"], 1)
             row = report["rows"][0]
-            self.assertEqual(row["student_number"], "GS-2026-TEST")
+            self.assertEqual(row["student_number"], "9900101")
             self.assertEqual(row["years_in_program"], 8)
             self.assertEqual(row["normal_years"], 5)
             self.assertEqual(row["absolute_years"], 7)

@@ -270,7 +270,7 @@ class DemoModeTests(HealthTestBase):
     def test_demo_mode_off_skips_the_demo_baseline_repair_on_login(self):
         with app.app_context():
             student = Student.query.filter_by(student_number="GS-HLT-A").one()
-            student.student_number = "GS-2026-WD-01"  # a whitelisted demo persona
+            student.student_number = "2690401"  # a whitelisted demo persona
             db.session.commit()
         with patch("app.ensure_workflow_demo_student_baseline") as baseline:
             with patch.dict(os.environ, {"DEMO_MODE": "0"}):

@@ -3564,6 +3564,7 @@ def curriculum_offering_dict(offering: CurriculumOffering) -> dict:
 # never hard-code the number. business_rules_catalog.py holds the seed values.
 from flask import g as _flask_g  # noqa: E402
 
+from panel_demo_data import DEMO_STUDENT_NUMBERS  # noqa: E402
 from business_rules_catalog import (  # noqa: E402
     BUSINESS_RULE_BY_KEY,
     BUSINESS_RULE_CATALOG,
@@ -14876,7 +14877,11 @@ def register_routes(app: Flask) -> None:
                     "Practicum Document Submission",
                 )
             record.certificate_attachment_id = certificate.id
-            record.completed_hours = max(safe_int(data.get("completed_hours"), record.completed_hours or 0), 0)
+            try:
+                record.completed_hours = checked_whole_hours(
+                    data.get("completed_hours"), record.required_hours or practicum_required_hours(), record.completed_hours or 0)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
             record.document_status = "Pending Review"
             if student_remark:
                 record.remarks = student_remark
@@ -16191,8 +16196,8 @@ def register_routes(app: Flask) -> None:
         eligible_roles = list(dict.fromkeys(role for role in eligible_roles if role in FACULTY_ELIGIBLE_ROLES))
         if not full_name or not department or not specialization or not email:
             return jsonify({"error": "Full name, department, specialization, and email are required."}), 400
-        if "@" not in email or email.startswith("@") or email.endswith("@"):
-            return jsonify({"error": "Enter a valid faculty email address."}), 400
+        if not EMAIL_RE.fullmatch(email):
+            return jsonify({"error": "Enter a valid faculty email address, like name@usls.edu.ph."}), 400
         if len(temporary_password) < 8:
             return jsonify({"error": "Temporary password must contain at least 8 characters."}), 400
         if status not in {"Active", "Inactive"}:
@@ -16345,8 +16350,8 @@ def register_routes(app: Flask) -> None:
             faculty.specialization = value
         if "email" in data:
             email = str(data.get("email") or "").strip().lower()
-            if "@" not in email or email.startswith("@") or email.endswith("@"):
-                return jsonify({"error": "Enter a valid faculty email address."}), 400
+            if not EMAIL_RE.fullmatch(email):
+                return jsonify({"error": "Enter a valid faculty email address, like name@usls.edu.ph."}), 400
             linked = UserAccount.query.filter_by(faculty_id=faculty.id).first()
             other_profile = Faculty.query.filter(func.lower(Faculty.email) == email, Faculty.id != faculty.id).first()
             other_login = UserAccount.query.filter(
@@ -18163,6 +18168,10 @@ def register_routes(app: Flask) -> None:
             faculty = Faculty.query.get_or_404(faculty_id)
             if not faculty.active or faculty.college != program.college:
                 return jsonify({"error": "Choose an active faculty member from this program's college."}), 409
+        try:
+            section = clean_section(data.get("section"))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         if CurriculumOffering.query.filter_by(program_id=program.id, academic_year=academic_year, semester=semester, course_id=course.id).first():
             return jsonify({"error": f"{course.code} is already offered this semester."}), 400
         actor = workflow_actor_label(current_account()) if current_account() else "Academic Coordinator"
@@ -18170,7 +18179,7 @@ def register_routes(app: Flask) -> None:
             program_id=program.id, academic_year=academic_year, semester=semester, course_id=course.id,
             added_by=actor, assigned_faculty_id=faculty_id,
             schedule=(data.get("schedule") or "").strip() or None,
-            section=(data.get("section") or "").strip() or None,
+            section=section,
         )
         db.session.add(off)
         add_log("course-adjustments", None, actor, "Course Offering Setup",
@@ -18209,9 +18218,14 @@ def register_routes(app: Flask) -> None:
                     return jsonify(error=f"{off.course.code}: choose an active faculty member from this college."), 409
                 schedule = row.get("schedule") or ""
                 section = row.get("section") or ""
-                if not isinstance(schedule, str) or not isinstance(section, str) or len(schedule) > 160 or len(section) > 50:
+                if not isinstance(schedule, str) or not isinstance(section, str) or len(schedule) > 160:
                     db.session.rollback()
                     return jsonify(error=f"{off.course.code}: invalid schedule or section."), 400
+                try:
+                    section = clean_section(section) or ""
+                except ValueError as exc:
+                    db.session.rollback()
+                    return jsonify(error=f"{off.course.code}: {exc}"), 400
                 schedule = schedule.strip()
                 if schedule and schedule != (off.schedule or "") and not parse_offering_schedule(schedule):
                     db.session.rollback()
@@ -18242,7 +18256,10 @@ def register_routes(app: Flask) -> None:
         if "schedule" in data:
             off.schedule = (data.get("schedule") or "").strip() or None
         if "section" in data:
-            off.section = (data.get("section") or "").strip() or None
+            try:
+                off.section = clean_section(data.get("section"))
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
         off.updated_at = now_utc()
         from teaching_backend import offering_conflict_errors
         with db.session.no_autoflush:
@@ -18391,9 +18408,10 @@ def register_routes(app: Flask) -> None:
                     demand_row = live_demand.get(cid, {})
                     offered = bool(sel.get("offer", True))
                     try:
-                        section_count = max(0, int(sel.get("section_count") or 0))
-                    except (TypeError, ValueError):
-                        section_count = 0
+                        section_count = checked_section_count(sel.get("section_count"))
+                    except ValueError as exc:
+                        db.session.rollback()
+                        return jsonify({"error": f"{course.code}: {exc}"}), 400
                     if offered and section_count == 0:
                         section_count = 1
                     assigned = None
@@ -21365,6 +21383,8 @@ def register_routes(app: Flask) -> None:
             appointed_on = parse_date(str(data["appointed_on"])) if data.get("appointed_on") else ph_today()
         except ValueError:
             return jsonify({"error": "Enter the appointment date as YYYY-MM-DD."}), 400
+        if appointed_on > ph_today():
+            return jsonify({"error": "The appointment date cannot be in the future."}), 400
         note = re.sub(r"\s+", " ", str(data.get("note") or "")).strip()[:500]
         row = AdviserAppointment(
             student_id=student.id, faculty_id=faculty.id, kind="Recorded", status=ADVISER_STATUS_ACCEPTED,
@@ -22743,7 +22763,7 @@ def apply_practicum_payload(record: PracticumRecord, data: MultiDict, student: S
     record.supervisor_name = (data.get("supervisor_name") or record.supervisor_name or "").strip()
     # The 200-hour rule is a floor: a request payload can raise the hours but never lower them.
     record.required_hours = max(safe_int(data.get("required_hours"), record.required_hours or 0), practicum_required_hours())
-    record.completed_hours = max(safe_int(data.get("completed_hours"), record.completed_hours or 0), 0)
+    record.completed_hours = checked_whole_hours(data.get("completed_hours"), record.required_hours, record.completed_hours or 0)
     record.document_status = (data.get("document_status") or record.document_status or "Pending Review").strip()
     record.completion_status = (data.get("completion_status") or record.completion_status or "Pending").strip()
     moa_attachment = request_attachment_from_payload(student, "practicum", data)
@@ -27906,8 +27926,29 @@ def apply_class_list_row(item: dict, term: AcademicTerm, filename: str, actor: s
     return "enrolled"
 
 
+_AY_PAIR_RE = re.compile(r"(?<!\d)(\d{4}|\d{2})\s*-\s*(\d{4}|\d{2})(?!\d)")
+
+
+def _ay_start_year(text: str) -> int | None:
+    """First year of a well-formed school year ('26-27', '2026-27', '2026-2027'); None when the second year
+    does not follow the first ('62-27')."""
+    match = _AY_PAIR_RE.fullmatch((text or "").strip())
+    if not match:
+        return None
+    first, second = match.groups()
+    start = int(first) if len(first) == 4 else 2000 + int(first)
+    if len(second) == 4:
+        return start if int(second) == start + 1 else None
+    return start if int(second) == (start + 1) % 100 else None
+
+
 def _entry_year_from_ay(ay: str) -> int:
-    """'23-24' -> 2023, '2023-2024' -> 2023, fallback to current year."""
+    """'23-24' -> 2023, '2023-2024' -> 2023; a school year that is not well formed, or no year, -> current year."""
+    start = _ay_start_year(ay)
+    if start:
+        return start
+    if _AY_PAIR_RE.search(ay or ""):
+        return ph_today().year
     m = re.search(r"(\d{2,4})", ay or "")
     if not m:
         return ph_today().year
@@ -27963,6 +28004,91 @@ def clean_person_name(value: str) -> str:
     Normalize to a clean display case so 'MIGUEL YU' becomes 'Miguel Yu'."""
     parts = re.split(r"\s+", (value or "").strip())
     return " ".join(part[:1].upper() + part[1:].lower() if part else part for part in parts).strip()
+
+
+# One student-ID format everywhere (I-353): the registrar's 7 digits, e.g. 2260004.
+STUDENT_NUMBER_RE = re.compile(r"\d{7}")
+STUDENT_NUMBER_MESSAGE = "Student ID must be exactly 7 digits, for example 2260004."
+EMAIL_RE = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
+PERSON_NAME_RE = re.compile(r"[^\W\d_](?:[^\W\d_]|[\u0300-\u036f\s.\'\u2019-])*")
+AY_ENTRY_FIRST_YEAR = 2000
+
+
+def normalize_student_number(value) -> str:
+    """The one writer-side check for a student ID: trimmed, exactly 7 digits, else MonitoringEntryError."""
+    text = str(value or "").strip()
+    if not STUDENT_NUMBER_RE.fullmatch(text):
+        raise MonitoringEntryError(STUDENT_NUMBER_MESSAGE)
+    return text
+
+
+def check_email_address(value, label: str = "email address") -> str:
+    text = str(value or "").strip()
+    if not EMAIL_RE.fullmatch(text):
+        raise MonitoringEntryError(f"Enter a valid {label}, like name@usls.edu.ph.")
+    return text
+
+
+def check_person_name(value, label: str) -> str:
+    text = str(value or "").strip()
+    if not PERSON_NAME_RE.fullmatch(text):
+        raise MonitoringEntryError(f"{label} may use letters only (spaces, hyphens, apostrophes and full stops are fine).")
+    return text
+
+
+def _latest_ay_entry_start() -> int:
+    """Newest school year a student can have entered: the latest configured semester or the running one."""
+    years = [academic_year_start()]
+    for (label,) in db.session.query(AcademicTerm.label).all():
+        match = re.search(r"(\d{4})\s*-\s*\d{4}", label or "")
+        if match:
+            years.append(int(match.group(1)))
+    return max(years)
+
+
+def checked_whole_hours(raw, required_hours: int, current: int = 0) -> int:
+    """Hours entered by a person: a whole number from 0 to twice the requirement. Blank keeps `current`."""
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return current
+    text = str(raw).strip()
+    if not re.fullmatch(r"\d{1,6}", text):
+        raise ValueError("Hours must be a whole number, for example 200.")
+    hours, limit = int(text), 2 * max(int(required_hours or 0), 1)
+    if hours > limit:
+        raise ValueError(f"Hours cannot be more than twice the required hours ({limit}).")
+    return hours
+
+
+def checked_clearance_date(raw) -> date:
+    """A real calendar date as YYYY-MM-DD, not later than today (Manila)."""
+    text = str(raw or "").strip()
+    try:
+        day = date.fromisoformat(text) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text) else None
+    except ValueError:
+        day = None
+    if day is None:
+        raise ValueError("Enter the date as YYYY-MM-DD.")
+    if day > ph_today():
+        raise ValueError("The date cannot be in the future.")
+    return day
+
+
+def clean_section(value) -> str | None:
+    """A class section is one letter A to Z (blank = none)."""
+    text = str(value or "").strip().upper()
+    if text and not re.fullmatch(r"[A-Z]", text):
+        raise ValueError("Section must be a single letter from A to Z.")
+    return text or None
+
+
+def checked_section_count(value) -> int:
+    """How many sections of a subject are offered: a whole number from 0 to 6 (blank = 0)."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return 0
+    text = str(value).strip()
+    if not re.fullmatch(r"\d", text) or int(text) > 6:
+        raise ValueError("Sections must be a whole number from 0 to 6.")
+    return int(text)
 
 
 def parse_ac_monitoring(stream) -> dict:
@@ -28247,6 +28373,14 @@ def _monitoring_row_discrepancies(row, program, course_by_code, id_counts=None):
     missing_fields = [label for label, value in required.items() if not str(value or "").strip()]
     if missing_fields:
         add("Missing required fields", "Missing: " + ", ".join(missing_fields))
+    if student_number and not STUDENT_NUMBER_RE.fullmatch(student_number):
+        add("Invalid student ID", f"Student ID {student_number} is not valid. {STUDENT_NUMBER_MESSAGE}")
+    ay_uploaded = str(row.get("ay_entry") or "").strip()
+    if ay_uploaded:
+        try:
+            _monitoring_ay_entry(ay_uploaded)
+        except MonitoringEntryError as exc:
+            add("Invalid school year", f"School year {ay_uploaded} is not valid. {exc}")
     if student_number and id_counts and id_counts.get(student_number, 0) > 1:
         add("Duplicate student ID in upload", f"Student ID {student_number} appears {id_counts[student_number]} times in this workbook")
     uploaded_program_code = str(row.get("course") or "").strip().upper().split("-", 1)[0]
@@ -28344,6 +28478,8 @@ def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, o
     ay_entry = str(row.get("ay_entry") or "").strip()
     if not student_number or not first_name or not last_name or not ay_entry:
         raise ValueError("Student ID, first name, last name, and School Year / AY Entry are required.")
+    student_number = normalize_student_number(student_number)
+    ay_entry = _monitoring_ay_entry(ay_entry)
     collision = Student.query.filter_by(student_number=student_number).first()
     if collision and (not student or collision.id != student.id):
         raise ValueError(f"Student ID {student_number} already belongs to {collision.name}.")
@@ -28923,10 +29059,16 @@ def _monitoring_log(student: Student, account: UserAccount | None, summary: str,
 
 
 def _monitoring_ay_entry(value) -> str:
+    """A school year of entry as stored: 'YY-YY', the second year the first plus one, inside the configured range."""
     text_value = _monitoring_clean(value, 20)
-    if not re.fullmatch(r"\d{2}(?:\d{2})?\s*-\s*\d{2}(?:\d{2})?", text_value):
-        raise MonitoringEntryError("School Year / AY Entry must look like 26-27 (or 2026-2027).")
-    return re.sub(r"\s+", "", text_value)
+    start = _ay_start_year(text_value)
+    latest = _latest_ay_entry_start()
+    if start is None or not AY_ENTRY_FIRST_YEAR <= start <= latest:
+        raise MonitoringEntryError(
+            "School Year / AY Entry must be a school year like 26-27 (the second year follows the first), "
+            f"from AY {AY_ENTRY_FIRST_YEAR}-{AY_ENTRY_FIRST_YEAR + 1} to AY {latest}-{latest + 1}."
+        )
+    return f"{start % 100:02d}-{(start + 1) % 100:02d}"
 
 
 def _monitoring_email_free(email: str, student: Student | None = None) -> None:
@@ -28965,6 +29107,9 @@ def monitoring_portal_create_student(data: dict) -> tuple[Student, UserAccount]:
         raise MonitoringEntryError("Missing required fields: " + ", ".join(missing) + ".")
     if not program:
         raise MonitoringEntryError("Choose a valid program for this student.")
+    student_number = normalize_student_number(student_number)
+    check_person_name(first_name, "First name")
+    check_person_name(last_name, "Last name")
     ay_entry = _monitoring_ay_entry(ay_raw)
     collision = Student.query.filter_by(student_number=student_number).first()
     if collision:
@@ -28986,8 +29131,7 @@ def monitoring_portal_create_student(data: dict) -> tuple[Student, UserAccount]:
         raise MonitoringEntryError("Only Enrolled or Not Enrolled can be set here; LOA, AWOL and withdrawal have their own workflows.")
     email = _monitoring_clean(data.get("email"), 160).lower()
     if email:
-        if "@" not in email or " " in email:
-            raise MonitoringEntryError("Enter a valid email address.")
+        check_email_address(email)
         _monitoring_email_free(email)
     term = get_active_term()  # never a client-sent term_id (I-246 pattern)
 
@@ -29051,8 +29195,12 @@ def monitoring_portal_update_student(student: Student, data: dict) -> list[dict]
         value = _monitoring_clean(data.get(field), 160)
         if field in {"first_name", "last_name"}:
             value = clean_person_name(value)
+            if value:
+                check_person_name(value, field.replace("_", " ").capitalize())
         if field == "email":
             value = value.lower()
+        if field == "student_number" and value:
+            value = normalize_student_number(value)
         if field == "academic_year_entry" and value:
             value = _monitoring_ay_entry(value)
         if not value and field != "adviser_name":
@@ -29081,8 +29229,7 @@ def monitoring_portal_update_student(student: Student, data: dict) -> list[dict]
                 existing_student=student_brief(collision),
             )
     if "email" in changes:
-        if "@" not in changes["email"] or " " in changes["email"]:
-            raise MonitoringEntryError("Enter a valid email address.")
+        check_email_address(changes["email"])
         _monitoring_email_free(changes["email"], student)
 
     login = UserAccount.query.filter_by(student_id=student.id, role="student").first()
@@ -29667,10 +29814,20 @@ def handle_student_handoff(data: MultiDict) -> int:
     # Intake transaction: create the monitoring record, mirror the enrollment
     # signal, compare onboarding evidence, and open a follow-up if anything is missing.
     program = Program.query.get(int(data["program_id"]))
-    count = Student.query.count() + 1
-    student_number = (data.get("student_number") or "").strip() or f"2026-{count:04d}"
-    first_name = data["first_name"].strip()
-    last_name = data["last_name"].strip()
+    student_number = normalize_student_number(data.get("student_number"))
+    first_name = check_person_name(data["first_name"], "First name")
+    last_name = check_person_name(data["last_name"], "Last name")
+    handoff_email = (data.get("email") or "").strip().lower()
+    if handoff_email:
+        check_email_address(handoff_email)
+    # The school year of entry is derived (the running year) unless the sheet row names it; never a free year.
+    ay_start = academic_year_start()
+    ay_entry = (
+        _monitoring_ay_entry(data.get("academic_year_entry")) if (data.get("academic_year_entry") or "").strip()
+        else f"{ay_start % 100:02d}-{(ay_start + 1) % 100:02d}"
+    )
+    if Student.query.filter_by(student_number=student_number).first():
+        raise MonitoringEntryError(f"Student ID {student_number} already belongs to a student.", 409)
     admission_signal = (data.get("admission_signal") or "").strip()
     transcript_status = (data.get("transcript_status") or "Not verified").strip()
     source_reference = (data.get("source_reference") or "").strip()
@@ -29694,9 +29851,10 @@ def handle_student_handoff(data: MultiDict) -> int:
         student_number=student_number,
         first_name=first_name,
         last_name=last_name,
-        email=(data.get("email") or "").strip().lower() or unique_student_email(first_name, last_name, student_number),
+        email=handoff_email or unique_student_email(first_name, last_name, student_number),
         program_id=program.id,
-        entry_year=int(data.get("entry_year") or ph_today().year),
+        entry_year=_entry_year_from_ay(ay_entry),
+        academic_year_entry=ay_entry,
         current_stage="Admission",
         standing="Active",
         risk_level="Not Yet Assessed",
@@ -29874,6 +30032,8 @@ def handle_research_gate(data: MultiDict) -> int:
         clearance_date = (data.get("ethics_clearance_date") or "").strip()
         if ethics_clearance_status == "Cleared" and not clearance_date:
             raise ValueError("Enter the ethics clearance date before marking the form Cleared.")
+        if clearance_date:
+            clearance_date = checked_clearance_date(clearance_date).isoformat()
         checks = ensure_research_document_checks(student.id, gate)
         clearance_doc = next((doc for doc in checks if doc.item_name == "Ethics Clearance"), None)
         record_doc = next((doc for doc in checks if doc.item_name == "Ethics clearance status and date"), None)
@@ -30407,6 +30567,9 @@ def evaluate_schedule_slot(
     }
 
 
+DEFENSE_MODES = ("On-site", "Online", "Hybrid")
+
+
 def book_defense_schedule(
     student: Student,
     data: MultiDict,
@@ -30443,14 +30606,18 @@ def book_defense_schedule(
 
     preferred_date = parse_date(data["preferred_date"])
     preferred_end_date = parse_date(data.get("preferred_end_date") or data["preferred_date"])
-    mode = data["mode"]
-    venue = data.get("venue", "")
+    mode = (data.get("mode") or "").strip()
+    if mode not in DEFENSE_MODES:
+        raise ValueError("Choose how the defense is held: " + ", ".join(DEFENSE_MODES) + ".")
+    venue = re.sub(r"\s+", " ", data.get("venue") or "").strip()
     selected_start = parse_time(data.get("selected_start"))
     selected_end = parse_time(data.get("selected_end"))
     if not selected_start or not selected_end:
         raise ValueError("Select a start and end time from the shared availability.")
     if selected_end <= selected_start:
         raise ValueError("Defense end time must be later than the start time.")
+    if any(t.minute not in (0, 30) or t.second for t in (selected_start, selected_end)):
+        raise ValueError("Defense times run on 30-minute slots (for example 9:00 or 9:30).")
     if preferred_end_date < preferred_date:
         raise ValueError("Preferred date window end cannot be before the selected defense date.")
     if datetime.combine(preferred_date, selected_start) <= manila_now():
@@ -37683,7 +37850,8 @@ def ensure_demo_comprehensive_exam_consistency() -> int:
     generated = [
         student
         for student in Student.query.all()
-        if re.fullmatch(r"(?:GS-2026-\d{4}|\d{7})", student.student_number or "")
+        if STUDENT_NUMBER_RE.fullmatch(student.student_number or "")
+        and student.student_number not in DEMO_STUDENT_NUMBERS.values()
     ]
     generated_ids = {student.id for student in generated}
     case_ids = {
@@ -38473,7 +38641,7 @@ def ensure_upcoming_defense_demo() -> int:
 
     Every seeded defense is in the past, so the calendars, the faculty dashboard and the
     reminders would be empty. This creates three clearly marked demonstration students (student
-    numbers GS-2026-UD-xx, schedule note "Demo seed") with a panel, accepted invitations and a
+    numbers 2691201 to 2691203, schedule note "Demo seed") with a panel, accepted invitations and a
     Proposal Defense booked ahead, and on every start moves a demo defense that is about to
     pass (and has no verdict) to a fresh date. Returns the number of records created or moved.
     """
@@ -38623,7 +38791,7 @@ def _seed_panel_demo_research(student: Student, spec: dict, adviser: Faculty) ->
     schedule = ScheduleRequest(
         student_id=student.id, preferred_date=defense_day, preferred_end_date=defense_day,
         start_time=time(9, 0), end_time=time(10, 30), defense_type=RESEARCH_GATE_DEFENSE_TYPES[title_gate],
-        mode="In person", venue="Graduate School Conference Room", status="Confirmed",
+        mode="On-site", venue="Graduate School Conference Room", status="Confirmed",
         matched_count=len(assignments), required_forms_status="Complete",
         panel_snapshot=json.dumps([
             {"faculty_id": a.faculty_id, "name": a.faculty.name, "role": a.panel_role} for a in assignments
@@ -39012,7 +39180,7 @@ def seed_maed_personas() -> None:
                 start_time=time(9, 0),
                 end_time=time(10, 30),
                 defense_type=defense_type,
-                mode="In person",
+                mode="On-site",
                 venue="Graduate School Conference Room",
                 status="Confirmed",
                 matched_count=len(assignments),
@@ -40304,7 +40472,7 @@ def seed_report_history(today: date | None = None) -> int:
             ))
             request = ScheduleRequest(
                 student_id=student.id, preferred_date=day, preferred_end_date=day, start_time=held_at.time(),
-                end_time=(held_at + timedelta(hours=1, minutes=30)).time(), defense_type=defense_type, mode="In person",
+                end_time=(held_at + timedelta(hours=1, minutes=30)).time(), defense_type=defense_type, mode="On-site",
                 venue="Graduate School Conference Room", status=HELD_DEFENSE_STATUS, matched_count=1,
                 panel_snapshot=json.dumps([{"faculty_id": chair.id, "name": chair.name, "role": "Panel Chair"}]),
                 required_forms_status="Complete", notes="Seeded history: defense held with a recorded verdict.",
@@ -40512,7 +40680,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "practicum-andrea": {
         "workflow": "practicum",
-        "student_number": "GS-2026-PRAC-01",
+        "student_number": DEMO_STUDENT_NUMBERS["PRAC-01"],
         "first_name": "Andrea",
         "last_name": "Villanueva",
         "email": "practicum.andrea@usls.edu.ph",
@@ -40521,7 +40689,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "practicum-paolo": {
         "workflow": "practicum",
-        "student_number": "GS-2026-PRAC-02",
+        "student_number": DEMO_STUDENT_NUMBERS["PRAC-02"],
         "first_name": "Paolo",
         "last_name": "Ramirez",
         "email": "practicum.paolo@usls.edu.ph",
@@ -40530,7 +40698,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "graduation-bianca": {
         "workflow": "graduation",
-        "student_number": "GS-2026-GRAD-01",
+        "student_number": DEMO_STUDENT_NUMBERS["GRAD-01"],
         "first_name": "Bianca",
         "last_name": "Santos",
         "email": "graduation.bianca@usls.edu.ph",
@@ -40539,7 +40707,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "graduation-carlo": {
         "workflow": "graduation",
-        "student_number": "GS-2026-GRAD-02",
+        "student_number": DEMO_STUDENT_NUMBERS["GRAD-02"],
         "first_name": "Carlo",
         "last_name": "Mendoza",
         "email": "graduation.carlo@usls.edu.ph",
@@ -40548,7 +40716,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "withdrawal-elena": {
         "workflow": "withdrawal",
-        "student_number": "GS-2026-WD-01",
+        "student_number": DEMO_STUDENT_NUMBERS["WD-01"],
         "first_name": "Elena",
         "last_name": "Navarro",
         "email": "withdrawal.elena@usls.edu.ph",
@@ -40559,7 +40727,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "withdrawal-joshua": {
         "workflow": "withdrawal",
-        "student_number": "GS-2026-WD-02",
+        "student_number": DEMO_STUDENT_NUMBERS["WD-02"],
         "first_name": "Joshua",
         "last_name": "Lim",
         "email": "withdrawal.joshua@usls.edu.ph",
@@ -40570,7 +40738,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "enrollment-clarissa": {
         "workflow": "enrollment",
-        "student_number": "GS-2026-ENR-01",
+        "student_number": DEMO_STUDENT_NUMBERS["ENR-01"],
         "first_name": "Clarissa",
         "last_name": "Dela Cruz",
         "email": "enrollment.clarissa@usls.edu.ph",
@@ -40579,7 +40747,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "enrollment-martin": {
         "workflow": "enrollment",
-        "student_number": "GS-2026-ENR-02",
+        "student_number": DEMO_STUDENT_NUMBERS["ENR-02"],
         "first_name": "Martin",
         "last_name": "Gonzales",
         "email": "enrollment.martin@usls.edu.ph",
@@ -40589,7 +40757,7 @@ WORKFLOW_DEMO_STUDENTS = {
     "student-handoff-sofia": {
         "workflow": "student-handoff",
         "scenario": "complete",
-        "student_number": "GS-2026-HO-01",
+        "student_number": DEMO_STUDENT_NUMBERS["HO-01"],
         "first_name": "Sofia",
         "last_name": "Reyes",
         "email": "handoff.sofia@usls.edu.ph",
@@ -40599,7 +40767,7 @@ WORKFLOW_DEMO_STUDENTS = {
     "student-handoff-anton": {
         "workflow": "student-handoff",
         "scenario": "follow-up",
-        "student_number": "GS-2026-HO-02",
+        "student_number": DEMO_STUDENT_NUMBERS["HO-02"],
         "first_name": "Anton",
         "last_name": "Bautista",
         "email": "anton.bautista@student.usls.edu.ph",
@@ -40609,7 +40777,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "course-adjustments-lianne": {
         "workflow": "course-adjustments",
-        "student_number": "GS-2026-CA-01",
+        "student_number": DEMO_STUDENT_NUMBERS["CA-01"],
         "first_name": "Lianne",
         "last_name": "Mercado",
         "email": "adjustments.lianne@usls.edu.ph",
@@ -40618,7 +40786,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "course-adjustments-roberto": {
         "workflow": "course-adjustments",
-        "student_number": "GS-2026-CA-02",
+        "student_number": DEMO_STUDENT_NUMBERS["CA-02"],
         "first_name": "Roberto",
         "last_name": "Aquino",
         "email": "roberto.aquino@student.usls.edu.ph",
@@ -40628,7 +40796,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "leave-of-absence-maureen": {
         "workflow": "leave-of-absence",
-        "student_number": "GS-2026-LOA-01",
+        "student_number": DEMO_STUDENT_NUMBERS["LOA-01"],
         "first_name": "Maureen",
         "last_name": "Castillo",
         "email": "maureen.castillo@student.usls.edu.ph",
@@ -40638,7 +40806,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "leave-of-absence-daniel": {
         "workflow": "leave-of-absence",
-        "student_number": "GS-2026-LOA-02",
+        "student_number": DEMO_STUDENT_NUMBERS["LOA-02"],
         "first_name": "Daniel",
         "last_name": "Fernandez",
         "email": "loa.daniel@usls.edu.ph",
@@ -40647,7 +40815,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "readmission-therese": {
         "workflow": "readmission",
-        "student_number": "GS-2026-READ-01",
+        "student_number": DEMO_STUDENT_NUMBERS["READ-01"],
         "first_name": "Therese",
         "last_name": "Lacson",
         "email": "readmission.therese@usls.edu.ph",
@@ -40656,7 +40824,7 @@ WORKFLOW_DEMO_STUDENTS = {
     },
     "readmission-gabriel": {
         "workflow": "readmission",
-        "student_number": "GS-2026-READ-02",
+        "student_number": DEMO_STUDENT_NUMBERS["READ-02"],
         "first_name": "Gabriel",
         "last_name": "Domingo",
         "email": "readmission.gabriel@usls.edu.ph",
@@ -40666,7 +40834,7 @@ WORKFLOW_DEMO_STUDENTS = {
     "awol-maya": {
         "workflow": "awol",
         "scenario": "return",
-        "student_number": "GS-2026-AWOL-01",
+        "student_number": DEMO_STUDENT_NUMBERS["AWOL-01"],
         "first_name": "Maya",
         "last_name": "Torres",
         "email": "awol.maya@usls.edu.ph",
@@ -40676,7 +40844,7 @@ WORKFLOW_DEMO_STUDENTS = {
     "residency-nicolas": {
         "workflow": "awol",
         "scenario": "residency",
-        "student_number": "GS-2026-RES-01",
+        "student_number": DEMO_STUDENT_NUMBERS["RES-01"],
         "first_name": "Nicolas",
         "last_name": "Valdez",
         "email": "residency.nicolas@usls.edu.ph",
@@ -40775,8 +40943,8 @@ def workflow_demo_config_for_student(student: Student | None) -> tuple[str, dict
 
 DEMO_LEAVE_PERIODS = {
     # (leave starts, leave ends) for the two readmission demo students.
-    "GS-2026-READ-01": ("AY 2026-2027 1st Semester", "AY 2026-2027 1st Semester"),
-    "GS-2026-READ-02": ("AY 2026-2027 1st Semester", "AY 2026-2027 2nd Semester"),
+    DEMO_STUDENT_NUMBERS["READ-01"]: ("AY 2026-2027 1st Semester", "AY 2026-2027 1st Semester"),
+    DEMO_STUDENT_NUMBERS["READ-02"]: ("AY 2026-2027 1st Semester", "AY 2026-2027 2nd Semester"),
 }
 
 
@@ -40881,7 +41049,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     )
     student.program_id = program.id
     student.entry_year = student.entry_year if is_research_demo else 2026 if (is_withdrawal_demo or is_new_demo) else 2024
-    student.academic_year_entry = student.academic_year_entry if is_research_demo else "2026-2027" if (is_withdrawal_demo or is_new_demo) else "2024-2025"
+    student.academic_year_entry = student.academic_year_entry if is_research_demo else "26-27" if (is_withdrawal_demo or is_new_demo) else "24-25"
     student.year_level = "Year 1" if (is_withdrawal_demo or is_new_demo) else "Completed Coursework"
     leave_snapshot = (student.standing, student.enrollment_tag, student.current_stage, student.risk_level)
     student.standing = "Active"
@@ -41244,7 +41412,7 @@ def ensure_workflow_demo_students() -> list[Student]:
                 email=config["email"],
                 program_id=program.id,
                 entry_year=2024,
-                academic_year_entry="2024-2025",
+                academic_year_entry="24-25",
                 year_level="Completed Coursework",
             )
             db.session.add(student)

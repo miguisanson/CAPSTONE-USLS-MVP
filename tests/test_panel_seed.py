@@ -20,6 +20,7 @@ os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 os.environ.setdefault("USLS_UPLOAD_DIR", tempfile.mkdtemp(prefix="uploads-"))
 
 from app import (  # noqa: E402
+    DEMO_STUDENT_NUMBERS,
     ResearchCase,
     Student,
     app,
@@ -49,7 +50,7 @@ class PanelSeedTests(unittest.TestCase):
                 (student.id, student.student_number)
                 for student in Student.query.filter(Student.current_stage.in_(RESEARCH_STAGES))
                 .order_by(Student.id).all()
-                if not student.student_number.startswith("GS-2026-PRAC-") and student.id not in finished
+                if student.student_number not in (DEMO_STUDENT_NUMBERS["PRAC-01"], DEMO_STUDENT_NUMBERS["PRAC-02"]) and student.id not in finished
             ]
             cls.profiles = {}
             cls.results = {}
@@ -99,7 +100,7 @@ class PanelSeedTests(unittest.TestCase):
 
     def test_a_student_with_no_paper_gets_no_scores(self):
         with app.app_context():
-            student = Student.query.filter_by(student_number="GS-2026-GRAD-01").first()
+            student = Student.query.filter_by(student_number="2690301").first()
             profile = research_matching_profile(student)
             result = panel_matching_result(student, profile)
             db.session.rollback()

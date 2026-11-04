@@ -139,15 +139,15 @@ class ProcessLogicTests(unittest.TestCase):
 
     # ---- I-172: the rules are checked again at every step ---------------------------------------------
     def test_research_gate_and_adviser_routes_refuse_an_awol_student(self):
-        self.set_standing("GS-2026-UD-03", "AWOL", "AWOL")
-        gate = self.research().post("/api/transactions/research-gate", json={"student_id": self.id_of("GS-2026-UD-03")})
+        self.set_standing("2691203", "AWOL", "AWOL")
+        gate = self.research().post("/api/transactions/research-gate", json={"student_id": self.id_of("2691203")})
         self.assertEqual(gate.status_code, 400, gate.get_json())
         self.assertIn("awol", gate.get_json()["error"].lower())
         record = self.research().post(
-            "/api/adviser-appointments/record", json={"student_id": self.id_of("GS-2026-UD-03"), "faculty_id": 1})
+            "/api/adviser-appointments/record", json={"student_id": self.id_of("2691203"), "faculty_id": 1})
         self.assertIn(record.status_code, (400, 409), record.get_json())
         self.assertIn("awol", record.get_json()["error"].lower())
-        change = self.student_client("GS-2026-UD-03").post(
+        change = self.student_client("2691203").post(
             "/api/student-portal/adviser/change", json={"faculty_id": 1, "reason": "My adviser left the university."})
         self.assertIn(change.status_code, (400, 409), change.get_json())
         self.assertIn("awol", change.get_json()["error"].lower())
@@ -157,9 +157,9 @@ class ProcessLogicTests(unittest.TestCase):
             return self.student_named(number).id
 
     def test_a_defense_verdict_for_an_awol_student_is_refused(self):
-        self.set_standing("GS-2026-UD-01", "AWOL", "AWOL")
+        self.set_standing("2691201", "AWOL", "AWOL")
         with app.app_context():
-            student = self.student_named("GS-2026-UD-01")
+            student = self.student_named("2691201")
             schedule = ScheduleRequest.query.filter_by(
                 student_id=student.id, defense_type="Proposal Defense", status="Scheduled").one()
             chair = PanelAssignment.query.filter_by(student_id=student.id, panel_role="Panel Chair").first()
@@ -171,7 +171,7 @@ class ProcessLogicTests(unittest.TestCase):
         self.assertIn("awol", response.get_json()["error"].lower())
 
     def test_a_booked_defense_is_flagged_for_the_coordinators_when_the_student_goes_awol(self):
-        number = "GS-2026-UD-02"
+        number = "2691202"
         self.set_standing(number, "AWOL", "AWOL")
         with app.app_context():
             self.assertEqual(sync_automatic_awol_statuses(commit=True) >= 1, True)
@@ -282,7 +282,7 @@ class ProcessLogicTests(unittest.TestCase):
         self.assertTrue({"leave-of-absence", "readmission", "withdrawal", "practicum", "graduation", "adviser", "awol"} <= processes, processes)
 
     def test_a_defense_request_needs_a_real_future_date_and_no_booking_already_in_place(self):
-        client = self.student_client("GS-2026-UD-01")  # Proposal Defense already booked for this student
+        client = self.student_client("2691201")  # Proposal Defense already booked for this student
         future = (date.today() + timedelta(days=40)).isoformat()
         for bad in ("not-a-date", "2020-01-01"):
             response = client.post("/api/student-portal/requests/defense-scheduling", json={"preferred_date": bad})

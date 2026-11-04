@@ -486,7 +486,7 @@ class UpcomingDefenseDemoTests(PolishBase):
     def schedules(self):
         return (
             ScheduleRequest.query.join(Student, Student.id == ScheduleRequest.student_id)
-            .filter(Student.student_number.like("GS-2026-UD-%"), ScheduleRequest.defense_type == "Proposal Defense")
+            .filter(Student.student_number.like("26912__"), ScheduleRequest.defense_type == "Proposal Defense")
             .order_by(ScheduleRequest.preferred_date).all()
         )
 
@@ -517,7 +517,7 @@ class UpcomingDefenseDemoTests(PolishBase):
             self.assertEqual(appmod.ensure_upcoming_defense_demo(), 0)
             db.session.commit()
             self.assertEqual([(r.id, r.preferred_date) for r in self.schedules()], before)
-            self.assertEqual(Student.query.filter(Student.student_number.like("GS-2026-UD-%")).count(), 3)
+            self.assertEqual(Student.query.filter(Student.student_number.like("26912__")).count(), 3)
 
     def test_a_demo_defense_that_has_passed_is_moved_ahead_but_a_recorded_verdict_is_respected(self):
         with app.app_context():
@@ -542,7 +542,7 @@ class UpcomingDefenseDemoTests(PolishBase):
     def test_nothing_is_seeded_outside_demo_mode(self):
         with patch.dict(os.environ, {"DEMO_MODE": "0"}), app.app_context():
             self.assertEqual(appmod.ensure_upcoming_defense_demo(), 0)
-            self.assertEqual(Student.query.filter(Student.student_number.like("GS-2026-UD-%")).count(), 0)
+            self.assertEqual(Student.query.filter(Student.student_number.like("26912__")).count(), 0)
 
     def test_the_staff_calendar_shows_them(self):
         with app.app_context():

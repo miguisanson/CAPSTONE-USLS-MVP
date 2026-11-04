@@ -114,7 +114,7 @@ class Night8SeedTests(unittest.TestCase):
             for student in Student.query.filter(Student.current_stage.in_(RESEARCH_OPEN)).all():
                 ids = adviser_faculty_ids_for_student(student)
                 if not ids or not AdviserAppointment.query.filter_by(student_id=student.id).count():
-                    continue  # no adviser, or the three GS-2026-UD demo students, whose adviser is the older assignment record
+                    continue  # no adviser, or the three upcoming-defense demo students (2691201 to 2691203), whose adviser is the older assignment record
                 live = AdviserAppointment.query.filter_by(student_id=student.id, status="Accepted", ended_at=None).all()
                 if {row.faculty_id for row in live} != ids:
                     problems.append(f"{student.name}: appointments {sorted(row.faculty_id for row in live)} vs {sorted(ids)}")

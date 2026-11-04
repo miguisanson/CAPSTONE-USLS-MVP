@@ -12,14 +12,14 @@ export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, w
 
 // The ready-made demo students that the existing reset (POST /api/auth/demo-students/<key>/reset) knows, by student number.
 export const RESET_KEYS = {
-  "GS-2026-LOA-01": "leave-of-absence-maureen",
-  "GS-2026-LOA-02": "leave-of-absence-daniel",
-  "GS-2026-READ-01": "readmission-therese",
-  "GS-2026-READ-02": "readmission-gabriel",
-  "GS-2026-AWOL-01": "awol-maya",
-  "GS-2026-WD-01": "withdrawal-elena",
-  "GS-2026-PRAC-02": "practicum-paolo",
-  "GS-2026-GRAD-02": "graduation-carlo",
+  "2690801": "leave-of-absence-maureen",
+  "2690802": "leave-of-absence-daniel",
+  "2690901": "readmission-therese",
+  "2690902": "readmission-gabriel",
+  "2691001": "awol-maya",
+  "2690401": "withdrawal-elena",
+  "2690202": "practicum-paolo",
+  "2690302": "graduation-carlo",
 };
 
 export const guideById = (id) => GUIDES.find((guide) => guide.id === id) || null;

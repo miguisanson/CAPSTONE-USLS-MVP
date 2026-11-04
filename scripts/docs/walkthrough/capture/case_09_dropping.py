@@ -131,7 +131,7 @@ def run(rt: Runtime) -> None:
         topts = sels.nth(1).locator("option").all_inner_texts()
         sels.nth(1).select_option(label=next(o for o in topts if CURRENT in o))
         rt.settle(coord)
-        row = coord.locator("tr", has_text="GS-2026-WD-02").first
+        row = coord.locator("tr", has_text="2690402").first
         row.scroll_into_view_if_needed()
         coord.evaluate("window.scrollBy(0, 180)")
         coord.wait_for_timeout(400)

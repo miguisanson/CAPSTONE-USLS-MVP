@@ -79,9 +79,9 @@ def run(rt):
     S = "graduation"
     rt.step("reset Carlo", lambda: rt.reset(KEY))
     bad = make_pdf("Carlo_Mendoza_Incorrect_Graduation_Application.pdf", "Graduation Application",
-                   ["Name: Carlo Mendosa", "Student number: GS-2026-GRAD-20", "Program: MAED"])
+                   ["Name: Carlo Mendosa", "Student number: 2691120", "Program: MAED"])
     good = make_pdf("Carlo_Mendoza_Corrected_Graduation_Application.pdf", "Graduation Application (corrected)",
-                    ["Name: Carlo Mendoza", "Student number: GS-2026-GRAD-02", "Program: MAED"])
+                    ["Name: Carlo Mendoza", "Student number: 2690302", "Program: MAED"])
 
     student = rt.new_page(EMAIL)
 

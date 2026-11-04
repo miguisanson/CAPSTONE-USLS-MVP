@@ -49,7 +49,7 @@ def run(rt: Runtime) -> None:
     # 3. Panel Matching: ranked faculty, then the score breakdown of the top candidate (demo student PM-01, nothing saved).
     def panel():
         rt.go(staff, "/workflow/panel-matching")
-        a4.pick_student(staff, "GS-2026-PM-01")
+        a4.pick_student(staff, "2690101")
         table = staff.get_by_role("table", name="Ranked panel candidates")
         a4.scroll_to(staff, table, 70)
         rt.shot(staff, s(5))

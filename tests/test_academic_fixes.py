@@ -474,6 +474,17 @@ class AcademicFixTests(unittest.TestCase):
         self.assertEqual(approved.status_code, 200, approved.get_json())
         return plan_id
 
+    def test_the_number_of_sections_is_a_whole_number_from_0_to_6(self):
+        for bad in (7, -1, "two", 2.5):
+            selections = [{"course_id": cid, "offer": True, "section_count": bad} for cid in self.course_ids]
+            response = self._plan_call("draft", selections=selections)
+            self.assertEqual(response.status_code, 400, (bad, response.get_json()))
+            self.assertIn("0 to 6", response.get_json()["error"])
+        for good in (0, 1, 6, "3"):
+            selections = [{"course_id": cid, "offer": True, "section_count": good} for cid in self.course_ids]
+            response = self._plan_call("draft", selections=selections)
+            self.assertEqual(response.status_code, 200, (good, response.get_json()))
+
     def test_dean_delay_counts_match_coordinator_details_for_submitted_term(self):
         selections = [{"course_id": cid, "offer": True, "section_count": 1} for cid in self.course_ids]
         response = self._plan_call("draft", selections=selections)
@@ -782,46 +793,46 @@ class AcademicFixTests(unittest.TestCase):
     def test_import_takes_standing_from_the_note_column_with_provenance(self):
         with app.app_context():
             result = import_ac_monitoring(self._parsed([
-                ("GS-IMP-1", "Lea", "Leave", "22-23", "LOA since 1st sem"),
-                ("GS-IMP-2", "Aw", "Ol", "22-23", "AWOL"),
-                ("GS-IMP-3", "Wid", "Raw", "22-23", "Withdrew from the program"),
-                ("GS-IMP-4", "Ann", "Normal", "22-23", ""),
+                ("9900301", "Lea", "Leave", "22-23", "LOA since 1st sem"),
+                ("9900302", "Aw", "Ol", "22-23", "AWOL"),
+                ("9900303", "Wid", "Raw", "22-23", "Withdrew from the program"),
+                ("9900304", "Ann", "Normal", "22-23", ""),
             ]))
             db.session.commit()
             by_number = {item.student_number: item for item in Student.query.filter(
-                Student.student_number.like("GS-IMP-%")).all()}
-            self.assertEqual((by_number["GS-IMP-1"].standing, by_number["GS-IMP-1"].enrollment_tag), ("On Leave", "LOA"))
-            self.assertEqual((by_number["GS-IMP-2"].standing, by_number["GS-IMP-2"].enrollment_tag), ("AWOL", "AWOL"))
-            self.assertEqual(by_number["GS-IMP-3"].standing, "Withdrawn")
-            self.assertEqual(by_number["GS-IMP-4"].standing, "Active")
-            self.assertEqual(by_number["GS-IMP-1"].current_stage, "LOA")
+                Student.student_number.like("99003__")).all()}
+            self.assertEqual((by_number["9900301"].standing, by_number["9900301"].enrollment_tag), ("On Leave", "LOA"))
+            self.assertEqual((by_number["9900302"].standing, by_number["9900302"].enrollment_tag), ("AWOL", "AWOL"))
+            self.assertEqual(by_number["9900303"].standing, "Withdrawn")
+            self.assertEqual(by_number["9900304"].standing, "Active")
+            self.assertEqual(by_number["9900301"].current_stage, "LOA")
             # no "Confirmed" enrollment for someone who is on leave
-            self.assertFalse(TermEnrollment.query.filter_by(student_id=by_number["GS-IMP-1"].id).count())
-            log = TransactionLog.query.filter_by(student_id=by_number["GS-IMP-1"].id).filter(
+            self.assertFalse(TermEnrollment.query.filter_by(student_id=by_number["9900301"].id).count())
+            log = TransactionLog.query.filter_by(student_id=by_number["9900301"].id).filter(
                 TransactionLog.notes.like("%NOTE%")).first()
             self.assertIsNotNone(log, "standing taken from the sheet must be logged with its source text")
             self.assertEqual(len(result["standing_from_note"]), 3)
             # those students are blocked by the shared guard
             from app import student_enrollment_block_reason
-            self.assertTrue(student_enrollment_block_reason(by_number["GS-IMP-1"], self.term1))
+            self.assertTrue(student_enrollment_block_reason(by_number["9900301"], self.term1))
 
     def test_import_does_not_change_the_stage_or_standing_of_an_existing_non_active_student(self):
         with app.app_context():
-            student = self._student("GS-IMP-9", "Existing", "On Leave", tag="LOA", stage="LOA", entry_year=2022)
+            student = self._student("9900309", "Existing", "On Leave", tag="LOA", stage="LOA", entry_year=2022)
             student.academic_year_entry = "22-23"
             student.last_name = "Leave"
             db.session.commit()
-            import_ac_monitoring(self._parsed([("GS-IMP-9", "Existing", "Leave", "22-23", "")]))
+            import_ac_monitoring(self._parsed([("9900309", "Existing", "Leave", "22-23", "")]))
             db.session.commit()
-            refreshed = Student.query.filter_by(student_number="GS-IMP-9").one()
+            refreshed = Student.query.filter_by(student_number="9900309").one()
             self.assertEqual((refreshed.standing, refreshed.enrollment_tag, refreshed.current_stage), ("On Leave", "LOA", "LOA"))
 
     def test_imported_accounts_get_random_passwords_when_demo_mode_is_off(self):
         with patch.dict(os.environ, {"DEMO_MODE": "0"}):
             with app.app_context():
                 result = import_ac_monitoring(self._parsed([
-                    ("GS-PW-1", "Pat", "One", "25-26", ""),
-                    ("GS-PW-2", "Pam", "Two", "25-26", ""),
+                    ("9900311", "Pat", "One", "25-26", ""),
+                    ("9900312", "Pam", "Two", "25-26", ""),
                 ]))
                 db.session.commit()
                 accounts = result["accounts"]
@@ -840,7 +851,7 @@ class AcademicFixTests(unittest.TestCase):
     def test_imported_accounts_keep_the_demo_password_in_demo_mode(self):
         with patch.dict(os.environ, {"DEMO_MODE": "1"}):
             with app.app_context():
-                result = import_ac_monitoring(self._parsed([("GS-PW-3", "Pia", "Three", "25-26", "")]))
+                result = import_ac_monitoring(self._parsed([("9900313", "Pia", "Three", "25-26", "")]))
                 db.session.commit()
                 account = UserAccount.query.filter_by(email=result["accounts"][0]["email"]).one()
                 self.assertTrue(check_password_hash(account.password_hash, "DemoPass123!"))
@@ -877,7 +888,7 @@ class AcademicFixTests(unittest.TestCase):
         with patch.dict(os.environ, {"DEMO_MODE": "0"}):
             client = self._client(self.academic_id, "academic_coordinator")
             response = client.post("/api/monitoring/students", json={
-                "student_number": "GS-PW-9", "first_name": "Nia", "last_name": "Nine",
+                "student_number": "9900319", "first_name": "Nia", "last_name": "Nine",
                 "academic_year_entry": "25-26", "program_id": self.program_id,
             })
             self.assertEqual(response.status_code, 201, response.get_json())

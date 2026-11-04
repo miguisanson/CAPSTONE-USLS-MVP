@@ -711,6 +711,23 @@ class SchedulingRuleTests(ResearchCoreBase):
         with app.app_context():
             self.assertEqual([x.status for x in self.schedules()], ["Held", "Scheduled"])
 
+    def test_a_booking_needs_a_listed_mode_a_half_hour_slot_and_a_trimmed_venue(self):
+        self.ready_for_proposal()
+        for over in ({"mode": "Zoom"}, {"mode": "In person"}, {"mode": ""}):
+            response = self.book(**over)
+            self.assertEqual(response.status_code, 400, (over, response.get_json()))
+            self.assertIn("On-site", response.get_json()["error"])
+        for start, end in (("09:10", "11:00"), ("09:00", "10:45"), ("09:00", "09:00")):
+            response = self.book(selected_start=start, selected_end=end)
+            self.assertEqual(response.status_code, 400, (start, end, response.get_json()))
+        with app.app_context():
+            self.assertEqual([x.status for x in self.schedules()], ["Held"])  # nothing was booked
+        ok = self.book(mode="Hybrid", venue="   Room   4B  ", selected_start="09:30", selected_end="11:30")
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        with app.app_context():
+            booked = [x for x in self.schedules() if x.status == "Scheduled"][-1]
+            self.assertEqual((booked.mode, booked.venue), ("Hybrid", "Room 4B"))
+
     def test_public_final_defense_is_not_a_bookable_type(self):
         self.ready_for_proposal()
         response = self.book(defense_type="Public Final Defense")

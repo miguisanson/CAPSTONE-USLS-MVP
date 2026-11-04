@@ -64,7 +64,7 @@ class SectionJBackendTests(unittest.TestCase):
             self.course = Course(program_id=self.program.id, code="BPM-501", title="Completion Course", units=3, category="Major")
             db.session.add(self.course)
             self.student = Student(
-                student_number="GS-2026-TEST",
+                student_number="9900101",
                 first_name="Workflow",
                 last_name="Student",
                 email="workflow@example.test",
@@ -211,11 +211,11 @@ class SectionJBackendTests(unittest.TestCase):
     def test_research_coordinator_student_search_finds_a_student_by_name_and_number(self):
         """J5: the student picker in Research Gate calls GET /api/students?q=...; it must answer for this role."""
         research = self._role_client(self.research_id, "research_coordinator")
-        for query in ("Workflow", "Student", "GS-2026-TEST"):
+        for query in ("Workflow", "Student", "9900101"):
             response = research.get("/api/students", query_string={"q": query, "page_size": 50})
             self.assertEqual(response.status_code, 200, (query, response.get_json()))
             numbers = [item["student_number"] for item in response.get_json()["items"]]
-            self.assertIn("GS-2026-TEST", numbers, query)
+            self.assertIn("9900101", numbers, query)
 
 
     # ------------------------------------------------------------------ I-002 (J2)
@@ -223,7 +223,7 @@ class SectionJBackendTests(unittest.TestCase):
         """J2: after the enrollment demo reset, enrolling one seeded student in an offered subject succeeds."""
         with app.app_context():
             seed_database()
-            student = Student.query.filter_by(student_number="GS-2026-ENR-01").one()
+            student = Student.query.filter_by(student_number="2690501").one()
             student_id = student.id
             term = AcademicTerm.query.filter_by(label="AY 2026-2027 2nd Semester").one()
             term_id = term.id

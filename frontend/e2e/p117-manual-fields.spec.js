@@ -59,13 +59,14 @@ test.describe("Monitoring Sheet: no typed school year, checked ID and email", ()
     await add.getByLabel("Last name").fill("Picker");
     await year.selectOption(`${String(oldest).slice(2)}-${String(oldest + 1).slice(2)}`);
 
-    // B-02: ID must be 7 digits; a different ID warns and needs a second click to go on
+    // B-02: ID must be exactly 7 digits everywhere (I-353); anything else blocks the button
     const id = add.getByLabel("Student ID");
     await id.fill("12ab");
     await expect(add.getByText("Student IDs are 7 digits")).toBeVisible();
+    await expect(add.getByRole("button", { name: "Add student", exact: true })).toBeDisabled();
     await id.fill("1860101");
     await expect(add.getByText("Student IDs are 7 digits")).toHaveCount(0);
-    await id.fill("GS-2026-XX-01");
+    await id.fill("9900112");
     // B-04: email shape
     const email = add.getByLabel("Email");
     await email.fill("not-an-email");
@@ -74,13 +75,10 @@ test.describe("Monitoring Sheet: no typed school year, checked ID and email", ()
     await email.fill("spec.picker@usls.edu.ph");
     await expect(add.getByText("Enter an email like")).toHaveCount(0);
     await add.getByRole("button", { name: "Add student", exact: true }).click();
-    await expect(add.getByRole("button", { name: "Use this ID anyway" })).toBeVisible();
-    expect(writes).toHaveLength(0);
-    await add.getByRole("button", { name: "Use this ID anyway" }).click();
     await expect(add.getByText("Spec: added.")).toBeVisible();
     expect(writes).toHaveLength(1);
     expect(writes[0].body.academic_year_entry).toBe(`${String(oldest).slice(2)}-${String(oldest + 1).slice(2)}`);
-    expect(writes[0].body.student_number).toBe("GS-2026-XX-01");
+    expect(writes[0].body.student_number).toBe("9900112");
   });
 
   test("B-01 / B-02 / B-04: Correct details preselects the normalised school year and sends it only when changed", async ({ page }) => {
