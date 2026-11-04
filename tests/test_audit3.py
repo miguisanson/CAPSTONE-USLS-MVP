@@ -186,5 +186,50 @@ class ResidencyClosesAtSemesterEndTests(Audit3Base):
             self.assertEqual(db.session.get(Student, self.student_id).enrollment_tag, "Residency")
 
 
+class GraduationBatchRechecksEligibilityTests(Audit3Base):
+    """I-322: Dean batch approve re-checks eligibility like the single decide; the export names what it leaves out."""
+
+    def setUp(self):
+        super().setUp()
+        with app.app_context():
+            for sid in (self.student_id, self.other_id):
+                db.session.add(GraduationEndorsement(student_id=sid, endorsement_status="Ready for Dean Review", batch_name="B1"))
+            db.session.commit()
+        self.eligible_ids = {self.student_id}
+        patcher = patch("app.graduation_eligibility", side_effect=lambda student: {"eligible": student.id in self.eligible_ids})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def status(self, sid):
+        with app.app_context():
+            return GraduationEndorsement.query.filter_by(student_id=sid).one().endorsement_status
+
+    def test_batch_approve_skips_an_ineligible_student_with_the_reason(self):
+        response = self.client("dean").post("/api/graduation/batch-actions", json={
+            "student_ids": [self.student_id, self.other_id], "action": "approve"})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        body = response.get_json()
+        self.assertEqual([row["student_id"] for row in body["updated"]], [self.student_id])
+        self.assertEqual([row["student_id"] for row in body["skipped"]], [self.other_id])
+        self.assertIn("eligible", body["skipped"][0]["reason"])
+        self.assertEqual(self.status(self.student_id), "Dean Approved")
+        self.assertEqual(self.status(self.other_id), "Ready for Dean Review")
+
+    def test_export_names_the_students_it_leaves_out(self):
+        with app.app_context():
+            for row in GraduationEndorsement.query.all():
+                row.endorsement_status = "Dean Approved"
+            db.session.commit()
+        dean = self.client("dean")
+        mixed = dean.post("/api/graduation/endorsed.csv", json={})
+        self.assertEqual(mixed.status_code, 200)
+        self.assertEqual(mixed.headers["X-Exported-Count"], "1")
+        self.assertIn("Ben Audit", mixed.headers["X-Left-Out"])
+        self.eligible_ids = set()
+        none = dean.post("/api/graduation/endorsed.csv", json={})
+        self.assertEqual(none.status_code, 400)
+        self.assertIn("Ana Audit", none.get_json()["error"])
+
+
 if __name__ == "__main__":
     unittest.main()

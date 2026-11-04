@@ -16309,9 +16309,12 @@ def register_routes(app: Flask) -> None:
         if endorsement_ids:
             query = query.filter(GraduationEndorsement.id.in_(endorsement_ids))
         rows = query.order_by(GraduationEndorsement.dean_decision_at.asc()).all()
-        rows = [item for item in rows if graduation_eligibility(item.student)["eligible"]]
+        dropped = [item for item in rows if not graduation_eligibility(item.student)["eligible"]]
+        left_out = [item.student.name for item in dropped]
+        rows = [item for item in rows if item not in dropped]
         if not rows:
-            return jsonify({"error": "No Dean-approved graduation endorsements are available to export."}), 400
+            reason = f" No longer eligible, so not exported: {', '.join(left_out)}." if left_out else ""
+            return jsonify({"error": "No Dean-approved graduation endorsements are available to export." + reason}), 400
 
         stream = io.StringIO()
         writer = safe_csv_writer(stream)
@@ -16356,6 +16359,7 @@ def register_routes(app: Flask) -> None:
             headers={
                 "Content-Disposition": f'attachment; filename="{filename}"',
                 "X-Exported-Count": str(len(rows)),
+                **({"X-Left-Out": ", ".join(left_out).encode("ascii", "replace").decode()} if left_out else {}),
             },
         )
 
@@ -22421,6 +22425,8 @@ def register_routes(app: Flask) -> None:
                     result = "Graduation candidate approved in Dean batch"
                     add_task(student.id, "Export endorsed list for manual Registrar email", "Dean", 3, 40)
                     sync_research_progress(student)  # approved: the student is Completed now, not at the next page view
+                    if not eligibility["eligible"]:  # same check as the single decision (I-322)
+                        raise ValueError("Student is no longer eligible for graduation")
                 elif action == "return":
                     if account.role == "dean" and (
                         not endorsement or endorsement.endorsement_status != "Ready for Dean Review"
