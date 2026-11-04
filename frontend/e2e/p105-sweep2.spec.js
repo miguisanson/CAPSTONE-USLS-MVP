@@ -63,23 +63,22 @@ test.describe("I-201: the Research Coordinator reads the faculty directory", () 
 test.describe("I-205: Research Gate overview", () => {
   test.use({ storageState: authFile("research-coordinator"), viewport: { width: 1366, height: 768 } });
 
-  test("lists who is ready, blocked or waiting, filters, and a row opens the record", async ({ page }) => {
+  test("shows who is ready, blocked or waiting on the board, filters, and a card opens the record", async ({ page }) => {
     const overview = await (await page.request.get("/api/research-gate/overview")).json();
     expect(overview.items.length).toBeGreaterThan(5);
     await ready(page, "/workflow/research-gate");
     const section = page.locator("#research-gate-overview");
     await expect(section.getByRole("heading", { name: "Who is at the Research Gate" })).toBeVisible();
-    await expect(section.getByRole("columnheader", { name: /Status/ })).toBeVisible();
     // the filter counts are the server's counts
-    const status = section.getByLabel("Status");
+    const status = section.getByLabel("Filter by status");
     await expect(status.locator("option", { hasText: `Blocked (${overview.counts.blocked})` })).toHaveCount(1);
     await status.selectOption("blocked");
-    const rows = section.locator("tbody tr");
-    await expect(rows).toHaveCount(Math.min(10, overview.counts.blocked));
-    for (const text of await rows.allInnerTexts()) expect(norm(text)).toContain("Blocked");
+    const blockedCards = section.locator("article");
+    await expect(blockedCards.first()).toBeVisible();
+    for (const text of await blockedCards.allInnerTexts()) expect(norm(text)).toContain("Blocked");
     await page.screenshot({ path: join(SHOTS, "research-gate-overview-1366.png"), fullPage: true });
 
-    // a row opens the per-student record below
+    // a card opens the per-student record below
     const blocked = overview.items.find((row) => row.state === "blocked");
     await section.getByRole("searchbox").fill(blocked.student.name);
     await section.getByRole("button", { name: `Open the Research Gate record of ${blocked.student.name}` }).click();

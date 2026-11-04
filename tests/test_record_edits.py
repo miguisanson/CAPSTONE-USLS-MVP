@@ -360,7 +360,7 @@ class RecordEditTests(unittest.TestCase):
         self._verdict(ids)
         verdict_id, account_id = ids
         chair = self.client(account_id, "faculty")
-        self.assertEqual(self.patch(self.staff_client(), "defense_verdict", verdict_id, "remarks", "Good work", "typo").status_code, 403)
+        self.assertEqual(self.patch(self.client(self.student_account_id, "student"), "defense_verdict", verdict_id, "remarks", "Good work", "typo").status_code, 403)
         ok = self.patch(chair, "defense_verdict", verdict_id, "remarks", "Good work", "typo")
         self.assertEqual(ok.status_code, 200, ok.get_json())
         with app.app_context():

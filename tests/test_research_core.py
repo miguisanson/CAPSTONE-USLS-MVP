@@ -1580,5 +1580,169 @@ class VerdictFlowTests(ResearchCoreBase):
             self.assertEqual(db.session.get(ScheduleRequest, scheduled.id).status, "Held")
 
 
+class StaffForPanelTests(ResearchCoreBase):
+    """I-361: Graduate School staff and the Research Coordinator record, correct and confirm for the panel."""
+
+    FOUR = ["Chair Person", "Content Person", "Method Person", "External Person"]
+
+    def setUp(self):
+        super().setUp()
+        patcher = patch("app.faculty_calendar_blocks", return_value=[], create=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def proposal_defense(self):
+        with app.app_context():
+            self.pass_gate(self.student_id, TITLE, "Title Defense")
+            self.fill_uploads(self.student_id, PROPOSAL, status="Complete")
+            self.panel(self.student_id, PROPOSAL, self.FOUR)
+            schedule = self.schedule(self.student_id, "Proposal Defense", names=self.FOUR)
+            db.session.commit()
+            return schedule.id
+
+    def title_defense(self):
+        with app.app_context():
+            self.endorse(self.student_id)
+            self.fill_uploads(self.student_id, TITLE, status="Complete")
+            self.panel(self.student_id, TITLE)
+            schedule = self.schedule(self.student_id, "Title Defense")
+            db.session.commit()
+            return schedule.id
+
+    def record(self, client, schedule_id, **body):
+        body.setdefault("result", "Passed")
+        body.setdefault("reason", "The panel chair is away and sent the result by email.")
+        return client.post(f"/api/research-gate/{schedule_id}/verdict", json=body)
+
+    def test_staff_records_the_verdict_for_the_panel_with_a_stamp(self):
+        schedule_id = self.proposal_defense()
+        response = self.record(self.staff(), schedule_id, remarks="Clean defense")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        verdict = response.get_json()["verdict"]
+        self.assertEqual(verdict["result"], "Passed")
+        self.assertEqual(verdict["chair_name"], "Chair Person")
+        self.assertEqual(verdict["recorded_for_panel_by"], "Test staff")
+        self.assertEqual(verdict["recorded_for_panel_label"], "Recorded by Test staff for the panel")
+        self.assertIn("chair is away", verdict["recorded_for_panel_reason"])
+        with app.app_context():
+            self.assertEqual(db.session.get(ScheduleRequest, schedule_id).status, "Held")
+            row = DefenseVerdict.query.filter_by(schedule_request_id=schedule_id).one()
+            self.assertEqual(row.faculty_id, self.faculty_ids["Chair Person"])
+        # the chair and the student both see the stamp
+        panels = self.faculty_client("Chair Person").get("/api/faculty-portal/context").get_json()["panels"]
+        seen = next(p for p in panels if p["gate"] == PROPOSAL)["defense"]["verdict"]
+        self.assertEqual(seen["recorded_for_panel_by"], "Test staff")
+        student = self.student().get("/api/student-portal/context").get_json()
+        self.assertIn("Recorded by Test staff for the panel", str(student))
+
+    def test_research_coordinator_can_record_too_and_others_cannot(self):
+        schedule_id = self.proposal_defense()
+        for client in (self.student(), self.academic(), self.faculty_client("Adviser Person"), self.faculty_client("Chair Person")):
+            self.assertEqual(self.record(client, schedule_id).status_code, 403)
+        ok = self.record(self.research(), schedule_id)
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+
+    def test_a_reason_is_required_and_a_second_verdict_is_refused(self):
+        schedule_id = self.proposal_defense()
+        missing = self.record(self.staff(), schedule_id, reason="")
+        self.assertEqual(missing.status_code, 400)
+        self.assertIn("reason", missing.get_json()["error"].lower())
+        self.assertEqual(self.record(self.staff(), schedule_id).status_code, 200)
+        again = self.record(self.staff(), schedule_id)  # the defense is already Held: same refusal the chair gets
+        self.assertEqual(again.status_code, 400)
+        chair = self.faculty_client("Chair Person").post(
+            f"/api/faculty-portal/defense-verdicts/{schedule_id}", json={"result": "Passed"})
+        self.assertEqual(chair.status_code, 400)
+
+    def test_staff_runs_the_same_checks_as_the_chair(self):
+        schedule_id = self.proposal_defense()
+        bad = self.record(self.staff(), schedule_id, result="Not a verdict")
+        self.assertEqual(bad.status_code, 400)
+        with app.app_context():
+            future = db.session.get(ScheduleRequest, schedule_id)
+            future.preferred_date = date.today() + timedelta(days=10)
+            db.session.commit()
+        with patch.dict(os.environ, {"DEMO_MODE": "0"}):
+            early = self.record(self.staff(), schedule_id)
+        self.assertEqual(early.status_code, 400)
+
+    def test_staff_title_pick_and_score_follow_the_chair_rules(self):
+        schedule_id = self.title_defense()
+        response = self.record(self.staff(), schedule_id, selected_title="The Chosen Title")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with app.app_context():
+            self.assertEqual(ResearchCase.query.filter_by(student_id=self.student_id).one().title, "The Chosen Title")
+        with app.app_context():
+            self.pass_gate(self.student_id, PROPOSAL, "Proposal Defense", names=self.FOUR)
+            self.fill_uploads(self.student_id, FINAL, status="Complete")
+            self.panel(self.student_id, FINAL)
+            final = self.schedule(self.student_id, "Final Defense")
+            db.session.commit()
+            final_id = final.id
+        no_score = self.record(self.staff(), final_id)
+        self.assertEqual(no_score.status_code, 400)
+        self.assertIn("score", no_score.get_json()["error"].lower())
+        ok = self.record(self.staff(), final_id, evaluation_score=92)
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        self.assertEqual(ok.get_json()["verdict"]["evaluation_score"], 92)
+
+    def test_staff_corrects_and_the_chair_can_still_correct(self):
+        schedule_id = self.proposal_defense()
+        verdict_id = self.record(self.staff(), schedule_id).get_json()["verdict"]["id"]
+        url = f"/api/research-gate/verdicts/{verdict_id}/correction"
+        self.assertEqual(self.staff().post(url, json={"result": "Failed"}).status_code, 400)  # no reason
+        ok = self.research().post(url, json={"result": "Failed", "reason": "Chair confirmed it was a fail."})
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        verdict = ok.get_json()["verdict"]
+        self.assertEqual(verdict["result"], "Failed")
+        self.assertEqual(verdict["original_result"], "Passed")
+        self.assertIn("for the panel", verdict["corrected_by"])
+        self.assertEqual(self.student().post(url, json={"result": "Passed", "reason": "no way"}).status_code, 403)
+        back = self.faculty_client("Chair Person").post(
+            f"/api/faculty-portal/defense-verdicts/{verdict_id}/correction", json={"result": "Passed", "reason": "Chair fixes it"})
+        self.assertEqual(back.status_code, 200, back.get_json())
+
+    def test_staff_confirms_revisions_for_the_panel(self):
+        schedule_id = self.proposal_defense()
+        verdict_id = self.record(self.staff(), schedule_id, result="Passed with minor revisions").get_json()["verdict"]["id"]
+        url = f"/api/research-gate/verdicts/{verdict_id}/confirm-revisions"
+        early = self.staff().post(url, json={"reason": "Chair is away."})
+        self.assertEqual(early.status_code, 409)
+        self.student().post(f"/api/student-portal/defense-verdicts/{verdict_id}/revisions", json={"note": "done"})
+        self.assertEqual(self.staff().post(url, json={}).status_code, 400)
+        ok = self.staff().post(url, json={"reason": "Chair is away and emailed the approval."})
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        verdict = ok.get_json()["verdict"]
+        self.assertIn("for the panel", verdict["revisions_confirmed_by"])
+        self.assertTrue(verdict["complete"])
+
+    def test_staff_can_edit_the_verdict_text_later_with_history(self):
+        schedule_id = self.proposal_defense()
+        verdict_id = self.record(self.staff(), schedule_id, remarks="First").get_json()["verdict"]["id"]
+        patch_url = f"/api/edits/defense_verdict/{verdict_id}"
+        no_reason = self.staff().patch(patch_url, json={"field": "remarks", "value": "Second"})
+        self.assertEqual(no_reason.status_code, 400)
+        ok = self.staff().patch(patch_url, json={"field": "remarks", "value": "Second", "reason": "Typo from the chair"})
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        history = self.student().get(patch_url).get_json()["items"]
+        self.assertEqual(history[0]["actor_role"], "staff")
+        self.assertTrue(history[0]["for_panel"])
+
+    def test_overview_rows_carry_the_board_column_and_the_card_facts(self):
+        self.proposal_defense()
+        with app.app_context():
+            from app import sync_research_progress
+            sync_research_progress(self.student_obj())
+            db.session.commit()
+        rows = self.staff().get("/api/research-gate/overview").get_json()["items"]
+        row = next(r for r in rows if r["student"]["id"] == self.student_id)
+        self.assertEqual(row["column"], 2)
+        self.assertEqual(row["next_defense"]["defense_type"], "Proposal Defense")
+        self.assertTrue(row["can_record_verdict"])
+        self.assertTrue(row["verdict_options"])
+        self.assertIsInstance(row["requirements"], list)
+        self.assertIsInstance(row["missing"], list)
+
+
 if __name__ == "__main__":
     unittest.main()

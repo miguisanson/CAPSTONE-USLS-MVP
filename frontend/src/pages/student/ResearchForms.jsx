@@ -9,6 +9,7 @@ import {
 import { api } from "../../api";
 import { Button, Field, InlineNotice, Input, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
+import { PanelStamp } from "../../components/process";
 import { formatDate, tomorrowISO } from "../../lib/format";
 import { PAGE } from "../../lib/labels.js";
 import { BOOKABLE_DEFENSES, defenseScheduleDone, defenseToRequest } from "../../lib/studentHome.js";
@@ -347,6 +348,7 @@ function RevisionSubmitForm({ followUp, onSaved }) {
       <div>
         <h3 className="card-title">Submit revised manuscript</h3>
         {followUp.label && <p className="mt-1 text-xs font-semibold text-amber-900">Defense outcome: {followUp.label}</p>}
+        <PanelStamp verdict={followUp.verdict} className="mt-1" />
         {followUp.summary && <p className="mt-1 text-xs leading-relaxed text-slate-600">{followUp.summary}</p>}
         {followUp.confirmed_by_role && (
           <p className="mt-1 text-xs text-slate-600">Your {followUp.confirmed_by_role} confirms the revisions. Only after that can you move to the next stage.</p>

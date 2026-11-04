@@ -437,6 +437,13 @@ export const api = {
     request(`/faculty-portal/defense-verdicts/${verdictId}/correction`, { method: "POST", body: JSON.stringify(payload) }),
   confirmDefenseRevisions: (verdictId, payload = {}) =>
     request(`/faculty-portal/defense-verdicts/${verdictId}/confirm-revisions`, { method: "POST", body: JSON.stringify(payload) }),
+  // I-361: Graduate School staff and the Research Coordinator act for the panel chair.
+  recordVerdictForPanel: (scheduleId, payload) =>
+    request(`/research-gate/${scheduleId}/verdict`, { method: "POST", body: JSON.stringify(payload) }),
+  correctVerdictForPanel: (verdictId, payload) =>
+    request(`/research-gate/verdicts/${verdictId}/correction`, { method: "POST", body: JSON.stringify(payload) }),
+  confirmRevisionsForPanel: (verdictId, payload) =>
+    request(`/research-gate/verdicts/${verdictId}/confirm-revisions`, { method: "POST", body: JSON.stringify(payload) }),
   submitDefenseRevisions: async (verdictId, { note, file } = {}) => {
     const form = new FormData();
     if (note) form.append("note", note);

@@ -3,6 +3,7 @@ import { BookOpen, CalendarClock, CheckCircle2, Eye, Gavel, Hourglass, History }
 import { api } from "../../api";
 import { Button, Card, EApprovalNote, EditableText, EmptyState, Field, Input, InlineNotice, SectionTitle, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatClock, formatDate, formatDateTime } from "../../lib/format";
+import { PanelStamp } from "../../components/process";
 
 // The Verdicts page (I-090). Three groups, most urgent first:
 //   1. "Needs your verdict"   - defenses where this member can record the verdict (with the papers and the form)
@@ -67,6 +68,7 @@ function VerdictResult({ verdict }) {
       <p className="mt-1 text-xs text-emerald-700">
         Submitted by {verdict.chair_name} · {formatDateTime(verdict.submitted_at)}{verdict.revision_status ? ` · ${verdict.revision_status}` : ""}
       </p>
+      <PanelStamp verdict={verdict} className="mt-1" />
       {verdict.follow_up && <p className="mt-1 text-xs text-emerald-700">{verdict.follow_up}</p>}
       {verdict.remarks && (
         <div className="mt-2 text-sm text-slate-700">
