@@ -35,7 +35,7 @@ export default {
       do: "Open Reports & Analytics: waiting now, decided this week, the approval share and the decisions by process.",
       actions: LOOK("Reports & Analytics", "Opening the Dean's reports"),
       doneWhen: "manual",
-      ifAsked: [{ q: "Are the numbers typed in?", a: "No. They are computed from the approval records." }],
+      ifAsked: [{ q: "Are the numbers typed in?", a: "No. The figures are computed from the approval records." }],
     },
     {
       id: "po-faculty-home", title: "The faculty dashboard", role: "faculty", route: "/faculty-portal", page: "Faculty Portal",
@@ -70,7 +70,7 @@ export default {
       do: "Open My Progress: the lifecycle strip, the coursework completion and every subject of the program with its status.",
       actions: LOOK("My Progress", "Opening My Progress"),
       doneWhen: "manual",
-      ifAsked: [{ q: "Where do the statuses come from?", a: "From the official record imported from AIMS; the student cannot edit them." }],
+      ifAsked: [{ q: "Where do the statuses come from?", a: "From the official record imported from AIMS; the student cannot edit the statuses." }],
     },
     {
       id: "po-student-requests", title: "The Request Center", role: "student", route: ["/student", "/student/requests"], page: "Request Center",

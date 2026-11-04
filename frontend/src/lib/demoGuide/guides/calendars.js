@@ -40,7 +40,7 @@ export default {
     },
     {
       id: "cal-availability", title: "Availability is entered by the faculty member", role: "faculty", route: ["/faculty-portal", "/faculty-portal/availability"], page: "My Availability",
-      do: "Open My Availability: weekly hours, specific dates when the faculty member is not available, and the requests from the Graduate School. Staff use these entries when they look for a shared date.",
+      do: "Open My Availability: weekly hours, specific dates when the faculty member is not available, and the requests from the Graduate School. Staff use these entries when looking for a shared date.",
       actions: [{ click: { role: "link", name: "My Availability" } }, { pause: 1800, caption: "Showing My Availability" }],
       doneWhen: "manual",
       ifAsked: [{ q: "Does a busy time block a booking?", a: "A panelist who is double-booked is a hard stop. A short lead time is a warning that needs a recorded reason." }],

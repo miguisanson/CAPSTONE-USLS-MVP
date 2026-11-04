@@ -27,7 +27,7 @@ export default {
       actions: ASK("Can a student withdraw a subject on Day 1, and how much is the fee?"),
       doneWhen: { apiWrite: "POST /assistant" },
       ifAsked: [
-        { q: "Is this an AI guess?", a: "No. The assistant finds passages in the policy documents by keyword and quotes them. Without an AI key every answer is labelled Offline answer." },
+        { q: "Is this an AI guess?", a: "No. The assistant finds passages in the policy documents by keyword and quotes the text. Without an AI key every answer is labelled Offline answer." },
         { q: "What if a panelist asks a different question?", a: "Take over and type it. The guide only follows the page." },
       ],
     },

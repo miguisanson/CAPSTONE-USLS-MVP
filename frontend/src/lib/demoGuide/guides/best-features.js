@@ -1,7 +1,7 @@
 import { STAFF, NO_CASE } from "./_shared.js";
 
 // The two-minute tour of the five features (case 21). It only opens screens and asks one question; nothing is filed. The pages of the
-// research gate, panel matching and defense scheduling are only shown, never driven, so their own guides can come later.
+// research gate, panel matching and defense scheduling are only shown, never driven, so those pages get guides of their own later.
 const OPEN = (link) => [{ click: { role: "link", name: link } }];
 
 export default {

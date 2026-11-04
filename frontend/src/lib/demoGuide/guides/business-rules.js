@@ -13,7 +13,7 @@ export default {
   steps: [
     {
       id: "br-open", title: "Open the register of rules", role: "staff", route: "/business-rules", page: "Business Rules",
-      do: "Open Business Rules under Monitoring & support. Rules set by the Handbook or the Research Protocol are locked: they change only when the Graduate School issues a new policy.",
+      do: "Open Business Rules under Monitoring & support. Rules set by the Handbook or the Research Protocol are locked: a value changes only when the Graduate School issues a new policy.",
       actions: [{ pause: 1500, caption: "Showing the register of rules" }],
       doneWhen: { route: "/business-rules", roleIs: "staff" },
       ifAsked: [{ q: "Who can change a rule?", a: "Rules from the Handbook or the Research Protocol are locked. Only the rules marked Needs review can be changed, and every change keeps the old value, the new value, who changed it and why." }],
@@ -54,7 +54,7 @@ export default {
     },
     {
       id: "br-screen", title: "The same rules on a workflow screen", role: "staff", route: "/workflow/withdrawal", page: "Subject Withdrawal",
-      do: "Open Subject Withdrawal and expand Rules applied on this screen: the same rules, with the same sources, at the place where they are used.",
+      do: "Open Subject Withdrawal and expand Rules applied on this screen: the same rules, with the same sources, at the place where the rules are used.",
       actions: [
         { click: { role: "link", name: "Subject Withdrawal" } },
         { click: { role: "button", name: "Rules applied on this screen" } },

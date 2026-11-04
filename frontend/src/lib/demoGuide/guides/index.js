@@ -31,6 +31,7 @@ export const RESET_KEYS = {
   "2690401": "withdrawal-elena",
   "2690202": "practicum-paolo",
   "2690402": "withdrawal-joshua",
+  "2690601": "student-handoff-sofia",
   "2691101": "residency-nicolas",
   "2690701": "course-adjustments-lianne",
   "2690302": "graduation-carlo",

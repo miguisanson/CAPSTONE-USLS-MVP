@@ -45,7 +45,7 @@ export default {
     },
     {
       id: "en-roster", title: "The same result on the class list", role: "staff", route: "/enrollment-class-list", page: "Enrollment Class List",
-      do: "Open Enrollment Class List under Records. It is a read-only roster: the imported students appear under their subject. Changes are made in Enrollment, never here.",
+      do: "Open Enrollment Class List under Records. It is a read-only roster: the imported students appear under the subject. Changes are made in Enrollment, never here.",
       actions: [{ click: { role: "link", name: "Enrollment Class List" } }, { pause: 1800 }],
       doneWhen: { route: "/enrollment-class-list", roleIs: "staff" },
       ifAsked: [{ q: "Can the roster be edited?", a: "No. It is read-only so the class list always matches what Enrollment confirmed." }],

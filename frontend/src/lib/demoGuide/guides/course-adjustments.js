@@ -43,7 +43,7 @@ export default {
         { click: { role: "button", name: "Submit plan", in: "dialog" } },
         { wait: { text: "Submitted to Dean" } },
       ],
-      doneWhen: "manual", // the draft, the submit and the publish all post the plan to the same path, so the write cannot tell them apart: the step waits for the page to say "Submitted to Dean"
+      doneWhen: "manual", // the draft, the submit and the publish all post the plan to the same path, so the write cannot tell the steps apart: the step waits for the page to say "Submitted to Dean"
       ifAsked: [{ q: "Can the plan still be edited?", a: "No. A draft save on a plan that is with the Dean is refused, so the list under approval cannot change by accident." }],
     },
     {
