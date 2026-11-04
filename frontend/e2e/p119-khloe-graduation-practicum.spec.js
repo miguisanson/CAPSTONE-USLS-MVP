@@ -255,3 +255,25 @@ test.describe("Khloe practicum as the Dean", () => {
     await shot(page, "practicum-dean-1366.png");
   });
 });
+
+// The pictures for the design review (IM15): staff graduation, Dean graduation and the practicum board at three widths.
+for (const [name, role, path, mock] of [
+  ["staff-graduation", "staff", "/workflow/graduation", mockGraduation],
+  ["dean-graduation", "dean", "/dean/approvals/graduation", (page) => mockGraduation(page, "Ready for Dean Review")],
+  ["staff-practicum", "staff", "/workflow/practicum", mockPracticum],
+]) {
+  test.describe(`pictures: ${name}`, () => {
+    test.use({ storageState: authFile(role) });
+    test(`${name} at 1366, 1920 and 390 px`, async ({ page }) => {
+      await mock(page);
+      for (const [width, height] of [[1366, 768], [1920, 1080], [390, 844]]) {
+        await page.setViewportSize({ width, height });
+        await page.goto(path);
+        await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+        await page.waitForLoadState("networkidle");
+        expect(await noOverflow(page), `${name} at ${width}px scrolls sideways`).toBe(true);
+        await shot(page, `pic-${name}-${width}.png`);
+      }
+    });
+  });
+}
