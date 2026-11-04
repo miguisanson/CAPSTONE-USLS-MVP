@@ -249,7 +249,7 @@ The whole run takes a few minutes. To run one file or one test:
 .venv\Scripts\python.exe -m unittest tests.test_bpm_workflows.BpmWorkflowSimulationTests.test_name -v
 ```
 
-`npm run build` only proves the React app compiles; there is no frontend test runner yet.
+`npm run build` only proves the React app compiles. The browser tests (Playwright) run with `npm run e2e`; on this PC they need `PLAYWRIGHT_BROWSERS_PATH=E:/DevCache/ms-playwright` (`scripts/e2e.mjs` sets it), and on another PC `npx playwright install chromium` once is enough (see `frontend/e2e/README.md`).
 
 ## Database
 
