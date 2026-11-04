@@ -13482,6 +13482,11 @@ def register_routes(app: Flask) -> None:
         """The sign-in page's global demo switch (demo mode only): skip_date_waits true/false, null = default."""
         if not demo_mode_enabled():
             return demo_mode_off_response()
+        account = current_account()
+        if not account:
+            return no_store(jsonify({"error": "Sign in as staff to change this."})), 401
+        if account.role not in {"staff", "admin", "dean"}:
+            return jsonify({"error": "Only Graduate School staff or the Dean can change this."}), 403
         value = (request.get_json(silent=True) or {}).get("skip_date_waits")
         if value is not None and not isinstance(value, bool):
             return jsonify({"error": "skip_date_waits must be true, false or null."}), 400

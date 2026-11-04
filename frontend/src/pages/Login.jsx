@@ -98,6 +98,7 @@ export default function Login() {
   const [demoMode, setDemoMode] = useState(false);
   // Global demo switch (null until the server answers, or with demo mode off): steps never wait for a calendar date.
   const [skipDateWaits, setSkipDateWaits] = useState(null);
+  const [skipNote, setSkipNote] = useState("");
   const [demoOpen, setDemoOpen] = useState(Boolean(asEmail));
   const [guideOn, setGuideOn] = useState(guideEnabled); // per browser; off unless the presenter turns it on
   const [starting, setStarting] = useState(""); // the guide being started (its button shows "Signing in...")
@@ -353,12 +354,17 @@ export default function Login() {
                     stateId="skip-date-waits-state"
                     onChange={(wanted) => {
                       setSkipDateWaits(wanted);
+                      setSkipNote("");
                       api.setDemoSettings({ skip_date_waits: wanted })
                         .then((result) => setSkipDateWaits(Boolean(result.skip_date_waits)))
-                        .catch(() => setSkipDateWaits(!wanted));
+                        .catch((error) => {
+                          setSkipDateWaits(!wanted);
+                          setSkipNote(error?.message || "Could not change this. Try again.");
+                        });
                     }}
                   />
                 )}
+                {skipNote && <p role="status" className="px-4 pb-3 text-xs font-semibold text-amber-900">{skipNote}</p>}
                 <PresenterSwitch
                   icon={Compass}
                   title="Demo guide panel"
