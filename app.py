@@ -22997,20 +22997,15 @@ def practicum_timeline(record: PracticumRecord | None, eligibility: dict) -> lis
 
 
 def apply_practicum_payload(record: PracticumRecord, data: MultiDict, student: Student) -> None:
-    record.moa_status = (data.get("moa_status") or record.moa_status or "Pending Review").strip()
-    record.practicum_site = (data.get("practicum_site") or data.get("site") or record.practicum_site or "").strip()
-    record.supervisor_name = (data.get("supervisor_name") or record.supervisor_name or "").strip()
-    # The 200-hour rule is a floor: a request payload can raise the hours but never lower them.
+    """What a back-office request may change on the record: the 200-hour floor and the attachments.
+    Site, supervisor, hours, MOA/document/completion status come from the student's own submission and from
+    the workflow step itself, never from the payload (I-286)."""
     record.required_hours = max(safe_int(data.get("required_hours"), record.required_hours or 0), practicum_required_hours())
-    record.completed_hours = checked_whole_hours(data.get("completed_hours"), record.required_hours, record.completed_hours or 0)
-    record.document_status = (data.get("document_status") or record.document_status or "Pending Review").strip()
-    record.completion_status = (data.get("completion_status") or record.completion_status or "Pending").strip()
     moa_attachment = request_attachment_from_payload(student, "practicum", data)
     if moa_attachment:
         record.moa_attachment_id = moa_attachment.id
         record.moa_uploaded = True
         record.moa_status = "Uploaded"
-    record.moa_uploaded = bool(record.moa_uploaded or data.get("moa_uploaded") in {"true", "1", "yes", "on"})
     cert_attachment_id = safe_int(data.get("certificate_attachment_id"), 0)
     if cert_attachment_id:
         cert = StudentRequestAttachment.query.filter_by(
@@ -32655,8 +32650,10 @@ def handle_practicum(data: MultiDict) -> int:
         expected_status = "Completed" if requested_status == "Report Sent to Dean" else None
         if expected_status and record.status != expected_status:
             raise ValueError("Record practicum completion before sending the status report to the Dean.")
-        if requested_status == "Completed" and record.status not in {"Documents Under Review", "Practicum In Progress"}:
+        if requested_status == "Completed" and record.status != "Documents Under Review":
             raise ValueError("The Academic Coordinator must receive the submitted documents before recording completion.")
+        if requested_status == "Completed" and not record.certificate_attachment_id:
+            raise ValueError("Practicum cannot be completed until a completion certificate is on file.")
         if record.completed_hours < record.required_hours:
             raise ValueError("Practicum cannot be completed until the required hours are met.")
         if record.document_status not in {"Verified", "Complete"} and requested_status == "Report Sent to Dean":

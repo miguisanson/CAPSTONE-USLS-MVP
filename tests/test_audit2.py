@@ -12,7 +12,7 @@ os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="pol
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 
 from app import (  # noqa: E402
-    AcademicTerm, AwolCase, CourseRecord, LeaveCase, SubjectEnrollment, leave_policy_review, Course, Faculty, PanelAssignment, Program, Student, UserAccount,
+    AcademicTerm, DocumentCheck, AwolCase, CourseRecord, LeaveCase, SubjectEnrollment, leave_policy_review, Course, Faculty, PanelAssignment, PracticumRecord, Program, Student, UserAccount,
     Notification, app, db, generate_password_hash, notify_workflow_owner,
 )
 
@@ -244,6 +244,60 @@ class ReadmissionGapTests(Audit2Base):
         self.assertEqual(check["status"], "Needs Review")
         self.assertIn("Term One", check["detail"])
         self.assertIn("Term Two", check["detail"])
+
+
+class PracticumPayloadTests(Audit2Base):
+    """I-286: hours, document status, site and completion status are never taken from a back-office payload."""
+
+    def setUp(self):
+        super().setUp()
+        with app.app_context():
+            db.session.get(Program, self.program_id).name = "Master of Arts in Psychology"
+            db.session.commit()
+
+    def make_record(self, **fields):
+        with app.app_context():
+            record = PracticumRecord(student_id=self.student_id, required_hours=200, **fields)
+            db.session.add(record)
+            db.session.commit()
+            return record.id
+
+    def record(self, record_id):
+        return db.session.get(PracticumRecord, record_id)
+
+    def test_academic_coordinator_cannot_complete_with_made_up_hours_and_no_certificate(self):
+        record_id = self.make_record(status="Practicum In Progress", completed_hours=0, document_status="Pending Review")
+        response = self.client("academic_coordinator").post("/api/transactions/practicum", json={
+            "student_id": self.student_id, "status": "Completed", "completed_hours": "200", "document_status": "Verified",
+        })
+        self.assertEqual(response.status_code, 400, response.get_json())
+        with app.app_context():
+            record = self.record(record_id)
+            self.assertEqual((record.status, record.completed_hours, record.document_status), ("Practicum In Progress", 0, "Pending Review"))
+
+    def test_completion_needs_the_certificate_on_file(self):
+        record_id = self.make_record(status="Documents Under Review", completed_hours=200, document_status="Pending Review")
+        response = self.client("academic_coordinator").post("/api/transactions/practicum", json={
+            "student_id": self.student_id, "status": "Completed",
+        })
+        self.assertEqual(response.status_code, 400, response.get_json())
+        self.assertIn("certificate", response.get_json()["error"].lower())
+        with app.app_context():
+            self.assertEqual(self.record(record_id).status, "Documents Under Review")
+
+    def test_staff_forward_does_not_store_site_hours_or_statuses_from_the_payload(self):
+        record_id = self.make_record(status="MOA Submitted", completed_hours=10, practicum_site="Real Site")
+        response = self.client("staff").post("/api/transactions/practicum", json={
+            "student_id": self.student_id, "status": "MOA Under Review", "completed_hours": "199",
+            "document_status": "Verified", "practicum_site": "Other Site", "completion_status": "Completed and accepted",
+        })
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with app.app_context():
+            record = self.record(record_id)
+            self.assertEqual(record.status, "MOA Under Review")
+            self.assertEqual((record.completed_hours, record.practicum_site), (10, "Real Site"))
+            self.assertNotEqual(record.document_status, "Verified")
+            self.assertNotEqual(record.completion_status, "Completed and accepted")
 
 
 if __name__ == "__main__":
