@@ -29,6 +29,8 @@ server/.env.*
 # Runtime data
 server/uploads/*
 !server/uploads/.gitkeep
+# Every runtime upload (AGENTS.md Rule 4); the seed reads Documents/Sample_Data, never uploads/.
+uploads/*
 uploads/research_evidence/*
 uploads/student_requests/*
 *.sqlite3
