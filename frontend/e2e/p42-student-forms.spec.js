@@ -632,7 +632,7 @@ test.describe("P4.2 student request forms", () => {
 
   // ---------------------------------------------------------------------------------------------- Research
   test("Research (Title Defense): stage header, requirement rows, PDF rules, the Form 1 title auto-fill and the payload", async ({ browser }) => {
-    const { context, page, writes, info } = await formPage(browser, (d) => researchBase(d, { ready: true, files: true, caseTitle: "Spec Saved Title" }));
+    const { context, page, writes } = await formPage(browser, (d) => researchBase(d, { ready: true, files: true }));
     try {
       await page.goto("/student/research");
       const main = page.locator("main");
@@ -641,12 +641,12 @@ test.describe("P4.2 student request forms", () => {
       await expect(main).toContainText("Spec milestone: submit Form 1 and three concept papers.");
       await expect(main.getByText("Pending", { exact: true }).first()).toBeVisible();
       await expect(main).toContainText("Research title");
-      await expect(main).toContainText("Spec Saved Title");
+      await expect(main).toContainText("Research title pending Form 1 submission");
       await expect(main).toContainText("Adviser");
       for (const stage of ["Title Defense", "Proposal Defense", "Final Defense", "Completion"]) await expect(main.getByText(stage, { exact: true }).first()).toBeVisible();
       await expectRequired(page, "Research title from uploaded Form 1", true); // I-153: the title is checked when Submit is pressed
       await expect(fieldOf(page, "Research title from uploaded Form 1")).toContainText("This fills automatically after the Form 1 application PDF is uploaded below.");
-      await expect(ctl(page, "Research title from uploaded Form 1")).toHaveValue("Spec Saved Title");
+      await expect(ctl(page, "Research title from uploaded Form 1")).toHaveValue(""); // no title on record: the box is asked
       await expect(ctl(page, "Research title from uploaded Form 1")).toHaveAttribute("placeholder", "Upload Form 1 below to auto-fill");
       await expect(main).toContainText("Files you upload");
       await expect(main).toContainText("Only these items require action from you for this milestone.");
@@ -697,8 +697,25 @@ test.describe("P4.2 student request forms", () => {
       await submit.click();
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
-      expect(lastWrite(writes, "requests/research-gate").body).toEqual({ student_id: info.studentId, research_title: "Spec Title From Form 1", submitted_package: "Spec message." });
+      expect(lastWrite(writes, "requests/research-gate").body).toEqual({ research_title: "Spec Title From Form 1", submitted_package: "Spec message." }); // no student_id: the server knows the student
       await snap(page, "research-sent");
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Research (Title Defense, title on record): the title is shown as text, not asked, and not sent", async ({ browser }) => {
+    const { context, page, writes } = await formPage(browser, (d) => researchBase(d, { ready: true, files: true, caseTitle: "Spec Saved Title" }));
+    try {
+      await page.goto("/student/research");
+      const main = page.locator("main");
+      await expect(main).toContainText("Spec Saved Title");
+      await expect(main.getByText("Research title from uploaded Form 1")).toHaveCount(0);
+      await ctl(page, "Message to the Research Coordinator").fill("Spec message.");
+      await submitButton(page, "Submit Form 1 for review").click();
+      await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
+      await expect(page.getByText("Spec: request saved.")).toBeVisible();
+      expect(lastWrite(writes, "requests/research-gate").body).toEqual({ submitted_package: "Spec message." });
     } finally {
       await context.close();
     }
@@ -786,7 +803,7 @@ test.describe("P4.2 student request forms", () => {
 
   // ---------------------------------------------------------------------------------------------- Defense schedule
   test("Defense schedule: the request form, the missing-date summary and the exact payload", async ({ browser }) => {
-    const { context, page, writes, info } = await formPage(browser, (d) => {
+    const { context, page, writes } = await formPage(browser, (d) => {
       researchBase(d, { panel: true, caseTitle: "Spec Saved Title" });
       d.schedules = [];
       d.defense_follow_up = null;
@@ -795,13 +812,11 @@ test.describe("P4.2 student request forms", () => {
       await page.goto("/student/defense-schedule");
       const main = page.locator("main");
       await expectRequired(page, "Preferred date", true);
-      await expectRequired(page, "Defense type", true);
       await expectRequired(page, "Mode", false);
       await expectRequired(page, "Venue / meeting link", false);
       await expectRequired(page, "Scheduling constraints", false);
-      await expect(fieldOf(page, "Defense type")).toContainText("Your current stage is Title Defense.");
-      await expect(ctl(page, "Defense type")).toHaveValue("Title Defense");
-      await expect(ctl(page, "Defense type").locator("option")).toHaveText(["Title Defense", "Proposal Defense", "Final Defense"]);
+      await expect(main).toContainText("Your next defense: Title Defense"); // read-only text, no select
+      await expect(page.getByLabel("Defense type")).toHaveCount(0);
       await expect(ctl(page, "Mode").locator("option")).toHaveText(["On-site", "Online", "Hybrid"]);
       await expect(ctl(page, "Mode")).toHaveValue("On-site");
       await expect(ctl(page, "Preferred date")).toHaveAttribute("type", "date");
@@ -813,7 +828,6 @@ test.describe("P4.2 student request forms", () => {
       expect(lastWrite(writes, "requests/defense-scheduling")).toBeUndefined();
       await expect(page.getByRole("alert").filter({ hasText: "There is a problem" })).toContainText("Choose the date you want for your defense.");
       await ctl(page, "Preferred date").fill("2026-12-04");
-      await ctl(page, "Defense type").selectOption("Final Defense");
       await ctl(page, "Mode").selectOption("Online");
       await ctl(page, "Venue / meeting link").fill("https://meet.example/spec");
       await ctl(page, "Scheduling constraints").fill("Not on Mondays.");
@@ -821,7 +835,7 @@ test.describe("P4.2 student request forms", () => {
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/defense-scheduling").body).toEqual({
-        student_id: info.studentId, preferred_date: "2026-12-04", defense_type: "Final Defense", mode: "Online", venue: "https://meet.example/spec", constraints: "Not on Mondays.",
+        preferred_date: "2026-12-04", mode: "Online", venue: "https://meet.example/spec", constraints: "Not on Mondays.",
       });
       await expect(main).toBeVisible();
     } finally {
@@ -931,8 +945,8 @@ test.describe("P4.2 student request forms", () => {
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/practicum").body).toEqual({
-        student_id: info.studentId, attachment_id: 7001, certificate_attachment_id: null, practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec",
-        required_hours: 200, completed_hours: 0, remarks: "Spec remarks.",
+        attachment_id: 7001, certificate_attachment_id: null, practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec",
+        completed_hours: 0, remarks: "Spec remarks.", // no student_id, no required_hours: the server knows both
       });
       await snap(page, "practicum-moa-sent");
     } finally {
@@ -960,11 +974,10 @@ test.describe("P4.2 student request forms", () => {
       await expect(main.getByRole("link", { name: "View file" })).toHaveAttribute("href", "/spec/moa.pdf");
       // the completion step
       await expect(main).toContainText("What you need to submit now: completed hours and one PDF containing the required completion documents.");
-      await expectRequired(page, "Required hours", false);
       await expectRequired(page, "Completed hours", true);
-      await expect(ctl(page, "Required hours")).toHaveAttribute("readonly", "");
-      await expect(ctl(page, "Required hours")).toHaveAttribute("aria-readonly", "true");
-      await expect(ctl(page, "Required hours")).toHaveValue("200");
+      await expect(main.getByText("Required hours", { exact: true })).toBeVisible(); // text, not an input
+      await expect(main.getByText("Required hours", { exact: true }).locator("xpath=following-sibling::p[1]")).toHaveText("200");
+      await expect(page.getByLabel("Required hours")).toHaveCount(0);
       await expect(ctl(page, "Completed hours")).toHaveAttribute("min", "0");
       await expect(ctl(page, "Completed hours")).toHaveValue("50");
       await expect(main).toContainText("Certificates are counted automatically");
@@ -983,8 +996,8 @@ test.describe("P4.2 student request forms", () => {
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/practicum").body).toEqual({
-        student_id: info.studentId, attachment_id: 6001, certificate_attachment_id: 7001, practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec",
-        required_hours: 200, completed_hours: "200", remarks: "",
+        attachment_id: 6001, certificate_attachment_id: 7001, practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec",
+        completed_hours: "200", remarks: "",
       });
     } finally {
       await context.close();
@@ -992,7 +1005,7 @@ test.describe("P4.2 student request forms", () => {
   });
 
   // ---------------------------------------------------------------------------------------------- Graduation
-  test("Graduation (eligible): the school-year choices, the PDF upload and the exact payload", async ({ browser }) => {
+  test("Graduation (eligible): the school year is shown as text, the PDF upload and the exact payload", async ({ browser }) => {
     const { context, page, writes, info } = await formPage(browser, (d) => {
       d.graduation_endorsement = null;
       d.graduation_eligibility = { eligible: true, status: "Eligible", missing_coursework: [], missing_research_requirements: [], missing_practicum_requirement: "" };
@@ -1007,12 +1020,12 @@ test.describe("P4.2 student request forms", () => {
       await expect(main).toContainText("Your application stays visible while each reviewing office completes its part.");
       await expect(main).toContainText("Not submitted");
       await expect(main).toContainText("What you need to submit now: the review window and signed graduation application / review-window PDF.");
-      await expectRequired(page, "Graduation school year", true);
-      await expect(fieldOf(page, "Graduation school year")).toContainText("Only AY 2026-2027 is open. Other school years are shown in gray and cannot be selected.");
-      const year = ctl(page, "Graduation school year");
-      await expect(year.locator("option")).toHaveText(["AY 2026-2027 — Current school year", "AY 2025-2026 — Not currently open"]);
-      await expect(year.locator("option").nth(1)).toHaveAttribute("disabled", "");
-      await expect(year).toHaveValue("AY 2026-2027");
+      const year = main.locator("#graduation-year"); // read-only text, not a select
+      await expect(year).toContainText("Graduation school year");
+      await expect(year).toContainText("AY 2026-2027");
+      await expect(year).toContainText("This is the school year that is open now.");
+      await expect(year.locator("select, input")).toHaveCount(0);
+      await expect(main).not.toContainText("AY 2025-2026");
       await expectRequired(page, "Signed graduation application / review-window PDF", false);
       await expectRequired(page, "Remarks for the reviewer", false);
       const submit = submitButton(page, "Submit graduation application");
@@ -1032,7 +1045,7 @@ test.describe("P4.2 student request forms", () => {
       await submit.click();
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
-      expect(lastWrite(writes, "requests/graduation").body).toEqual({ student_id: info.studentId, attachment_id: 7001, review_window: "AY 2026-2027", remarks: "Spec graduation remarks." });
+      expect(lastWrite(writes, "requests/graduation").body).toEqual({ attachment_id: 7001, remarks: "Spec graduation remarks." }); // no review_window, no student_id
       await snap(page, "graduation-sent");
     } finally {
       await context.close();
