@@ -24,9 +24,12 @@ re-deriving the gaps — they were verified against the running system, not assu
 - Walkthrough: `Documents/Graduate_School/Operations_Manual/USLS GS Portal Demo Walkthrough.docx`
 
 ### Environment
-See the `windows-dev-setup` memory. Short version: `.venv/Scripts/python.exe`, MySQL
-`usls_gs_demo`, launch config `usls-gs-win`, port 5050, ~40 s startup. Faculty accounts are
-`@gs.local` **not** `@usls.edu.ph`. AC/RC log in with `role: "staff"`.
+The app uses SQLite only (owner decision IM3): no database server to install. Set up once with
+`npm run setup` (creates `.venv`, installs the Python and web packages, builds the UI and seeds the
+demo database), and reset the demo data with `npm run seed`. Start the app with `npm run dev`; it
+listens on http://localhost:5000. Demo accounts use the `@usls.edu.ph` addresses, for example
+`staff@usls.edu.ph`, all with the same demo password (see the walkthrough cases). The live site runs
+in Docker behind Cloudflare; see `deploy/DOCKER.md`.
 
 ### Baseline at time of writing
 - **66 automated tests, 65 pass.** The single failure is pre-existing **DEF-001**

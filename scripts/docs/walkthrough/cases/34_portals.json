@@ -43,7 +43,7 @@
    "intro": null,
    "steps": [
     {
-     "text": "Sign in as **dean@usls.edu.ph** by typing the email and password. The **Dean Portal** opens on the **Dashboard**: **Welcome, Manuel**, the line Dean - the decisions waiting on you, and the button **Open approvals queue**. **Needs your action** lists the waiting cases, oldest first, each with a **Review** button. The figures beside it are **Decisions waiting**, **Oldest wait**, **Waiting over 7 days** and **Decided this week**, and **Recent decisions** (with **View all**) lists what the Dean decided before.",
+     "text": "Sign in as **dean@usls.edu.ph** by typing the email and password. The **Dean Portal** opens on the **Dashboard**: **Welcome, Manuel**, the line Dean - the decisions waiting on you, and the button **Open approvals queue**. **Needs your action** lists the waiting cases, oldest first, each with a **Review** button. The figures beside it are **Decisions waiting**, **Oldest wait**, **Waiting on you over 7 days** and **Decided this week**, and **Recent decisions** (with **View all**) lists what the Dean decided before.",
      "shots": [
       {
        "id": "portals-dean-01",
@@ -70,11 +70,11 @@
      ]
     },
     {
-     "text": "Open **Reports & Analytics** in the Dean portal. The figures are computed from the approvals records: **Waiting now**, **Decided this week**, **Approval share** and **Course plans waiting**, then the table **Decisions by process** (waiting, approved or completed, returned, denied and the average wait) and **Pending load by program**.",
+     "text": "Open **Reports & Analytics** in the Dean portal. The page uses the same frame as the staff page: the filters **Program**, **Year started** and **Period**, the same strip of six numbers (for example **Requests waiting more than 7 days (all offices)**, **Median days to decide** and **Endorsements sent to the Dean**), and five tabs. **Waiting for my decision** asks which decisions have waited the longest, grouped by how many days they have waited, with a chart and a table. **How fast decisions are made** asks how fast decisions are made, with the median and the slowest 10 percent for each process; a dashed line marks the decision target. **Outcomes** asks what was decided, and many returns for one process show as a warning. **Graduation pipeline** shows four steps: ready to graduate and not yet sent to the Dean, sent to the Dean in this period, waiting for the Dean's decision now, and decided in this period. **Students by stage** counts the active students at each stage. Each count opens the cases or students behind it.",
      "shots": [
       {
        "id": "portals-dean-04",
-       "caption": "Dean Reports & Analytics: decisions by process."
+       "caption": "Dean Reports & Analytics: the five tabs, starting with Waiting for my decision."
       }
      ]
     },

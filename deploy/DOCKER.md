@@ -57,9 +57,10 @@ Keep-awake does not change any power setting; on a laptop, closing the lid can s
 
 Two more buttons (double-click in the `deploy` folder, no typing):
 
-- **`UPDATE-SITE.cmd`**: gets the latest code (`git pull`), rebuilds the site, waits until it answers, resets the
-  demo data by itself if the new version needs it, and restarts the tunnel if https://miguisanson.dev does not answer.
-  It stops with a message if this folder has unsaved changes or the pull fails.
+- **`UPDATE-SITE.cmd`**: needs Docker Desktop running (start the site first). It gets the latest code (`git pull --ff-only`),
+  rebuilds the site, waits until it answers, resets the demo data by itself only when the new version needs it (the
+  rebuilt site reports an older database), and restarts the tunnel once if https://miguisanson.dev does not answer.
+  It stops with a message if this folder has unsaved changes or the pull fails; nothing on the site changes in that case.
 - **`RESET-DEMO-DATA.cmd`**: rebuilds the demo data after you type `YES`. It resets the Docker site when Docker runs it
   (otherwise the local file; close the local site first).
 
@@ -73,7 +74,8 @@ Two more buttons (double-click in the `deploy` folder, no typing):
 | Update to the latest code | double-click `deploy\UPDATE-SITE.cmd` |
 
 Reset removes everything testers entered (the app is stopped while the database is rebuilt). Reset on the morning of the meeting.
-Containers restart by themselves with Docker Desktop. To also wipe uploads and the session secret: `docker compose --profile tunnel down -v` (deletes the volume).
+Nothing comes back by itself: after a restart of the PC, press **USLS site - Start** again. To also wipe uploads and the session secret: `docker compose --profile tunnel down -v` (deletes the volume).
+The Docker site always uses its own SQLite file inside the `usls_data` volume. A `DATABASE_URL` line in `.env` does not move it (`docker-compose.yml` sets it).
 
 ## E. Google Calendar (optional)
 
@@ -96,17 +98,18 @@ If the PC sleeps or goes offline, the site is down. Check <https://miguisanson.d
 | `env file ... tunnel.env not found` | step C7 not done (only needed with `--profile tunnel`) |
 | Port 8080 busy | change `8080` in `docker-compose.yml` (the number before `:5000`) |
 
-## G. Without Docker (works today, while SVM Mode is off)
+## G. Without Docker (`START-SITE.cmd`)
 
-Docker cannot start on this PC until CPU virtualization (**SVM Mode**) is turned on in the BIOS (part A3).
-Until then the same site runs directly on Windows, with the same Cloudflare route (`http://localhost:5000`):
+If Docker Desktop cannot run on this PC (for example, CPU virtualization is still off, part A3), the same site runs
+directly on Windows, with the same Cloudflare route (`http://localhost:5000`). Use this path only when Docker is not
+running the site; the two must not run at the same time.
 
 1. Do part C steps 1-8 (domain, tunnel, token in `deploy\tunnel.env`, route). In step 6 any install option is fine:
    you only need the token.
 2. Double-click **`deploy\START-SITE.cmd`**. It starts the site (`npm run uat`) on http://127.0.0.1:5000 if it is not
    already running, and the Cloudflare tunnel with your token (the official connector is already downloaded to
    `E:\DevCache\cloudflared\`; no install or admin rights needed). Leave both windows open.
-3. To reset the demo data: close the "USLS site" window, double-click **`deploy\RESET-DEMO-DATA.cmd`**, then
-   `START-SITE.cmd` again. (If the Docker site exists, that same button resets the Docker database instead.)
+3. To reset the demo data: close the "USLS site - keep open" window, double-click **`deploy\RESET-DEMO-DATA.cmd`**, type `YES`,
+   then `START-SITE.cmd` again. (If the Docker site exists, that same button resets the Docker database instead.)
 
 Do not run the Docker app and `START-SITE.cmd` at the same time with the tunnel: both would answer for the domain.
