@@ -17,7 +17,9 @@
   commit 64ab255) and broke `test_login_page_source_carries_no_password...`; now UTF-8.
 - RAG checked on this PC: `/api/assistant` answers with a handbook citation in 1.3 s. Natalie's "RAG not working"
   is not reproduced here; her `.env` key / `.rag_index` are local to her PC (both gitignored).
-- `origin/v6.1-migui` got `a337357` (meeting folder docs only) from another session; not pulled here yet.
+- Committed + pushed as 736803b on v6.1-migui (on top of a337357). Full Python suite was still running when the
+  owner restarted the PC (10:1x): re-run it. Assistant also answers with GOOGLE_API_KEY=off (document-rag-local).
+  Next: the site goes on miguisanson.dev via Docker (other session); Natalie must pull v6.1-migui.
 
 ## FINAL 2026-11-04 09:10 — all sessions merged and pushed (v6.1-migui @ 21f92b5)
 
