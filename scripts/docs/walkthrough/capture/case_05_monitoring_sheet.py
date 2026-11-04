@@ -78,7 +78,7 @@ def run(rt: Runtime) -> None:
         f = page.get_by_role("form", name=f"Add {code}")
         f.wait_for()
         f.get_by_label("Status").select_option("Completed")
-        f.get_by_label("Term taken").fill(term)
+        f.get_by_label("Term taken").select_option(label=term)  # a select of the configured semesters
         f.get_by_label("Remarks").fill(remarks)
         page.wait_for_timeout(300)
         if shot_id:

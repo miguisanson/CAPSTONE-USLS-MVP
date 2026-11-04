@@ -8,7 +8,7 @@
  "duration": "6 min",
  "story": [
   "Student Handoff is step 1 of the lifecycle: the Academic Coordinator's AC Student Monitoring workbook (Excel) arrives from outside the portal and Graduate School staff import it. The import creates each student, the program and the curriculum, marks the subjects already completed, and gives each new student a portal login. The same screen keeps every uploaded file, so an upload can be traced and its conflicts reviewed later.",
-  "The sample workbooks of the project are in the folder Documents/Sample_Data/Monitoring_Sheets/Ready_To_Import (one per program). This case uses the MSN (Master of Science in Nursing) sample, trimmed to two new students with time-stamped names and new ID numbers, so the demonstration data are not touched and a re-run does not collide. The workbook layout is the AC template: PROGRAM in cell A1, one student per row, the AY entry on every row and a unit value in each completed subject cell. Students come only from this import; the portal has no screen to type a student in by hand."
+  "The sample workbooks of the project are in the folder Documents/Sample_Data/Monitoring_Sheets/Ready_To_Import (one per program). This case uses the MSN (Master of Science in Nursing) sample, trimmed to two new students with time-stamped names and new ID numbers, so the demonstration data are not touched and a re-run does not collide. The workbook layout is the AC template: PROGRAM in cell A1, one student per row, the AY entry on every row and a unit value in each completed subject cell. Students come from this import or, one at a time, from **Add student** on the Monitoring Sheet (marked Manual entry; see {case:monitoring-sheet})."
  ],
  "accounts": [
   [
@@ -79,11 +79,11 @@
      ]
     },
     {
-     "text": "Scroll to **Onboarding report & Dean approval**. The panel explains that each import batch is checked, reported to the Dean, and only then recorded as an admission completion, and that the checklist is derived from the import and not ticked by hand. This panel is loaded when the page opens, so straight after the import it can still say **No import batches yet**; select **Refresh** and the new batch appears: **MSN · 2 students · 2 new**, the workbook name, the status **Draft**, four checks (**Admission handoff recorded**, **Student profiles created from the import**, **Program assignment confirmed**, **Validation issues resolved**) and the button **Send onboarding report to Dean**. This walkthrough does not send the report.",
+     "text": "Scroll to **Onboarding report & Dean approval**. The panel explains that each import batch is checked, reported to the Dean, and only then recorded as an admission completion, and that the checklist is derived from the import and not ticked by hand. The panel reloads right after the import, so the new batch appears at once: **MSN · 2 students · 2 new**, the workbook name, the status **Draft**, four checks (**Admission handoff recorded**, **Student profiles created from the import**, **Program assignment confirmed**, **Validation issues resolved**) and the button **Send onboarding report to Dean**. This walkthrough does not send the report.",
      "shots": [
       {
        "id": "student-handoff-05",
-       "caption": "The onboarding report for the import, shown after Refresh: four checks, status Draft, not yet sent to the Dean."
+       "caption": "The onboarding report for the import, shown right after the import: four checks, status Draft, not yet sent to the Dean."
       }
      ]
     }

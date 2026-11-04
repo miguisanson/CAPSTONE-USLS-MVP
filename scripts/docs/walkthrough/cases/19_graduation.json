@@ -45,7 +45,7 @@
  "data": [
   [
    "School year",
-   "AY 2026-2027 (the only open year; the others are grey and cannot be selected)"
+   "AY 2026-2027 (the open year, shown as plain text; the student does not choose it)"
   ],
   [
    "First application file",
@@ -79,7 +79,7 @@
      ]
     },
     {
-     "text": "Choose the **Graduation school year** (**AY 2026-2027**, marked \"Current school year\"; the other years are not open), choose the PDF in **Signed graduation application / review-window PDF** and write a note in **Remarks for the reviewer**.",
+     "text": "The **Graduation school year** shows **AY 2026-2027** as plain text (\"This is the school year that is open now.\"; nothing to choose). Choose the PDF in **Signed graduation application / review-window PDF** and write a note in **Remarks for the reviewer**.",
      "shots": [
       {
        "id": "graduation-02",
@@ -163,7 +163,7 @@
      ]
     },
     {
-     "text": "Choose the corrected PDF, keep AY 2026-2027 and click **Resubmit graduation application**, then **Send request**. The status returns to **For Review** and the staff message is marked **Responded**.",
+     "text": "Choose the corrected PDF, click **Resubmit graduation application**, then **Send request**. The status returns to **For Review** and the staff message is marked **Responded**.",
      "shots": [
       {
        "id": "graduation-13",

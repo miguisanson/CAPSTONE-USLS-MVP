@@ -8,7 +8,7 @@
  "duration": "25 min",
  "story": [
   "Last of the six research cases of one demo slot ({case:research_title}, {case:panel_matching}, {case:defense-scheduling}, {case:calendars}, {case:verdicts}). After Miguel Yu's Title Defense package is endorsed and his panel is chosen, the research lifecycle continues through four stages in the same Research Gate: Title Defense, Proposal Defense, Final Defense and Completion. Each stage unlocks only when the one before it has a passing result recorded by the panel chair. This case follows Miguel through all of them and ends where the Graduation Endorsement page lists him as eligible.",
-  "Scheduling and verdict screens are the subject of {case:defense-scheduling} and {case:verdicts}; here they are used with the minimum of steps to move Miguel forward. The system only accepts a verdict after the defense has started and refuses a slot in the past, so each defense is booked for a short slot that starts about two minutes after the booking, and the panel chair submits the verdict once the start time has passed. The Title Defense needs the staff warning override for the 14-day lead time (with a recorded reason); the proposal and final defenses are counted from the date the panel received the manuscript, so no override is needed there.",
+  "Scheduling and verdict screens are the subject of {case:defense-scheduling} and {case:verdicts}; here they are used with the minimum of steps to move Miguel forward. The system refuses a slot in the past, so each defense is booked for a short slot that starts about two minutes after the booking. With the sign-in page switch **Skip date waits** ON (the default for the demo) the panel chair can submit the verdict right after booking; with it OFF the system accepts a verdict only after the defense has started, so the chair waits until the start time has passed. The Title Defense needs the staff warning override for the 14-day lead time (with a recorded reason); the proposal and final defenses are counted from the date the panel received the manuscript, so no override is needed there.",
   "The app also refuses a slot outside the hours a panelist or the adviser entered (this cannot be overridden). The demo faculty work Monday to Friday, 08:00 to 17:00. This run was made on a Monday evening, so before the first booking every person of the defense entered \"available only these hours\" for today in My Availability (Part A, first step). Run during office hours, that step is not needed."
  ],
  "accounts": [
@@ -122,7 +122,7 @@
      ]
     },
     {
-     "text": "When the start time has passed, sign in as the panel chair **Dr. Liwayway Bautista** (**liwayway.bautista@usls.edu.ph**) and open **Verdicts**. In **Needs your verdict** the card of Miguel Yu lists the Form 1 and the three concept papers under **Current-stage papers**, and the block **Submit panel chair verdict** is open (before the start time the card waits under Waiting on others).",
+     "text": "Sign in as the panel chair **Dr. Liwayway Bautista** (**liwayway.bautista@usls.edu.ph**) and open **Verdicts**. In **Needs your verdict** the card of Miguel Yu lists the Form 1 and the three concept papers under **Current-stage papers**, and the block **Submit panel chair verdict** is open (with Skip date waits OFF, the card waits under Waiting on others until the start time has passed).",
      "shots": [
       {
        "id": "proposal_final-07",
