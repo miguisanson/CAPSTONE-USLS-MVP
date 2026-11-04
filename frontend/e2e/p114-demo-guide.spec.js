@@ -130,7 +130,7 @@ test.describe("engine and content (pure)", () => {
   test("every guide is complete: narration key exists, 1-3 questions, a branch target exists, no pronouns for people", () => {
     const narration = JSON.parse(readFileSync(join(REPO_ROOT, "scripts", "demo", "narration.json"), "utf8"));
     const pronoun = /\b(he|she|they|them|their|his|her|hers|him|himself|herself|themselves)\b/i;
-    expect(GUIDES.map((g) => g.id)).toEqual(["leave-of-absence", "readmission", "awol", "monitoring", "reports", "withdrawal", "practicum", "graduation", "course-adjustments", "business-rules", "policy-assistant", "policy-documents", "student-handoff", "enrollment", "dropping", "residency", "calendars", "portals", "best-features"]);
+    expect(GUIDES.map((g) => g.id)).toEqual(["leave-of-absence", "readmission", "awol", "monitoring", "reports", "withdrawal", "practicum", "graduation", "course-adjustments", "business-rules", "policy-assistant", "policy-documents", "student-handoff", "enrollment", "dropping", "residency", "calendars", "portals", "best-features", "research-title", "panel-matching", "defense-scheduling", "verdicts", "proposal-final"]);
     for (const guide of GUIDES) {
       const ids = new Set(guide.steps.map((s) => s.id));
       for (const s of guide.steps) {

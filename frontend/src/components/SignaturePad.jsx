@@ -35,7 +35,7 @@ export default function SignaturePad({ onChange, resetKey, ariaLabel = "Signatur
     onChange("");
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
-    canvasRef.current.setPointerCapture?.(event.pointerId);
+    try { canvasRef.current.setPointerCapture?.(event.pointerId); } catch { /* a scripted pointer has no active id; drawing still works */ }
   }
 
   function draw(event) {

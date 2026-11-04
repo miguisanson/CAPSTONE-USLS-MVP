@@ -115,3 +115,17 @@ Calendars, Portals tour and Best features tour each have a guide in `guides/` an
   second step with the same path would count as done before it runs; later steps on the same path are `"manual"` with a `wait`.
 - Server change that would help (not made, `app.py` belongs to another packet): add these slugs to `DEMO_GUIDE_PROCESSES` and answer them
   with `case: null` (or a `{status: "record"}` like `monitoring`), then change `NO_CASE` in `guides/_shared.js` to the guide's own slug.
+
+### Research guides (2026-11-04, packet `pkt/guides-research`)
+Research Title and Form 1, Panel Matching, Defense Scheduling, Verdicts, and Proposal and Final Defense (`guides/research-title.js`,
+`panel-matching.js`, `defense-scheduling.js`, `verdicts.js`, `proposal-final.js`) all follow Miguel Yu (`research-miguel`, 2260004), one after
+the other: each one starts where the previous one ended, so reset Miguel and play them in that order (tested as one serial chain in `p122`).
+- Verdicts are recorded by Graduate School staff from the Research Gate card ("Record for the panel"); the Panel Chair never signs in. The
+  chair path is only named in the answers to "if asked". With "Skip date waits" on, a verdict can be recorded right after booking.
+- The adviser (Dr. Celeste Tan, role `faculty`) signs the proposal and final documents; the Academic Coordinator signs Form 1 on
+  `/form1-endorsements`. New player action `{ draw: target }` strokes a signature canvas with pointer events.
+- Not played by the autopilot: faculty accepting or declining a panel invitation (a pending invitation does not block booking; a decline
+  does), and the Panel Chair's own verdict page. Both are explained in the guide text only.
+- Server change that would help (not made): add the five research slugs to `DEMO_GUIDE_PROCESSES` so the guide can follow the record's
+  stage (`NO_CASE` is used today, as for the other case-less guides). Completed research leaves `/api/research-gate/overview`, so the end of
+  Proposal and Final Defense is read from the student record (`current_stage: Completed`).
