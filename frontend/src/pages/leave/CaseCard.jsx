@@ -1,7 +1,8 @@
-import { Eye } from "lucide-react";
+import { Eye, MessageSquare } from "lucide-react";
 import { Button, DataTable, StatusChip } from "../../components/ui/index.js";
 import { leaveCaseStatusBadge } from "../../components/leaveStatus";
-import { caseFlags, cardLines, keyFact, restLines, whenDates } from "./leaveHelpers";
+import { CaseCardFacts, CaseCardShell, MessageNote, NextOwner, ReadyMark, RequirementBoxes } from "../../components/process";
+import { caseFacts, caseFlags, caseRequirements, cardLines, whenDates } from "./leaveHelpers";
 
 export function FlagList({ item, role }) {
   const flags = caseFlags(item, role);
@@ -17,18 +18,15 @@ export function FlagList({ item, role }) {
   );
 }
 
-function ownerText(item) {
-  return item.owner ? `Next: ${item.owner}` : "No further step";
-}
-
-// One request on the board. The board adds dragging and the "Move to..." menu around it.
-export default function CaseCard({ item, role, selectable, selected, onToggleSelect, onOpen }) {
+// One request on the board, in Khloe's layout (components/process; the same card as Practicum): name and number, a green card with
+// "Ready for Dean review" when the Dean has to decide, the five facts, the requirement boxes, the amber message box, "Next:" and
+// the buttons View and Message. The board adds dragging and the "Move to..." menu around it.
+export default function CaseCard({ item, role, selectable, selected, onToggleSelect, onOpen, onMessage }) {
+  const requirements = caseRequirements(item);
+  const withDean = item.owner === "Dean";
+  const name = item.student.name;
   return (
-    <article
-      className={`rounded-xl border bg-white p-3 shadow-sm transition-colors ${
-        selected ? "border-brand-400 ring-2 ring-brand-100" : "border-slate-200 hover:border-slate-300"
-      }`}
-    >
+    <CaseCardShell ready={withDean} selected={selected}>
       <div className="flex items-start gap-2.5">
         {selectable && (
           <input
@@ -36,40 +34,44 @@ export default function CaseCard({ item, role, selectable, selected, onToggleSel
             checked={selected}
             onChange={() => onToggleSelect(item)}
             className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-            aria-label={`Select ${item.student.name} for a batch step`}
+            aria-label={`Select ${name} for a batch step`}
           />
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-ink">{item.student.name}</p>
-          <p className="meta truncate">
+          <p className="break-words text-sm font-semibold text-ink">{name}</p>
+          <p className="meta break-words">
             {item.student.student_number} · {item.student.program_code}
           </p>
         </div>
-        {item.kind === "LOA_EXTENSION" && <StatusChip label="Extension" tone="muted" size="sm" dot={false} />}
       </div>
+      {(withDean || item.kind === "LOA_EXTENSION" || item.kind === "RESIDENCY") && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <ReadyMark ready={withDean} />
+          {item.kind === "LOA_EXTENSION" && <StatusChip label="Extension" tone="muted" size="sm" dot={false} />}
+          {item.kind === "RESIDENCY" && <StatusChip label="Residency" tone="muted" size="sm" dot={false} />}
+        </div>
+      )}
 
-      <p data-testid="case-key-fact" className="mt-2 text-sm font-semibold text-ink">{keyFact(item)}</p>
-      {restLines(item).map((line, index) => (
-        <p key={index} className="meta mt-0.5">{line}</p>
-      ))}
+      <CaseCardFacts facts={caseFacts(item)} />
 
-      <p className="mt-2.5 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">{ownerText(item)}</p>
+      {requirements.length > 0 && <RequirementBoxes items={requirements} ariaLabel="Requirements for this request" className="mt-3 !grid-cols-1" />}
 
       <div className="mt-2">
         <FlagList item={item} role={role} />
       </div>
 
-      <Button
-        variant="secondary"
-        size="sm"
-        icon={Eye}
-        onClick={() => onOpen(item)}
-        className="mt-3 w-full"
-        aria-label={`View details for ${item.student.name}`}
-      >
-        View details
-      </Button>
-    </article>
+      <MessageNote count={item.unresolved_messages || 0} latest={item.latest_message?.comment || ""} />
+      <NextOwner owner={item.owner || "No further step"} />
+
+      <div className="mt-3 flex gap-2">
+        <Button variant="secondary" size="sm" icon={Eye} onClick={() => onOpen(item)} className="flex-1" aria-label={`View details for ${name}`}>
+          View
+        </Button>
+        <Button variant="secondary" size="sm" icon={MessageSquare} onClick={() => onMessage(item)} className="flex-1" aria-label={`Message ${name}`}>
+          Message
+        </Button>
+      </div>
+    </CaseCardShell>
   );
 }
 

@@ -115,14 +115,17 @@ test.describe("I-356 the reason is on the card", () => {
     expect(count).toBeGreaterThan(0);
     for (let i = 0; i < count; i++) {
       const card = cards.nth(i);
+      // CHANGED BY kstand (I-360): the reason is the first fact of the card's facts grid (it was line 3 of the card text; a
+      // "Ready for Dean review" mark can now sit between the number and the grid).
       const lines = await linesOf(card);
-      expect(reasons.has(lines[2]), `card ${i} (${lines[0]}): line 3 is the reason, got "${lines[2]}"`).toBe(true);
-      await expect(card.getByTestId("case-key-fact")).toHaveText(lines[2]);
+      const fact = ((await card.getByTestId("case-key-fact").innerText()) || "").trim();
+      expect(reasons.has(fact), `card ${i} (${lines[0]}): the key fact is the reason, got "${fact}"`).toBe(true);
+      await expect(card.getByTestId("case-facts").locator("li").first()).toHaveText(fact);
     }
     await shot(page, "loa-board-1366.png");
 
     const first = cards.first();
-    const reason = (await linesOf(first))[2];
+    const reason = ((await first.getByTestId("case-key-fact").innerText()) || "").trim();
     await first.getByRole("button", { name: /^View details for / }).click();
     const dialog = page.getByRole("dialog");
     const top = dialog.getByTestId("case-summary-top");
@@ -143,10 +146,10 @@ test.describe("I-356 the reason is on the card", () => {
       await expect(cards.first(), `${slug} has cards`).toBeVisible();
       const count = await cards.count();
       for (let i = 0; i < count; i++) {
-        const lines = await linesOf(cards.nth(i));
+        // CHANGED BY kstand (I-360): the key fact is the first fact of the grid, not "line 3" of the card text.
         const fact = await cards.nth(i).getByTestId("case-key-fact").innerText();
         expect(fact.trim(), `${slug} card ${i}: a key fact`).not.toBe("");
-        expect(lines[2], `${slug} card ${i}: the key fact is line 3, under the name and number`).toBe(fact.trim());
+        await expect(cards.nth(i).getByTestId("case-facts").locator("li").first(), `${slug} card ${i}: the key fact opens the grid`).toHaveText(fact.trim());
       }
     }
   });

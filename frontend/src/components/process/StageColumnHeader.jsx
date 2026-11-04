@@ -1,6 +1,7 @@
 // The header of a board column in Khloe's layout: an optional number in a circle (only for the stages before the real workflow
 // starts), the stage name, one sentence of what the column holds, and the count. Use it as StageBoard's `renderColumnHeader`.
-export function StageColumnHeader({ column, count, number = null, children = null }) {
+// `total` (when a filter hides some cards) shows "2 of 5"; `countLabel` replaces the screen-reader name of the count.
+export function StageColumnHeader({ column, count, total = count, number = null, countLabel = null, children = null }) {
   return (
     <header className="mb-3 space-y-2">
       <div className="flex items-start gap-2.5">
@@ -11,7 +12,7 @@ export function StageColumnHeader({ column, count, number = null, children = nul
           <h3 className="section-title break-words">{column.label}</h3>
           {column.description && <p className="meta mt-1 leading-relaxed">{column.description}</p>}
         </div>
-        <span className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200" aria-label={`${count} in ${column.label}`}>{count}</span>
+        <span className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200" aria-label={countLabel || (total !== count ? `${count} shown of ${total}` : `${count} in ${column.label}`)}>{total !== count ? `${count} of ${total}` : count}</span>
       </div>
       {children}
     </header>

@@ -121,9 +121,9 @@ test.describe("conC: the six boards have the same parts", () => {
         expect(view.length, `card ${i}: one View details button`).toBe(1);
         // CHANGED BY khloe-ui (owner 2026-11-04, "i want khloe's work back"): Practicum and Graduation cards are Khloe's cards again.
         // Practicum: View + Message. Graduation: the stage-check eye, View students, Select batch and the one step button (primary).
-        // The other boards keep "View details" only until their own packet (LOA, readmission, AWOL, withdrawal, residency).
-        const khloe = slug === "practicum" || slug === "graduation";
-        if (!khloe) expect(view[0].text, `card ${i}: the button says "View details"`).toBe("View details");
+        // CHANGED BY kstand (I-360): LOA, readmission, AWOL, withdrawal and residency cards are Khloe's cards too: View + Message.
+        const khloe = true;
+        if (slug !== "graduation") expect(view[0].text, `card ${i}: the button says "View"`).toBe("View");
         const KHLOE_EXTRA = /^Message |^(View|Hide) students$|^Select batch$|^Export batch|^Select .* for batch creation$/;
         for (const item of names) {
           const allowedExtra = khloe && (KHLOE_EXTRA.test(item.name) || (slug === "graduation" && item.primary));
