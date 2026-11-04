@@ -26,10 +26,16 @@ Branch: `v6.1-migui` until 13:3x, then `v6.2-migui`. Every item has its ISSUES r
 | PM | Research Gate: staff and the Research Coordinator record, correct and confirm the panel verdict, Form 7 and title for the panel (stamped, with reason and history); board with 1 Title Defense / 2 Proposal Defense / 3 Completion columns | I-361, I-362 | b642a0f |
 | PM | Demo Guide: 11 more guides with autopilot (course adjustments, enrollment, dropping, policy assistant, handoff, business rules, policy documents, residency, calendars, portals, best features) | — | 9d3a4ac |
 | PM | Server follow-ups: newest message on every board card, AWOL residence years, enrollment window enforced on every enrollment save (409 with the dates) and seeded, By-year-started student lists endpoint | I-355..I-357 | b09de19 |
+| eve | Audit round 2 (10 rows): guide-state privacy, bell links per role, daily automatic leave/AWOL sweeps, monitoring edits refused for enrolled current-term subjects, readmission gap semesters flagged, practicum completion from records + certificate, gate documents only through the gate, student schedule request prefills staff booking, verdict/revision notices, coordinator home scope | I-341, I-336, I-270, I-275, I-267, I-286, I-280, I-282, I-289, I-339 | 0a8a94e |
+| eve | Demo Guide: 5 research guides (title + Form 1, panel matching, scheduling, verdicts, proposal + final) played with `>` only, Panel Chair never signs in — 24 guides in all | — | 074327f |
+| eve | Course Adjustments table fits again at 1366; e2e temp folder made automatically; deploy UPDATE-SITE + RESET-DEMO-DATA one-click scripts | I-331 | ac767cb |
 
 ## In progress
-- Demo Guide guides for the research processes (title gate, panel matching, defense scheduling, verdicts, proposal/final) (`pkt/guides-research`).
-- Final full Python gate on the merged code.
+- Audit round 3 (`pkt/audit-round3`): demo switch needs sign-in, privacy notice enforced by the API, Registrar task, second AWOL, AWOL last enrolled at detection, residency closes at term end, defense lead time, Form 1 only at its gate, batch approve check, verdict standing check, bulk term/drop date/export, test order.
+
+## Gates
+- Full Python gate on 0a8a94e: 1,120 tests, 1 failure = known I-236 `test_teaching_schedule` (Myrine's teaching schedule).
+- Browser: every touched spec green on the merged code (p113-p122, p114/p115/p122 autopilot, p42, p77, p78, p84 except known I-236 line ~376, p86, p91, p93, p101, p116-p121).
 
 ## Next
 - The open audit rows (I-264..I-352), highest first.
