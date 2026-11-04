@@ -12,7 +12,7 @@ os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="pol
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 
 from app import (  # noqa: E402
-    AcademicTerm, AwolCase, Course, Faculty, PanelAssignment, Program, Student, UserAccount,
+    AcademicTerm, AwolCase, LeaveCase, Course, Faculty, PanelAssignment, Program, Student, UserAccount,
     Notification, app, db, generate_password_hash, notify_workflow_owner,
 )
 
@@ -130,6 +130,49 @@ class WorkflowNoticeLinkTests(Audit2Base):
 
     def test_staff_notice_keeps_workflow_page(self):
         self.assertEqual(self.link_for("withdrawal", "Graduate School Staff", "staff"), "/workflow/withdrawal")
+
+
+class DailySweepTests(Audit2Base):
+    """I-270: date-driven leave moves run by themselves, once a day, on the first signed-in API request."""
+
+    def tearDown(self):
+        app.config.pop("FORCE_DAILY_SWEEP", None)
+
+    def make_scheduled_leave(self):
+        with app.app_context():
+            term = AcademicTerm.query.filter_by(label="Running Term").one()
+            case = LeaveCase(student_id=self.student_id, kind="LOA", status="Leave Scheduled",
+                             start_term_id=term.id, end_term_id=term.id, start_label=term.label, end_label=term.label)
+            db.session.add(case)
+            db.session.commit()
+            return case.id
+
+    def status(self, case_id):
+        with app.app_context():
+            return db.session.get(LeaveCase, case_id).status
+
+    def test_first_signed_in_request_of_the_day_starts_due_leaves_once(self):
+        import app as app_module
+        app.config["FORCE_DAILY_SWEEP"] = True
+        app_module._DAILY_SWEEP_STATE["day"] = None
+        case_id = self.make_scheduled_leave()
+        client = self.client("staff")
+        self.assertEqual(self.status(case_id), "Leave Scheduled")  # nothing ran yet
+        self.assertEqual(app.test_client().get("/api/health").status_code, 200)
+        self.assertEqual(self.status(case_id), "Leave Scheduled")  # public/anonymous calls do not run it
+        self.assertEqual(client.get("/api/auth/me").status_code, 200)
+        self.assertEqual(self.status(case_id), "On Leave")
+        # same day: a second leave made due later is left for the next day (once per day)
+        second = self.make_scheduled_leave()
+        client.get("/api/auth/me")
+        self.assertEqual(self.status(second), "Leave Scheduled")
+
+    def test_sweep_is_off_while_testing_unless_forced(self):
+        import app as app_module
+        app_module._DAILY_SWEEP_STATE["day"] = None
+        case_id = self.make_scheduled_leave()
+        self.client("staff").get("/api/auth/me")
+        self.assertEqual(self.status(case_id), "Leave Scheduled")
 
 
 if __name__ == "__main__":

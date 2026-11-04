@@ -449,10 +449,44 @@ def create_app() -> Flask:
         return response
 
     register_json_error_handling(app)
+    register_daily_sweep(app)
     register_routes(app)
     from teaching_backend import install_routes as install_teaching_routes
     install_teaching_routes(app, db, globals())
     return app
+
+
+_DAILY_SWEEP_STATE: dict = {"day": None}
+
+
+def register_daily_sweep(app: Flask) -> None:
+    """Run the clock-driven sweeps by themselves: on the first signed-in API request after the app starts,
+    then on the first one each new day (I-270). Nobody has to press a refresh button; the buttons stay as a
+    manual extra. Off while testing unless a test sets FORCE_DAILY_SWEEP."""
+    import threading
+
+    lock = threading.Lock()
+
+    @app.before_request
+    def run_daily_sweep():
+        if not request.path.startswith("/api/") or not session.get("account_id"):
+            return None
+        if app.config.get("TESTING") and not app.config.get("FORCE_DAILY_SWEEP"):
+            return None
+        today = ph_today()
+        if _DAILY_SWEEP_STATE["day"] == today:
+            return None
+        with lock:
+            if _DAILY_SWEEP_STATE["day"] == today:
+                return None
+            _DAILY_SWEEP_STATE["day"] = today  # set first: a failing sweep is not retried on every request
+            try:
+                run_maintenance_sweeps()
+                db.session.commit()
+            except Exception:  # noqa: BLE001
+                db.session.rollback()
+                app.logger.exception("Daily sweep failed")
+        return None
 
 
 HTTP_ERROR_MESSAGES = {
@@ -5994,7 +6028,8 @@ _RISK_REFRESH_STATE: dict = {"at": None, "day": None}
 def run_maintenance_sweeps() -> dict:
     """Every sweep that depends on the clock or on data entered elsewhere. Writes; the caller commits.
 
-    The seed runs it once, and ``POST /api/maintenance/refresh`` runs it on request. A page view never does.
+    The seed runs it once, the first signed-in request of each day runs it (register_daily_sweep), and
+    ``POST /api/maintenance/refresh`` runs it on request. A page view itself never does.
     """
     awol = sync_automatic_awol_statuses(commit=False)
     leave = sync_leave_cases(commit=False)
