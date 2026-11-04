@@ -143,6 +143,17 @@ Claude, by reading this file and `.planning/STATE.md` and running
 
 ---
 
+## Rule 6 — Plain words on every screen and document (owner, 2026-11-04)
+
+- No jargon the Graduate School office does not use. Example: never "cohort";
+  say "year started" (the school year a student entered).
+- No pronouns for people (he/she/they/them/their/his/her). Name the role:
+  "the student", "the Dean", "Graduate School staff".
+- Never make a user type, pick or tick what the system already knows or can
+  check; derive it and show it read-only.
+
+---
+
 ## The gate
 
 ```bash
