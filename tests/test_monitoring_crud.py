@@ -121,6 +121,18 @@ class MonitoringPortalCrudTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.get_json())
         return response.get_json()
 
+    def test_add_student_ignores_a_client_term_id(self):
+        with app.app_context():
+            old = AcademicTerm(label="AY 2024-2025 1st Semester", start_date=date(2024, 8, 1), end_date=date(2024, 12, 15))
+            db.session.add(old)
+            db.session.commit()
+            old_id = old.id
+            active_id = AcademicTerm.query.filter_by(is_active_planning_term=True).one().id
+        body = self._create_student(term_id=old_id)
+        with app.app_context():
+            rows = TermEnrollment.query.filter_by(student_id=body["student"]["id"]).all()
+            self.assertEqual([r.term_id for r in rows], [active_id])
+
     def _course_id(self, code):
         with app.app_context():
             return Course.query.filter_by(code=code).one().id

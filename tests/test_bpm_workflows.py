@@ -876,6 +876,48 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(endorsement.request_attachment_id, replacement_file.id)
             self.assertEqual(return_message.status, "Responded")
 
+    def test_graduation_route_ignores_client_registrar_status_and_dean_remarks(self):
+        with app.app_context():
+            application_file = self._attachment("graduation", "audit-research2-02")
+            db.session.add(GraduationEndorsement(
+                student_id=self.student_id,
+                request_attachment_id=application_file.id,
+                batch_name="Batch audit",
+                review_window="AY 2026-2027",
+                endorsement_status="For Review",
+            ))
+            db.session.commit()
+            self._transition(self._staff_client(), "graduation", {
+                "student_id": self.student_id,
+                "endorsement_status": "Coursework Review",
+                "registrar_status": "Exported - Ready to Send",
+                "dean_remarks": "Approved by the Dean",
+            })
+            endorsement = GraduationEndorsement.query.filter_by(student_id=self.student_id).first()
+            self.assertEqual(endorsement.endorsement_status, "Coursework Review")
+            self.assertNotEqual(endorsement.registrar_status, "Exported - Ready to Send")
+            self.assertFalse(endorsement.dean_remarks)
+
+    def test_dean_single_graduation_decision_needs_the_dean_step(self):
+        with app.app_context():
+            application_file = self._attachment("graduation", "audit-research2-03")
+            record = GraduationEndorsement(
+                student_id=self.student_id,
+                request_attachment_id=application_file.id,
+                batch_name="Batch audit",
+                review_window="AY 2026-2027",
+                endorsement_status="Coursework Review",
+            )
+            db.session.add(record)
+            db.session.commit()
+            record_id = record.id
+            for decision in ("approve", "return"):
+                response = self._dean_client().post(
+                    f"/api/approvals/workflow/graduation/{record_id}/decide", json={"decision": decision, "note": "x"})
+                self.assertEqual(response.status_code, 400, response.get_json())
+                self.assertIn("not ready for Dean review", response.get_json()["error"])
+            self.assertEqual(db.session.get(GraduationEndorsement, record_id).endorsement_status, "Coursework Review")
+
     def test_graduation_incomplete_coursework_and_research_are_routed_to_staff(self):
         with app.app_context():
             staff = self._staff_client()
@@ -3293,6 +3335,63 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             report = self._staff_client().get(f"/api/awol/{item.id}/registrar-report")
             self.assertEqual(report.status_code, 200)
 
+    def _awol_case_in_dean_review(self):
+        student = db.session.get(Student, self.student_id)
+        student.entry_year = date.today().year - 2
+        student.current_stage = "Coursework"
+        student.standing = "Active"
+        student.enrollment_tag = "Enrolled"
+        student_account = self._account("student", "awol-audit-student@example.test")
+        student_account.student_id = student.id
+        term = AcademicTerm(
+            label="AWOL Audit Source", start_date=date(date.today().year, 1, 1),
+            end_date=date(date.today().year, 5, 31), is_active_planning_term=True)
+        future_term = AcademicTerm(
+            label="AWOL Audit Return", start_date=date(date.today().year + 1, 1, 10),
+            end_date=date(date.today().year + 1, 5, 31))
+        db.session.add_all([term, future_term])
+        db.session.flush()
+        term_row = TermEnrollment(student_id=student.id, term_id=term.id)
+        db.session.add(term_row)
+        term_row.status = "Withdrawn"
+        term_row.source_reference = "AIMS full-semester withdrawal"
+        db.session.commit()
+        self.assertEqual(sync_automatic_awol_statuses(commit=True), 1)
+        item = AwolCase.query.filter_by(student_id=student.id).first()
+        self.student_awol_client = self._role_client(student_account.id, "student")
+        payload = {
+            "target_return_term": future_term.label, "last_enrolled_term": term.label,
+            "return_intent": "I intend to resume enrollment in the selected semester.",
+            "return_reason": "My circumstances have stabilized and I am ready to continue.",
+        }
+        self.assertEqual(self.student_awol_client.post("/api/student-portal/requests/awol-return", json=payload).status_code, 200)
+        forward = {"student_id": student.id, "case_id": item.id, "workflow_action": "forward_return_to_dean"}
+        self.assertEqual(self._staff_client().post("/api/transactions/awol", json=forward).status_code, 200)
+        return student, item, forward
+
+    def test_approving_an_awol_return_closes_the_automatic_alert_task(self):
+        with app.app_context():
+            student, item, _ = self._awol_case_in_dean_review()
+            alert = Task.query.filter_by(student_id=student.id, title="Review automatic AWOL policy alert").one()
+            self.assertEqual(alert.status, "Pending")
+            response = self._dean_client().post(
+                f"/api/approvals/workflow/awol-return/{item.id}/decide", json={"decision": "approve", "note": "ok"})
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(alert)
+            self.assertEqual(alert.status, "Done")
+
+    def test_staff_cannot_reforward_an_awol_declaration_the_dean_returned(self):
+        with app.app_context():
+            student, item, forward = self._awol_case_in_dean_review()
+            response = self._dean_client().post(
+                f"/api/approvals/workflow/awol-return/{item.id}/decide", json={"decision": "return", "note": "Fix it."})
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(item)
+            self.assertEqual(item.status, "Returned for Revision")
+            self.assertEqual(self._staff_client().post("/api/transactions/awol", json=forward).status_code, 400)
+            db.session.refresh(item)
+            self.assertEqual(item.status, "Returned for Revision")
+
     def test_awol_absolute_limit_requires_reenrollment_and_valid_residency_is_recorded(self):
         with app.app_context():
             student = db.session.get(Student, self.student_id)
@@ -3351,6 +3450,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             student.standing = "Active"
             student.enrollment_tag = "Enrolled"
             student.current_stage = "Comprehensive Exam"
+            term.is_active_planning_term = False  # residency now always uses the one active term
             term = AcademicTerm(
                 label="AY 2026-2027 1st Semester",
                 start_date=date(date.today().year, 1, 1),
@@ -3374,6 +3474,45 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(student.enrollment_tag, "Residency")
             report = self._staff_client().get(f"/api/residency/{residency.id}/registrar-report")
             self.assertEqual(report.status_code, 200)
+
+    def test_residency_uses_the_active_term_and_closing_it_restores_the_old_tag(self):
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.entry_year = date.today().year
+            student.current_stage = "Comprehensive Exam"
+            student.standing = "Active"
+            student.enrollment_tag = "Not Enrolled"
+            active = AcademicTerm(
+                label="Residency Active Semester",
+                start_date=date(date.today().year, 1, 1),
+                end_date=date(date.today().year, 5, 31),
+                is_active_planning_term=True,
+            )
+            old = AcademicTerm(
+                label="Residency Old Semester",
+                start_date=date(date.today().year - 3, 1, 1),
+                end_date=date(date.today().year - 3, 5, 31),
+            )
+            db.session.add_all([active, old])
+            db.session.commit()
+            response = self._staff_client().post("/api/transactions/awol", json={
+                "student_id": self.student_id,
+                "workflow_action": "record_residency",
+                "term_id": old.id,
+                "residency_reason": "Comprehensive examination",
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            residency = ResidencyEnrollment.query.filter_by(student_id=self.student_id, status="Active").one()
+            self.assertEqual(residency.term_id, active.id)
+            self.assertIsNone(TermEnrollment.query.filter_by(student_id=self.student_id, term_id=old.id).first())
+            response = self._staff_client().post("/api/transactions/awol", json={
+                "student_id": self.student_id,
+                "workflow_action": "end_residency",
+                "residency_id": residency.id,
+            })
+            self.assertEqual(response.status_code, 200, response.get_json())
+            db.session.refresh(student)
+            self.assertEqual(student.enrollment_tag, "Not Enrolled")
 
     def test_demo_backoffice_accounts_sign_in_as_distinct_roles(self):
         with app.app_context():

@@ -35,6 +35,9 @@ from app import (  # noqa: E402
     TransactionLog,
     UserAccount,
     WithdrawalApplication,
+    align_seed_calendar,
+    generate_semester_calendar,
+    seed_semester_years,
     subject_withdrawal_window,
     adviser_max_advisees,
     app,
@@ -214,6 +217,20 @@ class SeedQualityTests(unittest.TestCase):
         self.assertIn(response.status_code, (200, 201), response.get_json())
 
     # ------------------------------------------------------------------ I-095 (F-41)
+    def test_the_seed_calendar_has_a_running_semester_on_any_seed_day(self):
+        """records-02: between semesters or near a semester's end the seed still dates a running semester."""
+        for today in (date(2026, 12, 5), date(2026, 11, 27), date(2027, 6, 15), date(2026, 8, 3), date(2026, 10, 1)):
+            terms = [AcademicTerm(label=label, start_date=start, end_date=start + timedelta(days=120))
+                     for label, start in generate_semester_calendar(*seed_semester_years(today))]
+            align_seed_calendar(terms, today)
+            running = [t for t in terms if t.start_date <= today <= t.end_date]
+            self.assertEqual(len(running), 1, today)
+            self.assertLessEqual((today - running[0].start_date).days, 3, today)
+            self.assertGreater((running[0].end_date - today).days, 100, today)
+            ordered = sorted(terms, key=lambda t: t.start_date)
+            for earlier, later in zip(ordered, ordered[1:]):
+                self.assertLess(earlier.end_date, later.start_date, (today, earlier.label, later.label))
+
     def test_terms_cover_only_the_current_year_plus_or_minus_two(self):
         with app.app_context():
             current_start = self.today.year if self.today.month >= 8 else self.today.year - 1

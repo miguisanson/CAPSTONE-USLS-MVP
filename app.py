@@ -863,6 +863,7 @@ class ResidencyEnrollment(db.Model):
     policy_status = db.Column(db.String(80), nullable=False)
     status = db.Column(db.String(40), nullable=False, default="Active")
     staff_notes = db.Column(db.Text)
+    prior_enrollment_tag = db.Column(db.String(40))  # restored when the residency closes
     created_at = db.Column(db.DateTime, default=now_utc)
     ended_at = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, default=now_utc, onupdate=now_utc)
@@ -1586,6 +1587,7 @@ class DefenseVerdict(db.Model):
     revision_confirm_note = db.Column(db.Text)
     evaluation_score = db.Column(db.Float)
     selected_title = db.Column(db.String(220))
+    title_before_verdict = db.Column(db.String(220))  # the study title before the panel's pick; put back if the verdict is corrected
     original_result = db.Column(db.String(60))
     correction_reason = db.Column(db.Text)
     corrected_by = db.Column(db.String(160))
@@ -18450,6 +18452,8 @@ def register_routes(app: Flask) -> None:
             if note:
                 item.staff_notes = "\n".join(part for part in [item.staff_notes, f"Dean: {note}"] if part)
             resolve_standing_change_tasks(student.id, "AWOL", "Dean")
+            if decision == "approve" and student.enrollment_tag != "AWOL":
+                resolve_standing_change_tasks(student.id, "Review automatic AWOL policy alert", "Academic Coordinator")
             workflow_message_record(
                 "awol", student, account, "Student", result,
                 note or f"Policy classification: {item.policy_classification}. Next owner: {next_owner}.",
@@ -18467,6 +18471,8 @@ def register_routes(app: Flask) -> None:
 
         elif case_type == "graduation":
             endorsement = GraduationEndorsement.query.get_or_404(item_id)
+            if endorsement.endorsement_status != "Ready for Dean Review":
+                return jsonify({"error": "Candidate is not ready for Dean review."}), 400
             if not graduation_eligibility(endorsement.student)["eligible"]:
                 return jsonify({"error": "Only students who completed every graduation requirement can be reviewed here."}), 400
             previous_status = endorsement.endorsement_status
@@ -20372,6 +20378,11 @@ def register_routes(app: Flask) -> None:
         payload = MultiDict(data)
         payload["student_id"] = str(schedule.student_id)
         payload["defense_type"] = schedule.defense_type
+        # What the booking already says is kept unless the request gives a new value.
+        for key, kept in (("mode", schedule.mode), ("venue", schedule.venue),
+                          ("manuscript_received_on", schedule.manuscript_received_on and schedule.manuscript_received_on.isoformat())):
+            if kept and not str(payload.get(key) or "").strip():
+                payload[key] = kept
         try:
             require_research_prerequisite(schedule.student)
             require_active_standing(schedule.student)
@@ -28543,7 +28554,7 @@ def monitoring_portal_create_student(data: dict) -> tuple[Student, UserAccount]:
         if "@" not in email or " " in email:
             raise MonitoringEntryError("Enter a valid email address.")
         _monitoring_email_free(email)
-    term = db.session.get(AcademicTerm, safe_int(data.get("term_id")) or 0) if data.get("term_id") else get_active_term()
+    term = get_active_term()  # never a client-sent term_id (I-246 pattern)
 
     student = Student(
         student_number=student_number,
@@ -31891,7 +31902,7 @@ def handle_awol(data: MultiDict) -> int:
 
     elif action == "forward_return_to_dean":
         item = AwolCase.query.get_or_404(safe_int(data.get("case_id")))
-        if item.student_id != student.id or item.status not in {"Return Submitted", "Returned for Revision"}:
+        if item.student_id != student.id or item.status != "Return Submitted":
             raise ValueError("Only a submitted AWOL return intent can be forwarded to the Dean.")
         if not item.return_intent:
             raise ValueError("The student's structured written return declaration is required before Dean review.")
@@ -31940,6 +31951,7 @@ def handle_awol(data: MultiDict) -> int:
             flag.resolved_at = now_utc()
             flag.updated_at = now_utc()
         resolve_standing_change_tasks(student.id, "Re-evaluate courses after maximum residence", "Academic Coordinator")
+        resolve_standing_change_tasks(student.id, "Review automatic AWOL policy alert", "Academic Coordinator")
         result = "Full re-enrollment completed; student is active again"
         workflow_message_record(
             "awol", student, account, "Student", result,
@@ -31967,7 +31979,7 @@ def handle_awol(data: MultiDict) -> int:
                 "The residency policy checker says this case needs human review, so residency cannot be recorded. "
                 "Fix the record the checker flagged (or choose the matching purpose), or use leave of absence instead."
             )
-        term = AcademicTerm.query.get(safe_int(data.get("term_id"))) if data.get("term_id") else get_active_term()
+        term = get_active_term()  # residency is registered within the current semester (Handbook p.48); no client term_id
         if not term:
             raise ValueError("No active semester is available for residency enrollment.")
         existing = ResidencyEnrollment.query.filter(
@@ -31984,6 +31996,7 @@ def handle_awol(data: MultiDict) -> int:
             policy_status=review["recommendation"],
             status="Active",
             staff_notes=staff_notes or None,
+            prior_enrollment_tag=student.enrollment_tag,
         )
         db.session.add(item)
         enrollment = TermEnrollment.query.filter_by(student_id=student.id, term_id=term.id).first()
@@ -32013,7 +32026,11 @@ def handle_awol(data: MultiDict) -> int:
         enrollment = TermEnrollment.query.filter_by(student_id=student.id, term_id=item.term_id).first()
         if enrollment and enrollment.status == "Residency":
             enrollment.status = "Completed"
-        student.enrollment_tag = "Enrolled"
+        still_active = ResidencyEnrollment.query.filter(
+            ResidencyEnrollment.student_id == student.id, ResidencyEnrollment.status == "Active",
+            ResidencyEnrollment.id != item.id).first()
+        if not still_active:
+            student.enrollment_tag = item.prior_enrollment_tag or "Enrolled"
         student.standing = "Active"
         result = "Residency enrollment closed"
         workflow_message_record("awol", student, account, "Student", result, f"Residency for {item.term.label if item.term else 'the semester'} was closed.", "notice", "Residency", "Active", status="Sent")
@@ -32039,10 +32056,6 @@ def handle_graduation(data: MultiDict) -> int:
     elif not normalize_graduation_school_year(endorsement.review_window):
         endorsement.review_window = default_graduation_school_year()
     requested_status = (data.get("endorsement_status") or "").strip()
-    if data.get("dean_remarks"):
-        endorsement.dean_remarks = data.get("dean_remarks")
-    if data.get("registrar_status"):
-        endorsement.registrar_status = data.get("registrar_status")
     transition_comment = workflow_transition_comment(data)
 
     if requested_status == "Coursework Review":
@@ -36010,6 +36023,8 @@ def apply_verdict_effects(student: Student, schedule: ScheduleRequest, verdict: 
     verdict.revision_status = None
     if gate == RESEARCH_GATE_TITLE and verdict.selected_title:
         # The panel selected one of the three titles; that is the title of the study from now on.
+        case_before = ResearchCase.query.filter_by(student_id=student.id).first()
+        verdict.title_before_verdict = case_before.title if case_before else None
         sync_research_progress(student, verdict.selected_title)
     after_defense_cleared(student, gate, verdict)
     return "Research Coordinator"
@@ -36025,6 +36040,12 @@ def revert_verdict_effects(verdict: DefenseVerdict, schedule: ScheduleRequest) -
     verdict.revision_status = None
     verdict.revision_note = None
     verdict.revisions_submitted_at = None
+    if verdict.title_before_verdict:
+        case = ResearchCase.query.filter_by(student_id=verdict.student_id).first()
+        if case and case.title == verdict.selected_title:
+            case.title = verdict.title_before_verdict
+        verdict.research_title = verdict.title_before_verdict
+        verdict.title_before_verdict = None
     defense_type = verdict.defense_type
     close_research_tasks(
         verdict.student_id,
@@ -36153,7 +36174,11 @@ def readmission_system_checks(student: Student, case: LeaveCase | None = None) -
         written = False
         written_detail = "The reason you write in this request is your written intention to enroll (Handbook p. 53)."
     audit = compute_course_audit(student)
-    if audit["required_count"] > 0:
+    failed = [row["course"].code for row in audit["incomplete"]]
+    if failed:
+        evaluated = False
+        eval_detail = f"Failed subject on record: {', '.join(failed)}. Handbook p. 54: a failure means no re-admission to the program."
+    elif audit["required_count"] > 0:
         done = len(audit["completed"])
         evaluated = True
         eval_detail = (
@@ -39040,6 +39065,28 @@ def seed_maed_personas() -> None:
     adopt_legacy_leave_logs()
 
 
+def align_seed_calendar(terms: list, today: date) -> None:
+    """Date the seeded semesters so one is running on the seed day, started 3 days ago and 120 days long.
+
+    The running semester is used; between semesters the next one is brought forward. Any later semester
+    that would now overlap is pushed back, keeping its original gap, so the calendar stays in order.
+    """
+    ordered = sorted(terms, key=lambda t: t.start_date)
+    anchor = next((i for i, t in enumerate(ordered) if t.start_date <= today <= t.end_date), None)
+    if anchor is None:
+        anchor = next((i for i, t in enumerate(ordered) if t.start_date > today), len(ordered) - 1)
+    if not ordered or (ordered[anchor].start_date <= today <= ordered[anchor].end_date
+                       and (today - ordered[anchor].start_date).days <= 3):
+        return
+    gaps = [later.start_date - earlier.end_date for earlier, later in zip(ordered, ordered[1:])]
+    ordered[anchor].start_date = today - timedelta(days=3)
+    ordered[anchor].end_date = ordered[anchor].start_date + timedelta(days=120)
+    for i in range(anchor + 1, len(ordered)):
+        if ordered[i].start_date <= ordered[i - 1].end_date:
+            ordered[i].start_date = ordered[i - 1].end_date + gaps[i - 1]
+            ordered[i].end_date = ordered[i].start_date + timedelta(days=120)
+
+
 def seed_database() -> None:
     # Deterministic seed data keeps demos repeatable while still showing varied
     # stages, risks, documents, panels, schedules, and activity history.
@@ -39073,12 +39120,8 @@ def seed_database() -> None:
         term = AcademicTerm(label=label, start_date=start, end_date=start + timedelta(days=120))
         db.session.add(term)
         terms.append(term)
-    # I-162 (IM16): the 14-day withdrawal window of the running semester must be open on any seed day, or the
-    # withdrawal demo cannot run. The running semester is dated as if it began 3 days ago; its end date stays.
-    today = ph_today()
-    running = next((t for t in terms if t.start_date <= today <= t.end_date), None)
-    if running and (today - running.start_date).days > 3:
-        running.start_date = today - timedelta(days=3)
+    # I-162 (IM16): the 14-day withdrawal window of the running semester must be open on any seed day.
+    align_seed_calendar(terms, ph_today())
     db.session.flush()
     active_term = get_active_term()
     if active_term:
