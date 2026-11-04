@@ -571,5 +571,19 @@ class StartupTests(HealthTestBase):
                 self.assertEqual(PolicyDocument.query.filter_by(category="Operations Manual", status="draft").count(), 1)
 
 
+class TrackedFilesHoldNoSecretsTests(unittest.TestCase):
+    """I-330: a live Cloudflare tunnel token was pasted into the tracked example file. The real one lives in
+    deploy/tunnel.env (gitignored); the example must keep its placeholder."""
+
+    def test_the_tunnel_example_keeps_its_placeholder(self):
+        text = (REPO_ROOT / "deploy" / "tunnel.env.example").read_text(encoding="utf-8")
+        values = [line.split("=", 1)[1].strip() for line in text.splitlines() if line.startswith("TUNNEL_TOKEN=")]
+        self.assertTrue(values)
+        for value in values:
+            # Cloudflare tunnel tokens are long base64 strings starting "ey"; the placeholder is short text.
+            self.assertFalse(value.startswith("ey") or len(value) > 60,
+                             "Put the real token in deploy/tunnel.env (not committed), not in the example file.")
+
+
 if __name__ == "__main__":
     unittest.main()
