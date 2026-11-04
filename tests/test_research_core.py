@@ -1336,6 +1336,36 @@ class VerdictFlowTests(ResearchCoreBase):
         payload.update(over)
         return self.staff().post("/api/transactions/defense-scheduling", json=payload)
 
+    def future_proposal_schedule(self):
+        with app.app_context():
+            self.pass_gate(self.student_id, TITLE, "Title Defense")
+            self.fill_uploads(self.student_id, PROPOSAL, status="Complete")
+            self.panel(self.student_id, PROPOSAL, self.FOUR)
+            schedule = self.schedule(self.student_id, "Proposal Defense", names=self.FOUR, day=date.today() + timedelta(days=14))
+            db.session.commit()
+            return schedule.id
+
+    def test_demo_mode_lets_the_chair_record_a_verdict_before_the_defense_day(self):
+        """Demo day: the presenter must not wait two weeks for the booked defense date."""
+        schedule_id = self.future_proposal_schedule()
+        with patch.dict(os.environ, {"DEMO_MODE": "1"}):
+            os.environ.pop("DEMO_SKIP_DATE_WAITS", None)
+            panel = next(p for p in self.faculty_client("Chair Person").get("/api/faculty-portal/context").get_json()["panels"] if p["gate"] == PROPOSAL)
+            self.assertTrue(panel["can_submit_verdict"])
+            self.assertIsNone(panel["verdict_blocked_reason"])
+            ok = self.faculty_client("Chair Person").post(f"/api/faculty-portal/defense-verdicts/{schedule_id}", json={"result": "Passed"})
+            self.assertEqual(ok.status_code, 200, ok.get_json())
+
+    def test_outside_demo_mode_the_verdict_waits_for_the_defense_to_start(self):
+        schedule_id = self.future_proposal_schedule()
+        for env in ({"DEMO_MODE": "0"}, {"DEMO_MODE": "1", "DEMO_SKIP_DATE_WAITS": "0"}):
+            with patch.dict(os.environ, env):
+                panel = next(p for p in self.faculty_client("Chair Person").get("/api/faculty-portal/context").get_json()["panels"] if p["gate"] == PROPOSAL)
+                self.assertFalse(panel["can_submit_verdict"])
+                self.assertEqual(panel["verdict_blocked_reason"], "The defense has not started yet.")
+                refused = self.faculty_client("Chair Person").post(f"/api/faculty-portal/defense-verdicts/{schedule_id}", json={"result": "Passed"})
+                self.assertEqual(refused.status_code, 400, refused.get_json())
+
     def test_redefense_loop_finishes_the_stage_after_the_second_defense_passes(self):
         first_id, _ = self.proposal_booked_and_held("Provisional pass - re-defense required")
         with app.app_context():

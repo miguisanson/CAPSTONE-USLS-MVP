@@ -57,6 +57,7 @@ export const api = {
   acceptPrivacyNotice: () => request("/auth/privacy-consent", { method: "POST", body: JSON.stringify({ accept: true }) }),
   authConfig: () => request("/auth/config"),
   demoAccounts: () => request("/auth/demo-accounts"),
+  setDemoSettings: (payload) => request("/auth/demo-settings", { method: "POST", body: JSON.stringify(payload) }),
   demoStudents: () => request("/auth/demo-students"),
   resetDemoStudent: (demoKey) =>
     request(`/auth/demo-students/${encodeURIComponent(demoKey)}/reset`, {

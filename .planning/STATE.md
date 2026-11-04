@@ -1,5 +1,24 @@
 # State
 
+## Demo-day date waits skipped — 2026-11-04 (NOT committed)
+
+- New switch `demo_skip_date_waits()` (`app.py`, `DEMO_SKIP_DATE_WAITS`, default ON, needs DEMO_MODE). While on:
+  the Panel Chair/Lead can record a verdict before the booked defense date (faculty context + verdict API), and
+  staff can confirm AWOL before the leave end + grace period. Leave start / return due already had manual buttons.
+- Tests: `test_research_core` 2 new (demo skips; DEMO_MODE=0 or DEMO_SKIP_DATE_WAITS=0 still waits),
+  `test_loa_readmission` 1 new + the I-165 test now pins DEMO_SKIP_DATE_WAITS=0. Targeted 58/58 OK; live API on
+  5050 shows Nov 10/23 defenses submittable. Docs: README, .env.example, walkthrough case 16_verdicts.json
+  (manual not regenerated).
+- Then: global **"Skip date waits"** switch on the sign-in page (demo mode only, default ON, every account):
+  `POST /api/auth/demo-settings {skip_date_waits}`, `/api/auth/config` reports it; kept in memory (`DEMO_RUNTIME`),
+  restart = env default. Test `test_health` ...switches_the_demo_date_waits_for_everyone. Checked live on 5050.
+  Lead time before a defense is only a soft warning (override with reason), so it was left alone.
+- Fixed in passing: `frontend/src/components/ui/PageHeader.jsx` was saved as cp1252 (byte 0xb7 in a comment,
+  commit 64ab255) and broke `test_login_page_source_carries_no_password...`; now UTF-8.
+- RAG checked on this PC: `/api/assistant` answers with a handbook citation in 1.3 s. Natalie's "RAG not working"
+  is not reproduced here; her `.env` key / `.rag_index` are local to her PC (both gitignored).
+- `origin/v6.1-migui` got `a337357` (meeting folder docs only) from another session; not pulled here yet.
+
 ## FINAL 2026-11-04 09:10 — all sessions merged and pushed (v6.1-migui @ 21f92b5)
 
 - Merged: night1-13 fixes, Myrine's teaching schedule, pkt/forms-ops (60 forms in chapter folders, Ops Manual 113 pp,

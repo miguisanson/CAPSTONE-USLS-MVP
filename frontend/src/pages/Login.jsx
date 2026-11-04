@@ -84,6 +84,8 @@ export default function Login() {
   const [signInError, setSignInError] = useState("");
   const [signingIn, setSigningIn] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  // Global demo switch (null until the server answers, or with demo mode off): steps never wait for a calendar date.
+  const [skipDateWaits, setSkipDateWaits] = useState(null);
   const [demoOpen, setDemoOpen] = useState(false);
   const [demoAccounts, setDemoAccounts] = useState([]);
   const [demoStudents, setDemoStudents] = useState([]);
@@ -101,7 +103,9 @@ export default function Login() {
     let active = true;
     api.authConfig()
       .then((result) => {
-        if (active) setDemoMode(Boolean(result.show_accounts));
+        if (!active) return;
+        setDemoMode(Boolean(result.show_accounts));
+        setSkipDateWaits(result.demo_mode ? Boolean(result.skip_date_waits) : null);
       })
       .catch(() => {
         if (active) setDemoMode(false);
@@ -237,6 +241,32 @@ export default function Login() {
               description="Sign in with your Graduate School account. The screens you see depend on the role your account holds."
             />
           </div>
+
+          {skipDateWaits !== null && (
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-amber-600"
+                checked={skipDateWaits}
+                onChange={(event) => {
+                  const wanted = event.target.checked;
+                  setSkipDateWaits(wanted);
+                  api.setDemoSettings({ skip_date_waits: wanted })
+                    .then((result) => setSkipDateWaits(Boolean(result.skip_date_waits)))
+                    .catch(() => setSkipDateWaits(!wanted));
+                }}
+              />
+              <span className="min-w-0">
+                <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-900">
+                  <CalendarOff className="h-4 w-4" aria-hidden="true" /> Skip date waits
+                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">Demo mode</span>
+                </span>
+                <span className="mt-0.5 block text-xs text-amber-800">
+                  On: steps go ahead without waiting for a real date (a panel verdict before the defense day, AWOL before the leave ends). Applies to every account. Off: the real date rules.
+                </span>
+              </span>
+            </label>
+          )}
 
           {demoMode && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50/60">

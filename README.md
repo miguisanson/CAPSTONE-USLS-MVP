@@ -186,6 +186,7 @@ local demo flow keeps working; set `DEMO_MODE=0` (in `.env` or the environment) 
 | Demo endpoints (`/api/auth/demo-accounts`, `/api/auth/demo-students`, demo reset) | available | `404` |
 | Passwords sent to the browser | only inside the expanded panel | never |
 | Demo persona repair at sign-in | yes | no |
+| Steps that wait for a date (panel verdict before the defense starts, AWOL before the leave and grace period end) | go ahead now, so demo day never waits (turn off with `DEMO_SKIP_DATE_WAITS=0`) | wait for the real date |
 | `SECRET_KEY` not set | uses a public default | uses a random per-process key (set `SECRET_KEY` so sessions survive a restart) |
 
 Nothing is ever pre-filled: the presenter either types the password or presses **Fill form** /
@@ -205,6 +206,7 @@ Set these in the environment or in `.env` (the app never needs `.env` to start).
 | `DATABASE_URL` | local SQLite file | optional; must be a `sqlite:///` file path (anything else is refused) |
 | `FLASK_PORT` | `5000` | port the app listens on |
 | `DEMO_MODE` | `1` | presenter conveniences on/off (see above) |
+| `DEMO_SKIP_DATE_WAITS` | `1` | with `DEMO_MODE` on, date waits are skipped (see above); `0` keeps them |
 | `SECRET_KEY` | public demo value in demo mode | signs the session cookie |
 | `SESSION_COOKIE_SECURE` | `0` | `1` when served over HTTPS |
 | `LOGIN_MAX_FAILURES`, `LOGIN_LOCKOUT_SECONDS` | `5`, `300` | sign-in lockout |

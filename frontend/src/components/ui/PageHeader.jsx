@@ -10,7 +10,7 @@ import { formRefLine } from "../../lib/formRefs.js";
 /**
  * @param title        the page title
  * @param description  one short line under the title
- * @param forms        a key of lib/formRefs.js; adds the muted line "Forms GS-F-07 · Operations Manual 4.6" under the description
+ * @param forms        a key of lib/formRefs.js; adds the muted line "Forms GS-F-07 Â· Operations Manual 4.6" under the description
  * @param icon         a lucide icon component; shown in a 44px tile from sm up
  * @param actions      buttons for the right-hand side (under the title on phones)
  * @param badge        a StatusChip or similar, shown beside the title

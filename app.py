@@ -368,6 +368,23 @@ def demo_mode_enabled() -> bool:
     return os.getenv("DEMO_MODE", "1").strip().lower() not in {"0", "false", "no", "off"}
 
 
+# Set by the sign-in page's "Skip date waits" switch (POST /api/auth/demo-settings); None = use DEMO_SKIP_DATE_WAITS.
+# shortcut: kept in memory, so a restart goes back to the environment default (ON); fine for a one-process demo.
+DEMO_RUNTIME = {"skip_date_waits": None}
+
+
+def demo_skip_date_waits() -> bool:
+    """Needs DEMO_MODE. On demo day a step that normally waits for a calendar date (a panel verdict
+    before the defense starts, AWOL before the leave and grace period end) may go ahead now, so the
+    presenter never waits for a real date. The sign-in page switch wins; otherwise DEMO_SKIP_DATE_WAITS
+    (default ON)."""
+    if not demo_mode_enabled():
+        return False
+    if DEMO_RUNTIME["skip_date_waits"] is not None:
+        return DEMO_RUNTIME["skip_date_waits"]
+    return os.getenv("DEMO_SKIP_DATE_WAITS", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
 def demo_accounts_listing_enabled() -> bool:
     """DEMO_SHOW_ACCOUNTS (default ON, needs DEMO_MODE): may the public sign-in page list the demo
     logins and the shared password? A public UAT site turns this OFF and hands logins out privately."""
@@ -7546,7 +7563,7 @@ def _leave_h_confirm_awol(case, account, comment, data, move):
     end = leave_end_date(case)
     grace_days = int(rule_value("leave.return_grace_days", 14) or 14)
     # The sync proposes AWOL only after end + grace, so a proposal counts as proof that the period passed.
-    if not case.awol_proposed_at and end and ph_today() <= end + timedelta(days=grace_days):
+    if not case.awol_proposed_at and end and ph_today() <= end + timedelta(days=grace_days) and not demo_skip_date_waits():
         raise LeaveError(
             f"This leave runs until {end.isoformat()}. AWOL can be confirmed only after it ends and the "
             f"{grace_days}-day grace period has passed ({(end + timedelta(days=grace_days + 1)).isoformat()} at the earliest).",
@@ -12883,7 +12900,21 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/auth/config")
     def auth_config():
         """Tell the sign-in page whether to offer the demo panel. Public, no secrets."""
-        return no_store(jsonify({"demo_mode": demo_mode_enabled(), "show_accounts": demo_accounts_listing_enabled()}))
+        return no_store(jsonify({
+            "demo_mode": demo_mode_enabled(), "show_accounts": demo_accounts_listing_enabled(),
+            "skip_date_waits": demo_skip_date_waits(),
+        }))
+
+    @app.route("/api/auth/demo-settings", methods=["POST"])
+    def auth_demo_settings():
+        """The sign-in page's global demo switch (demo mode only): skip_date_waits true/false, null = default."""
+        if not demo_mode_enabled():
+            return demo_mode_off_response()
+        value = (request.get_json(silent=True) or {}).get("skip_date_waits")
+        if value is not None and not isinstance(value, bool):
+            return jsonify({"error": "skip_date_waits must be true, false or null."}), 400
+        DEMO_RUNTIME["skip_date_waits"] = value
+        return no_store(jsonify({"skip_date_waits": demo_skip_date_waits()}))
 
     @app.route("/api/auth/demo-accounts")
     def auth_demo_accounts():
@@ -15913,7 +15944,7 @@ def register_routes(app: Flask) -> None:
                 and is_chair
                 and not schedule_verdict
                 and schedule.status in ACTIVE_DEFENSE_STATUSES
-                and defense_start_datetime(schedule) <= manila_now()
+                and (demo_skip_date_waits() or defense_start_datetime(schedule) <= manila_now())
             )
             documents = []
             for doc in DocumentCheck.query.filter_by(student_id=student.id, gate=assignment.gate).all():
@@ -16386,7 +16417,7 @@ def register_routes(app: Flask) -> None:
         if DefenseVerdict.query.filter_by(schedule_request_id=schedule.id).first():
             return jsonify({"error": "A verdict has already been submitted for this defense schedule."}), 409
         start = defense_start_datetime(schedule)
-        if start > manila_now():
+        if start > manila_now() and not demo_skip_date_waits():
             return jsonify({
                 "error": (
                     "A verdict cannot be recorded before the defense starts "

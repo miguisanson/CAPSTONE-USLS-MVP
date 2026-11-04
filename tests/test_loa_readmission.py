@@ -11,6 +11,7 @@ import os
 import tempfile
 import unittest
 from datetime import date, datetime, timedelta
+from unittest.mock import patch
 
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
@@ -880,10 +881,20 @@ class LeaveCaseTests(unittest.TestCase):
         self.assertTrue(any(i["id"] == case_id for i in recent))
 
     # ---- process-logic audit (I-165, I-166, I-168) ---------------------------------------------------
+    def test_demo_mode_lets_staff_confirm_awol_without_waiting_for_the_leave_to_end(self):
+        """Demo day: the presenter must not wait for the leave end plus the grace period."""
+        case_id = self.make_on_leave("Running Term", "Running Term")
+        with patch.dict(os.environ, {"DEMO_MODE": "1"}):
+            os.environ.pop("DEMO_SKIP_DATE_WAITS", None)
+            ok = self.act(self.staff_client(), case_id, "confirm_awol", comment="Student did not answer.")
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        self.assertEqual(self.status_of(case_id), "Expired")
+
     def test_staff_cannot_confirm_awol_in_the_middle_of_a_valid_leave(self):
         """I-165: the leave runs another 100 days; AWOL is only for a leave that ended plus the grace period."""
         case_id = self.make_on_leave("Running Term", "Running Term")
-        refused = self.act(self.staff_client(), case_id, "confirm_awol", comment="Student did not answer.")
+        with patch.dict(os.environ, {"DEMO_SKIP_DATE_WAITS": "0"}):
+            refused = self.act(self.staff_client(), case_id, "confirm_awol", comment="Student did not answer.")
         self.assertEqual(refused.status_code, 409, refused.get_json())
         self.assertIn("grace", refused.get_json()["error"].lower())
         self.assertEqual(self.status_of(case_id), "On Leave")

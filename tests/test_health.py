@@ -54,6 +54,7 @@ DEMO_API_ROUTES = {
     ("GET", "/api/auth/demo-students"),
     ("GET", "/api/auth/demo-accounts"),
     ("POST", "/api/auth/demo-students/<demo_key>/reset"),
+    ("POST", "/api/auth/demo-settings"),
 }
 
 
@@ -172,6 +173,24 @@ class DemoModeTests(HealthTestBase):
         with patch.dict(os.environ, {"DEMO_MODE": "1"}):
             self.assertTrue(demo_mode_enabled())
 
+    def test_the_sign_in_page_switches_the_demo_date_waits_for_everyone(self):
+        """One global switch on the sign-in page: on = steps never wait for a calendar date."""
+        from app import demo_skip_date_waits
+        self.addCleanup(lambda: app.test_client().post("/api/auth/demo-settings", json={"skip_date_waits": None}))
+        with patch.dict(os.environ, {"DEMO_MODE": "1"}):
+            os.environ.pop("DEMO_SKIP_DATE_WAITS", None)
+            client = app.test_client()
+            self.assertIs(client.get("/api/auth/config").get_json()["skip_date_waits"], True)
+            off = client.post("/api/auth/demo-settings", json={"skip_date_waits": False})
+            self.assertEqual(off.status_code, 200, off.get_json())
+            self.assertIs(client.get("/api/auth/config").get_json()["skip_date_waits"], False)
+            self.assertFalse(demo_skip_date_waits())
+            client.post("/api/auth/demo-settings", json={"skip_date_waits": True})
+            self.assertTrue(demo_skip_date_waits())
+        with patch.dict(os.environ, {"DEMO_MODE": "0"}):
+            self.assertFalse(demo_skip_date_waits())
+            self.assertIs(app.test_client().get("/api/auth/config").get_json()["skip_date_waits"], False)
+
     def test_demo_mode_off_hides_every_demo_endpoint_and_leaks_no_password(self):
         with patch.dict(os.environ, {"DEMO_MODE": "0"}):
             client = app.test_client()
@@ -183,6 +202,7 @@ class DemoModeTests(HealthTestBase):
                 ("GET", "/api/auth/demo-students"),
                 ("GET", "/api/auth/demo-accounts"),
                 ("POST", "/api/auth/demo-students/withdrawal-elena/reset"),
+                ("POST", "/api/auth/demo-settings"),
             ]:
                 response = _call(client, method, path)
                 self.assertEqual(response.status_code, 404, (method, path))
