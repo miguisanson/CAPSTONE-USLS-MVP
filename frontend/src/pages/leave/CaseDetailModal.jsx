@@ -16,6 +16,7 @@ import { CaseHistory, CaseSummary, ChecklistView, EarlierCases, FileList, Follow
 export default function CaseDetailModal({ caseId, slug, vocabulary, version, onClose, onAction, onNoteSent }) {
   const [loaded, setLoaded] = useState(null);
   const [error, setError] = useState("");
+  const [edited, setEdited] = useState(0); // an edit in the window re-reads the request
 
   useEffect(() => {
     let active = true;
@@ -27,7 +28,7 @@ export default function CaseDetailModal({ caseId, slug, vocabulary, version, onC
     return () => {
       active = false;
     };
-  }, [slug, caseId, version]);
+  }, [slug, caseId, version, edited]);
 
   const detail = loaded && loaded.id === caseId ? loaded : null;
   const actions = detail?.actions || [];
@@ -64,14 +65,14 @@ export default function CaseDetailModal({ caseId, slug, vocabulary, version, onC
         <div className="space-y-4">
           {error && <InlineNotice tone="danger">{error}</InlineNotice>}
           <LeaveTimeline steps={detail.timeline} />
-          <CaseSummary item={detail} />
+          <CaseSummary item={detail} onEdited={() => setEdited((n) => n + 1)} />
           <PolicyCheck detail={detail} />
           <ChecklistView detail={detail} />
           <div className="grid gap-4 lg:grid-cols-2">
             <StudentSummary detail={detail} />
             <EarlierCases detail={detail} />
           </div>
-          <CaseConversation slug={slug} detail={detail} onNoteSent={onNoteSent} />
+          <CaseConversation slug={slug} detail={detail} onNoteSent={onNoteSent} onEdited={() => setEdited((n) => n + 1)} />
           <FileList files={detail.files} />
           <FollowUpBlock detail={detail} />
           <CaseHistory detail={detail} vocabulary={vocabulary} />

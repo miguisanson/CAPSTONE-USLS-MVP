@@ -80,7 +80,7 @@ function NoteForm({ slug, detail, onSent }) {
 
 // Returning a request to the student is the "Return to student" step in the case window's footer, which opens the one
 // step dialog (StepDialog); this block only holds the conversation and the note box (I-152).
-export default function CaseConversation({ slug, detail, onNoteSent }) {
+export default function CaseConversation({ slug, detail, onNoteSent, onEdited }) {
   return (
     <Block title="Messages" hint="Notes and returns about this request, newest at the bottom.">
       <WorkflowDiscussion
@@ -89,6 +89,7 @@ export default function CaseConversation({ slug, detail, onNoteSent }) {
         showHeader={false}
         title="Messages about this request"
         emptyText="No messages yet."
+        onEdited={onEdited}
       />
       <div className="mt-4">
         <NoteForm slug={slug} detail={detail} onSent={onNoteSent} />

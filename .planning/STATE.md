@@ -17,6 +17,19 @@
 
 **Current branch: `v6.2-migui`** (made 2026-11-04 13:3x from `v6.1-migui` 9bf95ac, identical code). Natalie works here: `git fetch` then `git switch v6.2-migui`, `npm run seed` once, `/continue_CAPSTONE-USLS-MVP`.
 
+## 2026-11-04 evening - edit anything, with history (packet `pkt/edit-history`, worktree `CAPSTONE-USLS-MVP-wt/kedit`; not pushed)
+
+**Reseed after pull** (`npm run seed`; IM4): new table `RecordEdit`, new columns `AwolCase.dean_remarks`, `WithdrawalApplication.dean_remarks`
+(the Dean's note is no longer glued into `staff_notes` / `staff_remarks` as "Dean: ...").
+- Backend: `PATCH/GET /api/edits/<entity>/<id>`, one whitelist `editable_map()` in `app.py` (who / until / validate per field);
+  payloads carry `edits` / `edit` references (`record_edit_info`, `record_edit_ref`, `attach_row_edits`). The edited column is updated in
+  place (every reader sees it); `RecordEdit` keeps old/new/who/when/why; copies of a sentence in the activity log or another message keep
+  what was said then. Test: `tests/test_record_edits.py` (17).
+- Frontend: `components/ui/EditableText.jsx` (Edit button, Edited chip, history window), used in `WorkflowDiscussion` (every chat), the leave
+  case window and Dean view, student cards, `ProcessGates`, verdicts, adviser notes, practicum. Spec `frontend/e2e/p116-edit-history.spec.js`.
+- Left: item 5 (change a decision itself: approve/deny/return) not built; research-gate and graduation screens only get the chat edit; AWOL
+  return fields editable in the API and in the case window but not on a student card; `LeaveCaseEvent` comments editable on the Dean view only.
+
 ## 2026-11-04 13:25 — demo videos re-recorded (session "redo videos"; not committed)
 
 - `scripts/demo/narration.json`: every line rewritten as plain spoken English with linking phrases ("Here we have…",

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { BookOpen, CalendarClock, CheckCircle2, Eye, Gavel, Hourglass, History } from "lucide-react";
 import { api } from "../../api";
-import { Button, Card, EApprovalNote, EmptyState, Field, Input, InlineNotice, SectionTitle, Select, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Card, EApprovalNote, EditableText, EmptyState, Field, Input, InlineNotice, SectionTitle, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatClock, formatDate, formatDateTime } from "../../lib/format";
 
 // The Verdicts page (I-090). Three groups, most urgent first:
@@ -68,7 +68,17 @@ function VerdictResult({ verdict }) {
         Submitted by {verdict.chair_name} · {formatDateTime(verdict.submitted_at)}{verdict.revision_status ? ` · ${verdict.revision_status}` : ""}
       </p>
       {verdict.follow_up && <p className="mt-1 text-xs text-emerald-700">{verdict.follow_up}</p>}
-      {verdict.remarks && <p className="mt-2 text-sm text-slate-700">{verdict.remarks}</p>}
+      {verdict.remarks && (
+        <div className="mt-2 text-sm text-slate-700">
+          <EditableText edit={verdict.edits?.remarks} value={verdict.remarks} />
+        </div>
+      )}
+      {verdict.selected_title && verdict.edits?.selected_title?.can && (
+        <div className="mt-2 text-sm text-slate-700">
+          <span className="text-xs font-semibold">Title selected by the panel:</span>
+          <EditableText edit={verdict.edits.selected_title} value={verdict.selected_title} />
+        </div>
+      )}
       {verdict.correction_reason && <p className="mt-2 text-xs text-slate-600">Corrected from {verdict.original_result}: {verdict.correction_reason}</p>}
     </div>
   );

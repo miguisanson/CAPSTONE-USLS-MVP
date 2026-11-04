@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardCheck, FileCheck2, Send, UserRoundCheck } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Button, Card, DecisionPanel, EmptyState, Field, InlineNotice, Input, PageHeader, Spinner, Stepper, StatusChip, Tabs, Textarea } from "../components/ui/index.js";
+import { Button, Card, DecisionPanel, EditableText, EmptyState, Field, InlineNotice, Input, PageHeader, Spinner, Stepper, StatusChip, Tabs, Textarea } from "../components/ui/index.js";
 import { toneOf } from "../lib/tone";
 import { useConfirm } from "../components/confirm";
 import { formatDay } from "./faculty/FacultyContext";
@@ -53,7 +53,7 @@ function AdviseeMeter({ advisees, max }) {
   );
 }
 
-function NoteLine({ label, who, at, children }) {
+function NoteLine({ label, who, at, edit, children }) {
   if (!children) return null;
   return (
     <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
@@ -62,7 +62,9 @@ function NoteLine({ label, who, at, children }) {
         {who ? ` - ${who}` : ""}
         {at ? ` · ${formatDay(at)}` : ""}
       </p>
-      <p className="mt-0.5 whitespace-pre-line text-slate-700">{children}</p>
+      <div className="mt-0.5 text-slate-700">
+        {edit ? <EditableText edit={edit} value={String(children)} /> : <p className="whitespace-pre-line">{children}</p>}
+      </div>
     </div>
   );
 }
@@ -266,11 +268,12 @@ function AppointmentCard({ row, onDone }) {
       <StepsTracker steps={row.steps} />
 
       <div className="grid gap-2 sm:grid-cols-2">
-        <NoteLine label={row.kind === "Change" ? "Reason for the change" : "Student's note"} at={row.applied_at}>
+        <NoteLine label={row.kind === "Change" ? "Reason for the change" : "Student's note"} at={row.applied_at}
+          edit={row.kind === "Change" && row.reason ? row.edits?.reason : row.edits?.student_note}>
           {row.kind === "Change" ? row.reason || row.student_note : row.student_note}
         </NoteLine>
-        <NoteLine label="Academic Coordinator note" who={row.ac_noted_by} at={row.ac_noted_at}>{row.ac_note}</NoteLine>
-        <NoteLine label="Dean's decision" who={row.decided_by} at={row.decided_at}>
+        <NoteLine label="Academic Coordinator note" who={row.ac_noted_by} at={row.ac_noted_at} edit={row.edits?.ac_note}>{row.ac_note}</NoteLine>
+        <NoteLine label="Dean's decision" who={row.decided_by} at={row.decided_at} edit={row.decision_note ? row.edits?.decision_note : null}>
           {row.decision_note || (row.decided_at && ["Appointed", "Accepted", "Declined", "Not approved"].includes(row.status) ? "No note." : "")}
         </NoteLine>
         {row.associate_dean_name && <NoteLine label="Approved for the Dean by">{row.associate_dean_name}</NoteLine>}

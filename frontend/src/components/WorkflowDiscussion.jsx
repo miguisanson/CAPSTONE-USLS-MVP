@@ -1,6 +1,6 @@
 import { CornerDownRight, MessageSquare, Reply } from "lucide-react";
 import { formatDateTime } from "../lib/format";
-import { Button, EmptyState, StatusChip } from "./ui/index.js";
+import { Button, EditableText, EmptyState, StatusChip } from "./ui/index.js";
 
 function messageTime(message) {
   const timestamp = new Date(message.created_at || 0).getTime();
@@ -68,6 +68,7 @@ export default function WorkflowDiscussion({
   canReply = null,
   renderMessageFooter = null,
   highlightLatest = false,
+  onEdited = null,
 }) {
   const thread = buildWorkflowMessageThread(messages);
   const latestMessage = [...messages].sort(messageSort).at(-1) || null;
@@ -126,7 +127,13 @@ export default function WorkflowDiscussion({
                       <StatusChip status={message.status || "Message"} tone="muted" dot={false} />
                     </span>
                   </div>
-                  {message.comment && <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{message.comment}</p>}
+                  {(message.comment || message.edit?.can) && (
+                    <div className="mt-3 text-sm leading-relaxed text-slate-700">
+                      <EditableText edit={message.edit} value={message.comment} onSaved={onEdited}>
+                        {(text) => <p className="whitespace-pre-wrap">{text}</p>}
+                      </EditableText>
+                    </div>
+                  )}
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 pt-2.5">
                     <time className="meta font-medium" dateTime={message.created_at || undefined}>{formatDateTime(message.created_at)}</time>
                     {replyAllowed && (
