@@ -822,6 +822,22 @@ class SchedulingRuleTests(ResearchCoreBase):
             self.assertEqual(new.start_time, time(13, 0))
             self.assertTrue(TransactionLog.query.filter(TransactionLog.result.like("%rescheduled%")).count() >= 1)
 
+    def test_reschedule_keeps_venue_mode_and_manuscript_date_unless_new_ones_are_given(self):
+        self.ready_for_proposal()
+        received = date.today() - timedelta(days=3)
+        response = self.book(manuscript_received_on=received.isoformat())
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with app.app_context():
+            old_id = self.schedules()[-1].id
+        body = {"preferred_date": future_weekday(28).isoformat(), "selected_start": "13:00", "selected_end": "15:00",
+                "venue": "", "manuscript_received_on": "", "reason": "Panel conflict", "requested_by": "Panel member"}
+        with patch("app.remove_defense_google_events"), patch("app.sync_defense_google_events"):
+            ok = self.staff().post(f"/api/defense-schedules/{old_id}/reschedule", json=body)
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        with app.app_context():
+            new = self.schedules()[-1]
+            self.assertEqual((new.mode, new.venue, new.manuscript_received_on), ("Online", "Zoom room A", received))
+
     # ---- Google Calendar lifecycle (pkt/cal review items 1 and 6) -------------
     def connect_google(self, name):
         from app import Faculty

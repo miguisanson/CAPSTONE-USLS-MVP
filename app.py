@@ -20377,6 +20377,11 @@ def register_routes(app: Flask) -> None:
         payload = MultiDict(data)
         payload["student_id"] = str(schedule.student_id)
         payload["defense_type"] = schedule.defense_type
+        # What the booking already says is kept unless the request gives a new value.
+        for key, kept in (("mode", schedule.mode), ("venue", schedule.venue),
+                          ("manuscript_received_on", schedule.manuscript_received_on and schedule.manuscript_received_on.isoformat())):
+            if kept and not str(payload.get(key) or "").strip():
+                payload[key] = kept
         try:
             require_research_prerequisite(schedule.student)
             require_active_standing(schedule.student)
