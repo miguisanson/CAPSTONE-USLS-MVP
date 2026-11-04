@@ -66,9 +66,10 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
       .sort((a, b) => new Date(b.latestAt || 0) - new Date(a.latestAt || 0));
   }, [messages, data.student.id]);
   const currentOwner = (data.logs || []).find((log) => log.transaction_slug === composeWorkflow)?.next_owner;
+  // The case's current owner first: that is who the question is meant for.
   const recipientOptions = [...new Set([
-    "Graduate School Staff",
     currentOwner && currentOwner !== "Student" ? currentOwner : null,
+    "Graduate School Staff",
   ].filter(Boolean))];
 
   useEffect(() => {
@@ -76,7 +77,7 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
   }, [activeWorkflows.join("|"), composeWorkflow]);
 
   useEffect(() => {
-    if (!recipientOptions.includes(composeRecipient)) setComposeRecipient(recipientOptions[0] || "Graduate School Staff");
+    setComposeRecipient(recipientOptions[0]);
   }, [composeWorkflow, currentOwner]);
 
   useEffect(() => {
@@ -166,7 +167,11 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
                   <Select value={composeWorkflow} onChange={(event) => setComposeWorkflow(event.target.value)} placeholder="" options={activeWorkflows.map((slug) => ({ value: slug, label: requestLabel(slug) }))} />
                 </Field>
                 <Field label="Recipient">
-                  <Select value={composeRecipient} onChange={(event) => setComposeRecipient(event.target.value)} placeholder="" options={recipientOptions} />
+                  {recipientOptions.length > 1 ? (
+                    <Select value={composeRecipient} onChange={(event) => setComposeRecipient(event.target.value)} placeholder="" options={recipientOptions} />
+                  ) : (
+                    <p aria-label="Recipient" className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">{recipientOptions[0]}</p>
+                  )}
                 </Field>
               </div>
               <Field label="Question or clarification">

@@ -292,6 +292,8 @@ test.describe("Defense scheduling and the availability workspace", () => {
     for (const label of [/Selected date/, /Start time/, /End time/, /Defense type/, /Mode/, /Venue/, /Scheduling constraints/, /Reason for rescheduling/, /Requested by/, /Source reference/]) {
       await expect(main(page).getByLabel(label).first(), String(label)).toBeVisible();
     }
+    // I-259: the stage allows one defense type, so it is text, not a one-option select
+    await expect(main(page).getByLabel(/Defense type/).first()).not.toHaveJSProperty("tagName", "SELECT");
     await expect(main(page).getByRole("button", { name: "Reschedule defense" })).toBeDisabled();
     await expect(main(page).getByRole("link", { name: /Open the defense calendar/ })).toHaveAttribute("href", "/workflow/defense-scheduling?view=calendar");
     await expect(main(page).getByRole("link", { name: /View faculty profiles/ })).toHaveAttribute("href", "/faculty");

@@ -212,6 +212,14 @@ test.describe("P7.7 Graduation actions as staff", () => {
     let dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading").first()).toContainText("Create batch");
     await expect(dialog.getByLabel("Batch No.")).toBeVisible();
+    // I-258: the batch number is one more than the highest batch on the board; the single open school year is text, not a select
+    const highest = await page.evaluate(async () => {
+      const json = await (await fetch("/api/transactions/graduation/context")).json();
+      return Math.max(0, ...json.roster.map((r) => Number(/^Batch(?:\s+No\.)?\s+(\d+)/.exec(r.endorsement?.batch_name || "")?.[1]) || 0));
+    });
+    expect(highest).toBeGreaterThanOrEqual(1);
+    await expect(dialog.getByLabel("Batch No.")).toHaveValue(String(highest + 1));
+    await expect(dialog.locator("select")).toHaveCount(1); // only the month
     await expect(dialog.getByText("Completed subjects:")).toBeVisible(); // the cohort list lives here
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click(); // CHANGED BY p98 (I-152): the step dialog closes with Cancel, not "Close details"
     await expect(page.getByRole("dialog")).toHaveCount(0);

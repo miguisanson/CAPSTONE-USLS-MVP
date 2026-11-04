@@ -260,7 +260,7 @@ export default function Enrollment() {
       courseTitle: course.course_title,
       studentName: data?.selected_student?.name || "Student",
       termLabel: data?.term?.label || "",
-      status: "",
+      status: "Dropped",
       effectiveDate: todayISO(),
       note: "",
       unexcusedAbsencePercent: "",

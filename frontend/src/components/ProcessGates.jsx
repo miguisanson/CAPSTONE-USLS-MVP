@@ -197,7 +197,11 @@ export function StudyPlanPanel({ students = [], studentId: fixedStudentId, stude
     setRationale("");
     if (!studentId) { setTag(null); setVersion(""); return; }
     api.curriculumTag(studentId)
-      .then((res) => { setTag(res); setVersion(res.tag?.curriculum_version || ""); })
+      .then((res) => {
+        setTag(res);
+        const only = (res.available_versions || []).length === 1 ? res.available_versions[0] : "";
+        setVersion(res.tag?.curriculum_version || only);
+      })
       .catch((e) => setMsg({ tone: "danger", text: e.message }));
   }, [studentId]);
 
@@ -209,6 +213,7 @@ export function StudyPlanPanel({ students = [], studentId: fixedStudentId, stude
   }
 
   const multipleVersions = (tag?.available_versions || []).length > 1;
+  const onlyVersion = (tag?.available_versions || []).length === 1 ? tag.available_versions[0] : "";
   const studentOptions = students.map((s) => ({ value: String(s.id), label: `${s.name} · ${s.student_number}` }));
   const versionOptions = (tag?.available_versions || []).map((v) => ({ value: v, label: v }));
 
@@ -306,14 +311,20 @@ export function StudyPlanPanel({ students = [], studentId: fixedStudentId, stude
           </Field>
         ) : null}
         <Field label="Curriculum version">
-          <Select
-            aria-label="Curriculum version"
-            options={versionOptions}
-            placeholder="Select a version…"
-            value={version}
-            onChange={(e) => setVersion(e.target.value)}
-            disabled={!studentId}
-          />
+          {onlyVersion ? (
+            <p aria-label="Curriculum version" className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">
+              {onlyVersion} <span className="meta font-normal">· the only version published</span>
+            </p>
+          ) : (
+            <Select
+              aria-label="Curriculum version"
+              options={versionOptions}
+              placeholder="Select a version…"
+              value={version}
+              onChange={(e) => setVersion(e.target.value)}
+              disabled={!studentId}
+            />
+          )}
         </Field>
       </div>
 

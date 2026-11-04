@@ -184,7 +184,9 @@ test.describe("Enrollment (GS staff): behaviour that must not change", () => {
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText(withEnrolled.data.selected_student.name);
     await expect(dialog).toContainText(code);
-    await expect(dialog.getByLabel("New status")).toBeVisible();
+    // I-256: Dropped is the only status, so it is shown as text, not a select
+    await expect(dialog.locator("select")).toHaveCount(0);
+    await expect(dialog.getByText("Dropped", { exact: true })).toBeVisible();
     await expect(dialog.getByLabel("Effective date")).toBeVisible();
     await expect(dialog.getByLabel(/Unexcused absences/)).toBeVisible();
     await expect(dialog.getByLabel("Coordinator note")).toBeVisible();
@@ -199,7 +201,6 @@ test.describe("Enrollment (GS staff): behaviour that must not change", () => {
     // 2. fill every field: the Save button names the status and can be pressed (we do not press it)
     await page.getByRole("button", { name: `Change ${code} student status` }).click();
     await expect(dialog).toBeVisible();
-    await dialog.getByLabel("New status").selectOption("Dropped");
     await dialog.getByLabel(/Unexcused absences/).fill("25");
     await dialog.getByLabel("Coordinator note").fill("Pin test: abandoned, not saved.");
     await expect(dialog.getByRole("button", { name: "Save Dropped" })).toBeEnabled();
@@ -311,6 +312,22 @@ test.describe("Enrollment (GS staff): P8.3 changes", () => {
     await expect(page.getByText(`Study plan for ${first.selected_student.name}`)).toHaveCount(0);
   });
 
+  test("I-255: a single published curriculum version is preselected and shown as text", async ({ page }) => {
+    await page.route(/\/api\/enrollment\/curriculum-tag\//, async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.available_versions = ["2026 Revision"];
+      json.tag = null;
+      await route.fulfill({ response, json });
+    });
+    await openEnrollment(page);
+    const plan = page.getByRole("heading", { level: 2, name: "Curriculum version & study plan draft" });
+    await plan.scrollIntoViewIfNeeded();
+    await expect(page.getByText("2026 Revision").first()).toBeVisible();
+    await expect(page.locator("select[aria-label='Curriculum version']")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Tag curriculum version" })).toBeEnabled();
+  });
+
   test("I-081: no 'Cross-screen consistency' widget when the check is clean", async ({ page }) => {
     await patchEnrollment(page, (json) => {
       json.integrity = { status: "Consistent", issue_count: 0, checked_enrollments: 3, issues: [], surfaces: [] };
@@ -361,7 +378,7 @@ test.describe("Enrollment (GS staff): P8.3 changes", () => {
     await expect(dialog).toBeVisible();
 
     // required fields say so, and the button is not greyed out
-    for (const name of ["New status", "Effective date", "Unexcused absences", "Coordinator note"]) {
+    for (const name of ["Effective date", "Unexcused absences", "Coordinator note"]) {
       await expect(dialog.getByLabel(name)).toHaveAttribute("aria-required", "true");
     }
     const save = dialog.getByRole("button", { name: /^Save/ });
@@ -373,8 +390,7 @@ test.describe("Enrollment (GS staff): P8.3 changes", () => {
     await expect(dialog).toBeVisible();
     const summary = dialog.getByRole("alert").filter({ hasText: "There is a problem" });
     await expect(summary).toBeVisible();
-    await expect(summary.getByRole("link")).toHaveCount(3); // status, absences, note (the date is filled in)
-    await expect(summary).toContainText("Choose Dropped as the new status.");
+    await expect(summary.getByRole("link")).toHaveCount(2); // absences, note (the date is filled in)
     await expect(summary).toContainText("Add a coordinator note");
     await expect(dialog.getByLabel("Effective date")).toHaveValue("2026-10-01");
     // the focus moves to the summary so a screen reader reads it first

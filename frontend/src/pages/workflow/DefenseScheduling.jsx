@@ -371,7 +371,11 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
             <Input type="time" value={form.selected_end} min={form.selected_start} onChange={set("selected_end")} required />
           </Field>
           <Field label="Defense type" required>
-            <Select value={form.defense_type} onChange={set("defense_type")} placeholder="" options={schedulableTypes.length ? schedulableTypes : [form.defense_type]} />
+            {schedulableTypes.length > 1 ? (
+              <Select value={form.defense_type} onChange={set("defense_type")} placeholder="" options={schedulableTypes} />
+            ) : (
+              <p aria-label="Defense type" className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">{form.defense_type}</p>
+            )}
           </Field>
           {usesManuscriptDate && (
             <Field label="Date the panel received the manuscript">
