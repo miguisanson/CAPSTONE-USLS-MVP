@@ -36151,7 +36151,11 @@ def readmission_system_checks(student: Student, case: LeaveCase | None = None) -
         written = False
         written_detail = "The reason you write in this request is your written intention to enroll (Handbook p. 53)."
     audit = compute_course_audit(student)
-    if audit["required_count"] > 0:
+    failed = [row["course"].code for row in audit["incomplete"]]
+    if failed:
+        evaluated = False
+        eval_detail = f"Failed subject on record: {', '.join(failed)}. Handbook p. 54: a failure means no re-admission to the program."
+    elif audit["required_count"] > 0:
         done = len(audit["completed"])
         evaluated = True
         eval_detail = (

@@ -723,6 +723,20 @@ class LeaveCaseTests(unittest.TestCase):
         self.assertEqual(check["status"], "Pass")
         self.assertIn("2 of 2", check["detail"])
 
+    def test_a_failed_subject_cannot_pass_the_subject_evaluation(self):
+        with app.app_context():
+            db.session.add(CourseRecord(student_id=self.student_id, course_id=self.course_id, status="Failed"))
+            db.session.commit()
+        self.make_on_leave("Running Term", "Term One")
+        self.student_client().post("/api/student-portal/requests/readmission", json={
+            "target_return_term": "Term Two", "return_intent": "Ready."})
+        case_id = self.case()
+        self.act(self.staff_client(), case_id, "forward", confirmed_items=STAFF_CHECKS)
+        detail = self.staff_client().get(f"/api/leave-cases/{case_id}").get_json()["case"]
+        row = next(r for r in detail["checklist"] if r["item"] == "Evaluation of subject/grade requirements")
+        self.assertFalse(row["confirmed"])
+        self.assertIn("LVE-501", row["detail"])
+
     def test_a_program_without_a_curriculum_on_record_cannot_pass_the_subject_evaluation(self):
         with app.app_context():
             CourseRecord.query.delete()
