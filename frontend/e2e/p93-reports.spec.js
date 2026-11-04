@@ -2,7 +2,7 @@
 // Packet P9.3 (owner decision IM20): Reports are five real reports and a short analytics section.
 // Written BEFORE the change and red on the old page (a wall of 11 report tabs and 8 analytics tabs above 8 tiles).
 // Through the real UI as Graduate School staff (and the Academic Coordinator for the role gate), read-only:
-//   - the page offers exactly: Students at risk, Cohorts by stage, Overdue and pending, Defenses, Graduation
+//   - the page offers exactly: Students at risk, By year started, Overdue and pending, Defenses, Graduation
 //     candidates (+ the Registrar's daily list and Analytics); none of the old tabs or tiles is left;
 //   - each report shows the columns and rows the API gives, sorts from the header, pages, narrows with its filters
 //     (the API gets the same filters, the URL follows), and Clear filters resets them;
@@ -38,7 +38,7 @@ test.afterEach(async () => {
 
 const NEW_TABS = ["Needs attention", "Where students get stuck", "Office speed", "Records to fix"];
 const REPORTS = [
-  { id: "cohorts", tab: "Cohorts by stage" },
+  { id: "cohorts", tab: "By year started" },
   { id: "graduation", tab: "Graduation candidates" },
   { id: "overdue", tab: "Overdue and pending" },
   { id: "defenses", tab: "Defenses" },

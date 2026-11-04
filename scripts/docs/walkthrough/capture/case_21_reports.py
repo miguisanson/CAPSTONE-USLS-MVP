@@ -71,7 +71,7 @@ def run(rt: Runtime) -> None:
         rt.shot(staff, s(3))
     rt.step("clear the filter, go to the next page of the table", next_page)
 
-    for chip, shot in [("Cohorts by stage", 4), ("Overdue and pending", 5), ("Defenses", 6), ("Graduation candidates", 7)]:
+    for chip, shot in [("By year started", 4), ("Overdue and pending", 5), ("Defenses", 6), ("Graduation candidates", 7)]:
         def tab(chip=chip, shot=shot):
             _tab(staff, chip)
             _frame(staff)

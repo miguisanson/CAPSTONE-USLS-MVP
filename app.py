@@ -25214,7 +25214,7 @@ def report_cohorts(args) -> dict:
     options = _report_option_lists()
     options["entries"] = all_entries
     return _report_result(
-        "cohorts", "Cohorts by lifecycle stage", columns, rows, filters, options,
+        "cohorts", "Students by year started and stage", columns, rows, filters, options,
         "No student matches these filters.",
     )
 
@@ -38179,7 +38179,7 @@ def seed_maed_personas() -> None:
             filename.removesuffix(".pdf").replace("_", " "),
             f"Official demo submission for {student.name}, student number "
             f"{student.student_number}, under the {request_type} workflow. "
-            f"Submitted for the MAED workflow validation cohort. "
+            f"Submitted for the MAED workflow validation group. "
             f"Workflow stage: {workflow_stage or 'Student submission'}.",
         )
         existing = StudentRequestAttachment.query.filter_by(stored_name=stored_name).first()

@@ -78,7 +78,7 @@ function scopeSentence(summary, programs, scope) {
   const program = programs.find((p) => String(p.id) === scope.program_id);
   const against = summary.previous_term ? `, compared with ${summary.previous_term.label}` : "";
   const note = last12 ? ". The current term is new, so this shows the decisions and defenses of earlier terms too. Choose This term to see only the current term." : ".";
-  return `${when}${range}${program ? ` for ${program.code}` : ""}${scope.cohort ? `, entry ${scope.cohort}` : ""}${against}${note}`;
+  return `${when}${range}${program ? ` for ${program.code}` : ""}${scope.cohort ? `, started ${scope.cohort}` : ""}${against}${note}`;
 }
 
 export default function ReportsFrame({ title, description, icon, actions, tabs, label = "Reports", children }) {
@@ -140,8 +140,8 @@ export default function ReportsFrame({ title, description, icon, actions, tabs, 
             <Field label="Program">
               <Select placeholder="All programs" value={params.get("program_id") || ""} onChange={(e) => setParam("program_id", e.target.value)} options={programs.map((p) => ({ value: String(p.id), label: p.code }))} />
             </Field>
-            <Field label="Entry cohort">
-              <Select placeholder="All cohorts" value={params.get("cohort") || ""} onChange={(e) => setParam("cohort", e.target.value)} options={summary?.options?.cohorts || (params.get("cohort") ? [params.get("cohort")] : [])} />
+            <Field label="Year started">
+              <Select placeholder="All years" value={params.get("cohort") || ""} onChange={(e) => setParam("cohort", e.target.value)} options={summary?.options?.cohorts || (params.get("cohort") ? [params.get("cohort")] : [])} />
             </Field>
             <Field label="Period">
               <Select placeholder={null} value={params.get("period") || DEFAULT_PERIOD} onChange={(e) => setParam("period", e.target.value)} options={PERIODS} />

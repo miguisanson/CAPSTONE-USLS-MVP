@@ -217,7 +217,7 @@ export function GraduationBatchModal({ rows, accountRole, reviewWindows, default
                   <GraduationRequirementBoxes row={row} />
                   {completedCourses(row).length > 0 && (
                     <p className="meta mt-2">
-                      <span className="font-semibold text-slate-700">Completed-course cohort:</span>{" "}
+                      <span className="font-semibold text-slate-700">Completed subjects:</span>{" "}
                       {completedCourses(row).slice(0, 4).map((course) => course.code).join(", ")}
                       {completedCourses(row).length > 4 ? ` +${completedCourses(row).length - 4} more` : ""}
                     </p>

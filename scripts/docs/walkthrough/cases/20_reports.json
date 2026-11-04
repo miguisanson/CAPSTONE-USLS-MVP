@@ -8,7 +8,7 @@
  "duration": "6 min",
  "story": [
   "The lifecycle cases follow one student at a time. This case answers the other question: what does the Graduate School know about all of its students at once. Every figure on these screens is computed from the records and recorded events rather than typed in, so the numbers move as the other cases are run. The case reads them off the screen instead of promising fixed values.",
-  "**Reports & Analytics** has one tab per report: Students at risk, Cohorts by stage, Overdue and pending, Defenses and Graduation candidates, then Registrar changes (the daily list for the Registrar) and Analytics (four charts). Every report can be filtered, sorted and downloaded as Excel or PDF."
+  "**Reports & Analytics** has one tab per report: Students at risk, By year started, Overdue and pending, Defenses and Graduation candidates, then Registrar changes (the daily list for the Registrar) and Analytics (four charts). Every report can be filtered, sorted and downloaded as Excel or PDF."
  ],
  "accounts": [
   [
@@ -29,7 +29,7 @@
   ],
   [
    "Tabs",
-   "Students at risk, Cohorts by stage, Overdue and pending, Defenses, Graduation candidates, Registrar changes, Analytics"
+   "Students at risk, By year started, Overdue and pending, Defenses, Graduation candidates, Registrar changes, Analytics"
   ],
   [
    "Downloads",
@@ -45,7 +45,7 @@
    "title": "Part A - Open the first report",
    "steps": [
     {
-     "text": "Sign in as **staff@usls.edu.ph** and open **Reports & Analytics** under Overview. The page says it shows who is late, where each cohort stands, what is waiting, defenses and graduation, and that the lists can be filtered, sorted and downloaded. Across the top are the seven tabs. The first one, **Students at risk**, opens with three filters (**Program**, **Stage**, **Risk**) and a card called **Students at risk or delayed** with the two buttons **Download Excel** and **Download PDF**. Under the card title is the row count (18 rows in this run) and the table: STUDENT, PROGRAM, STAGE, RISK, WHAT IS LATE, SINCE, DAYS LATE and NEXT OWNER. Each student name is a link to the student record.",
+     "text": "Sign in as **staff@usls.edu.ph** and open **Reports & Analytics** under Overview. The page says it shows who is late, where each entry year stands, what is waiting, defenses and graduation, and that the lists can be filtered, sorted and downloaded. Across the top are the seven tabs. The first one, **Students at risk**, opens with three filters (**Program**, **Stage**, **Risk**) and a card called **Students at risk or delayed** with the two buttons **Download Excel** and **Download PDF**. Under the card title is the row count (18 rows in this run) and the table: STUDENT, PROGRAM, STAGE, RISK, WHAT IS LATE, SINCE, DAYS LATE and NEXT OWNER. Each student name is a link to the student record.",
      "shots": [
       {
        "id": "reports-01",
@@ -77,11 +77,11 @@
    "title": "Part B - The other four reports",
    "steps": [
     {
-     "text": "Select the **Cohorts by stage** tab. The filters are Program, Stage and **AY entry**. The card **Cohorts by lifecycle stage** has one row per program and entry year (for example DBA 24-25), with the number of STUDENTS and one column for every lifecycle stage from ADMISSION to COMPLETED, so it reads as how many students of each program and entry year are at each stage.",
+     "text": "Select the **By year started** tab. The filters are Program, Stage and **AY entry**. The card **Students by year started and stage** has one row per program and entry year (for example DBA 24-25), with the number of STUDENTS and one column for every lifecycle stage from ADMISSION to COMPLETED, so it reads as how many students of each program and entry year are at each stage.",
      "shots": [
       {
        "id": "reports-04",
-       "caption": "Cohorts by lifecycle stage."
+       "caption": "Students by year started and stage."
       }
      ]
     },

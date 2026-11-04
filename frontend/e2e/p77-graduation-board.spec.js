@@ -124,7 +124,7 @@ for (const [role, path] of ROLES) {
       expect(await cards.count()).toBeGreaterThanOrEqual(4);
       for (let i = 0; i < (await cards.count()); i++) {
         const text = (await cards.nth(i).textContent()) || "";
-        expect(text, `card ${i} shows the cohort list`).not.toContain("Completed-course cohort");
+        expect(text, `card ${i} shows the cohort list`).not.toContain("Completed subjects:");
         await expect(cards.nth(i).locator('[aria-label="Completed graduation requirements"]'), `card ${i}: requirement tiles`).toHaveCount(0);
         await expect(cards.nth(i).locator("span.rounded-full.ring-1"), `card ${i}: exactly one status chip`).toHaveCount(1);
         await expect(cards.nth(i).getByText(/^Next:/), `card ${i}: who is next`).toHaveCount(1);
@@ -212,7 +212,7 @@ test.describe("P7.7 Graduation actions as staff", () => {
     let dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading").first()).toContainText("Create batch");
     await expect(dialog.getByLabel("Batch No.")).toBeVisible();
-    await expect(dialog.getByText("Completed-course cohort:")).toBeVisible(); // the cohort list lives here
+    await expect(dialog.getByText("Completed subjects:")).toBeVisible(); // the cohort list lives here
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click(); // CHANGED BY p98 (I-152): the step dialog closes with Cancel, not "Close details"
     await expect(page.getByRole("dialog")).toHaveCount(0);
 

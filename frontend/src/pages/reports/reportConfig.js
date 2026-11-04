@@ -9,7 +9,7 @@ const TERM = { key: "term", label: "Term", options: "terms" };
 export const REPORTS = [
   {
     id: "cohorts",
-    tab: "Cohorts by stage",
+    tab: "By year started",
     about: "How many students of each program and entry year are at each lifecycle stage.",
     filters: [STAGE, { key: "entry", label: "AY entry", options: "entries", any: "Any entry year" }],
   },

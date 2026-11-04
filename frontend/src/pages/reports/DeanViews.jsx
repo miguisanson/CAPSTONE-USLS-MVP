@@ -268,7 +268,7 @@ export function StagesView({ scope, scopeKey }) {
       <ChartCard
         question="How many active students are at each stage?"
         hint="Select a bar or a count to see the students. A stage with many students and few in the next one is where students wait."
-        empty={stages.length ? null : { title: "No active students for these filters", hint: "Change the program, cohort or period to look elsewhere." }}
+        empty={stages.length ? null : { title: "No active students for these filters", hint: "Change the program, year started or period to look elsewhere." }}
         chart={<BarsChart data={stages} categoryKey="stage" series={[{ key: "count", name: "Students", color: BLUE }]} onSelect={(row) => setOpen(stages.find((s) => s.stage === row.stage))} ariaLabel="Active students per stage" />}
         table={table}
       />

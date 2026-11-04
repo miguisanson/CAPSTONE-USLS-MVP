@@ -64,7 +64,7 @@ export function AttentionView({ scope, scopeKey, params, setParam }) {
       <ChartCard
         question="What is holding students back?"
         hint="Start with the longest bar: that cause affects the most students. Select a bar to list those students."
-        empty={data.causes.length ? null : { title: "No students need attention for these filters", hint: "Nobody is marked At Risk of Delay or Delayed. Change the program, cohort or period to look elsewhere." }}
+        empty={data.causes.length ? null : { title: "No students need attention for these filters", hint: "Nobody is marked At Risk of Delay or Delayed. Change the program, year started or period to look elsewhere." }}
         chart={chart}
         table={table}
       />
@@ -131,7 +131,7 @@ export function StagesView({ scope, scopeKey }) {
       <ChartCard
         question="Where do students wait the longest?"
         hint="Look for stages with slow or stuck students, open them, and ask the next owner what is blocking each one."
-        empty={rows.length ? null : { title: "No active students for these filters", hint: "Change the program, cohort or period to look elsewhere." }}
+        empty={rows.length ? null : { title: "No active students for these filters", hint: "Change the program, year started or period to look elsewhere." }}
         chart={
           <>
             <BarsChart data={rows} categoryKey="stage" series={ZONES.map((z) => ({ key: z.key, name: z.head, color: z.color, text: z.text }))} ariaLabel="Students per stage, split by how long they have been there" />
@@ -193,7 +193,7 @@ export function SpeedView({ scope, scopeKey }) {
       <ChartCard
         question="Which offices are slow to close requests?"
         hint="Offices with a long red bar have requests waiting over 30 days: ask them first. The table gives the days an office takes to close a request."
-        empty={withOpen.length ? null : { title: "No open requests for these filters", hint: "Every request in scope has been closed. Change the program or cohort to look elsewhere." }}
+        empty={withOpen.length ? null : { title: "No open requests for these filters", hint: "Every request in scope has been closed. Change the program or year started to look elsewhere." }}
         chart={<BarsChart data={withOpen} categoryKey="process_area" series={AGE_SERIES} ariaLabel="Open requests per office, by how long they have waited" />}
         table={table}
         tableBelow

@@ -185,13 +185,13 @@ qa([
 doc.add_heading("5. Part 2l — Reports & Analytics", 1)
 para("Say: every case so far followed one student; this screen answers what the Graduate School knows about all students at once. Every number is computed from recorded events, not typed in, and every number opens the students behind it.")
 bullets([
-    "Where: Overview > Reports & Analytics. Filters on top: Program, Entry cohort, Period (default: last 12 months, compared with the 12 months before).",
+    "Where: Overview > Reports & Analytics. Filters on top: Program, Year started, Period (default: last 12 months, compared with the 12 months before).",
     "Six numbers: Active students · Behind schedule (vs target 10%) · Requests waiting more than 7 days · Median days to decide · Defenses held · Endorsements sent to the Dean.",
     "Needs attention: what is holding students back (no progress for a long time, coursework behind, documents missing, AWOL); select a bar to list the students; full list with next owner; Excel/PDF download.",
     "Where students get stuck: per stage, On time (< 120 days), Slow (120–209), Stuck (210+), counted from the day the student entered the stage (real stage clock).",
     "Office speed: which offices take longest to close requests (0–7, 8–14, 15–30, over 30 days).",
     "Records to fix: research students with missing records (e.g. no adviser).",
-    "Older lists kept: Cohorts by stage, Graduation candidates, Overdue and pending, Defenses. Registrar changes: the daily list the Registrar must apply in AIMS.",
+    "Older lists kept: By year started, Graduation candidates, Overdue and pending, Defenses. Registrar changes: the daily list the Registrar must apply in AIMS.",
     "Dean has own tabs (waiting for the Dean, decision speed, outcomes, graduation pipeline, students by stage).",
     "Risk reads 'Not Yet Assessed' where the official risk rules are not confirmed — we do not invent High/Medium/Low.",
 ])

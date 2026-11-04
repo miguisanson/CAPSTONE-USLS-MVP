@@ -75,7 +75,7 @@ def run(rt: Runtime) -> None:
         rt.shot(staff, s(9))
     rt.step("Records to fix", fix)
 
-    for n, name in ((10, "Cohorts by stage"), (11, "Graduation candidates"), (12, "Overdue and pending"), (13, "Defenses")):
+    for n, name in ((10, "By year started"), (11, "Graduation candidates"), (12, "Overdue and pending"), (13, "Defenses")):
         def older(name=name, n=n):
             tab(name)
             rt.shot(staff, s(n))

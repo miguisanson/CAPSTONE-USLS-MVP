@@ -143,7 +143,7 @@ const GRADUATION_BATCH_STAGES = [
   },
   {
     label: "GS Staff creates graduation batch",
-    detail: "Application-submitted candidates are grouped by the selected cohort.",
+    detail: "Candidates who submitted an application are grouped into one batch.",
     completeStatuses: GRADUATION_STATUS_PRIORITY.filter((status) => status !== "Not Prepared"),
   },
   {
