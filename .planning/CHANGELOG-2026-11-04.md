@@ -19,14 +19,15 @@ Branch: `v6.1-migui` until 13:3x, then `v6.2-migui`. Every item has its ISSUES r
 | PM | Edit anything with history: RecordEdit table, `/api/edits/<entity>/<id>`, Edit / Edited chip + history on chats, requests, remarks and notes of every process, every role; Dean notes on AWOL and withdrawal in their own field | I-354 | b6b81c3 |
 | PM | Status colours: seven meanings each with its own icon + "What the colours mean" legend; LOA card shows the reason; details window opens with reason and period; enrollment OPEN/CLOSED banner and controls off while closed; Reports "By year started" with On coursework / On thesis or dissertation / Graduated | I-355..I-358 | 82668c7 |
 | PM | Demo Guide: `>` and the Right arrow make the app do the step; panel steps aside while it runs; Stop ends the demo | — | 9d01167 |
+| PM | Khloe's graduation + practicum batch UI back on today's API: batch overview with stage checks, requirement boxes, numbered stages, practicum cards; shared `components/process/` | I-359 | 9c242c4 |
+| PM | Live site: Docker always uses its own SQLite volume (a `.env` DATABASE_URL took it down); Start button restarts the tunnel when the public address does not answer | I-363, I-352 | 125ab29 |
 
 ## In progress
 - One 7-digit student ID everywhere + server checks for the new dropdowns (`pkt/server-checks`). I-353.
-- Khloe's graduation + practicum batch UI back (`pkt/khloe-ui`). I-359.
+- Khloe's design on LOA, readmission, AWOL, withdrawal, residency (`pkt/khloe-standalone`). I-360.
 
 ## Next
 - Staff act for the panel in the research gate (I-361) + research gate stage columns (I-362).
-- Khloe's design on LOA, readmission, AWOL, withdrawal, residency (I-360).
 - Server follow-ups from the polish: refuse enrollment changes outside the window, real `enrollment_open`, seeded window, `/api/reports/cohorts/students`.
 - Guides (with autopilot) for the missing processes; the 64 open audit rows.
 - Full gate, full e2e, push, Docker rebuild, final report.
