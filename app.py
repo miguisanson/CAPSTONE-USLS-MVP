@@ -8892,6 +8892,15 @@ def resolve_source_flags_after_monitoring_upload(
 
 
 def automatic_awol_evidence(student: Student) -> tuple[str, str, date | None] | None:
+def awol_withdrawal_is_after_return(case: AwolCase, withdrawn: TermEnrollment) -> bool:
+    """True when the withdrawn semester is a new one, not the withdrawal that caused the AWOL the student already returned from (I-295).
+    New = it starts on or after the approved return semester; with no return semester on the case, it was recorded after the decision."""
+    target = AcademicTerm.query.filter_by(label=case.target_return_term).first() if case.target_return_term else None
+    if target:
+        return withdrawn.term.start_date >= target.start_date
+    return bool(case.decided_at and withdrawn.confirmed_at and withdrawn.confirmed_at > case.decided_at)
+
+
     """Return explicit handbook-backed evidence; never infer AWOL from mere absence."""
     if student.enrollment_tag == "AWOL" or student.standing == "AWOL":
         latest_term = (
@@ -8920,7 +8929,7 @@ def automatic_awol_evidence(student: Student) -> tuple[str, str, date | None] | 
             "Extension Approved - Refresher Required",
             "Re-enrollment Required",
             "Re-enrollment Completed",
-        }:
+        } and not awol_withdrawal_is_after_return(resolved_case, latest_term):
             return None
         return (
             "Full-semester withdrawal without approved LOA",
@@ -8957,6 +8966,7 @@ def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
             db.session.add(latest)
         newly_detected = not latest.automatically_flagged_at
         latest.status = latest.status if latest.status in {
+        latest.last_enrolled_term = latest.last_enrolled_term or awol_last_enrolled_term(student)
             "Return Submitted", "Returned for Revision", "Dean Review", "Re-enrollment Required"
         } else "AWOL Declared"
         latest.awol_effective_date = latest.awol_effective_date or effective_date or ph_today()

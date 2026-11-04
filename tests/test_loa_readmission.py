@@ -816,7 +816,7 @@ class LeaveCaseTests(unittest.TestCase):
             from app import leave_policy_review
             filing = next(c for c in leave_policy_review(case)["checks"] if c["label"] == "Filing date")
             self.assertEqual(filing["status"], "Pass")  # 15 days were left when it was filed
-            case.submitted_at = datetime.utcnow()
+            case.submitted_at = app_module.now_utc()
             filing = next(c for c in leave_policy_review(case)["checks"] if c["label"] == "Filing date")
             self.assertEqual(filing["status"], "Fail")  # only 10 days left today
 
@@ -1424,6 +1424,41 @@ class LeaveCaseTests(unittest.TestCase):
         confirmed = self.act(self.staff_client(), case_id, "confirm_awol", comment="No reply.")
         self.assertEqual(confirmed.status_code, 200, confirmed.get_json())
         self.assertEqual(self.registrar_task_status(), "Pending")
+
+    def withdraw_term(self, label):
+        with app.app_context():
+            db.session.add(TermEnrollment(student_id=self.student_id, term_id=self.term_ids[label], status="Withdrawn"))
+            db.session.commit()
+
+    def test_i301_a_detected_awol_case_already_names_the_last_enrolled_semester(self):
+        self.withdraw_term("Past Term")
+        with app.app_context():
+            self.assertEqual(sync_automatic_awol_statuses(commit=True), 1)
+            self.assertEqual(AwolCase.query.one().last_enrolled_term, "Past Term")
+
+    def return_approved_after_first_awol(self):
+        self.withdraw_term("Past Term")
+        with app.app_context():
+            sync_automatic_awol_statuses(commit=True)
+            case = AwolCase.query.one()
+            case.status, case.target_return_term, case.decided_at = "Return Approved", "Running Term", app_module.now_utc()
+            student = db.session.get(Student, self.student_id)
+            student.standing, student.current_stage, student.enrollment_tag = "Active", "Coursework", "Not Enrolled"
+            db.session.commit()
+
+    def test_i295_the_same_withdrawal_after_an_approved_return_is_not_flagged_again(self):
+        self.return_approved_after_first_awol()
+        with app.app_context():
+            self.assertEqual(sync_automatic_awol_statuses(commit=True), 0)
+            self.assertEqual(AwolCase.query.count(), 1)
+
+    def test_i295_a_new_full_semester_withdrawal_after_an_approved_return_is_flagged(self):
+        self.return_approved_after_first_awol()
+        self.withdraw_term("Running Term")
+        with app.app_context():
+            self.assertEqual(sync_automatic_awol_statuses(commit=True), 1)
+            self.assertEqual(AwolCase.query.count(), 2)
+            self.assertEqual(db.session.get(Student, self.student_id).standing, "AWOL")
 
 
 if __name__ == "__main__":
