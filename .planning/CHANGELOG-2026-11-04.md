@@ -33,11 +33,12 @@ Branch: `v6.1-migui` until 13:3x, then `v6.2-migui`. Every item has its ISSUES r
 | night | Audit round 4 (10 rows): practicum refused for AWOL/on-leave students; panel seats check the faculty's Panel Chair / Member role; booking warns about unanswered invitations; the chair sets the defense room or link (with history); one practicum review column; exported batch card; AWOL Registrar handoff tracking; stale demo data notice for staff; the Dean's assistant counts like the Dean home | I-290, I-283, I-314, I-318, I-321, I-328, I-329, I-296, I-332, I-340 | 83a7aeb |
 | night | Docs follow the app (Reports and Dean Reports cases, setup, Docker) + Reports capture/video scripts; requirement boxes in the shared tones (no false error banners); one-click UPDATE-SITE proved itself (auto-reseed + tunnel restart) | I-338, I-343, I-344, I-350 | 3a8e213, 419ad84, f0e?? |
 
-## In progress
-- AWOL Registrar list on the AWOL board (`pkt/awol-registrar-ui`, I-296 UI).
-- Final Python gate on 83a7aeb.
+## Handed over
+- Merge with Natalie's `v6.3-natalie` into `v6.4`: session "merge-v64" (grill-me with the owner before touching her work).
+- AWOL Registrar list (I-296 UI) landed in ef12348.
 
 ## Gates
+- Final full Python gate on 83a7aeb: 1,164 tests, only known I-236 `test_teaching_schedule` failing.
 - Full Python gate on 0a8a94e: 1,120 tests, 1 failure = known I-236 `test_teaching_schedule` (Myrine's teaching schedule).
 - Full e2e (`npm run e2e`) on b9e91cf: 953 passed, 12 failed -> fixed: page sweep x5 (requirement boxes read as error banners), p117, p32; p112/p88 pass alone (cross-spec data, see I-364); known: p110, p84:376 (I-236), p79 flaky. Then 194/194 on 83a7aeb incl. the sweep for every role.
 - Browser: every touched spec green on the merged code (p113-p122, p114/p115/p122 autopilot, p42, p77, p78, p84 except known I-236 line ~376, p86, p91, p93, p101, p116-p121).
