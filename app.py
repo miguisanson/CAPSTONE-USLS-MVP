@@ -449,10 +449,44 @@ def create_app() -> Flask:
         return response
 
     register_json_error_handling(app)
+    register_daily_sweep(app)
     register_routes(app)
     from teaching_backend import install_routes as install_teaching_routes
     install_teaching_routes(app, db, globals())
     return app
+
+
+_DAILY_SWEEP_STATE: dict = {"day": None}
+
+
+def register_daily_sweep(app: Flask) -> None:
+    """Run the clock-driven sweeps by themselves: on the first signed-in API request after the app starts,
+    then on the first one each new day (I-270). Nobody has to press a refresh button; the buttons stay as a
+    manual extra. Off while testing unless a test sets FORCE_DAILY_SWEEP."""
+    import threading
+
+    lock = threading.Lock()
+
+    @app.before_request
+    def run_daily_sweep():
+        if not request.path.startswith("/api/") or not session.get("account_id"):
+            return None
+        if app.config.get("TESTING") and not app.config.get("FORCE_DAILY_SWEEP"):
+            return None
+        today = ph_today()
+        if _DAILY_SWEEP_STATE["day"] == today:
+            return None
+        with lock:
+            if _DAILY_SWEEP_STATE["day"] == today:
+                return None
+            _DAILY_SWEEP_STATE["day"] = today  # set first: a failing sweep is not retried on every request
+            try:
+                run_maintenance_sweeps()
+                db.session.commit()
+            except Exception:  # noqa: BLE001
+                db.session.rollback()
+                app.logger.exception("Daily sweep failed")
+        return None
 
 
 HTTP_ERROR_MESSAGES = {
@@ -1583,6 +1617,19 @@ class ScheduleRequest(db.Model):
     manuscript_received_on = db.Column(db.Date)
 
     student = db.relationship("Student")
+
+
+class DefenseScheduleAsk(db.Model):
+    """What the student asked for when requesting a defense schedule (date, mode, venue, constraints).
+    Staff see it on the booking form, prefilled, so nothing the student already said is typed again."""
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False, index=True)
+    defense_type = db.Column(db.String(60), nullable=False)
+    preferred_date = db.Column(db.Date)
+    mode = db.Column(db.String(40))
+    venue = db.Column(db.String(160))
+    constraints = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=now_utc, nullable=False)
 
 
 class DefenseVerdict(db.Model):
@@ -5994,7 +6041,8 @@ _RISK_REFRESH_STATE: dict = {"at": None, "day": None}
 def run_maintenance_sweeps() -> dict:
     """Every sweep that depends on the clock or on data entered elsewhere. Writes; the caller commits.
 
-    The seed runs it once, and ``POST /api/maintenance/refresh`` runs it on request. A page view never does.
+    The seed runs it once, the first signed-in request of each day runs it (register_daily_sweep), and
+    ``POST /api/maintenance/refresh`` runs it on request. A page view itself never does.
     """
     awol = sync_automatic_awol_statuses(commit=False)
     leave = sync_leave_cases(commit=False)
@@ -6862,7 +6910,19 @@ def leave_policy_review(case: LeaveCase) -> dict:
         end_date = leave_end_date(linked) if linked else None
         target = case.target_term
         if target and end_date:
-            if target.start_date > end_date:
+            gap = AcademicTerm.query.filter(
+                AcademicTerm.start_date > end_date, AcademicTerm.start_date < target.start_date,
+            ).order_by(AcademicTerm.start_date).all()
+            if target.start_date > end_date and gap:
+                checks.append({
+                    "label": "Return semester after the leave",
+                    "status": "Needs Review",
+                    "detail": (
+                        f"{target.label} is not the semester right after the leave. {', '.join(t.label for t in gap)} "
+                        "would be left without leave cover or enrollment. The Dean decides."
+                    ),
+                })
+            elif target.start_date > end_date:
                 checks.append({
                     "label": "Return semester after the leave",
                     "status": "Pass",
@@ -13452,6 +13512,14 @@ def register_routes(app: Flask) -> None:
         if process not in DEMO_GUIDE_PROCESSES:
             return jsonify({"error": "Unknown demo process."}), 400
         is_student = account.role == "student"
+        if not is_student and account.role not in BACKOFFICE_ROLES | {"dean", "faculty"}:
+            return jsonify({"error": "Not allowed."}), 403
+        visible_ids = None  # faculty see only the students they advise or sit on the panel of
+        if account.role == "faculty":
+            faculty = db.session.get(Faculty, account.faculty_id) if account.faculty_id else None
+            visible_ids = set() if faculty is None else advisee_student_ids(faculty) | {
+                sid for (sid,) in db.session.query(PanelAssignment.student_id).filter_by(faculty_id=faculty.id)
+            }
         models = {
             "awol": (AwolCase, "status"), "withdrawal": (WithdrawalApplication, "status"),
             "practicum": (PracticumRecord, "status"), "graduation": (GraduationEndorsement, "endorsement_status"),
@@ -13475,9 +13543,11 @@ def register_routes(app: Flask) -> None:
             student = db.session.get(Student, safe_int(request.args.get("student_id"))) if request.args.get("student_id") else None
             if not student and request.args.get("student_number"):  # the guide's own demo student, by number
                 student = Student.query.filter_by(student_number=request.args["student_number"].strip()).first()
-            if not student:
+            if not student and visible_ids is None:
                 demo = next((c for c in WORKFLOW_DEMO_STUDENTS.values() if c["workflow"] == process), None)
                 student = Student.query.filter_by(student_number=demo["student_number"]).first() if demo else None
+            if student and visible_ids is not None and student.id not in visible_ids:
+                student = None
         record = newest.get(student.id) if student else None
         case = None
         if record is not None and process in LEAVE_SLUGS:
@@ -13494,7 +13564,8 @@ def register_routes(app: Flask) -> None:
                     "last_change": iso(last.created_at) if last else None}
         candidates = []
         if not is_student:
-            for student_id, row in sorted(newest.items(), key=lambda item: -item[1].id)[:20]:
+            for student_id, row in [item for item in sorted(newest.items(), key=lambda item: -item[1].id)
+                                    if visible_ids is None or item[0] in visible_ids][:20]:
                 other = db.session.get(Student, student_id)
                 if other:
                     candidates.append({"student_id": other.id, "name": other.name, "status_label": status_of(row)})
@@ -15479,6 +15550,11 @@ def register_routes(app: Flask) -> None:
         if data.get("constraints"):
             notes.append(f"Constraints: {data.get('constraints')}.")
 
+        db.session.add(DefenseScheduleAsk(
+            student_id=student.id, defense_type=defense_type, preferred_date=day if preferred_date else None,
+            mode=(data.get("mode") or "").strip()[:40] or None, venue=source[:160] or None,
+            constraints=(data.get("constraints") or "").strip() or None,
+        ))
         ensure_open_task(student.id, f"Review student {defense_type} schedule request", "Research Coordinator", 4, 45)
         add_log(
             "defense-scheduling",
@@ -15500,6 +15576,8 @@ def register_routes(app: Flask) -> None:
         doc = DocumentCheck.query.filter_by(id=document_id, student_id=student.id).first_or_404()
         if doc.gate.endswith("(archived)"):
             return jsonify({"error": "This is superseded evidence kept for the record; upload to the current requirement instead."}), 400
+        if doc.gate in RESEARCH_MILESTONES:  # the Research Gate has its own route and rules (current stage, source, locks)
+            return jsonify({"error": "Research Gate documents are uploaded from the Research Gate page, which checks the stage and the rules."}), 409
         if doc.gate == "Form 1 - Title Defense" and doc.item_name in {"Form 1 - Application for Title Defense", "Three concept papers"} and title_uploads_locked(student):
             return jsonify({"error": "Title-defense uploads are locked because a panel has already been matched."}), 409
         uploaded = request.files.get("file")
@@ -17059,6 +17137,7 @@ def register_routes(app: Flask) -> None:
             + (f", recorded for the panel by {recorder.full_name}. Reason: {reason}. " if recorder else ". ")
             + f"{verdict.remarks or 'No remarks.'}",
         )
+        notify_verdict_people(verdict, include_student=not recorder)
         if recorder:
             notify_schedule_people(
                 schedule, "defense_verdict_for_panel",
@@ -17197,6 +17276,12 @@ def register_routes(app: Flask) -> None:
             f"{verdict.defense_type}: revisions confirmed", "Research Coordinator",
             f"Revisions after '{verdict.result}' confirmed by {confirmed_by}. {note or ''}".strip(),
         )
+        for account in accounts_for_student(student.id):
+            notify_account(
+                account, "defense_revisions_confirmed", f"Your revisions after the {verdict.defense_type} were confirmed",
+                "The stage is complete. Open your research page for the next step.", link="/student/research",
+                related_type="defense_verdict", related_id=verdict.id, dedupe_key=f"defense_revisions_confirmed:{verdict.id}",
+            )
         sync_research_progress(student)
         db.session.commit()
         return jsonify({"ok": True, "message": "Revisions confirmed. The stage is complete.", "verdict": defense_verdict_dict(verdict)})
@@ -17289,6 +17374,7 @@ def register_routes(app: Flask) -> None:
             f"{verdict.defense_type}: revisions submitted", confirmer,
             f"Student submitted the revised manuscript after '{verdict.result}'. {note}".strip(),
         )
+        notify_revisions_submitted(verdict)
         db.session.commit()
         return jsonify({"ok": True, "message": f"Revisions submitted. The {confirmer.lower()} will confirm them.", "verdict": defense_verdict_dict(verdict)})
 
@@ -22491,13 +22577,22 @@ def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
     active_students = students_scope().filter(active_student_clause()).count()  # the same students Reports counts (I-193)
     on_leave = students_scope().filter(on_leave_clause()).count()
     completed = students_scope().filter(Student.current_stage == "Completed").count()
-    at_risk = students_scope().filter(at_risk_clause()).count()
-    high_risk = students_scope().filter(Student.risk_level == "Delayed").count()
+    # A coordinator's home counts the students with open work for their role, but the risk and defense numbers link to
+    # school-wide lists, so they count the same school-wide students as those lists (I-339).
+    wide_ids = student_ids
+    if locked_owner:
+        wide_filters = MultiDict(filters)
+        wide_filters.pop("owner", None)
+        wide_ids = [sid for (sid,) in filtered_students_query(wide_filters).with_entities(Student.id).all()]
+    wide = Student.query.filter(Student.id.in_(wide_ids)) if wide_ids else Student.query.filter(False)
+    at_risk = wide.filter(at_risk_clause()).count()
+    high_risk = wide.filter(Student.risk_level == "Delayed").count()
     withdrawn = students_scope().filter(Student.standing == "Withdrawn").count()
     pending_tasks = task_query.count()
     overdue_tasks = task_query.filter(Task.due_at < ph_today(), Task.status != "Done").count()
-    confirmed_schedules = scoped(ScheduleRequest).filter(ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES)).count()
-    needs_availability = scoped(ScheduleRequest).filter(ScheduleRequest.status.in_(PENDING_DEFENSE_STATUSES)).count()
+    wide_schedules = ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(wide_ids)) if wide_ids else ScheduleRequest.query.filter(False)
+    confirmed_schedules = wide_schedules.filter(ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES)).count()
+    needs_availability = wide_schedules.filter(ScheduleRequest.status.in_(PENDING_DEFENSE_STATUSES)).count()
     practicum_records = (
         scoped_practicum_records_query()
         .filter(PracticumRecord.student_id.in_(student_ids))
@@ -22939,20 +23034,15 @@ def practicum_timeline(record: PracticumRecord | None, eligibility: dict) -> lis
 
 
 def apply_practicum_payload(record: PracticumRecord, data: MultiDict, student: Student) -> None:
-    record.moa_status = (data.get("moa_status") or record.moa_status or "Pending Review").strip()
-    record.practicum_site = (data.get("practicum_site") or data.get("site") or record.practicum_site or "").strip()
-    record.supervisor_name = (data.get("supervisor_name") or record.supervisor_name or "").strip()
-    # The 200-hour rule is a floor: a request payload can raise the hours but never lower them.
+    """What a back-office request may change on the record: the 200-hour floor and the attachments.
+    Site, supervisor, hours, MOA/document/completion status come from the student's own submission and from
+    the workflow step itself, never from the payload (I-286)."""
     record.required_hours = max(safe_int(data.get("required_hours"), record.required_hours or 0), practicum_required_hours())
-    record.completed_hours = checked_whole_hours(data.get("completed_hours"), record.required_hours, record.completed_hours or 0)
-    record.document_status = (data.get("document_status") or record.document_status or "Pending Review").strip()
-    record.completion_status = (data.get("completion_status") or record.completion_status or "Pending").strip()
     moa_attachment = request_attachment_from_payload(student, "practicum", data)
     if moa_attachment:
         record.moa_attachment_id = moa_attachment.id
         record.moa_uploaded = True
         record.moa_status = "Uploaded"
-    record.moa_uploaded = bool(record.moa_uploaded or data.get("moa_uploaded") in {"true", "1", "yes", "on"})
     cert_attachment_id = safe_int(data.get("certificate_attachment_id"), 0)
     if cert_attachment_id:
         cert = StudentRequestAttachment.query.filter_by(
@@ -27277,6 +27367,17 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 else []
             )
             context["verdict_outcome"] = stage_outcome
+            # The student's latest request for this defense, unless a booking was made after it.
+            ask = DefenseScheduleAsk.query.filter_by(
+                student_id=selected_student.id, defense_type=stage_defense_type,
+            ).order_by(DefenseScheduleAsk.id.desc()).first() if stage_defense_type else None
+            last_booking = ScheduleRequest.query.filter_by(
+                student_id=selected_student.id, defense_type=stage_defense_type,
+            ).order_by(ScheduleRequest.id.desc()).first() if ask else None
+            context["student_request"] = None if not ask or (last_booking and last_booking.created_at >= ask.created_at) else {
+                "defense_type": ask.defense_type, "preferred_date": iso(ask.preferred_date), "mode": ask.mode,
+                "venue": ask.venue, "constraints": ask.constraints, "requested_at": iso(ask.created_at),
+            }
             context["lead_reference"] = {"date": iso(lead_reference), "label": lead_reference_label, "days": lead_days}
             context["change_requesters"] = list(SCHEDULE_CHANGE_REQUESTERS)
             current_booking = ScheduleRequest.query.filter(
@@ -29588,6 +29689,20 @@ def monitoring_portal_add_subject(student: Student, data: dict) -> CourseRecord:
     return record
 
 
+def _monitoring_refuse_if_enrolled_now(student: Student, record: CourseRecord, what: str) -> None:
+    """The sheet is not a back door around the workflows: a subject the student is enrolled in this term moves
+    only through Enrollment, the Subject Withdrawal request or the Academic Coordinator's Record dropped subject."""
+    term = get_active_term()
+    if term and SubjectEnrollment.query.filter_by(
+        student_id=student.id, course_id=record.course_id, term_id=term.id, status="Enrolled",
+    ).first():
+        raise MonitoringEntryError(
+            f"{record.course.code} is an enrolled subject this term, so it cannot be {what} here. Use Enrollment to add or "
+            "remove it, the student's Subject Withdrawal request to withdraw it, or Record dropped subject to drop it.",
+            409,
+        )
+
+
 def monitoring_portal_update_subject(student: Student, record: CourseRecord, data: dict) -> tuple[CourseRecord, list[dict]]:
     account, actor_name = _monitoring_actor()
     course = record.course
@@ -29617,6 +29732,9 @@ def monitoring_portal_update_subject(student: Student, record: CourseRecord, dat
                 changes.append((field, getattr(course, field), new))
     if not changes:
         return record, []
+    for field, _old, new in changes:
+        if field == "status" and new in {"Withdrawn", "Dropped", "Completed"}:
+            _monitoring_refuse_if_enrolled_now(student, record, f"set to {new}")
     if any(field == "status" and new == "Dropped" for field, _old, new in changes):
         reason = _monitoring_drop_reason(data, reason)
     if monitoring_record_source(record) in {"Imported", "System"} and not reason:
@@ -29655,6 +29773,7 @@ def monitoring_portal_remove_subject(student: Student, record: CourseRecord, dat
         raise MonitoringEntryError(f"{course.code} is already removed from this record.", 409)
     if (record.status or "") in MONITORING_NO_ROW_STATUSES:
         raise MonitoringEntryError(f"{course.code} has no entry to remove.", 409)
+    _monitoring_refuse_if_enrolled_now(student, record, "removed")
     if not reason:
         raise MonitoringEntryError("Enter a reason for removing this row; the row is kept in the change history.")
     old_status, old_term = record.status, record.term_label or ""
@@ -31083,6 +31202,17 @@ OWNER_LABEL_ACCOUNT_ROLE = {
 }
 
 
+def workflow_link_for_role(slug: str, role: str) -> str:
+    """The page a bell notice opens: the Dean has its own approvals pages, and a role that cannot open a
+    /workflow page (e.g. the Academic Coordinator for readmission) lands on the Work Queue instead."""
+    slug = slug.replace("awol-return", "awol")
+    if role == "dean":
+        return f"/dean/approvals/{slug}"
+    if slug in ROLE_TRANSACTION_ACCESS.get(role, {slug}):
+        return f"/workflow/{slug}"
+    return "/work-queue"
+
+
 def notify_workflow_owner(
     slug: str, student: Student, result: str, next_owner: str | None, key: str, *,
     count: int = 1, actor: UserAccount | None = None,
@@ -31098,7 +31228,7 @@ def notify_workflow_owner(
         title, body = f"{name}: {student.name} is waiting for you", f"{result}."
     recipients = [row for row in accounts_for_roles(role) if not actor or row.id != actor.id]
     return notify_many(
-        recipients, "workflow_waiting", title, body, link=f"/workflow/{slug.replace('awol-return', 'awol')}",
+        recipients, "workflow_waiting", title, body, link=workflow_link_for_role(slug, role),
         related_type=slug, related_id=student.id, dedupe_key=f"waiting:{key}",
     )
 
@@ -32201,6 +32331,40 @@ def notify_schedule_people(schedule: ScheduleRequest, kind: str, title: str, bod
         )
 
 
+def notify_verdict_people(verdict: DefenseVerdict, *, include_student: bool = True) -> None:
+    """A recorded verdict reaches the student and the adviser (Protocol: the result is sent on the first working day)."""
+    student = verdict.student
+    people = accounts_for_student(student.id) if include_student else []
+    for faculty_id in sorted(adviser_faculty_ids_for_student(student)):
+        people.extend(accounts_for_faculty(faculty_id))
+    for account in {item.id: item for item in people}.values():
+        notify_account(
+            account, "defense_verdict", f"{verdict.defense_type} result of {student.name}: {verdict.result}",
+            RESEARCH_VERDICTS.get(verdict.result, {}).get("summary", ""),
+            link="/student/research" if account.role == "student" else "/faculty-portal",
+            related_type="defense_verdict", related_id=verdict.id, dedupe_key=f"defense_verdict:{verdict.id}",
+        )
+
+
+def notify_revisions_submitted(verdict: DefenseVerdict) -> None:
+    """The student sent the revisions: the person who must confirm them (adviser, or the chair when the panel decides)."""
+    student = verdict.student
+    faculty_ids = set()
+    if verdict_effect(verdict) != "panel_revise":
+        faculty_ids |= adviser_faculty_ids_for_student(student)
+    faculty_ids |= {
+        row.faculty_id for row in PanelAssignment.query.filter_by(student_id=student.id, gate=verdict.gate).all()
+        if row.panel_role.lower() in {"panel chair", "panel lead"}
+    }
+    for faculty_id in sorted(faculty_ids):
+        for account in accounts_for_faculty(faculty_id):
+            notify_account(
+                account, "defense_revisions_submitted", f"{student.name} sent the revisions after the {verdict.defense_type}",
+                "Open the revisions and confirm them so the stage can complete.", link="/faculty-portal",
+                related_type="defense_verdict", related_id=verdict.id, dedupe_key=f"defense_revisions_submitted:{verdict.id}",
+            )
+
+
 def notify_defense_booked(schedule: ScheduleRequest, replaced: ScheduleRequest | None, reason: str, requested_by: str | None) -> None:
     slot = defense_slot_text(schedule.preferred_date, schedule.start_time, schedule.end_time)
     where = f"{schedule.venue} ({schedule.mode})" if schedule.venue else schedule.mode
@@ -32568,8 +32732,10 @@ def handle_practicum(data: MultiDict) -> int:
         expected_status = "Completed" if requested_status == "Report Sent to Dean" else None
         if expected_status and record.status != expected_status:
             raise ValueError("Record practicum completion before sending the status report to the Dean.")
-        if requested_status == "Completed" and record.status not in {"Documents Under Review", "Practicum In Progress"}:
+        if requested_status == "Completed" and record.status != "Documents Under Review":
             raise ValueError("The Academic Coordinator must receive the submitted documents before recording completion.")
+        if requested_status == "Completed" and not record.certificate_attachment_id:
+            raise ValueError("Practicum cannot be completed until a completion certificate is on file.")
         if record.completed_hours < record.required_hours:
             raise ValueError("Practicum cannot be completed until the required hours are met.")
         if record.document_status not in {"Verified", "Complete"} and requested_status == "Report Sent to Dean":

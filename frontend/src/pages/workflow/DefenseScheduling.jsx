@@ -132,6 +132,19 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
     }));
   }, [studentId, availability.window_start, availability.window_end, readiness.stage, context.defense_type]);
 
+  // What the student asked for (date, mode, venue, constraints) fills the booking form; staff change only what differs.
+  const studentRequest = context.student_request;
+  useEffect(() => {
+    if (!studentRequest) return;
+    setForm((current) => ({
+      ...current,
+      preferred_date: studentRequest.preferred_date || current.preferred_date,
+      mode: ["On-site", "Online", "Hybrid"].includes(studentRequest.mode) ? studentRequest.mode : current.mode,
+      venue: studentRequest.venue || current.venue,
+      constraints: studentRequest.constraints || current.constraints,
+    }));
+  }, [studentId, studentRequest?.requested_at]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     setPanelEditIds(panelSeatIds(panelRoleLabels, panel));
     setEditingPanel(false);

@@ -146,7 +146,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
     if (accountRole === "academic_coordinator" && record.status === "Documents Under Review" && row.hours_status !== "Complete") {
       return { label: "Request additional certificates", payload: { ...base, status: "Additional Certificates Requested" }, requireReason: true };
     }
-    if (accountRole === "academic_coordinator" && ["Documents Under Review", "Practicum In Progress"].includes(record.status) && row.hours_status === "Complete") {
+    if (accountRole === "academic_coordinator" && record.status === "Documents Under Review" && row.hours_status === "Complete" && (record.certificate_count || 0) > 0) {
       return { label: "Verify completion", payload: { ...base, status: "Completed", document_status: "Verified" } };
     }
     if (accountRole === "academic_coordinator" && record.status === "Completed") {
