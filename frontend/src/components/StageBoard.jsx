@@ -362,7 +362,7 @@ export default function StageBoard({
         aria-label={ariaLabel}
         tabIndex={0}
       >
-        <div className={fitColumns ? "flex min-w-full w-max gap-3" : "flex w-max items-start gap-3"}>
+        <div className={fitColumns ? "flex w-full gap-3" : "flex w-max items-start gap-3"}>
           {columns.map((column) => {
             const columnItems = items.filter((item) => getColumnKey(item) === column.key);
             const isHover = hoverColumn === column.key && Boolean(draggedItem);
@@ -375,7 +375,7 @@ export default function StageBoard({
                 onDragOver={readOnly ? undefined : (event) => onDragOver(event, column)}
                 onDragLeave={readOnly ? undefined : () => hoverColumn === column.key && setHoverColumn(null)}
                 onDrop={readOnly ? undefined : (event) => onDrop(event, column)}
-                className={`${columnClassName} ${fitColumns ? "min-w-64 flex-1" : "min-h-[14rem] shrink-0"} flex flex-col rounded-2xl border bg-slate-50/70 p-3 transition-colors duration-150 ${
+                className={`${columnClassName} ${fitColumns ? "min-w-64 flex-1 basis-0" : "min-h-[14rem] shrink-0"} flex flex-col rounded-2xl border bg-slate-50/70 p-3 transition-colors duration-150 ${
                   allowedHere
                     ? "border-brand-400 bg-brand-50/60 ring-2 ring-brand-200"
                     : refusedHere

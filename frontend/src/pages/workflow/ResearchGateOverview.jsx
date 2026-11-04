@@ -129,8 +129,8 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
       <SectionTitle
         title="Who is at the Research Gate"
         subtitle={canAct
-          ? "Every active student with a research case, in the column of the stage they are at. Graduate School staff and the Research Coordinator can record the panel's verdict from a card if the panel chair cannot."
-          : "Every active student with a research case, in the column of the stage they are at."}
+          ? "Every active student with research records, in the column of the stage they are at. Graduate School staff and the Research Coordinator can record the panel's verdict from a card if the panel chair cannot."
+          : "Every active student with research records, in the column of the stage they are at."}
         icon={ClipboardList}
       />
       {error && !data ? (

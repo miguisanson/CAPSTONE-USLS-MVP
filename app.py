@@ -15874,7 +15874,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/research-gate/overview")
     @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def research_gate_overview():
-        """Every active student with a research case, at their gate, with ready / blocked / waiting and why (I-205, AD12)."""
+        """Every active student with research records (a case, document checks, a panel or a booking), at their gate, with ready / blocked / waiting and why (I-205, AD12)."""
         rows = []
         cases = (
             ResearchCase.query.join(Student, Student.id == ResearchCase.student_id)
@@ -36787,7 +36787,7 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
 
     state: "ready" (documents are in; the next step is the Research Coordinator's), "blocked" (the student must act),
     "waiting" (someone else must review, sign or record a verdict), "done" (stage complete). Read-only."""
-    progress = detected_research_progress(student)
+    progress = detected_research_progress(student, ensure_checks=False)
     gate = progress["gate"]
     milestone = progress["milestone"]
     stage = progress["stage"]
@@ -36928,11 +36928,14 @@ def staff_defense_action_for_student(student: Student, gate: str) -> dict:
     }
 
 
-def detected_research_progress(student: Student) -> dict:
+def detected_research_progress(student: Student, *, ensure_checks: bool = True) -> dict:
+    """`ensure_checks=False` only reads (the Research Gate board lists every research student; creating their
+    document rows on each load held the SQLite write lock for seconds). Missing rows read as missing documents."""
     stages = []
     detected_index = len(RESEARCH_PORTAL_STAGE_SEQUENCE) - 1
     for index, (stage_name, gate) in enumerate(RESEARCH_PORTAL_STAGE_SEQUENCE):
-        ensure_research_document_checks(student.id, gate)
+        if ensure_checks:
+            ensure_research_document_checks(student.id, gate)
         milestone = research_milestone_payload(student, gate)
         stage = {
             "name": stage_name,

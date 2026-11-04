@@ -1,9 +1,10 @@
 // e2e-writes: gab-tolentino
 // Packet research-gate (owner 2026-11-04, I-361 and I-362).
-//   I-362  The Research Gate is a board with three numbered columns (1 Title Defense, 2 Proposal Defense, 3 Completion), each card a
+//   I-362  The Research Gate is a board with three numbered columns (1 Title Defense, 2 Proposal Defense, 3 Final Defense), each card a
 //          student with program, adviser, title, next defense and what is missing, the requirement boxes, "Next:" and the buttons.
 //   I-361  Graduate School staff (and the Research Coordinator) record the verdict for the panel from a card, with a reason; the
 //          verdict says "Recorded by <name> for the panel"; a later correction shows in the history. The Academic Coordinator only reads.
+//   Merge v6.4 (owner M5): every card is on the board (no "Show all"); each column scrolls inside a fixed height.
 // The writer is Gab Tolentino (2691203, MBA), the upcoming-defense demo student nobody else changes: staff record a Proposal Defense
 // verdict and then correct it.
 import { test, expect } from "@playwright/test";
@@ -40,7 +41,7 @@ test.describe("I-362: the Research Gate board (staff)", () => {
   test("three numbered columns with counts that match the server", async ({ page }) => {
     const overview = await (await page.request.get("/api/research-gate/overview")).json();
     await openGate(page);
-    const expected = { "Title Defense": 1, "Proposal Defense": 2, Completion: 3 };
+    const expected = { "Title Defense": 1, "Proposal Defense": 2, "Final Defense": 3 };
     const numbers = await page.getByTestId("stage-number").allInnerTexts();
     expect(numbers).toEqual(["1", "2", "3"]);
     for (const [name, number] of Object.entries(expected)) {
@@ -48,7 +49,7 @@ test.describe("I-362: the Research Gate board (staff)", () => {
       const section = column(page, name);
       await expect(section, `${name} column`).toBeVisible();
       await expect(section.getByLabel(`${count} in ${name}`)).toBeVisible();
-      await expect(section.locator("article")).toHaveCount(Math.min(count, 8)); // "Show all" opens the rest
+      await expect(section.locator("article")).toHaveCount(count); // every card; the column scrolls (merge M5)
     }
     await expect(page.getByTestId("research-gate-summary")).toContainText(`${overview.items.length} students`);
     expect(await noOverflow(page)).toBe(true);
@@ -76,7 +77,7 @@ test.describe("I-362: the Research Gate board (staff)", () => {
     await openGate(page);
     await page.locator("#research-gate-overview").getByLabel("Filter by program").selectOption("MBA");
     const perColumn = [1, 2, 3].map((n) => overview.items.filter((row) => row.student.program_code === "MBA" && row.column === n).length);
-    const shown = perColumn.reduce((sum, n) => sum + Math.min(n, 8), 0);
+    const shown = perColumn.reduce((sum, n) => sum + n, 0);
     await expect(page.getByRole("region", { name: BOARD }).locator("article")).toHaveCount(shown);
     await page.locator("#research-gate-overview").getByLabel("Filter by program").selectOption("");
     await card(page, NICO).getByRole("button", { name: `Open the Research Gate record of ${NICO}` }).click();

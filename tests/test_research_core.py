@@ -396,6 +396,16 @@ class VerdictOutcomeTests(ResearchCoreBase):
         self.assertEqual(row["stage"], "Proposal Defense")
         self.assertEqual(row["board_stage"], "Proposal Defense")
 
+    def test_research_gate_overview_only_reads(self):
+        """Merge v6.4: the wider board (every student with research records) read-and-flushed document rows for each
+        student on every page load, holding the SQLite write lock for seconds ("database is locked" in the e2e run)."""
+        self.at_proposal_ready_for_verdict()
+        with patch("app.ensure_research_document_checks", side_effect=AssertionError("the overview must not create rows")):
+            response = self.staff().get("/api/research-gate/overview")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        row = next(item for item in response.get_json()["items"] if item["student"]["id"] == self.student_id)
+        self.assertEqual(row["board_stage"], "Proposal Defense")
+
     def test_failed_proposal_verdict_does_not_delete_signed_files_and_survives_foreign_keys(self):
         """R31: a Failed verdict used to delete files the adviser had signed and crash under MySQL-style FK enforcement."""
         schedule_id = self.at_proposal_ready_for_verdict()
