@@ -71,6 +71,9 @@ function queryString(params = {}) {
 }
 
 export const api = {
+  // Edit anything, with history: one pair of calls for every editable text (components/ui/EditableText.jsx).
+  editRecord: (entity, id, body) => request(`/edits/${encodeURIComponent(entity)}/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  editHistory: (entity, id) => request(`/edits/${encodeURIComponent(entity)}/${id}`),
   saveCourseOfferings: (body) => request("/course-offerings/bulk", { method: "PATCH", body: JSON.stringify(body) }),
   teachingAvailability: (params = {}) => request(`/faculty-portal/teaching-schedule?${queryString(params)}`),
   saveTeachingAvailability: (termId, body) => request(`/faculty-portal/teaching-schedule?${queryString({ term_id: termId })}`, { method: "PUT", body: JSON.stringify(body) }),

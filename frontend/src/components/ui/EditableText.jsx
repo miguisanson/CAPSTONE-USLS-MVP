@@ -134,7 +134,7 @@ export function EditableText({ edit, value, onSaved, className = "", empty = "No
   );
   if (!edit || (!edit.can && !edits)) return text;
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" data-edit-field={edit.field}>
       {text}
       <div className="mt-1.5 flex flex-wrap items-center gap-2">
         {edits > 0 && (
