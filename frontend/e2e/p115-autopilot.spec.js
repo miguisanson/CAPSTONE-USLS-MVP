@@ -211,7 +211,7 @@ const PLAN = {
   "leave-of-absence": { key: "autopilot-loa", reset: ["leave-of-absence-daniel"], number: "GS-2026-LOA-02", final: "On Leave" },
   readmission: { key: "autopilot-readmission", reset: ["readmission-therese"], number: "GS-2026-READ-01", final: "Approved" },
   awol: { key: "autopilot-awol", reset: ["awol-maya"], number: "GS-2026-AWOL-01", final: "Return Approved" },
-  monitoring: { key: "autopilot-monitoring", reset: [], number: "2260073", final: "record" },
+  monitoring: { key: "autopilot-monitoring", reset: [], number: null, final: null },
   reports: { key: "reports", reset: [], number: null, final: null },
   withdrawal: { key: "autopilot-withdrawal", reset: ["withdrawal-elena"], number: "GS-2026-WD-01", final: "Exported - Ready to Send" },
   practicum: { key: "autopilot-practicum", reset: ["practicum-paolo"], number: "GS-2026-PRAC-02", final: "Dean Reviewed" },
@@ -229,6 +229,7 @@ async function pressNext(page) {
           const now = bar(page);
           if (!(await now.count())) return "loading"; // a sign-in as the next person reloads the page
           const status = await now.getAttribute("data-status");
+          if (status === "error") await page.screenshot({ path: join(SHOTS, "stopped.png") });
           if (status === "error") throw new Error(`The autopilot stopped on "${before}": ${(await now.innerText()).replace(/\s+/g, " ")}`);
           if (status !== "idle") return "running";
           const label = await now.getByTestId("autopilot-step").innerText();
@@ -252,18 +253,20 @@ for (const guide of GUIDES) {
     const { context, page } = await startDemo(browser, guide);
     try {
       const count = guide.steps.filter((step) => !step.side).length;
-      let before = null;
-      if (plan.number || guide.process === "monitoring") {
-        before = await (await page.request.get(`/api/demo/guide-state?process=${guide.process}${plan.number ? `&student_number=${plan.number}` : ""}`)).json();
-      }
-      for (let n = 0; n < count; n += 1) await pressNext(page);
+      const writes = [];
+      page.on("response", (res) => {
+        if (res.request().method() === "POST" && /\/api\/monitoring\/students/.test(res.url())) writes.push(`${new URL(res.url()).pathname.replace(/\d+/g, "*")} ${res.status()}`);
+      });
+      // Starting on the first step's page already finishes a step that only asks for that page (Monitoring Sheet, Reports), so count by the bar.
+      for (let n = 0; n < count && !(await bar(page).getByText("That is the whole demo").count()); n += 1) await pressNext(page);
       await expect(bar(page).getByText("That is the whole demo")).toBeVisible();
       await page.screenshot({ path: join(SHOTS, `${guide.id}-done-1366.png`) });
       if (plan.final) {
         const after = await (await page.request.get(`/api/demo/guide-state?process=${guide.process}&student_number=${plan.number}`)).json();
         expect(after.case && after.case.status, `${guide.title}: the final record`).toBe(plan.final);
-        if (guide.process === "monitoring") expect(after.case.subject_count, "a subject row was added").toBeGreaterThan(before.case.subject_count);
       }
+      // The Monitoring Sheet has no case: the record is the student it added and the subject row it gave that student.
+      if (guide.process === "monitoring") expect(writes).toEqual(["/api/monitoring/students 201", "/api/monitoring/students/*/subjects 201"]);
     } finally {
       await context.close();
       await resetStudents(playwright, ...plan.reset);

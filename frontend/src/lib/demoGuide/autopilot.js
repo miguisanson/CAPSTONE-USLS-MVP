@@ -287,7 +287,11 @@ async function pick(target, signal, options) {
   return waitFor(target, { signal, enabled: true, ...options });
 }
 
-async function typeInto(el, text, signal) {
+// "{stamp}" in typed text becomes the time of day as six digits, so a value that must be new (a Student ID) is new on every run.
+const stamped = (text) => String(text).replace(/\{stamp\}/g, () => new Date().toTimeString().slice(0, 8).replace(/:/g, ""));
+
+async function typeInto(el, raw, signal) {
+  const text = stamped(raw);
   el.focus();
   const whole = reducedMotion() || /^(date|time|number|file)$/.test(el.type) || text.length < 2;
   setValue(el, "");
