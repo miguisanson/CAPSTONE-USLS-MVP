@@ -17137,6 +17137,7 @@ def register_routes(app: Flask) -> None:
             + (f", recorded for the panel by {recorder.full_name}. Reason: {reason}. " if recorder else ". ")
             + f"{verdict.remarks or 'No remarks.'}",
         )
+        notify_verdict_people(verdict, include_student=not recorder)
         if recorder:
             notify_schedule_people(
                 schedule, "defense_verdict_for_panel",
@@ -17275,6 +17276,12 @@ def register_routes(app: Flask) -> None:
             f"{verdict.defense_type}: revisions confirmed", "Research Coordinator",
             f"Revisions after '{verdict.result}' confirmed by {confirmed_by}. {note or ''}".strip(),
         )
+        for account in accounts_for_student(student.id):
+            notify_account(
+                account, "defense_revisions_confirmed", f"Your revisions after the {verdict.defense_type} were confirmed",
+                "The stage is complete. Open your research page for the next step.", link="/student/research",
+                related_type="defense_verdict", related_id=verdict.id, dedupe_key=f"defense_revisions_confirmed:{verdict.id}",
+            )
         sync_research_progress(student)
         db.session.commit()
         return jsonify({"ok": True, "message": "Revisions confirmed. The stage is complete.", "verdict": defense_verdict_dict(verdict)})
@@ -17367,6 +17374,7 @@ def register_routes(app: Flask) -> None:
             f"{verdict.defense_type}: revisions submitted", confirmer,
             f"Student submitted the revised manuscript after '{verdict.result}'. {note}".strip(),
         )
+        notify_revisions_submitted(verdict)
         db.session.commit()
         return jsonify({"ok": True, "message": f"Revisions submitted. The {confirmer.lower()} will confirm them.", "verdict": defense_verdict_dict(verdict)})
 
@@ -32323,6 +32331,40 @@ def notify_defense_booked(schedule: ScheduleRequest, replaced: ScheduleRequest |
         notify_schedule_people(
             schedule, "defense_rescheduled", f"{schedule.defense_type} of {student.name} was rescheduled",
             f"Moved from {old} to {slot}. Venue: {where}. Reason: {reason or 'not recorded'}"
+def notify_verdict_people(verdict: DefenseVerdict, *, include_student: bool = True) -> None:
+    """A recorded verdict reaches the student and the adviser (Protocol: the result is sent on the first working day)."""
+    student = verdict.student
+    people = accounts_for_student(student.id) if include_student else []
+    for faculty_id in sorted(adviser_faculty_ids_for_student(student)):
+        people.extend(accounts_for_faculty(faculty_id))
+    for account in {item.id: item for item in people}.values():
+        notify_account(
+            account, "defense_verdict", f"{verdict.defense_type} result of {student.name}: {verdict.result}",
+            RESEARCH_VERDICTS.get(verdict.result, {}).get("summary", ""),
+            link="/student/research" if account.role == "student" else "/faculty-portal",
+            related_type="defense_verdict", related_id=verdict.id, dedupe_key=f"defense_verdict:{verdict.id}",
+        )
+
+
+def notify_revisions_submitted(verdict: DefenseVerdict) -> None:
+    """The student sent the revisions: the person who must confirm them (adviser, or the chair when the panel decides)."""
+    student = verdict.student
+    faculty_ids = set()
+    if verdict_effect(verdict) != "panel_revise":
+        faculty_ids |= adviser_faculty_ids_for_student(student)
+    faculty_ids |= {
+        row.faculty_id for row in PanelAssignment.query.filter_by(student_id=student.id, gate=verdict.gate).all()
+        if row.panel_role.lower() in {"panel chair", "panel lead"}
+    }
+    for faculty_id in sorted(faculty_ids):
+        for account in accounts_for_faculty(faculty_id):
+            notify_account(
+                account, "defense_revisions_submitted", f"{student.name} sent the revisions after the {verdict.defense_type}",
+                "Open the revisions and confirm them so the stage can complete.", link="/faculty-portal",
+                related_type="defense_verdict", related_id=verdict.id, dedupe_key=f"defense_revisions_submitted:{verdict.id}",
+            )
+
+
             + (f" (asked by {requested_by})." if requested_by else "."),
             "defense_rescheduled",
         )
