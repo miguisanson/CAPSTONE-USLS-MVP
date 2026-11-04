@@ -40,10 +40,10 @@ import standalone_process  # noqa: E402
 
 SLUGS = ("leave-of-absence", "readmission", "awol", "withdrawal")
 CHECKLIST = [
-    "Structured return intention completed",
-    "Updated study plan confirmed",
-    "Program or adviser consultation completed",
-    "No pending accountability confirmed",
+    "Written intention to enroll",
+    "Evaluation of subject/grade requirements",
+    "Clearance from Business Office",
+    "Interview (reason for delay, residency requirements)",
 ]
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend" / "src"
 

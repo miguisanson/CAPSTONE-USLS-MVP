@@ -115,8 +115,8 @@ function leaveScenario(data) {
     target_term: "AY 2026-2027 2nd Semester", return_intent: "Spec: I am ready to return.",
     linked_case: { id: 3, kind_label: "Leave of Absence", period_text: "AY 2026-2027 1st Semester", status_label: "Returned to student" },
     checklist: [
-      { item: "Structured return intention completed", checked: true, confirmed: true },
-      { item: "Updated study plan confirmed", checked: false, confirmed: false },
+      { item: "Written intention to enroll", source: "system", confirmed: true, detail: "Spec system detail." },
+      { item: "Clearance from Business Office", source: "staff", confirmed: false, detail: "Spec staff detail." },
     ],
     period: { ...PERIOD, text: "" }, reason_category: null, reason_text: null, messages: [], history: [],
     submitted_at: "2026-10-01T09:00:00", forwarded_at: null, decided_at: null, started_at: null, closed_at: null,
@@ -536,13 +536,12 @@ test.describe("P4.1 shared student parts", () => {
       await expect(c).toContainText("What you told us");
       await expect(c).toContainText("Spec: I am ready to return.");
       await expect(c).toContainText("Return checklist");
-      const items = c.locator("li").filter({ hasText: /Structured return intention completed|Updated study plan confirmed/ });
+      const items = c.locator("li").filter({ hasText: /Written intention to enroll|Clearance from Business Office/ });
       await expect(items).toHaveCount(2);
-      await expect(items.nth(0)).toContainText("Structured return intention completed");
-      await expect(items.nth(0)).toContainText("(you ticked this)");
-      await expect(items.nth(0).getByText("Staff confirmed", { exact: true })).toBeVisible();
-      await expect(items.nth(1)).toContainText("(not ticked)");
-      await expect(c.getByText("Staff confirmed", { exact: true })).toHaveCount(1);
+      await expect(items.nth(0)).toContainText("Written intention to enroll");
+      await expect(items.nth(0)).toContainText("Checked by the system: Spec system detail.");
+      await expect(items.nth(1)).toContainText("Not verified by staff yet");
+      await expect(c.getByText("Staff confirmed", { exact: true })).toHaveCount(0);
       await expect(c.getByRole("button", { name: "Withdraw request" })).toBeVisible();
       const steps = c.getByRole("region", { name: "Where this request is" }).getByRole("listitem");
       await expect(steps).toHaveCount(4);

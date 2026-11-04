@@ -3005,10 +3005,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "previous_loa_period": "AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester",
                 "eligibility_status": "Eligible to Return",
                 "readmission_items": [
-                    "Structured return intention completed",
-                    "Updated study plan confirmed",
-                    "Program or adviser consultation completed",
-                    "No pending accountability confirmed",
+                    "Written intention to enroll",
+                    "Evaluation of subject/grade requirements",
+                    "Clearance from Business Office",
+                    "Interview (reason for delay, residency requirements)",
                 ],
                 "dean_action": "Deny",
             })
@@ -3124,10 +3124,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "previous_loa_end": past.label,
                 "return_intent": "I am ready to resume my studies in the selected semester.",
                 "readmission_items": [
-                    "Structured return intention completed",
-                    "Updated study plan confirmed",
-                    "Program or adviser consultation completed",
-                    "No pending accountability confirmed",
+                    "Written intention to enroll",
+                    "Evaluation of subject/grade requirements",
+                    "Clearance from Business Office",
+                    "Interview (reason for delay, residency requirements)",
                 ],
             })
             self.assertEqual(readmission.status_code, 200, readmission.get_json())
@@ -3167,9 +3167,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "previous_loa_period": "AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester",
                 "eligibility_status": "Needs Review",
                 "readmission_items": [
-                    "Structured return intention completed",
-                    "Updated study plan confirmed",
-                    "Program or adviser consultation completed",
+                    "Written intention to enroll",
+                    "Evaluation of subject/grade requirements",
+                    "Clearance from Business Office",
                 ],
             })
             self.assertEqual(response.status_code, 200, response.get_json())

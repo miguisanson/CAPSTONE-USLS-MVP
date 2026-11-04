@@ -106,10 +106,9 @@ const PAGES = {
     path: "/student/requests/readmission",
     mutate: (d) => {
       leaveBase(d);
-      d.leave_overview.can_file.readmission = { allowed: true, reason: "" };
+      d.leave_overview.can_file.readmission = { allowed: true, reason: "", previous_semester_options: ["AY 2025-2026 1st Semester", "AY 2026-2027 1st Semester"] };
       d.leave_overview.return_semester_options = ["AY 2026-2027 2nd Semester", "AY 2027-2028 1st Semester"];
-      d.semester_options = ["AY 2025-2026 1st Semester", "AY 2026-2027 1st Semester"];
-      d.readmission_requirements = ["Structured return intention completed"];
+      d.readmission_checks = [{ item: "Written intention to enroll", source: "system", confirmed: false, detail: "Spec detail." }];
     },
     region: "Ask to come back",
     submit: "Submit readmission request",
@@ -121,8 +120,7 @@ const PAGES = {
       d.student.enrollment_tag = "AWOL";
       d.awol_case = null;
       d.standalone_cases = { ...(d.standalone_cases || {}), awol: [] };
-      d.upcoming_semesters = ["AY 2026-2027 2nd Semester"];
-      d.semester_options = ["AY 2026-2027 1st Semester"];
+      d.awol_return = { last_enrolled_term: "AY 2026-2027 1st Semester", return_semester_options: ["AY 2026-2027 2nd Semester"], default_return_term: null };
       d.workflow_messages = [];
     },
     region: "Tell us you are coming back",

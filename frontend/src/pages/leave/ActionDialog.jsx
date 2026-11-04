@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../api";
 import StepDialog from "../../components/StepDialog";
 import { Field, Select, Textarea } from "../../components/ui/index.js";
+import { CheckCircle2, XCircle } from "lucide-react";
 import { statusLabelFor } from "./leaveHelpers";
 
 const COMMENT_LABELS = {
@@ -55,7 +56,7 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
   }, [isForward, detailProp, item.id]);
 
   const recommendation = detail?.policy_review?.recommendation || "";
-  const unverified = showChecklist ? checklist.filter((row) => !verified.has(row.item)) : [];
+  const unverified = showChecklist ? checklist.filter((row) => row.source !== "system" && !verified.has(row.item)) : [];
   const fromLabel = item.status_label;
   const toLabel = statusLabelFor(vocabulary, action.to);
 
@@ -75,7 +76,7 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
     if (isForward) {
       if (showEligibility && eligibility) payload.eligibility_result = eligibility;
       if (staffNotes.trim()) payload.staff_notes = staffNotes.trim();
-      if (showChecklist) payload.confirmed_items = checklist.filter((row) => verified.has(row.item)).map((row) => row.item);
+      if (showChecklist) payload.confirmed_items = checklist.filter((row) => row.source !== "system" && verified.has(row.item)).map((row) => row.item);
     }
     try {
       await onConfirm(payload);
@@ -122,11 +123,26 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
               <fieldset className="rounded-xl border border-slate-200 p-3">
                 <legend className="px-1 text-sm font-semibold text-slate-700">Return checklist</legend>
                 <p className="meta mb-2">
-                  Tick each item you have checked yourself. Anything left unticked reaches the Dean as Needs Review.
+                  Tick each office check you have confirmed. Anything left unticked reaches the Dean as Needs Review.
                 </p>
                 <ul className="space-y-2">
                   {checklist.map((row) => (
                     <li key={row.item}>
+                      {row.source === "system" ? (
+                        <div className="flex items-start gap-2.5 px-2 py-1.5 text-sm">
+                          {row.confirmed ? (
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden="true" />
+                          ) : (
+                            <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden="true" />
+                          )}
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-medium text-ink">{row.item}</span>
+                            <span className="meta block">
+                              Checked by the system{row.confirmed ? "" : " (not confirmed)"}: {row.detail}
+                            </span>
+                          </span>
+                        </div>
+                      ) : (
                       <label className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
                         <input
                           type="checkbox"
@@ -137,10 +153,11 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
                         <span className="min-w-0 flex-1">
                           <span className="block font-medium text-ink">{row.item}</span>
                           <span className="meta block">
-                            {row.checked ? "The student ticked this." : "The student has not ticked this."} Tick to mark it verified by staff.
+                            {row.detail} Tick to mark it verified by staff.
                           </span>
                         </span>
                       </label>
+                      )}
                     </li>
                   ))}
                 </ul>

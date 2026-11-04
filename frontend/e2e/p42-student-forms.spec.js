@@ -349,13 +349,18 @@ test.describe("P4.2 student request forms", () => {
 
   // ---------------------------------------------------------------------------------------------- Readmission
   test("Readmission (no linked leave): the problem summary walks through the missing parts, the checklist and the exact payload", async ({ browser }) => {
-    const ITEMS = ["Structured return intention completed", "Updated study plan confirmed", "Program or adviser consultation completed", "No pending accountability confirmed"];
+    const CHECKS = [
+  { item: "Written intention to enroll", source: "system", confirmed: false, detail: "The reason you write in this request is your written intention to enroll (Handbook p. 53)." },
+  { item: "Evaluation of subject/grade requirements", source: "system", confirmed: true, detail: "0 of 1 subjects completed; 1 still to take. Adviser on record: none." },
+  { item: "Clearance from Business Office", source: "staff", confirmed: false, detail: "Graduate School staff confirm this during review." },
+  { item: "Interview (reason for delay, residency requirements)", source: "staff", confirmed: false, detail: "Graduate School staff confirm this during review." },
+];
     const { context, page, writes } = await formPage(browser, (d) => {
       leaveBase(d);
-      d.leave_overview.can_file.readmission = { allowed: true, reason: "" };
+      // Nothing on record for the previous leave: only then does the form ask for it.
+      d.leave_overview.can_file.readmission = { allowed: true, reason: "", previous_semester_options: ["AY 2025-2026 1st Semester", "AY 2025-2026 2nd Semester", "AY 2026-2027 1st Semester"] };
       d.leave_overview.return_semester_options = ["AY 2026-2027 2nd Semester", "AY 2027-2028 1st Semester"];
-      d.semester_options = ["AY 2025-2026 1st Semester", "AY 2025-2026 2nd Semester", "AY 2026-2027 1st Semester"];
-      d.readmission_requirements = ITEMS;
+      d.readmission_checks = CHECKS;
     });
     try {
       await page.goto("/student/requests/readmission");
@@ -363,31 +368,29 @@ test.describe("P4.2 student request forms", () => {
       await expect(form).toContainText("Graduate School staff check your request first, then the Dean decides.");
       for (const label of ["Your leave started in", "Your leave ended in", "Semester you want to return in", "Why you are ready to come back"]) await expectRequired(page, label, true);
       await expect(fieldOf(page, "Semester you want to return in")).toContainText("You can ask to return before your leave ends, but the Dean decides whether that is allowed.");
-      await expect(form).toContainText("Before you send this, confirm each item");
-      await expect(form.getByRole("checkbox")).toHaveCount(4);
+      // Owner rule 2026-11-04: the student ticks nothing; the form shows what is checked for her.
+      await expect(form).toContainText("What is checked for you");
+      await expect(form.getByRole("checkbox")).toHaveCount(0);
+      await expect(form.getByTestId("readmission-checks").locator("li")).toHaveCount(4);
+      await expect(form.getByTestId("readmission-checks")).toContainText("0 of 1 subjects completed");
       const submit = submitButton(page, "Submit readmission request");
       const problems = page.getByRole("alert").filter({ hasText: "There is a problem" });
       await expect(submit).toBeEnabled();
       await snap(page, "readmission-empty");
-      await submit.click(); // nothing answered: five problems (P82)
-      await expect(problems.getByRole("link")).toHaveCount(5);
+      await submit.click(); // nothing answered: four problems (P82)
+      await expect(problems.getByRole("link")).toHaveCount(4);
       expect(lastWrite(writes, "requests/readmission")).toBeUndefined();
       await ctl(page, "Semester you want to return in").selectOption("AY 2027-2028 1st Semester");
       await ctl(page, "Why you are ready to come back").fill("Spec: I am ready.");
       await ctl(page, "Your leave started in").selectOption("AY 2025-2026 2nd Semester");
       await expect(ctl(page, "Your leave ended in")).toHaveValue("AY 2025-2026 2nd Semester"); // follows the start
-      await submit.click(); // only the checklist is left
-      await expect(problems.getByRole("link")).toHaveCount(1);
-      await expect(problems).toContainText("Tick every item on the checklist.");
-      expect(lastWrite(writes, "requests/readmission")).toBeUndefined();
-      for (const item of ITEMS) await form.getByLabel(item).check();
       await expect(submit).toBeEnabled();
       await snap(page, "readmission-ready");
       await submit.click();
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/readmission").body).toEqual({
-        target_return_term: "AY 2027-2028 1st Semester", return_intent: "Spec: I am ready.", readmission_items: ITEMS,
+        target_return_term: "AY 2027-2028 1st Semester", return_intent: "Spec: I am ready.",
         previous_loa_start: "AY 2025-2026 2nd Semester", previous_loa_end: "AY 2025-2026 2nd Semester",
       });
     } finally {
@@ -401,7 +404,7 @@ test.describe("P4.2 student request forms", () => {
       d.leave_overview.cases = [LOA_CASE];
       d.leave_overview.can_file.readmission = { allowed: true, reason: "", linked_case_id: 11, leave_period: "AY 2026-2027 1st Semester", leave_end: "2026-11-29" };
       d.leave_overview.return_semester_options = ["AY 2026-2027 2nd Semester"];
-      d.readmission_requirements = [];
+      d.readmission_checks = [];
     });
     try {
       await page.goto("/student/requests/readmission");
@@ -409,14 +412,14 @@ test.describe("P4.2 student request forms", () => {
       await expect(form).toContainText("You are ending your leave: AY 2026-2027 1st Semester.");
       await expect(form).toContainText("It runs until Nov 29, 2026.");
       await expect(fieldOf(page, "Your leave started in")).toHaveCount(0);
-      await expect(form).not.toContainText("Before you send this, confirm each item");
+      await expect(form).not.toContainText("Tick every item");
       await ctl(page, "Semester you want to return in").selectOption("AY 2026-2027 2nd Semester");
       await ctl(page, "Why you are ready to come back").fill("Spec: back after the leave.");
       await snap(page, "readmission-linked");
       await submitButton(page, "Submit readmission request").click();
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
-      expect(lastWrite(writes, "requests/readmission").body).toEqual({ target_return_term: "AY 2026-2027 2nd Semester", return_intent: "Spec: back after the leave.", readmission_items: [] });
+      expect(lastWrite(writes, "requests/readmission").body).toEqual({ target_return_term: "AY 2026-2027 2nd Semester", return_intent: "Spec: back after the leave." });
     } finally {
       await context.close();
     }
@@ -429,8 +432,7 @@ test.describe("P4.2 student request forms", () => {
       d.student.enrollment_tag = "AWOL";
       d.awol_case = null;
       d.standalone_cases = { ...(d.standalone_cases || {}), awol: [] };
-      d.upcoming_semesters = ["AY 2026-2027 2nd Semester", "AY 2027-2028 1st Semester"];
-      d.semester_options = ["AY 2025-2026 2nd Semester", "AY 2026-2027 1st Semester"];
+      d.awol_return = { last_enrolled_term: "AY 2025-2026 2nd Semester", return_semester_options: ["AY 2026-2027 2nd Semester", "AY 2027-2028 1st Semester"], default_return_term: null };
     });
     try {
       await page.goto("/student/requests/awol-return");
@@ -439,7 +441,8 @@ test.describe("P4.2 student request forms", () => {
       await expect(main).toContainText("You cannot enroll until a return request is approved.");
       await expect(main).toContainText("The handbook requires a written intention to enroll routed through the Graduate School Dean. Complete the form below; no file needs to be uploaded.");
       await expectRequired(page, "Intended return semester", true);
-      await expectRequired(page, "Last enrolled semester", false);
+      // Owner rule 2026-11-04: the last enrolled semester comes from the enrollment records, nothing to pick.
+      await expect(page.getByTestId("awol-last-enrolled")).toHaveText("AY 2025-2026 2nd Semester");
       await expectRequired(page, "Written intention to resume enrollment", true);
       await expectRequired(page, "Reason for returning and readiness to continue", true);
       await expect(ctl(page, "Written intention to resume enrollment")).toHaveAttribute("placeholder", "I intend to resume enrollment in the selected semester…");
@@ -456,13 +459,12 @@ test.describe("P4.2 student request forms", () => {
       await expect(page.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link")).toHaveCount(1);
       expect(lastWrite(writes, "requests/awol-return")).toBeUndefined();
       await ctl(page, "Reason for returning and readiness to continue").fill("Spec reason.");
-      await ctl(page, "Last enrolled semester").selectOption("AY 2025-2026 2nd Semester");
       await expect(submit).toBeEnabled();
       await submit.click();
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/awol-return").body).toEqual({
-        student_id: info.studentId, target_return_term: "AY 2027-2028 1st Semester", last_enrolled_term: "AY 2025-2026 2nd Semester",
+        target_return_term: "AY 2027-2028 1st Semester",
         return_intent: "Spec intention.", return_reason: "Spec reason.",
       });
       await snap(page, "awol-sent");
@@ -477,8 +479,7 @@ test.describe("P4.2 student request forms", () => {
       d.student.standing = "AWOL";
       d.student.enrollment_tag = scenario === "residency" ? "Residency" : "AWOL";
       d.standalone_cases = { ...(d.standalone_cases || {}), awol: [] };
-      d.upcoming_semesters = ["AY 2026-2027 2nd Semester"];
-      d.semester_options = ["AY 2026-2027 1st Semester"];
+      d.awol_return = { last_enrolled_term: "AY 2026-2027 1st Semester", return_semester_options: ["AY 2026-2027 2nd Semester"], default_return_term: null };
       if (scenario === "returned") d.awol_case = { id: 5, status: "Returned for Revision", last_enrolled_term: "AY 2026-2027 1st Semester", return_intent: "Spec old intention.", return_reason: "Spec old reason." };
       if (scenario === "locked") d.awol_case = { id: 5, status: "Dean Review", last_enrolled_term: "AY 2026-2027 1st Semester", return_intent: "Spec old intention.", return_reason: "Spec old reason." };
     });
@@ -490,12 +491,12 @@ test.describe("P4.2 student request forms", () => {
       scenario = "returned";
       await page.reload();
       await expect(ctl(page, "Written intention to resume enrollment")).toHaveValue("Spec old intention.");
-      await expect(ctl(page, "Last enrolled semester")).toHaveValue("AY 2026-2027 1st Semester");
+      await expect(page.getByTestId("awol-last-enrolled")).toHaveText("AY 2026-2027 1st Semester");
       await ctl(page, "Intended return semester").selectOption("AY 2026-2027 2nd Semester");
       await submitButton(page, "Resubmit return declaration").click();
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
-      expect(lastWrite(writes, "requests/awol-return").body).toMatchObject({ target_return_term: "AY 2026-2027 2nd Semester", last_enrolled_term: "AY 2026-2027 1st Semester", return_intent: "Spec old intention.", return_reason: "Spec old reason." });
+      expect(lastWrite(writes, "requests/awol-return").body).toMatchObject({ target_return_term: "AY 2026-2027 2nd Semester", return_intent: "Spec old intention.", return_reason: "Spec old reason." });
 
       scenario = "locked";
       await page.reload();

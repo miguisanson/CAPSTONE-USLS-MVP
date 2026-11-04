@@ -273,16 +273,20 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
           <ul className="mt-1.5 space-y-1">
             {checklist.map((entry) => (
               <li key={entry.item} className="flex items-start gap-2 text-sm text-slate-700">
-                {entry.checked ? (
+                {entry.confirmed ? (
                   <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden="true" />
                 ) : (
                   <Square className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />
                 )}
                 <span className="min-w-0 flex-1">
                   {entry.item}
-                  <span className="sr-only">{entry.checked ? " (you ticked this)" : " (not ticked)"}</span>
+                  <span className="block text-xs text-slate-500">
+                    {entry.source === "system"
+                      ? `${entry.confirmed ? "Checked by the system" : "Not confirmed by the system"}: ${entry.detail}`
+                      : entry.confirmed ? "Verified by staff" : "Not verified by staff yet"}
+                  </span>
                 </span>
-                {entry.confirmed && <LeaveStatusBadge label="Staff confirmed" tone="good" />}
+                {entry.source !== "system" && entry.confirmed && <LeaveStatusBadge label="Staff confirmed" tone="good" />}
               </li>
             ))}
           </ul>

@@ -6210,19 +6210,27 @@ def prior_loa_semesters(student: Student) -> int:
     return leave_approved_semesters(student)
 
 
+def leave_loa_terms_on_record(student: Student) -> list[AcademicTerm]:
+    """Semesters the enrollment records mark LOA that have started, oldest first."""
+    terms = (
+        AcademicTerm.query.join(TermEnrollment, TermEnrollment.term_id == AcademicTerm.id)
+        .filter(TermEnrollment.student_id == student.id, TermEnrollment.status == "LOA",
+                AcademicTerm.start_date <= ph_today())
+        .order_by(AcademicTerm.start_date.asc()).all()
+    )
+    return list(dict.fromkeys(terms))
+
+
 def leave_checklist_state(case: LeaveCase) -> list[dict]:
-    """The readmission checklist item by item: what the student ticked and staff verified."""
-    try:
-        ticked = json.loads(case.checklist_json or "{}")
-    except (TypeError, ValueError):
-        ticked = {}
+    """The readmission checklist: system rows worked out live, then the rows staff verify."""
     try:
         checked = json.loads(case.staff_checks_json or "{}")
     except (TypeError, ValueError):
         checked = {}
-    return [
-        {"item": item, "checked": bool(ticked.get(item)), "confirmed": bool(checked.get(item))}
-        for item in readmission_requirements()
+    return readmission_system_checks(case.student, case) + [
+        {"item": item, "source": "staff", "confirmed": bool(checked.get(item)),
+         "detail": "Graduate School staff confirm this during review."}
+        for item in READMISSION_STAFF_ITEMS
     ]
 
 
@@ -6391,9 +6399,10 @@ def leave_policy_review(case: LeaveCase) -> dict:
     student = case.student
     as_of = (case.submitted_at or now_utc()).date()
     if case.kind == KIND_READMISSION:
-        ticked = [row["item"] for row in leave_checklist_state(case) if row["checked"]]
+        state = leave_checklist_state(case)
         review = readmission_policy_review(student, {
-            "readmission_items": ticked,
+            # The office items are judged by the separate "Checklist verified by staff" check below.
+            "readmission_items": [row["item"] for row in state if row["confirmed"] or row["source"] == "staff"],
             "target_return_term": leave_target_label(case),
             "previous_loa_period": leave_period_text(case) if (case.start_label or case.start_term_id) else "",
             "application_reference": "Student portal readmission request",
@@ -6430,12 +6439,19 @@ def leave_policy_review(case: LeaveCase) -> dict:
                         f"back in {target.label}. The Dean decides whether the leave ends early."
                     ),
                 })
+        system_failed = [row["item"] for row in state if row["source"] == "system" and not row["confirmed"]]
+        checks.append({
+            "label": "Checked by the system",
+            "status": "Needs Review" if system_failed else "Pass",
+            "detail": ("Not confirmed by the records: " + ", ".join(system_failed) + ".") if system_failed
+            else "The written intention and the subject evaluation are confirmed by the records.",
+        })
         if case.staff_checks_json is not None:
-            confirmed = [row for row in leave_checklist_state(case) if row["confirmed"]]
+            confirmed = [row for row in state if row["source"] == "staff" and row["confirmed"]]
             checks.append({
                 "label": "Checklist verified by staff",
-                "status": "Pass" if len(confirmed) == len(readmission_requirements()) else "Needs Review",
-                "detail": f"Staff verified {len(confirmed)} of {len(readmission_requirements())} checklist item(s).",
+                "status": "Pass" if len(confirmed) == len(READMISSION_STAFF_ITEMS) else "Needs Review",
+                "detail": f"Staff verified {len(confirmed)} of {len(READMISSION_STAFF_ITEMS)} office check(s).",
             })
         needs = [row for row in checks if row["status"] in {"Needs Review", "Fail"}]
         review = {
@@ -6706,11 +6722,6 @@ def leave_file_readmission(student: Student, data, account: UserAccount | None) 
     return_intent = (data.get("return_intent") or "").strip()
     if not return_intent:
         raise LeaveError("Enter your intention and readiness to resume studies.")
-    submitted = set(data.getlist("readmission_items")) if hasattr(data, "getlist") else set(data.get("readmission_items") or [])
-    requirements = readmission_requirements()
-    missing = [item for item in requirements if item not in submitted]
-    if missing:
-        raise LeaveError("Complete the readmission checklist: " + ", ".join(missing))
     start_label = end_label = ""
     start_term = end_term = None
     if active:
@@ -6718,11 +6729,15 @@ def leave_file_readmission(student: Student, data, account: UserAccount | None) 
         start_label = active.start_label or (start_term.label if start_term else "")
         end_label = active.end_label or (end_term.label if end_term else "")
     else:
-        start_label = (data.get("previous_loa_start") or "").strip()
-        end_label = (data.get("previous_loa_end") or "").strip()
-        start_term, end_term = leave_term(start_label), leave_term(end_label)
-        if not start_term or not end_term or end_term.start_date < start_term.start_date:
-            raise LeaveError("Choose a valid previous LOA start and end semester.")
+        on_record = leave_loa_terms_on_record(student)
+        if on_record:
+            start_term, end_term = on_record[0], on_record[-1]
+        else:
+            start_term, end_term = leave_term(data.get("previous_loa_start")), leave_term(data.get("previous_loa_end"))
+            if (not start_term or not end_term or end_term.start_date < start_term.start_date
+                    or end_term.start_date > ph_today()):
+                raise LeaveError("Choose a valid previous LOA start and end semester that has already started.")
+        start_label, end_label = start_term.label, end_term.label
     case = returned
     if case is None:
         case = LeaveCase(student_id=student.id, kind=KIND_READMISSION, source="portal")
@@ -6732,7 +6747,7 @@ def leave_file_readmission(student: Student, data, account: UserAccount | None) 
     case.start_label, case.end_label = start_label or None, end_label or None
     case.target_term_id, case.target_label = target.id, target.label
     case.return_intent = return_intent
-    case.checklist_json = json.dumps({item: True for item in requirements})
+    case.checklist_json = None
     case.staff_checks_json = None
     if returned:
         leave_case_apply(case, "resubmit", account, comment="")
@@ -6777,9 +6792,6 @@ def _legacy_case_fields(slug: str, notes: str | None, case: LeaveCase) -> None:
         intent = _legacy_note(notes, "Return intention")
         if intent and not case.return_intent:
             case.return_intent = intent
-        counted = re.search(r"Checklist submitted:\s*(\d+)", notes or "")
-        if counted and not case.checklist_json and int(counted.group(1)) >= len(readmission_requirements()):
-            case.checklist_json = json.dumps({item: True for item in readmission_requirements()})
     eligibility = _legacy_note(notes, "Eligibility result")
     if eligibility and not case.eligibility_result:
         case.eligibility_result = eligibility
@@ -7181,7 +7193,7 @@ def leave_declare_awol(case: LeaveCase, account: UserAccount | None, comment: st
     awol_remember_stage(awol, stage_before)
     awol.status = awol.status if awol.status in {"Return Submitted", "Returned for Revision", "Dean Review", "Re-enrollment Required"} else "AWOL Declared"
     awol.awol_effective_date = awol.awol_effective_date or ((end_date + timedelta(days=1)) if end_date else ph_today())
-    awol.last_enrolled_term = awol.last_enrolled_term or case.end_label or (case.end_term.label if case.end_term else None)
+    awol.last_enrolled_term = awol_last_enrolled_term(student) or awol.last_enrolled_term or case.end_label or (case.end_term.label if case.end_term else None)
     awol.detection_source = "Leave of absence ended without a return"
     awol.automatically_flagged_at = awol.automatically_flagged_at or now_utc()
     awol.policy_classification = awol.policy_classification or "Awaiting structured return declaration"
@@ -7279,7 +7291,8 @@ def _leave_h_forward(case, account, comment, data, move):
         unknown = sorted(confirmed - set(readmission_requirements()))
         if unknown:
             raise LeaveError("Unknown readmission checklist item: " + ", ".join(unknown))
-        case.staff_checks_json = json.dumps({item: item in confirmed for item in readmission_requirements()})
+        # System items are worked out from the records; a name sent for one is ignored.
+        case.staff_checks_json = json.dumps({item: item in confirmed for item in READMISSION_STAFF_ITEMS})
     review = leave_policy_review(case)
     result_label = eligibility if eligibility and eligibility != "Checked" else review["recommendation"]
     case.eligibility_result = result_label
@@ -7958,11 +7971,21 @@ def leave_student_overview(student: Student) -> dict:
         can_read = {"allowed": False, "reason": "Your leave has not started yet. Cancel the leave if you do not want it."}
     elif active or on_leave:
         end = leave_end_date(active) if active else None
+        leave_period = leave_period_text(active) if active else None
+        if not active:
+            on_record = leave_loa_terms_on_record(student)
+            if on_record:
+                first, last = on_record[0].label, on_record[-1].label
+                leave_period = first if first == last else f"{first} to {last}"
         can_read = {
             "allowed": True, "reason": "",
             "linked_case_id": active.id if active else None,
             "leave_end": iso(end),
-            "leave_period": leave_period_text(active) if active else None,
+            "leave_period": leave_period,
+            "previous_semester_options": [
+                t.label for t in AcademicTerm.query.filter(AcademicTerm.start_date <= today)
+                .order_by(AcademicTerm.start_date.desc()).all()
+            ],
         }
     banner = None
     standing = student_standing_summary(student)
@@ -8476,6 +8499,21 @@ def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
     if commit and changed:
         db.session.commit()
     return changed
+
+
+def awol_last_enrolled_term(student: Student) -> str | None:
+    """The latest semester the enrollment records show the student enrolled in (not typed by the student)."""
+    row = (
+        TermEnrollment.query.join(AcademicTerm, TermEnrollment.term_id == AcademicTerm.id)
+        .filter(TermEnrollment.student_id == student.id,
+                TermEnrollment.status.in_(("Confirmed", "Enrolled", "Active", "Withdrawn")),
+                AcademicTerm.start_date <= ph_today())
+        .order_by(AcademicTerm.start_date.desc()).first()
+    )
+    if row:
+        return row.term.label
+    awol = latest_awol_case(student.id)
+    return awol.last_enrolled_term if awol and awol.last_enrolled_term else None
 
 
 def latest_awol_case(student_id: int) -> AwolCase | None:
@@ -13667,7 +13705,16 @@ def register_routes(app: Flask) -> None:
                 "loa_allowed_reasons": LOA_ALLOWED_REASONS,
                 "leave_overview": leave_student_overview(student),
                 "standalone_cases": student_standalone_cases(student),
-                "readmission_requirements": readmission_requirements(),
+                "readmission_checks": readmission_system_checks(student) + [
+                    {"item": item, "source": "staff", "confirmed": False,
+                     "detail": "Graduate School staff confirm this during review."}
+                    for item in READMISSION_STAFF_ITEMS
+                ],
+                "awol_return": {
+                    "last_enrolled_term": awol_last_enrolled_term(student),
+                    "return_semester_options": future_semester_labels(6),
+                    "default_return_term": next(iter(future_semester_labels(6)), None),
+                },
                 "upcoming_semesters": upcoming_semester_labels(5),
                 "future_semesters": future_semester_labels(5),
                 "semester_options": [
@@ -14226,15 +14273,12 @@ def register_routes(app: Flask) -> None:
         if student.enrollment_tag != "AWOL" and student.standing != "AWOL":
             return jsonify({"error": "A return-from-AWOL request can be filed only while your record is marked AWOL."}), 409
         target_return_term = (data.get("target_return_term") or "").strip()
-        last_enrolled_term = (data.get("last_enrolled_term") or "").strip()
+        last_enrolled_term = awol_last_enrolled_term(student) or ""
         return_intent = (data.get("return_intent") or "").strip()
         return_reason = (data.get("return_reason") or "").strip()
         target_term = AcademicTerm.query.filter_by(label=target_return_term).first()
-        last_term = AcademicTerm.query.filter_by(label=last_enrolled_term).first()
         if not target_term or target_term.start_date <= ph_today():
             return jsonify({"error": "Choose a valid future semester when you intend to return."}), 400
-        if last_enrolled_term and not last_term:
-            return jsonify({"error": "Choose a valid last enrolled semester."}), 400
         if not return_intent:
             return jsonify({"error": "Enter your written intention to resume enrollment."}), 400
         if not return_reason:
@@ -35985,13 +36029,38 @@ def onboarding_requirements() -> list[str]:
     ]
 
 
+# Handbook 2022-2023 p. 45 ("For Returnees") and p. 53 (written intention to enroll).
+# The system works out the first two from the request and the records; only an office can confirm the last two.
+READMISSION_SYSTEM_ITEMS = ["Written intention to enroll", "Evaluation of subject/grade requirements"]
+READMISSION_STAFF_ITEMS = ["Clearance from Business Office", "Interview (reason for delay, residency requirements)"]
+
+
 def readmission_requirements() -> list[str]:
-    # Return checklist for moving a student from LOA back to active monitoring.
+    return READMISSION_SYSTEM_ITEMS + READMISSION_STAFF_ITEMS
+
+
+def readmission_system_checks(student: Student, case: LeaveCase | None = None) -> list[dict]:
+    """What the records already show for a returning student; the student ticks nothing."""
+    if case is not None:
+        written = bool((case.return_intent or "").strip())
+        written_detail = "The reason written in this request is the written intention to enroll." if written else "No written intention is on file."
+    else:
+        written = False
+        written_detail = "The reason you write in this request is your written intention to enroll (Handbook p. 53)."
+    audit = compute_course_audit(student)
+    if audit["required_count"] > 0:
+        done = len(audit["completed"])
+        evaluated = True
+        eval_detail = (
+            f"{done} of {audit['required_count']} subjects completed; {audit['required_count'] - done} still to take. "
+            f"Adviser on record: {student.adviser_name or 'none'}."
+        )
+    else:
+        evaluated = False
+        eval_detail = "No curriculum is on record for this program; Graduate School staff must evaluate the subjects by hand."
     return [
-        "Structured return intention completed",
-        "Updated study plan confirmed",
-        "Program or adviser consultation completed",
-        "No pending accountability confirmed",
+        {"item": READMISSION_SYSTEM_ITEMS[0], "source": "system", "confirmed": written, "detail": written_detail},
+        {"item": READMISSION_SYSTEM_ITEMS[1], "source": "system", "confirmed": evaluated, "detail": eval_detail},
     ]
 
 
@@ -38990,11 +39059,10 @@ def seed_dean_review_cases() -> int:
                 start_label=on_leave.start_label, end_label=on_leave.end_label,
                 target_term_id=next_term.id, target_label=next_term.label,
                 return_intent="I am ready to resume my graduate studies.",
-                checklist_json=json.dumps({item: True for item in readmission_requirements()}),
             )
         leave_submit_new(case, portal_account(student))
         leave_case_apply(case, "start_review", staff)
-        data = {"confirmed_items": readmission_requirements()} if kind == KIND_READMISSION else {}
+        data = {"confirmed_items": READMISSION_STAFF_ITEMS} if kind == KIND_READMISSION else {}
         leave_case_apply(case, "forward", staff, data=data)
         return case
 
