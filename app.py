@@ -12963,6 +12963,73 @@ def register_routes(app: Flask) -> None:
             return demo_mode_off_response()
         return no_store(jsonify({"items": demo_accounts_payload()}))
 
+    DEMO_GUIDE_PROCESSES = {
+        "leave-of-absence", "readmission", "awol", "withdrawal", "graduation", "practicum", "monitoring", "reports",
+    }
+
+    @app.route("/api/demo/guide-state")
+    @require_api_login()
+    def demo_guide_state():
+        """Where a demo case really is, so the Demo Guide follows the record and not the clicks (demo mode only)."""
+        if not demo_mode_enabled():
+            return demo_mode_off_response()
+        account = current_account()
+        process = (request.args.get("process") or "").strip()
+        if process not in DEMO_GUIDE_PROCESSES:
+            return jsonify({"error": "Unknown demo process."}), 400
+        is_student = account.role == "student"
+        models = {
+            "awol": (AwolCase, "status"), "withdrawal": (WithdrawalApplication, "status"),
+            "practicum": (PracticumRecord, "status"), "graduation": (GraduationEndorsement, "endorsement_status"),
+        }
+        newest = {}  # student_id -> newest case row of this process
+        if process in LEAVE_SLUGS:
+            query = LeaveCase.query.filter(LeaveCase.kind.in_(KINDS_FOR_SLUG[process])).order_by(LeaveCase.id)
+            status_of = lambda row: row.status  # noqa: E731
+        elif process in models:
+            model, field = models[process]
+            query = model.query.order_by(model.id)
+            status_of = lambda row: getattr(row, field)  # noqa: E731
+        else:
+            query = None
+        for row in (query.all() if query is not None else []):
+            newest[row.student_id] = row
+        student = None
+        if is_student:
+            student = db.session.get(Student, account.student_id) if account.student_id else None
+        elif process != "reports":
+            student = db.session.get(Student, safe_int(request.args.get("student_id"))) if request.args.get("student_id") else None
+            if not student and request.args.get("student_number"):  # the guide's own demo student, by number
+                student = Student.query.filter_by(student_number=request.args["student_number"].strip()).first()
+            if not student:
+                demo = next((c for c in WORKFLOW_DEMO_STUDENTS.values() if c["workflow"] == process), None)
+                student = Student.query.filter_by(student_number=demo["student_number"]).first() if demo else None
+        record = newest.get(student.id) if student else None
+        case = None
+        if record is not None and process in LEAVE_SLUGS:
+            case = leave_case_dict(record, account.role)
+        elif record is not None:
+            case = process_case_dict(process, "", record, account.role) if process in {"awol", "withdrawal"} else {"id": record.id}
+        if case is not None:
+            status = status_of(record)
+            case = {"id": case["id"], "kind": case.get("kind"), "status": status,
+                    "status_label": case.get("status_label") or status, "owner": case.get("owner")}
+        elif process == "monitoring" and student:
+            last = MonitoringEdit.query.filter_by(student_id=student.id).order_by(MonitoringEdit.id.desc()).first()
+            case = {"status": "record", "subject_count": SubjectEnrollment.query.filter_by(student_id=student.id).count(),
+                    "last_change": iso(last.created_at) if last else None}
+        candidates = []
+        if not is_student:
+            for student_id, row in sorted(newest.items(), key=lambda item: -item[1].id)[:20]:
+                other = db.session.get(Student, student_id)
+                if other:
+                    candidates.append({"student_id": other.id, "name": other.name, "status_label": status_of(row)})
+        return no_store(jsonify({
+            "demo_mode": True, "role": account.role, "skip_date_waits": demo_skip_date_waits(), "process": process,
+            "student": {"id": student.id, "name": student.name, "student_number": student.student_number} if student else None,
+            "case": case, "candidates": candidates,
+        }))
+
     @app.route("/api/auth/demo-students")
     def auth_demo_students():
         """Expose only the purpose-built quick-login demo identities (demo mode only)."""

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { BookPlus, BriefcaseBusiness, CalendarOff, CheckCircle2, ChevronDown, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, PlayCircle, RotateCcw, SlidersHorizontal, UserCog, UserRound, UserX } from "lucide-react";
+import { BookPlus, BriefcaseBusiness, CalendarOff, CheckCircle2, ChevronDown, Compass, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, PlayCircle, RotateCcw, SlidersHorizontal, UserCog, UserRound, UserX } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { homePath } from "../lib/homePaths.js";
+import { GUIDES } from "../lib/demoGuide/guides.js";
 import { Button, InlineNotice, Input, PageHeader } from "../components/ui/index.js";
 
 
@@ -77,7 +78,9 @@ export default function Login() {
   const { user, refresh } = useAuth();
   const expired = new URLSearchParams(window.location.search).get("expired") === "1"; // sent by api.js on a 401 (I-211)
   // The form always starts empty: nothing is pre-filled, so a real typed login can be shown.
-  const [form, setForm] = useState({ email: "", password: "" });
+  // The one exception: the Demo Guide's "Sign in as ..." opens this page with ?as=<email>, so that account is ready to sign in.
+  const asEmail = new URLSearchParams(window.location.search).get("as") || "";
+  const [form, setForm] = useState({ email: asEmail, password: "" });
   const [showPassword, setShowPassword] = useState(false);
   // The sign-in is made here (not through the auth context's login(), which sets the app-wide loading flag and so
   // unmounts this page): a wrong password keeps what was typed, the open demo panel and the scroll position.
@@ -86,7 +89,9 @@ export default function Login() {
   const [demoMode, setDemoMode] = useState(false);
   // Global demo switch (null until the server answers, or with demo mode off): steps never wait for a calendar date.
   const [skipDateWaits, setSkipDateWaits] = useState(null);
-  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(Boolean(asEmail));
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [guidePick, setGuidePick] = useState("");
   const [demoAccounts, setDemoAccounts] = useState([]);
   const [demoStudents, setDemoStudents] = useState([]);
   const [demoLoading, setDemoLoading] = useState(false);
@@ -117,7 +122,7 @@ export default function Login() {
 
   // Demo credentials are fetched only when the presenter expands the panel.
   useEffect(() => {
-    if (!demoMode || !demoOpen || demoLoaded) return undefined;
+    if (!demoMode || !(demoOpen || guideOpen) || demoLoaded) return undefined;
     let active = true;
     setDemoLoading(true);
     Promise.all([api.demoAccounts(), api.demoStudents()])
@@ -136,7 +141,13 @@ export default function Login() {
     return () => {
       active = false;
     };
-  }, [demoMode, demoOpen, demoLoaded]);
+  }, [demoMode, demoOpen, guideOpen, demoLoaded]);
+
+  // With ?as=<email>, once the demo accounts are known, the shared demo password goes in as well.
+  useEffect(() => {
+    const match = asEmail && demoAccounts.find((account) => account.email === asEmail);
+    if (match) setForm((current) => (current.password ? current : { email: match.email, password: match.password || "" }));
+  }, [asEmail, demoAccounts]);
 
   if (user?.role) return <Navigate to={homePath(user.role)} replace />;
 
@@ -386,6 +397,55 @@ export default function Login() {
                     )}
                     {demoError && <InlineNotice tone="danger">{demoError}</InlineNotice>}
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+          {demoMode && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/60">
+              <button
+                type="button"
+                onClick={() => setGuideOpen((value) => !value)}
+                aria-expanded={guideOpen}
+                aria-controls="demo-guide-panel"
+                className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-900">
+                    <Compass className="h-4 w-4" aria-hidden="true" /> Demo guide
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">Demo mode</span>
+                  </span>
+                  <span className="mt-0.5 block text-xs text-amber-800">Which account to use for each demo. After signing in, open Demo guide in the top bar.</span>
+                </span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-amber-800 transition-transform ${guideOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+              </button>
+              {guideOpen && (
+                <div id="demo-guide-panel" className="space-y-3 border-t border-amber-200 px-4 pb-4 pt-3">
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="Choose a demo">
+                    {GUIDES.map((guide) => (
+                      <Button key={guide.id} size="sm" variant={guidePick === guide.id ? "primary" : "secondary"} aria-pressed={guidePick === guide.id} onClick={() => setGuidePick(guide.id)}>
+                        {guide.title}
+                      </Button>
+                    ))}
+                  </div>
+                  {GUIDES.filter((guide) => guide.id === guidePick).map((guide) => (
+                    <div key={guide.id} className="space-y-2">
+                      <p className="text-xs text-slate-600">{guide.summary}</p>
+                      <ol className="divide-y divide-amber-100 overflow-hidden rounded-xl border border-amber-100 bg-white">
+                        {["student", "staff", "dean"].filter((role) => guide.accounts[role]).map((role) => (
+                          <li key={role} className="flex items-center gap-2 p-2">
+                            <span className="min-w-0 flex-1 px-1">
+                              <span className="block truncate text-sm font-semibold text-ink">{guide.accounts[role].label.charAt(0).toUpperCase() + guide.accounts[role].label.slice(1)}</span>
+                              <span className="meta block truncate">{guide.accounts[role].who === guide.accounts[role].label ? "" : `${guide.accounts[role].who} · `}{guide.accounts[role].email}</span>
+                            </span>
+                            <Button size="sm" variant="secondary" className="shrink-0" aria-label={`Fill form for ${guide.accounts[role].who}`} onClick={() => fillForm({ email: guide.accounts[role].email, password: sharedPassword })}>
+                              Fill form
+                            </Button>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

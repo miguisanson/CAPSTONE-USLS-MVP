@@ -1,5 +1,13 @@
 # State
 
+## Demo Guide built — 2026-11-04 (branch pkt/demo-guide, worktree wt/kguide)
+
+- Server: `GET /api/demo/guide-state` in `app.py` (`tests/test_demo_guide.py` OK). Frontend: `frontend/src/lib/demoGuide/{engine,guides,narration}.js`,
+  `components/DemoGuide.jsx` (launcher in the shared header + panel), "Demo guide" entry and `?as=<email>` on `pages/Login.jsx`, `demo-guide:api`
+  event in `api.js`. Spec `frontend/e2e/p114-demo-guide.spec.js` (owns demo student `therese`; resets it before and after).
+  Not in the guide yet: withdrawal / graduation / practicum scripts (the server route already answers for them); upload writes (FormData fetches) do not emit the event.
+
+
 ## Known-data rule sweep — 2026-11-04 (IN PROGRESS, session "known-data", NOT committed)
 
 - Owner rule: "never make a user type, pick or tick something the system already knows or can check."

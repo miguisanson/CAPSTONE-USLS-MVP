@@ -33,6 +33,7 @@ import { useAuth } from "../auth";
 import { Button, Drawer } from "./ui/index.js";
 import { PORTAL_NAV, PORTAL_FOOTERS, findNavItem, usePortalNav } from "./portalNav";
 import NotificationBell from "./NotificationBell";
+import DemoGuide from "./DemoGuide";
 import { PAGE, PORTAL_NAMES, RECORD_LABELS, stepLabel, withoutStep } from "../lib/labels.js";
 import { RecordTitleProvider } from "./recordTitle.jsx";
 
@@ -305,6 +306,7 @@ export default function Layout({ children }) {
             <span className="hidden max-w-[16rem] truncate rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-block xl:max-w-[24rem]" title={identity}>
               {identity}
             </span>
+            <DemoGuide />
             <NotificationBell />
             <Button variant="icon" icon={LogOut} aria-label="Sign out" onClick={logout} />
             <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-600 text-sm font-semibold text-white" aria-hidden="true">

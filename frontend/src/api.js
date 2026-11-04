@@ -6,9 +6,16 @@ const NOT_REACHABLE = "The site is not reachable right now. Check your connectio
 const SIGN_IN_PATHS = ["/auth/login", "/auth/logout", "/auth/me", "/auth/config", "/auth/demo-accounts", "/auth/demo-students"];
 let signingOut = false;
 
+// The Demo Guide listens to this event: after each write it re-reads the case, and a refused write shows its reason.
+function announce(method, path, status, message = "") {
+  if (method === "GET" || typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("demo-guide:api", { detail: { method, path, status, message } }));
+}
+
 async function request(path, options = {}) {
   if (path === "/auth/logout") signingOut = true; // a poll still in flight must not look like an expired session
   if (path === "/auth/login") signingOut = false;
+  const method = String(options.method || "GET").toUpperCase();
   let res;
   try {
     res = await fetch(`${BASE}${path}`, {
@@ -17,6 +24,7 @@ async function request(path, options = {}) {
       ...options,
     });
   } catch {
+    announce(method, path, 0, NOT_REACHABLE);
     throw new Error(NOT_REACHABLE);
   }
   if (!res.ok) {
@@ -31,8 +39,10 @@ async function request(path, options = {}) {
     } catch (e) {
       /* ignore parse errors */
     }
+    announce(method, path, res.status, message);
     throw new Error(message);
   }
+  announce(method, path, res.status);
   return res.json();
 }
 
@@ -59,6 +69,7 @@ export const api = {
   demoAccounts: () => request("/auth/demo-accounts"),
   setDemoSettings: (payload) => request("/auth/demo-settings", { method: "POST", body: JSON.stringify(payload) }),
   demoStudents: () => request("/auth/demo-students"),
+  demoGuideState: (params = {}) => request(`/demo/guide-state?${queryString(params)}`),
   resetDemoStudent: (demoKey) =>
     request(`/auth/demo-students/${encodeURIComponent(demoKey)}/reset`, {
       method: "POST",
