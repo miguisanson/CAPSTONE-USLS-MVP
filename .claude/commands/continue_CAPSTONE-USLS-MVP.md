@@ -19,7 +19,7 @@ exact next step into `.planning/STATE.md` so the next session (or the
 scheduled resume task) picks it up.
 ## Current run: v6.1 — UAT from Wednesday 2026-11-04 (IM28–IM33)
 
-- **Branch `v6.1-migui`** (from Natalie's `v6.0-natalie`). It is the one line
+- **Branch `v6.2-migui`** (from `v6.1-migui`, which came from Natalie's `v6.0-natalie`). It is the one line
   for UAT; push as work lands. Older branches are not touched.
 - **Priority:** anything that would embarrass us in UAT first — red gate,
   crashes, broken flows, the public-site hardening for `https://miguisanson.dev`

@@ -1,5 +1,7 @@
 # State
 
+**Current branch: `v6.2-migui`** (made 2026-11-04 13:3x from `v6.1-migui` 9bf95ac, identical code). Natalie works here: `git fetch` then `git switch v6.2-migui`, `npm run seed` once, `/continue_CAPSTONE-USLS-MVP`.
+
 ## 2026-11-04 13:25 — demo videos re-recorded (session "redo videos"; not committed)
 
 - `scripts/demo/narration.json`: every line rewritten as plain spoken English with linking phrases ("Here we have…",

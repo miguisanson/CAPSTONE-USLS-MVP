@@ -5,7 +5,7 @@ shelf-and-sword (2026-10-17) and adjusted to this web app and the owner's decisi
 `DECISIONS.md` (IM1–IM15).
 
 **Plain version:** the owner opens a session, types `/continue_CAPSTONE-USLS-MVP`, and leaves
-it running. Agents work on the current branch (`v6.1-migui`; earlier `v5.2-migui_again`), one small commit per fix or feature,
+it running. Agents work on the current branch (`v6.2-migui`; earlier `v6.1-migui`, `v5.2-migui_again`), one small commit per fix or feature,
 each with its test and, for anything visual, screenshots. The owner reviews `BOARD.md` when
 free and says which commits to merge into `v5.1-migui_clean`. There is no cap on unreviewed
 work (IM11); every commit can be reverted on its own.
