@@ -7644,7 +7644,7 @@ def leave_end_leave_for_readmission(case: LeaveCase, linked: LeaveCase | None) -
             actor_role="Workflow System", actor_name="Workflow System",
             comment=linked.closed_reason,
         ))
-        leave_close_tasks(linked, stages=("return_due", "awol", "file_return", "registrar"), kinds=(KIND_LOA,))
+        leave_close_tasks(linked, stages=("return_due", "awol", "file_return"), kinds=(KIND_LOA,))  # the Registrar task stays until the export
     if target:
         # Leave rows from the return semester onward no longer apply.
         for row in TermEnrollment.query.filter(
@@ -8096,7 +8096,7 @@ def _leave_h_confirm_awol(case, account, comment, data, move):
     case.status = "Expired"
     case.closed_at = now_utc()
     case.closed_reason = "Leave ended with no return; student confirmed AWOL"
-    leave_close_tasks(case, stages=("return_due", "awol", "file_return", "registrar"), kinds=(KIND_LOA,))
+    leave_close_tasks(case, stages=("return_due", "awol", "file_return"), kinds=(KIND_LOA,))  # the Registrar task stays until the export
     leave_declare_awol(case, account, comment)
     leave_notice(
         case, account, "Your leave of absence ended without a return",

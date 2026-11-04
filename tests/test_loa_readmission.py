@@ -1400,6 +1400,31 @@ class LeaveCaseTests(unittest.TestCase):
         self.assertEqual([s["state"] for s in steps("LOA", "On Leave", set())],
                          ["complete", "complete", "complete", "current", "upcoming", "upcoming"])
 
+    # ---- audit round 3 -------------------------------------------------------------
+    REGISTRAR_TASK = "Send the approved Leave of Absence to the Registrar"
+
+    def registrar_task_status(self):
+        with app.app_context():
+            task = Task.query.filter_by(student_id=self.student_id, title=self.REGISTRAR_TASK).first()
+            return task.status if task else None
+
+    def test_i294_readmission_keeps_the_send_to_registrar_task_open_until_the_leave_is_exported(self):
+        leave_id = self.make_on_leave("Running Term", "Term One")
+        self.assertEqual(self.registrar_task_status(), "Pending")
+        self.readmit("Term Two")
+        with app.app_context():
+            self.assertEqual(db.session.get(LeaveCase, leave_id).registrar_status, "Pending Handoff")
+        self.assertEqual(self.registrar_task_status(), "Pending")
+
+    def test_i294_confirming_awol_keeps_the_send_to_registrar_task_open(self):
+        case_id = self.make_on_leave("Running Term", "Running Term")
+        with app.app_context():
+            end = AcademicTerm.query.filter_by(label="Running Term").one().end_date
+            sync_leave_cases(today=end + timedelta(days=30), commit=True)
+        confirmed = self.act(self.staff_client(), case_id, "confirm_awol", comment="No reply.")
+        self.assertEqual(confirmed.status_code, 200, confirmed.get_json())
+        self.assertEqual(self.registrar_task_status(), "Pending")
+
 
 if __name__ == "__main__":
     unittest.main()
