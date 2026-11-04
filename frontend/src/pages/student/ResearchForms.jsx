@@ -219,7 +219,7 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
           <StatusChip status={requirement.status_label} dot={false} />
           <Button as="label" variant="secondary" icon={titlePackageLocked ? Lock : FileUp} className={titlePackageLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
             {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading…" : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
-            <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy || titlePackageLocked} onChange={(e) => upload(e.target.files?.[0])} />
+            <input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={busy || titlePackageLocked} onChange={(e) => upload(e.target.files?.[0])} />
           </Button>
         </div>
       </div>

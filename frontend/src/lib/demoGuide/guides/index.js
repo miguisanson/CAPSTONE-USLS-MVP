@@ -18,8 +18,12 @@ import residency from "./residency.js";
 import calendars from "./calendars.js";
 import portals from "./portals.js";
 import bestFeatures from "./best-features.js";
+import researchTitle from "./research-title.js";
+import panelMatching from "./panel-matching.js";
+import defenseScheduling from "./defense-scheduling.js";
+import verdicts from "./verdicts.js";
 
-export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, withdrawal, practicum, graduation, courseAdjustments, businessRules, policyAssistant, policyDocuments, studentHandoff, enrollment, dropping, residency, calendars, portals, bestFeatures];
+export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, withdrawal, practicum, graduation, courseAdjustments, businessRules, policyAssistant, policyDocuments, studentHandoff, enrollment, dropping, residency, calendars, portals, bestFeatures, researchTitle, panelMatching, defenseScheduling, verdicts];
 
 // The ready-made demo students that the existing reset (POST /api/auth/demo-students/<key>/reset) knows, by student number.
 export const RESET_KEYS = {
@@ -35,6 +39,7 @@ export const RESET_KEYS = {
   "2691101": "residency-nicolas",
   "2690701": "course-adjustments-lianne",
   "2690302": "graduation-carlo",
+  "2260004": "research-miguel",
 };
 
 export const guideById = (id) => GUIDES.find((guide) => guide.id === id) || null;

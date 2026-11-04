@@ -1,0 +1,98 @@
+import { STAFF, ACADEMIC, NO_CASE } from "./_shared.js";
+
+export default {
+  id: "research-title",
+  process: NO_CASE,
+  title: "Research Title and Form 1",
+  summary: "A student sends Form 1 and three concept papers, staff verify them, and the Academic Coordinator endorses Form 1 with a signature.",
+  studentNumber: "2260004",
+  walkthrough: "12_research_gate",
+  accounts: {
+    student: { who: "the student", label: "Miguel Yu", email: "student@usls.edu.ph" },
+    staff: STAFF,
+    academic_coordinator: ACADEMIC,
+  },
+  steps: [
+    {
+      id: "rt-form1", title: "The student uploads Form 1", role: "student", route: "/student/research", page: "Research",
+      do: "Open Research. Choose the Form 1 PDF: the research title is read from the file and fills in by itself.",
+      actions: [
+        { upload: { css: 'input[type="file"]', nth: 0 }, fixture: "research-form1.pdf" },
+        { wait: { text: "1 of 1 file uploaded" }, timeout: 20000 },
+        { pause: 1500, caption: "The title came from the PDF" },
+      ],
+      doneWhen: { apiWrite: "POST /student-portal/research-evidence/upload" },
+      rule: "The research title is taken from the Form 1 file, not typed.",
+      ifAsked: [{ q: "Can the student type the title?", a: "No. The title is read from the uploaded Form 1 so that it always matches the file." }],
+    },
+    {
+      id: "rt-papers", title: "Three concept papers", role: "student", route: "/student/research", page: "Research",
+      do: "Choose the three concept papers one after the other, each as its own PDF. Each paper is checked against the concept paper guidelines.",
+      actions: [
+        { upload: { css: 'input[type="file"]', nth: 1 }, fixture: "research-concept-1.pdf" },
+        { wait: { text: "1 of 3 files uploaded" }, timeout: 20000 },
+        { upload: { css: 'input[type="file"]', nth: 1 }, fixture: "research-concept-2.pdf" },
+        { wait: { text: "2 of 3 files uploaded" }, timeout: 20000 },
+        { upload: { css: 'input[type="file"]', nth: 1 }, fixture: "research-concept-3.pdf" },
+        { wait: { text: "3 of 3 files uploaded" }, timeout: 20000 },
+        { pause: 1500, caption: "All three papers are in" },
+      ],
+      doneWhen: "manual",
+      rule: "Panel Matching reads these papers, so each one is a separate PDF.",
+      ifAsked: [{ q: "What does the compliance check do?", a: "It reads the PDF and checks the concept paper guidelines: the sections, the length and the similarity limit. It tells the student what is missing before the paper is sent." }],
+    },
+    {
+      id: "rt-submit", title: "The student submits the Title Defense package", role: "student", route: "/student/research", page: "Research",
+      do: "Select Submit Title Defense for review, then Send request. The package goes to Graduate School staff.",
+      actions: [
+        { click: { role: "button", name: "Submit Title Defense" } },
+        { click: { role: "button", name: "Send request", in: "dialog" } },
+        { wait: { text: "Request sent" }, timeout: 20000 },
+      ],
+      doneWhen: { apiWrite: "POST /student-portal/requests/research-gate" },
+      ifAsked: [{ q: "Can the student submit with a file missing?", a: "No. The button stays unavailable until Form 1 and all three concept papers are uploaded." }],
+    },
+    {
+      id: "rt-verify", title: "Staff verify the submitted requirements", role: "staff", route: "/workflow/research-gate", page: "Research Gate",
+      do: "Open Research Gate, find the student's card and select View. The files are listed with what is still pending. Select Verify submitted requirements: the package moves on to the Academic Coordinator.",
+      actions: [
+        { type: { label: "Search requests" }, text: "Miguel" },
+        { click: { role: "button", name: "Open the Research Gate record of Miguel Yu" } },
+        { wait: { role: "button", name: "Verify submitted requirements" }, timeout: 20000 },
+        { pause: 1500, caption: "The files the student sent" },
+        { click: { role: "button", name: "Verify submitted requirements" } },
+        { wait: { text: "Saved." }, timeout: 20000 },
+      ],
+      doneWhen: { apiWrite: "POST /transactions/research-gate" },
+      rule: "Staff cannot mark a missing document as received; the system reads the stored files.",
+      ifAsked: [{ q: "Can staff accept a missing file?", a: "No. A requirement turns complete only when its file is stored." }],
+    },
+    {
+      id: "rt-endorse", title: "The Academic Coordinator endorses Form 1", role: "academic_coordinator", route: "/form1-endorsements", page: "Form 1 Endorsements",
+      do: "Open Form 1 Endorsements and select the student. Draw the signature, select Finalize signature, then Endorse and sign Form 1.",
+      actions: [
+        { click: { role: "button", name: "Miguel Yu" } },
+        { wait: { text: "Draw signature" }, timeout: 20000 },
+        { draw: { css: "canvas" } },
+        { click: { role: "button", name: "Finalize signature" } },
+        { click: { role: "button", name: "Endorse and sign Form 1" } },
+        { wait: { text: "Endorsed by" }, timeout: 20000 },
+        { pause: 1500, caption: "The signature is saved with the endorsement" },
+      ],
+      doneWhen: { apiWrite: "POST /research-gate/form1-endorsements/*" },
+      rule: "Form 1 is endorsed by the Academic Coordinator with a drawn signature before the panel is matched.",
+      ifAsked: [{ q: "Why a drawn signature?", a: "The endorsement keeps the coordinator's signature with the file, so the record shows who endorsed it and when." }],
+    },
+    {
+      id: "rt-board", title: "The card moves on to Panel Matching", role: "staff", route: "/workflow/research-gate", page: "Research Gate",
+      do: "Back on Research Gate, search the student's name: the card shows Form 1 endorsed and names who is next. The stage moves by itself when its requirements are complete; nobody drags the card.",
+      actions: [
+        { type: { label: "Search requests" }, text: "Miguel" },
+        { wait: { role: "button", name: "Open the Research Gate record of Miguel Yu" }, timeout: 20000 },
+        { pause: 2500, caption: "The card says who is next" },
+      ],
+      doneWhen: "manual",
+      ifAsked: [{ q: "Where does the student go next?", a: "To Panel Matching, which suggests a panel from the concept papers and the faculty records." }],
+    },
+  ],
+};

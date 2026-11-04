@@ -1,7 +1,7 @@
 // The Demo Guide's action player (.planning/demo-guide/DESIGN.md, "Autopilot"): plays a step's `actions` on the real page so the
 // guide can "do it" for the presenter, with a visible cursor, a ring on the target and typed text. No React, no dependency.
 //
-//   action   { click: T } | { type: T, text } | { select: T, label | index } | { check: T } | { upload: T, fixture } |
+//   action   { click: T } | { type: T, text } | { select: T, label | index } | { check: T } | { upload: T, fixture } | { draw: T } (a stroke on a signature canvas) |
 //            { wait: T } | { gone: T } | { go: "/route" } | { signInAs: "role" } | { pause: ms }      (+ optional { caption, timeout, optional: true })
 //   target T "name"               -> the element with data-demo="name" (preferred: stable, added to the page's markup);
 //            "#id"                 -> the element with that id (the request forms have stable ids such as #loa-start)
@@ -356,6 +356,7 @@ const CAPTIONS = {
   select: (a) => `Choosing ${a.label || "an option"}`,
   check: (a) => `Ticking ${labelOf(a.check)}`,
   upload: () => "Attaching the sample file",
+  draw: () => "Drawing the signature",
   wait: () => "Waiting for the page",
   go: () => "Opening the page",
 };
@@ -375,7 +376,7 @@ async function play(action, ctx) {
     await waitFor(action.gone, { signal, gone: true, timeout: action.timeout || 8000 });
     return undefined;
   }
-  const key = ["click", "type", "select", "check", "upload"].find((name) => action[name] != null);
+  const key = ["click", "type", "select", "check", "upload", "draw"].find((name) => action[name] != null);
   if (!key) throw new AutopilotError(`Unknown autopilot action: ${JSON.stringify(action)}`);
   let el;
   try {
@@ -398,6 +399,17 @@ async function play(action, ctx) {
     dt.items.add(await toFile(action.fixture));
     el.files = dt.files;
     fire(el, "input", "change");
+  } else if (key === "draw") {
+    // A signature stroke on a canvas, as pointer events (the pad listens to pointerdown/move/up).
+    pulse();
+    const rect = el.getBoundingClientRect();
+    const at = (i) => ({ clientX: rect.left + rect.width * (0.1 + 0.8 * (i / 40)), clientY: rect.top + rect.height * (0.5 + 0.22 * Math.sin(i / 3)), pointerId: 1, bubbles: true, cancelable: true });
+    el.dispatchEvent(new PointerEvent("pointerdown", at(0)));
+    for (let i = 1; i <= 40; i += 1) {
+      el.dispatchEvent(new PointerEvent("pointermove", at(i)));
+      if (!reducedMotion()) await sleep(15, signal);
+    }
+    el.dispatchEvent(new PointerEvent("pointerup", at(40)));
   } else if (key === "check") {
     if (!el.checked) {
       pulse();
