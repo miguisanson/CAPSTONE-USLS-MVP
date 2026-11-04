@@ -25,7 +25,10 @@ wt/forms so a worktree removal can never touch the main checkout's node_modules)
 **Checks done:** tests.test_forms_pack 10/10; tests.test_operations_manual_content 24 OK (+ policy_documents, health,
 crosscut, polish OK); test_privacy_consent(+_seed), seed_determinism, demo_password OK; build:web ok; check:ui:strict 0;
 e2e p112 43 passed; helper's full e2e 822 passed / 3 failed (p110, p84 line 373, p79 — p110 fails the same on the
-base code: Course Adjustments has no "Schedule" tab; p79 passes alone). Full Python gate result: see below.
+base code: Course Adjustments has no "Schedule" tab; p79 passes alone). Full Python gate: NOT finished when the forms
+session closed at 08:30 (1 E seen mid-run, unidentified; log E:/Temp/claude/rev-shots/gate.txt) — the leader runs it on the merged commit.
+**Leader = "Session progress report" session** (owner, 2026-11-04); the forms session handed over and closed. Checklist:
+`.planning/forms-ops/MERGE-CHECKLIST.md`.
 Fable P1 forms findings all fixed; P2/P3 mostly fixed; left: declaration line on page 2 of GS-F-10 and GS-F-42, some P3 polish.
 
 **To land (owner OK given; after the 2026-11-04 meeting):** `git fetch` + merge origin first (Myrine pushes to v6.1),
