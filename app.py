@@ -14344,6 +14344,7 @@ def register_routes(app: Flask) -> None:
                 "course_records": [course_record_dict(record) for record in course_records],
                 "research_case": research_case_dict(research_case),
                 "research_progress": research_progress,
+                "defense_earliest": student_defense_earliest(student, research_progress["gate"]),
                 "defense_follow_up": student_defense_follow_up(student, research_progress["gate"]),
                 "research_vocabulary": RESEARCH_VOCABULARY,
                 "form1_endorsement": form1_endorsement_dict(Form1Endorsement.query.filter_by(student_id=student.id).first()),
@@ -15584,6 +15585,12 @@ def register_routes(app: Flask) -> None:
                 return jsonify({"error": "Enter the preferred date as YYYY-MM-DD."}), 400
             if day <= ph_today():
                 return jsonify({"error": "The preferred date must be a future date."}), 400
+            earliest = student_defense_earliest(student, stage_progress["gate"])
+            if earliest and day.isoformat() < earliest["date"]:
+                return jsonify({"error": (
+                    f"The earliest date for your {defense_type} is {earliest['date']}: it needs at least "
+                    f"{earliest['days']} days after {earliest['label']}. Choose that date or a later one."
+                )}), 400
         if not active_panel_assignments(student, stage_progress["gate"]):
             return jsonify({"error": "Panel matching must be completed before requesting a defense schedule."}), 400
         booked = ScheduleRequest.query.filter(
@@ -37239,6 +37246,15 @@ def readmission_requirements() -> list[str]:
 
 
 def readmission_system_checks(student: Student, case: LeaveCase | None = None) -> list[dict]:
+def student_defense_earliest(student: Student, gate: str) -> dict | None:
+    """What the student is told about the defense lead time (the stage's defense, its earliest date, the reason); None when no defense is left."""
+    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
+    if not defense_type:
+        return None
+    earliest, _reference, label = student_earliest_defense_date(student, defense_type)
+    return {"defense_type": defense_type, "date": earliest.isoformat(), "days": defense_lead_days(defense_type), "label": label}
+
+
     """What the records already show for a returning student; the student ticks nothing."""
     if case is not None:
         written = bool((case.return_intent or "").strip())
