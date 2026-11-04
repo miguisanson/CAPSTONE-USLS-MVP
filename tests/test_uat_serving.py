@@ -34,6 +34,12 @@ def load_serve_uat():
 
 
 class ServeUatTests(unittest.TestCase):
+    def setUp(self):
+        # The first test module to import ``app`` fixes the database for the whole run, and other modules delete that
+        # file when they finish; make the tables here so this module passes in any order (I-347).
+        with app_module.app.app_context():
+            app_module.db.create_all()
+
     def seen_url_root(self, wsgi_app, headers):
         """Send one request through ``wsgi_app`` and return request.url_root as the app saw it."""
         seen = []

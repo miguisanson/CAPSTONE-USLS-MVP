@@ -667,6 +667,16 @@ class AcademicFixTests(unittest.TestCase):
         ok = self._drop(enrollment_id, date.today().isoformat())
         self.assertEqual(ok.status_code, 200, ok.get_json())
 
+    def test_i308_a_drop_cannot_be_dated_in_the_future(self):
+        with app.app_context():
+            enrollment_id = self._enroll_row(self.student_id, self.course_ids[0], self.term1_id).id
+            db.session.commit()
+        response = self._drop(enrollment_id, (date.today() + timedelta(days=10)).isoformat())  # inside the semester, but not yet
+        self.assertEqual(response.status_code, 400, response.get_json())
+        self.assertIn("future", response.get_json()["error"].lower())
+        with app.app_context():
+            self.assertEqual(db.session.get(SubjectEnrollment, enrollment_id).status, "Enrolled")
+
     def test_dropping_a_subject_closes_a_pending_withdrawal_request_for_it(self):
         with app.app_context():
             enrollment = self._enroll_row(self.student_id, self.course_ids[0], self.term1_id)

@@ -381,6 +381,8 @@ export function ScheduleRequestForm({ data, onSaved }) {
   // The stage's defense already took place (e.g. revisions are due): the office schedules another only if the result requires it.
   const tookPlace = !liveSchedule && defenseScheduleDone(data);
   const closed = Boolean(liveSchedule) || tookPlace;
+  const earliest = data.defense_earliest; // the lead time the server enforces (14 days for a proposal or final defense)
+  const minDate = earliest?.date && earliest.date > tomorrowISO() ? earliest.date : tomorrowISO();
   const followUp = data.defense_follow_up;
   const [form, setForm] = useState({
     preferred_date: "",
@@ -420,8 +422,8 @@ export function ScheduleRequestForm({ data, onSaved }) {
         <ErrorSummary errors={errors} />
         <fieldset disabled={closed} className="space-y-4 disabled:opacity-60">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Preferred date" required error={messageFor("schedule-date")}>
-              <Input id="schedule-date" type="date" min={tomorrowISO()} value={form.preferred_date} onChange={set("preferred_date")} />
+            <Field label="Preferred date" required error={messageFor("schedule-date")} hint={earliest ? `Earliest date: ${formatDate(earliest.date)}, ${earliest.days} days after ${earliest.label}.` : undefined}>
+              <Input id="schedule-date" type="date" min={minDate} value={form.preferred_date} onChange={set("preferred_date")} />
             </Field>
             <div className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
               <p className="eyebrow">Defense type</p>

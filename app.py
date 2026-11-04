@@ -5372,11 +5372,23 @@ def require_api_login(*roles):
                     "error": "Choose your own password before you continue.",
                     "must_change_password": True,
                 }), 403
+            if privacy_consent_enforced() and account.privacy_notice_version != PRIVACY_NOTICE_VERSION:
+                return jsonify({
+                    "error": "Accept the Data Privacy Notice before you continue.",
+                    "privacy_consent_required": True,
+                }), 403
             return fn(*args, **kwargs)
 
         return wrapper
 
     return decorator
+
+
+def privacy_consent_enforced() -> bool:
+    """The API refuses an account that has not accepted the Data Privacy Notice (I-349). Off while testing
+    (like the daily sweep) unless a test sets ENFORCE_PRIVACY_CONSENT, so suites that build bare accounts need no consent step."""
+    from flask import current_app
+    return not current_app.config.get("TESTING") or bool(current_app.config.get("ENFORCE_PRIVACY_CONSENT"))
 
 
 def require_workflow_actor(*roles) -> UserAccount:
@@ -6045,6 +6057,7 @@ def run_maintenance_sweeps() -> dict:
     ``POST /api/maintenance/refresh`` runs it on request. A page view itself never does.
     """
     awol = sync_automatic_awol_statuses(commit=False)
+    close_ended_residencies()
     leave = sync_leave_cases(commit=False)
     risk = refresh_risk_levels(force=True)
     reviews = ensure_onboarding_reviews()
@@ -7632,7 +7645,7 @@ def leave_end_leave_for_readmission(case: LeaveCase, linked: LeaveCase | None) -
             actor_role="Workflow System", actor_name="Workflow System",
             comment=linked.closed_reason,
         ))
-        leave_close_tasks(linked, stages=("return_due", "awol", "file_return", "registrar"), kinds=(KIND_LOA,))
+        leave_close_tasks(linked, stages=("return_due", "awol", "file_return"), kinds=(KIND_LOA,))  # the Registrar task stays until the export
     if target:
         # Leave rows from the return semester onward no longer apply.
         for row in TermEnrollment.query.filter(
@@ -8084,7 +8097,7 @@ def _leave_h_confirm_awol(case, account, comment, data, move):
     case.status = "Expired"
     case.closed_at = now_utc()
     case.closed_reason = "Leave ended with no return; student confirmed AWOL"
-    leave_close_tasks(case, stages=("return_due", "awol", "file_return", "registrar"), kinds=(KIND_LOA,))
+    leave_close_tasks(case, stages=("return_due", "awol", "file_return"), kinds=(KIND_LOA,))  # the Registrar task stays until the export
     leave_declare_awol(case, account, comment)
     leave_notice(
         case, account, "Your leave of absence ended without a return",
@@ -8879,6 +8892,15 @@ def resolve_source_flags_after_monitoring_upload(
     return len(rows)
 
 
+def awol_withdrawal_is_after_return(case: AwolCase, withdrawn: TermEnrollment) -> bool:
+    """True when the withdrawn semester is a new one, not the withdrawal that caused the AWOL the student already returned from (I-295).
+    New = it starts on or after the approved return semester; with no return semester on the case, it was recorded after the decision."""
+    target = AcademicTerm.query.filter_by(label=case.target_return_term).first() if case.target_return_term else None
+    if target:
+        return withdrawn.term.start_date >= target.start_date
+    return bool(case.decided_at and withdrawn.confirmed_at and withdrawn.confirmed_at > case.decided_at)
+
+
 def automatic_awol_evidence(student: Student) -> tuple[str, str, date | None] | None:
     """Return explicit handbook-backed evidence; never infer AWOL from mere absence."""
     if student.enrollment_tag == "AWOL" or student.standing == "AWOL":
@@ -8908,7 +8930,7 @@ def automatic_awol_evidence(student: Student) -> tuple[str, str, date | None] | 
             "Extension Approved - Refresher Required",
             "Re-enrollment Required",
             "Re-enrollment Completed",
-        }:
+        } and not awol_withdrawal_is_after_return(resolved_case, latest_term):
             return None
         return (
             "Full-semester withdrawal without approved LOA",
@@ -8944,6 +8966,7 @@ def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
             latest = AwolCase(student_id=student.id)
             db.session.add(latest)
         newly_detected = not latest.automatically_flagged_at
+        latest.last_enrolled_term = latest.last_enrolled_term or awol_last_enrolled_term(student)
         latest.status = latest.status if latest.status in {
             "Return Submitted", "Returned for Revision", "Dean Review", "Re-enrollment Required"
         } else "AWOL Declared"
@@ -9029,6 +9052,40 @@ def latest_awol_case(student_id: int) -> AwolCase | None:
         .order_by(AwolCase.updated_at.desc(), AwolCase.id.desc())
         .first()
     )
+
+
+def close_residency_record(item: ResidencyEnrollment) -> None:
+    """Close one residency: the record, its semester row, and (when no other residency is open) the student's earlier tag."""
+    student = item.student
+    item.status = "Completed"
+    item.ended_at = now_utc()
+    item.updated_at = now_utc()
+    enrollment = TermEnrollment.query.filter_by(student_id=item.student_id, term_id=item.term_id).first()
+    if enrollment and enrollment.status == "Residency":
+        enrollment.status = "Completed"
+    still_active = ResidencyEnrollment.query.filter(
+        ResidencyEnrollment.student_id == item.student_id, ResidencyEnrollment.status == "Active",
+        ResidencyEnrollment.id != item.id).first()
+    if not still_active:
+        student.enrollment_tag = item.prior_enrollment_tag or "Enrolled"
+
+
+def close_ended_residencies() -> int:
+    """Residency is per semester (Handbook p.48): close every Active residency whose semester has ended (I-300)."""
+    closed = 0
+    for item in ResidencyEnrollment.query.filter_by(status="Active").all():
+        if not item.term or item.term.end_date >= ph_today():
+            continue
+        student = item.student
+        close_residency_record(item)
+        closed += 1
+        workflow_message_record(
+            "awol", student, None, "Student", "Residency enrollment closed",
+            f"Residency for {item.term.label} ended with the semester.", "notice", "Residency", student.standing, status="Sent",
+        )
+        add_log("awol", student.id, "Workflow System", "Residency record", "Residency enrollment closed", "Student",
+                f"{item.term.label} ended.", previous_status="Residency", new_status=student.standing)
+    return closed
 
 
 def latest_residency_enrollment(student_id: int, active_only: bool = False) -> ResidencyEnrollment | None:
@@ -13482,6 +13539,11 @@ def register_routes(app: Flask) -> None:
         """The sign-in page's global demo switch (demo mode only): skip_date_waits true/false, null = default."""
         if not demo_mode_enabled():
             return demo_mode_off_response()
+        account = current_account()
+        if not account:
+            return no_store(jsonify({"error": "Sign in as staff to change this."})), 401
+        if account.role not in {"staff", "admin", "dean"}:
+            return jsonify({"error": "Only Graduate School staff or the Dean can change this."}), 403
         value = (request.get_json(silent=True) or {}).get("skip_date_waits")
         if value is not None and not isinstance(value, bool):
             return jsonify({"error": "skip_date_waits must be true, false or null."}), 400
@@ -14282,6 +14344,7 @@ def register_routes(app: Flask) -> None:
                 "course_records": [course_record_dict(record) for record in course_records],
                 "research_case": research_case_dict(research_case),
                 "research_progress": research_progress,
+                "defense_earliest": student_defense_earliest(student, research_progress["gate"]),
                 "defense_follow_up": student_defense_follow_up(student, research_progress["gate"]),
                 "research_vocabulary": RESEARCH_VOCABULARY,
                 "form1_endorsement": form1_endorsement_dict(Form1Endorsement.query.filter_by(student_id=student.id).first()),
@@ -15522,6 +15585,12 @@ def register_routes(app: Flask) -> None:
                 return jsonify({"error": "Enter the preferred date as YYYY-MM-DD."}), 400
             if day <= ph_today():
                 return jsonify({"error": "The preferred date must be a future date."}), 400
+            earliest = student_defense_earliest(student, stage_progress["gate"])
+            if earliest and day.isoformat() < earliest["date"]:
+                return jsonify({"error": (
+                    f"The earliest date for your {defense_type} is {earliest['date']}: it needs at least "
+                    f"{earliest['days']} days after {earliest['label']}. Choose that date or a later one."
+                )}), 400
         if not active_panel_assignments(student, stage_progress["gate"]):
             return jsonify({"error": "Panel matching must be completed before requesting a defense schedule."}), 400
         booked = ScheduleRequest.query.filter(
@@ -15688,6 +15757,9 @@ def register_routes(app: Flask) -> None:
             if not doc.evidence_files:
                 continue
             student = Student.query.get(doc.student_id)
+            progress = detected_research_progress(student)
+            if progress["gate"] != RESEARCH_GATE_TITLE:
+                continue  # past the title defense (or not there yet): nothing left to endorse (I-320)
             endorsement = Form1Endorsement.query.filter_by(student_id=student.id).first() if concept_paper_package_ready(student.id) else None
             case = ResearchCase.query.filter_by(student_id=student.id).order_by(ResearchCase.opened_at.desc()).first()
             rows.append({
@@ -15695,7 +15767,7 @@ def register_routes(app: Flask) -> None:
                 "research_title": case.title if case else "Research title pending Form 1 submission",
                 "form": document_check_dict(doc),
                 "endorsement": form1_endorsement_dict(endorsement),
-                "current_stage": detected_research_progress(student)["stage"],
+                "current_stage": progress["stage"],
             })
         return jsonify({"items": rows})
 
@@ -15738,6 +15810,11 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "The student must upload Form 1 before it can be endorsed."}), 400
         if not concept_paper_package_ready(student.id):
             return jsonify({"error": "The student must upload all three concept papers before Form 1 can be endorsed."}), 400
+        if detected_research_progress(student)["gate"] != RESEARCH_GATE_TITLE:
+            return jsonify({"error": "Form 1 is endorsed only while the student is at the Form 1 and title defense step."}), 409
+        existing = Form1Endorsement.query.filter_by(student_id=student.id).first()
+        if existing and existing.status == "Endorsed":
+            return jsonify({"error": "Form 1 is already endorsed for this student."}), 409
         signature_data = (data.get("signature_data") or "").strip()
         if signature_data and (not signature_data.startswith("data:image/png;base64,") or len(signature_data) > 750000):
             return jsonify({"error": "The drawn signature is not a valid PNG image."}), 400
@@ -16232,9 +16309,12 @@ def register_routes(app: Flask) -> None:
         if endorsement_ids:
             query = query.filter(GraduationEndorsement.id.in_(endorsement_ids))
         rows = query.order_by(GraduationEndorsement.dean_decision_at.asc()).all()
-        rows = [item for item in rows if graduation_eligibility(item.student)["eligible"]]
+        dropped = [item for item in rows if not graduation_eligibility(item.student)["eligible"]]
+        left_out = [item.student.name for item in dropped]
+        rows = [item for item in rows if item not in dropped]
         if not rows:
-            return jsonify({"error": "No Dean-approved graduation endorsements are available to export."}), 400
+            reason = f" No longer eligible, so not exported: {', '.join(left_out)}." if left_out else ""
+            return jsonify({"error": "No Dean-approved graduation endorsements are available to export." + reason}), 400
 
         stream = io.StringIO()
         writer = safe_csv_writer(stream)
@@ -16279,6 +16359,7 @@ def register_routes(app: Flask) -> None:
             headers={
                 "Content-Disposition": f'attachment; filename="{filename}"',
                 "X-Exported-Count": str(len(rows)),
+                **({"X-Left-Out": ", ".join(left_out).encode("ascii", "replace").decode()} if left_out else {}),
             },
         )
 
@@ -17195,6 +17276,10 @@ def register_routes(app: Flask) -> None:
     def correct_defense_verdict(verdict: DefenseVerdict, faculty: Faculty | None, recorder=None):
         """Correct a verdict until it is acted on, with a reason. Same rules for the chair and for staff
         acting for the panel (`recorder` is then the staff account)."""
+        try:
+            require_open_standing(verdict.student, "correcting a defense verdict")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 409
         data = request_payload()
         reason = (data.get("reason") or "").strip()
         if len(reason) < 5:
@@ -17265,6 +17350,10 @@ def register_routes(app: Flask) -> None:
         return correct_defense_verdict(verdict, verdict.faculty, recorder=current_account())
 
     def confirm_defense_revisions(verdict: DefenseVerdict, confirmed_by: str, note: str, actor: str):
+        try:
+            require_open_standing(verdict.student, "confirming the revisions")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 409
         verdict.revision_status = REVISION_CONFIRMED
         verdict.revisions_confirmed_by = confirmed_by
         verdict.revisions_confirmed_at = now_utc()
@@ -18055,6 +18144,8 @@ def register_routes(app: Flask) -> None:
             effective_date = date.fromisoformat(raw_effective_date)
         except ValueError:
             return jsonify({"error": "Use a valid effective date."}), 400
+        if effective_date > ph_today():
+            return jsonify({"error": "The effective date cannot be in the future: a drop records absences that already happened."}), 400
 
         student = enrollment.student
         course = enrollment.course
@@ -22336,6 +22427,8 @@ def register_routes(app: Flask) -> None:
                 elif action == "approve":
                     if not endorsement or endorsement.endorsement_status != "Ready for Dean Review":
                         raise ValueError("Candidate is not ready for Dean review")
+                    if not eligibility["eligible"]:  # same check as the single decision (I-322)
+                        raise ValueError("Student is no longer eligible for graduation")
                     endorsement.endorsement_status = "Dean Approved"
                     endorsement.dean_remarks = comment or endorsement.dean_remarks
                     endorsement.dean_decision_at = now_utc()
@@ -29805,6 +29898,8 @@ def monitoring_portal_bulk_add_remaining(program: Program, data: dict) -> dict:
     if status != "Planned":
         raise MonitoringEntryError("Only Planned can be added in bulk; set other statuses one subject at a time.")
     term_label = _monitoring_clean(data.get("term_label"), 40)
+    if not _monitoring_term_label_ok(term_label):  # the same check as the single-row path (I-305)
+        raise MonitoringEntryError("Choose the semester from the list (for example AY 2026-2027 1st Semester).")
     curriculum = monitoring_curriculum_courses(program)
     if data.get("course_ids"):
         wanted = {safe_int(item) for item in data.get("course_ids")}
@@ -30096,7 +30191,28 @@ def monitoring_export_workbook(program: Program) -> bytes:
          if (item.status or "") not in MONITORING_NO_ROW_STATUSES or item.removed_at),
         key=lambda item: (by_id[item.student_id].last_name, by_id[item.student_id].first_name, item.course.code),
     )
+    # A subject withdrawn or dropped through the workflow is reset on the monitoring record (no adverse grade) and the
+    # grid shows it from the enrollment ledger, so the export adds it the same way (I-307).
+    ledger = [
+        item for item in SubjectEnrollment.query.filter(
+            SubjectEnrollment.student_id.in_([s.id for s in students] or [-1]),
+            SubjectEnrollment.status.in_(["Withdrawn", "Dropped"]),
+        ).all()
+        if item.course and (records.get((item.student_id, item.course_id)) is None
+                            or (records[(item.student_id, item.course_id)].status or "") in MONITORING_NO_ROW_STATUSES)
+    ]
+    ordered = ordered + sorted(ledger, key=lambda item: (by_id[item.student_id].last_name, by_id[item.student_id].first_name, item.course.code))
     for row_number, record in enumerate(ordered, 2):
+        if isinstance(record, SubjectEnrollment):
+            student, course = by_id[record.student_id], record.course
+            values = [
+                student.student_number, student.name, program.code, course.code, course.title, course.units or 3,
+                "Yes" if course.id in curriculum_ids else "No", record.term.label if record.term else "", record.status,
+                record.status_note or "", "Enrollment workflow", "", "", "", "", "", "",
+            ]
+            for column, value in enumerate(values, 1):
+                rows_sheet.cell(row=row_number, column=column, value=value)
+            continue
         student, course = by_id[record.student_id], record.course
         manual = record.source == MONITORING_MANUAL_SOURCE
         values = [
@@ -33000,17 +33116,7 @@ def handle_awol(data: MultiDict) -> int:
         item = ResidencyEnrollment.query.get_or_404(safe_int(data.get("residency_id")))
         if item.student_id != student.id or item.status != "Active":
             raise ValueError("Choose an active residency enrollment to close.")
-        item.status = "Completed"
-        item.ended_at = now_utc()
-        item.updated_at = now_utc()
-        enrollment = TermEnrollment.query.filter_by(student_id=student.id, term_id=item.term_id).first()
-        if enrollment and enrollment.status == "Residency":
-            enrollment.status = "Completed"
-        still_active = ResidencyEnrollment.query.filter(
-            ResidencyEnrollment.student_id == student.id, ResidencyEnrollment.status == "Active",
-            ResidencyEnrollment.id != item.id).first()
-        if not still_active:
-            student.enrollment_tag = item.prior_enrollment_tag or "Enrolled"
+        close_residency_record(item)
         student.standing = "Active"
         result = "Residency enrollment closed"
         workflow_message_record("awol", student, account, "Student", result, f"Residency for {item.term.label if item.term else 'the semester'} was closed.", "notice", "Residency", "Active", status="Sent")
@@ -37163,6 +37269,15 @@ def student_earliest_defense_date(
         reference = manuscript_received_on or today
         label = "the panel received the manuscript" if manuscript_received_on else "today (no manuscript receipt date recorded)"
     return max(today, earliest_defense_date(defense_type, reference)), reference, label
+
+
+def student_defense_earliest(student: Student, gate: str) -> dict | None:
+    """What the student is told about the defense lead time (the stage's defense, its earliest date, the reason); None when no defense is left."""
+    defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(gate)
+    if not defense_type:
+        return None
+    earliest, _reference, label = student_earliest_defense_date(student, defense_type)
+    return {"defense_type": defense_type, "date": earliest.isoformat(), "days": defense_lead_days(defense_type), "label": label}
 
 
 def onboarding_requirements() -> list[str]:

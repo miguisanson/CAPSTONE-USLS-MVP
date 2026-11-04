@@ -7,6 +7,7 @@ import { ClipboardCheck } from "lucide-react";
 import { Button, Field, InlineNotice, Input, Modal, StatusChip, Textarea } from "../../components/ui/index.js";
 import PolicyRules from "../../components/PolicyRules";
 import { ErrorSummary } from "../student/shared";
+import { todayISO } from "../../lib/format";
 
 const FIELD_ORDER = ["effectiveDate", "absence", "note"];
 
@@ -72,7 +73,7 @@ export default function SubjectStatusDialog({ edit, setEdit, error, busy, onClos
             <p id="drop-status" aria-label="New status" className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">Dropped</p>
           </Field>
           <Field label="Effective date" required error={errors.effectiveDate}>
-            <Input id="drop-effectiveDate" type="date" value={edit.effectiveDate} onChange={set("effectiveDate")} />
+            <Input id="drop-effectiveDate" type="date" max={todayISO()} value={edit.effectiveDate} onChange={set("effectiveDate")} />
           </Field>
         </div>
 

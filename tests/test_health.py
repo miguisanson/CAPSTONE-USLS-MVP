@@ -176,10 +176,11 @@ class DemoModeTests(HealthTestBase):
     def test_the_sign_in_page_switches_the_demo_date_waits_for_everyone(self):
         """One global switch on the sign-in page: on = steps never wait for a calendar date."""
         from app import demo_skip_date_waits
-        self.addCleanup(lambda: app.test_client().post("/api/auth/demo-settings", json={"skip_date_waits": None}))
+        staff = self.signed_in("staff")  # I-342: only a signed-in staff, admin or dean account may flip it
+        self.addCleanup(lambda: staff.post("/api/auth/demo-settings", json={"skip_date_waits": None}))
         with patch.dict(os.environ, {"DEMO_MODE": "1"}):
             os.environ.pop("DEMO_SKIP_DATE_WAITS", None)
-            client = app.test_client()
+            client = staff
             self.assertIs(client.get("/api/auth/config").get_json()["skip_date_waits"], True)
             off = client.post("/api/auth/demo-settings", json={"skip_date_waits": False})
             self.assertEqual(off.status_code, 200, off.get_json())
