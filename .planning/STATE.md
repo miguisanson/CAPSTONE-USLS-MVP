@@ -45,7 +45,8 @@
   Form 4; autopilot 27/30 then guide fixes, Withdrawal autopilot passes alone, times out under parallel load). ISSUES I-373 (GET
   student rewrites current_stage) -> `pkt/readonly5` in `wt/readonly5` (Sonnet). Fable review #2 of 67d4432..HEAD running ->
   `.planning/research/FABLE-REVIEW2-2026-11-05.md`.
-- Full Python gate on 70704d19 running in the isolated worktree `CAPSTONE-USLS-MVP-wt/gate` (detached) -> `E:/Temp/claude/pygate-70704d1.log`.
+- Full Python gate on 70704d19 (isolated worktree `CAPSTONE-USLS-MVP-wt/gate`): 1,239 tests, 2 failed = test_crosscut queue aging +
+  I-236 timetable guard, both fixed in fix6 (54327294) right after. Fable review 2: no P1; IM45 -> packet after readonly5.
 - Next (old line): full Python gate on the final commit; full `npm run e2e` (with `--build` the e2e dist has the /__ui gallery);
   changelog; push v6.4.1-test (owner allows pushing the current branch).
 - (old) Next after these: P-D research gate polish, P-F questions round 2 (app.py, after P-C merges), P-G derived inputs, P-E loading states.
