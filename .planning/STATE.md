@@ -48,6 +48,9 @@
 - MERGED ae1f744d readonly5 (I-373: GET no longer saves research progress). Running: `pkt/im45` in `wt/im45` (IM45: closed at
   Sent to Registrar, forward needs both returnee checks, F6-03..07; owns app.py), `pkt/persona5` in `wt/persona5` (I-375 task
   lands on the send action, I-377 phone popup table, I-240 staff export/print on Graduation + Practicum; frontend only).
+- MERGED ea0903ca im45 (IM45 done; F6-06 not a bug: now_utc() is naive Manila time) + d0877db8 manual rebuilt. Running
+  `pkt/seedfix` in `wt/seedfix` (I-374 seed history + ready count = export filter, I-378 finished Registrar column, I-376 server,
+  I-379 group forward vs returnee checks; owns app.py).
 - Persona UAT (dean-phone, staff-rushed; reports in E:/Temp/claude/persona-uat/) -> I-374..I-378. I-374 (P1: Dean export says 4
   ready, exports none — "Seeded history" endorsements app.py ~41815 are Dean Approved + registrar Pending for Coursework students)
   and I-376/I-378 wait for app.py after im45.
