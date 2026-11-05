@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CalendarClock, CalendarDays, MailCheck, UserX, Users } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, EApprovalNote, EmptyState, Field, InlineNotice, PageHeader, SectionTitle, Spinner, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Card, EApprovalNote, EmptyState, Field, InlineNotice, PageHeader, SectionTitle, Skeleton, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatDateTime } from "../../lib/format";
 import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
 
@@ -198,7 +198,7 @@ export default function FacultyInvitationsPage() {
     return (
       <div className="space-y-5">
         {header}
-        <Card><Spinner label="Loading your invitations…" /></Card>
+        <Card><Skeleton lines={6} /></Card>
       </div>
     );
   }

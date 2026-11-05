@@ -472,7 +472,10 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       await dialog.getByRole("searchbox", { name: "Search a student" }).click();
       await dialog.getByRole("button", { name: /^\S.* \S+ · / }).first().click();
       await expect(dialog.getByText("Selected student")).toBeVisible();
-      await dialog.getByLabel("Residency purpose").selectOption({ index: 1 });
+      // the stage fills the purpose and the check runs by itself (P-E); a stage with no answer leaves the select to staff
+      const purposeSelect = dialog.getByRole("combobox", { name: "Residency purpose" });
+      if (await purposeSelect.count()) await purposeSelect.selectOption({ index: 1 });
+      await expect(dialog.getByRole("button", { name: "Check again" })).toBeEnabled();
       const review = (recommendation) => ({
         review: {
           recommendation,
@@ -484,7 +487,7 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       await page.route("**/api/awol/policy-review", (route) =>
         route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(review("Needs Human Review")) }),
       );
-      await dialog.getByRole("button", { name: "Run residency policy checker" }).click();
+      await dialog.getByRole("button", { name: "Check again" }).click();
       const result = dialog.getByRole("region", { name: "Residency policy result" });
       await expect(result).toContainText("Needs Human Review");
       await expect(result).toContainText("Pretend check");
@@ -497,7 +500,7 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       await page.route("**/api/awol/policy-review", (route) =>
         route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(review("Eligible for Residency")) }),
       );
-      await dialog.getByRole("button", { name: "Run residency policy checker" }).click();
+      await dialog.getByRole("button", { name: "Check again" }).click();
       await expect(result).toContainText("Eligible for Residency");
       await expect(dialog.getByRole("alert").filter({ hasText: "cannot be recorded" })).toHaveCount(0);
       await expect(record).toBeEnabled();

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Handshake, UserCheck, UserRoundCog, Users } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, DataTable, EApprovalNote, Field, InlineNotice, SectionTitle, Spinner, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Card, DataTable, EApprovalNote, Field, InlineNotice, SectionTitle, Skeleton, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatDay, useFaculty } from "./FacultyContext";
 
 const MIN_REASON = 3;
@@ -294,7 +294,7 @@ export function FacultyAdviserPanel({ portalAdvisees = [] }) {
     await refetchPortal();
   };
 
-  if (loading && !data) return <Card><Spinner label="Loading adviser requests…" /></Card>;
+  if (loading && !data) return <Card><Skeleton lines={6} /></Card>;
   if (!data) {
     return (
       <div className="space-y-5">

@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, FileSpreadsheet, FileText } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, DataTable, EmptyState, SectionCard, Spinner, StatusChip } from "../../components/ui/index.js";
+import { Button, DataTable, EmptyState, SectionCard, SkeletonTable, StatusChip } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import ReportFilters from "./ReportFilters.jsx";
 
@@ -63,7 +63,7 @@ export default function ReportPanel({ report, params, setParam, clearFilters }) 
   const { data, loading, error } = useApi(() => api.report(report.id, query), [report.id, queryKey]);
 
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load this report" hint={error} />;
-  if (!data) return <Spinner label="Loading the report…" />;
+  if (!data) return <SkeletonTable />;
 
   const count = data.count;
   const filtered = Object.keys(query).length > 0;

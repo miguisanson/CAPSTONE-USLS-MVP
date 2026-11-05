@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { EmptyState, SectionCard, Spinner } from "../../components/ui/index.js";
+import { EmptyState, SectionCard, SkeletonTable } from "../../components/ui/index.js";
 import { BarsChart, ChartCard } from "./ChartParts.jsx";
 import ListDialog, { CountButton } from "./ListDialog.jsx";
 import ReportPanel from "./ReportPanel.jsx";
@@ -72,7 +72,7 @@ export default function YearStartedView({ params, setParam, clearFilters }) {
       {error ? (
         <EmptyState icon={AlertTriangle} title="Could not load this report" hint={error} />
       ) : !data ? (
-        <Spinner label="Loading students by year started…" />
+        <SkeletonTable />
       ) : (
         <ChartCard
           question="Where are the students of each year started?"

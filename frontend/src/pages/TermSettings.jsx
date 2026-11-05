@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CalendarClock, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Button, DataTable, Field, InlineNotice, Input, Modal, PageHeader, Select, Spinner, StatusChip } from "../components/ui/index.js";
+import { Button, DataTable, Field, InlineNotice, Input, Modal, PageHeader, Select, SkeletonTable, StatusChip } from "../components/ui/index.js";
 import { useConfirm } from "../components/confirm";
 import { PAGE } from "../lib/labels.js";
 import { formatDate } from "../lib/format";
@@ -237,7 +237,7 @@ export default function TermSettings() {
       {notice.text && <InlineNotice tone={notice.tone} onDismiss={() => say("")}>{notice.text}</InlineNotice>}
 
       {loading ? (
-        <Spinner label="Loading academic semesters…" />
+        <SkeletonTable />
       ) : (
         <DataTable
           caption="Academic semesters, newest first, with dates and actions"

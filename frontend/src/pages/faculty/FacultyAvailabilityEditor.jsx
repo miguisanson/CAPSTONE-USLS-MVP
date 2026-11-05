@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { CalendarDays, CalendarOff, CalendarPlus, Clock3, Inbox, Trash2 } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, Field, InlineNotice, Input, PageHeader, SectionTitle, Spinner, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, Field, InlineNotice, Input, PageHeader, SectionTitle, Skeleton, StatusChip } from "../../components/ui/index.js";
 import { RadioRow } from "../../components/ui/RadioRow.jsx";
 import { useConfirm } from "../../components/confirm";
 import { formatDateTime } from "../../lib/format";
@@ -342,7 +342,7 @@ export default function FacultyAvailabilityEditor() {
     return (
       <div className="space-y-5">
         <PageHeader title="My Availability" icon={CalendarDays} />
-        <Card><Spinner label="Loading your availability…" /></Card>
+        <Card><Skeleton lines={6} /></Card>
       </div>
     );
   }
