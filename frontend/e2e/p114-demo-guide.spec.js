@@ -867,7 +867,7 @@ test.describe("show me, the step list and the keys", () => {
 test.describe("more guides", () => {
   const cases = [
     { id: "withdrawal", title: "Subject Withdrawal", student: { id: 9101, name: "Elena Navarro", student_number: "2690401" }, route: "/workflow/withdrawal", first: "The student asks to withdraw from a subject",
-      mid: [["Dean Review", "The Dean decides"], ["Exported - Ready to Send", "The student sees the result"], ["Returned", "Correct it and send it again"], ["Denied", "Not approved"]] },
+      mid: [["Dean Review", "The Dean decides"], ["Exported - Ready to Send", "Staff mark the list as sent to the Registrar"], ["Sent to Registrar", "The student sees the result"], ["Returned", "Correct it and send it again"], ["Denied", "Not approved"]] },
     { id: "practicum", title: "Practicum", student: { id: 9102, name: "Paolo Ramirez", student_number: "2690202" }, route: "/workflow/practicum", first: "The student sends the MOA",
       mid: [["Documents Under Review", "The Coordinator checks the hours"], ["Additional Certificates Requested", "The student sends the missing documents again"], ["Report Sent to Dean", "The Dean reviews the report"]] },
     { id: "graduation", title: "Graduation", student: { id: 9103, name: "Carlo Mendoza", student_number: "2690302" }, route: "/workflow/graduation", first: "The student sends the graduation application",

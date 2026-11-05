@@ -90,6 +90,18 @@ export default function Dashboard() {
 
   const actions = officeActions(data.own.items, role);
   const waiting = officeWaiting(data.all.items, role);
+  // F5-14: the Research Coordinator's "Waiting on others" lists the students waiting on a panel verdict (max 3), not tasks.
+  const researchWaiting = data.dashboard?.research_waiting;
+  const waitingItems = researchWaiting?.total
+    ? researchWaiting.items.map((entry) => ({
+        key: `research-${entry.student_id}`,
+        title: entry.student_name,
+        detail: [entry.stage, entry.reason].filter(Boolean).join(". "),
+        tone: "neutral",
+        status: "Waiting",
+        target: { to: entry.to || researchWaiting.view_all, label: "Open the Research Gate" },
+      }))
+    : waiting.items;
   // the tasks API counts every open task; the page of 200 may hold fewer than the total
   const heldByOthers = Math.max((data.all.total ?? 0) - (data.own.total ?? 0), waiting.total);
   const stats = officeStats({ role, own: { ...actions, total: data.own.total ?? actions.total }, waiting: { total: heldByOthers }, kpis: data.dashboard?.kpis || null });
@@ -133,8 +145,8 @@ export default function Dashboard() {
       waiting={{
         title: "Waiting on others",
         subtitle: "Another office or the student holds these. Nothing to do here until that office or the student acts.",
-        items: waiting.items.map(toRow),
-        all: { to: "/work-queue", label: "View all" },
+        items: waitingItems.map(toRow),
+        all: { to: researchWaiting?.total ? researchWaiting.view_all : "/work-queue", label: "View all" },
       }}
       stats={stats}
       activity={activity}

@@ -10,6 +10,7 @@ import {
   CheckSquare,
   BookOpenCheck,
   Printer,
+  Send,
   Users,
 } from "lucide-react";
 import { api } from "../../api";
@@ -69,12 +70,13 @@ function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, det
 
 // "View details" on a batch card: the stage check and, below it, every student of the batch.
 // The batch's step (and the Dean's Export) are buttons in this window, not on the card, like the process boards.
-function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStudent, onMessageStudent, onProcessBatch, onExportBatch, onPrintBatch = null, exporting = false }) {
+function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStudent, onMessageStudent, onProcessBatch, onExportBatch, onRegistrarMove = null, onPrintBatch = null, exporting = false }) {
   const currentStage = stageCheckSummary(graduationBatchStages(group)).current;
   const modalId = `graduation-stage-${String(group.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
   const stageSelection = graduationStageSelection(group.rows, accountRole);
   const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
   const alreadyExported = graduationGroupExported(group);
+  const registrarMove = onRegistrarMove ? graduationRegistrarMove(group, accountRole) : null;
   return (
     <WorkflowCaseModal
       id={modalId}
@@ -89,6 +91,8 @@ function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStuden
             <Button icon={Download} loading={exporting} onClick={() => onExportBatch(group)}>
               {exporting ? "Exporting…" : alreadyExported ? "Export approved list again" : "Export approved list"}
             </Button>
+          ) : registrarMove ? (
+            <Button icon={Send} onClick={() => onRegistrarMove(group, registrarMove)}>{registrarMove.label}</Button>
           ) : stageSelection.action ? (
             <Button icon={CheckSquare} onClick={() => onProcessBatch(group)}>{graduationBatchActionLabel(stageSelection.action)}</Button>
           ) : (
@@ -162,8 +166,8 @@ const GRADUATION_BOARD_COLUMNS = [
   },
   {
     label: "Approved, ready to export",
-    description: "The Dean exports the approved list.",
-    statuses: ["Dean Approved"],
+    description: "The Dean exports; staff then mark it sent.",
+    statuses: ["Dean Approved", "Sent to Registrar", "Registrar Received"],
   },
   {
     label: "Exceptions",
@@ -206,6 +210,16 @@ function graduationBoardCanDrag(item, accountRole) {
 
 // The short reason a graduation card sits still (StageBoard's lockReason), same wording as the process boards.
 const graduationGroupExported = (group) => group.rows.every((row) => row.endorsement?.registrar_status === "Exported - Ready to Send");
+const graduationGroupSent = (group) => ["Sent to Registrar", "Registrar Received"].includes(group.boardStatus);
+
+// I-324: after the Dean's export staff record the two hand-off moves, same words as the Withdrawal board.
+// Returns { status, label } for the one move due now, or null (staff only; the server checks the rules again).
+function graduationRegistrarMove(group, accountRole) {
+  if (accountRole !== "staff") return null;
+  if (group.boardStatus === "Dean Approved" && graduationGroupExported(group)) return { status: "Sent to Registrar", label: "Mark as sent to the Registrar" };
+  if (group.boardStatus === "Sent to Registrar") return { status: "Registrar Received", label: "Registrar acknowledged" };
+  return null;
+}
 
 function graduationBoardLockReason(item, accountRole) {
   if (item.kind === "student") {
@@ -213,7 +227,9 @@ function graduationBoardLockReason(item, accountRole) {
     return "Only Graduate School Staff create a graduation batch.";
   }
   const group = item.group;
-  if (group.boardStatus === "Dean Approved" && graduationGroupExported(group)) return "Exported. The list is ready to send to the Registrar.";
+  if (group.boardStatus === "Registrar Received") return "The Registrar acknowledged the list.";
+  if (group.boardStatus === "Sent to Registrar") return accountRole === "staff" ? "Sent. Mark it acknowledged when the Registrar replies." : "Sent to the Registrar.";
+  if (group.boardStatus === "Dean Approved" && graduationGroupExported(group)) return accountRole === "staff" ? "Exported. Email the list, then mark it as sent." : "Exported. The list is ready to send to the Registrar.";
   if (group.boardStatus === "Dean Approved") return accountRole === "dean" ? "Approved. Export it from this card." : "Waiting for: Dean (export)";
   const owners = (group.nextOwners || []).filter(Boolean);
   return owners.length ? `Waiting for: ${owners.join(", ")}` : "No step is open right now";
@@ -230,7 +246,9 @@ function graduationBoardCheckMove(item, toColumn, accountRole) {
   const group = item.group;
   const selection = graduationStageSelection(group.rows, accountRole);
   if (!selection.action) {
-    if (group.boardStatus === "Dean Approved") return { allowed: false, reason: graduationGroupExported(group) ? "The list is already exported; it is ready to send to the Registrar." : "Export is a button on the batch card." };
+    const registrarMove = graduationRegistrarMove(group, accountRole);
+    if (registrarMove) return { allowed: false, reason: `Open View details to: ${registrarMove.label}.` };
+    if (group.boardStatus === "Dean Approved") return { allowed: false, reason: graduationGroupExported(group) ? "The list is already exported; staff mark it as sent to the Registrar." : "Export is a button on the batch card." };
     return { allowed: false, reason: `No step is due on this batch for your role; waiting for: ${group.nextOwners.join(", ")}.` };
   }
   const actionLabel = graduationBatchActionLabel(selection.action);
@@ -308,9 +326,12 @@ function ViewDetailsButton({ onClick, label }) {
 
 // F5-04: once the Dean has approved a batch its application documents were checked, so the document badge goes, and
 // "Next" names the one step left: the Dean's export, then the hand-off to the Registrar.
-const graduationNextText = (group) => {
+const graduationNextText = (group, accountRole) => {
+  if (group.boardStatus === "Sent to Registrar") return "Registrar (optional acknowledgement)";
+  if (group.boardStatus === "Registrar Received") return "Done - the Registrar has it";
   if (group.boardStatus !== "Dean Approved") return group.nextOwners.join(", ");
-  return graduationGroupExported(group) ? "Done - with the Registrar" : "Dean (export)";
+  if (!graduationGroupExported(group)) return "Dean (export)";
+  return accountRole === "staff" ? "Graduate School Staff (email the list)" : "Done - with the Registrar";
 };
 
 function graduationBatchBadges(group) {
@@ -318,7 +339,7 @@ function graduationBatchBadges(group) {
   const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
   return [
     graduationReadyForDeanReview(group) && <GroupBadge key="dean" tone="ready">Ready for Dean review</GroupBadge>,
-    !applicationComplete && group.boardStatus !== "Dean Approved" && <GroupBadge key="docs" tone="warning">Application document issue</GroupBadge>,
+    !applicationComplete && group.boardStatus !== "Dean Approved" && !graduationGroupSent(group) && <GroupBadge key="docs" tone="warning">Application document issue</GroupBadge>,
     messageCount > 0 && <GroupBadge key="msg" tone="warning">{messageCount} message{messageCount === 1 ? "" : "s"}</GroupBadge>,
   ].filter(Boolean);
 }
@@ -337,15 +358,16 @@ function graduationBatchFacts(group) {
 }
 
 // The batch card in Khloe's layout: GroupCard with Students, Next, the stage strip, and View students / Select batch / the step.
-function GraduationBatchCard({ group, accountRole, selectedIds, expanded, onToggleBatch, onToggleExpanded, onViewBatch, onProcessBatch, onExportBatch, exporting, children }) {
+function GraduationBatchCard({ group, accountRole, selectedIds, expanded, onToggleBatch, onToggleExpanded, onViewBatch, onProcessBatch, onExportBatch, onRegistrarMove, exporting, children }) {
   const selection = graduationBatchSelectionState(group, selectedIds);
   const stageSelection = graduationStageSelection(group.rows, accountRole);
   const facts = graduationBatchFacts(group);
   const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
   const alreadyExported = graduationGroupExported(group);
+  const registrarMove = onRegistrarMove ? graduationRegistrarMove(group, accountRole) : null;
   return (
     <GroupCard
-      ready={Boolean(stageSelection.action) || canExport}
+      ready={Boolean(stageSelection.action) || canExport || Boolean(registrarMove)}
       selected={selection.selectedCount > 0}
       checkbox={onToggleBatch && (
         <input
@@ -362,7 +384,7 @@ function GraduationBatchCard({ group, accountRole, selectedIds, expanded, onTogg
       selection={onToggleBatch ? selectionWords(selection.selectedCount, group.rows.length) : ""}
       chip={facts.chip}
       badges={facts.badges}
-      facts={[{ label: "Students", value: facts.students }, { label: "Next", value: graduationNextText(group) }]}
+      facts={[{ label: "Students", value: facts.students }, { label: "Next", value: graduationNextText(group, accountRole) }]}
       stages={graduationBatchStages(group)}
       onOpenStages={() => onViewBatch(group)}
       openStagesLabel={`View details for ${group.label}`}
@@ -372,6 +394,8 @@ function GraduationBatchCard({ group, accountRole, selectedIds, expanded, onTogg
           {onToggleBatch && <Button variant="secondary" size="sm" onClick={() => onToggleBatch(group)}>Select batch</Button>}
           {canExport ? (
             <Button size="sm" icon={Download} loading={exporting} onClick={() => onExportBatch(group)}>{alreadyExported ? "Export batch again" : "Export batch"}</Button>
+          ) : registrarMove ? (
+            <Button size="sm" icon={Send} onClick={() => onRegistrarMove(group, registrarMove)}>{registrarMove.label}</Button>
           ) : stageSelection.action ? (
             <Button size="sm" icon={CheckSquare} onClick={() => onProcessBatch(group)}>{graduationBatchActionLabel(stageSelection.action)}</Button>
           ) : null}
@@ -602,6 +626,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
         onViewBatch={(group) => setStageGroupId(group.id)}
         onProcessBatch={processBatchGroup}
         onExportBatch={accountRole === "dean" ? (group) => exportApproved([group]) : null}
+        onRegistrarMove={accountRole === "staff" ? markRegistrar : null}
         exporting={exportingBatchId === item.group.id}
       >
         <GraduationBatchStudentList
@@ -627,7 +652,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
       count: facts.count,
       updated: group.updatedAt ? formatDate(group.updatedAt) : "",
       students: facts.students,
-      next: graduationNextText(group),
+      next: graduationNextText(group, accountRole),
       chip: facts.chip,
       badges: facts.badges,
       stages: graduationBatchStages(group),
@@ -659,6 +684,19 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
       await refetch();
     } catch (error) {
       boardNotice.show("error", error.message || "Could not export the Dean-approved graduation list.");
+    } finally {
+      setExportingBatchId("");
+    }
+  }
+  // Staff: "Mark as sent to the Registrar", then "Registrar acknowledged", one endorsement at a time (the server checks each).
+  async function markRegistrar(group, move) {
+    setExportingBatchId(group.id);
+    try {
+      for (const row of group.rows) await api.submitTransaction("graduation", { student_id: row.student.id, endorsement_status: move.status });
+      boardNotice.show("success", `${group.label}: ${move.status === "Sent to Registrar" ? "marked as sent to the Registrar" : "the Registrar acknowledged the list"}.`);
+      await refetch();
+    } catch (error) {
+      boardNotice.show("error", error.message || "Could not record the Registrar step.");
     } finally {
       setExportingBatchId("");
     }
@@ -796,8 +834,8 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           getColumnKey={graduationBoardColumnKey}
           renderCard={renderGraduationBoardCard}
           canDrag={(item) => graduationBoardCanDrag(item, accountRole)}
-          needsMe={(item) => graduationBoardCanDrag(item, accountRole) || (item.kind !== "student" && accountRole === "dean" && item.group.boardStatus === "Dean Approved" && !graduationGroupExported(item.group))}
-          isFinished={(item) => item.kind !== "student" && item.group.boardStatus === "Dean Approved" && graduationGroupExported(item.group)}
+          needsMe={(item) => graduationBoardCanDrag(item, accountRole) || (item.kind !== "student" && ((accountRole === "dean" && item.group.boardStatus === "Dean Approved" && !graduationGroupExported(item.group)) || Boolean(graduationRegistrarMove(item.group, accountRole))))}
+          isFinished={(item) => item.kind !== "student" && graduationGroupSent(item.group)}
           lockReason={(item) => graduationBoardLockReason(item, accountRole)}
           showMoveMenu={(item) => !(item.kind === "student" && item.stage === "stage-1")}
           checkMove={(item, toColumn) => graduationBoardCheckMove(item, toColumn, accountRole)}
@@ -827,6 +865,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           onMessageStudent={setMessageRow}
           onProcessBatch={processBatchGroup}
           onExportBatch={accountRole === "dean" ? (group) => { setStageGroupId(null); exportApproved([group]); } : null}
+          onRegistrarMove={accountRole === "staff" ? (group, move) => { setStageGroupId(null); markRegistrar(group, move); } : null}
           onPrintBatch={accountRole === "dean" ? printGraduationBatch : null}
           exporting={exportingBatchId === stageGroup.id}
         />

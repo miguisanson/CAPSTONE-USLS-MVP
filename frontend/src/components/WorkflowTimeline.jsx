@@ -38,7 +38,7 @@ export function withdrawalTimelineSteps(status) {
     "Approved - Registrar Preparation": 3,
     "Subject Tagged - Registrar Preparation": 4,
     "Exported - Ready to Send": 5,
-    "Sent to Registrar": 5,
+    "Sent to Registrar": WITHDRAWAL_STEPS.length, // the email step is done once staff mark the list as sent
     "Withdrawn Confirmed": WITHDRAWAL_STEPS.length,
     Denied: 2,
     Returned: 0,
@@ -67,6 +67,8 @@ export function graduationTimelineSteps(status, eligibility = {}) {
     activeIndex = status === "Returned for Revision" ? 6 : 5;
   } else if (status === "Dean Approved") {
     activeIndex = 7;
+  } else if (["Sent to Registrar", "Registrar Received"].includes(status)) {
+    activeIndex = GRADUATION_STEPS.length;
   }
   return numberedStates(GRADUATION_STEPS, activeIndex, [6]);
 }

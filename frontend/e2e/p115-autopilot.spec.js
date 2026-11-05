@@ -141,7 +141,7 @@ const PLAN = {
   awol: { key: "autopilot-awol", reset: ["awol-maya"], number: "2691001", final: "Return Approved" },
   monitoring: { key: "autopilot-monitoring", reset: [], number: null, final: null },
   reports: { key: "reports", reset: [], number: null, final: null },
-  withdrawal: { key: "autopilot-withdrawal", reset: ["withdrawal-elena"], number: "2690401", final: "Exported - Ready to Send" },
+  withdrawal: { key: "autopilot-withdrawal", reset: ["withdrawal-elena"], number: "2690401", final: "Sent to Registrar" },
   practicum: { key: "autopilot-practicum", reset: ["practicum-paolo"], number: "2690202", final: "Dean Reviewed" },
   graduation: { key: "autopilot-graduation", reset: ["graduation-carlo"], number: "2690302", final: "Dean Approved" },
 };
