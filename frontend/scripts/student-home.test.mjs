@@ -74,7 +74,8 @@ test("waiting on the Graduate School: tasks held by any office, neutral, overdue
     tasks: [task(1, "Student"), task(2, "Graduate School Staff"), task(3, "Academic Coordinator", { action_url: "/workflow/awol" }), task(4, "Dean", { overdue: true }), task(5, "Research Coordinator"), task(6, "Registrar")],
   });
   const waiting = studentWaiting(data);
-  assert.deepEqual(waiting.map((i) => i.title), ["T4", "T2", "T3", "T5", "T6"]);
+  // I-385: an office task reads as the office working on it, not as the student's own to-do
+  assert.deepEqual(waiting.map((i) => i.title), ["T4", "T2", "T3", "T5", "T6"].map((t) => `The Graduate School is working on: ${t}`));
   assert.ok(waiting.every((i) => i.tone === "neutral" && i.kind === "waiting"));
   assert.match(waiting[0].detail, /With the Dean/);
   assert.equal(waiting[0].status, "Overdue");
