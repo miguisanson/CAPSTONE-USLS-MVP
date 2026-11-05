@@ -806,6 +806,8 @@ def _chunk_best_sentence(query: QueryTerms, index: PolicyIndex, position: int) -
 
 
 # --------------------------------------------------------------------------- search
+_PURPOSE_SECTION = re.compile(r"(?:^|[›>]\s*)(?:[\d.]+\s+)?purpose\s*$", re.I)
+_ASKS_PURPOSE = re.compile(r"\b(purpose|why|aim|goal|objective)\b", re.I)
 def search(
     question: str,
     chunks: list[dict],
@@ -848,6 +850,8 @@ def search(
             score *= 1.05  # a staff upload is the newer, approved word
         window = " ".join(sentences[max(0, best_i - 1): best_i + 2])
         section = chunk.get("section") or ""
+        if _PURPOSE_SECTION.search(section) and not _ASKS_PURPOSE.search(question):
+            score *= 0.4  # a "Purpose" paragraph says why a rule exists, not what the rule is (I-392)
         coverage = _coverage(window, query, index, section)
         scored.append((score, position, coverage, coverage >= MIN_COVERAGE and _anchored(query, index, window, section, coverage)))
     scored.sort(key=lambda item: -item[0])

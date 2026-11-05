@@ -14,7 +14,7 @@ const STATUS_FILTER = [
   { value: "loa", label: "LOA" },
 ];
 const RISK_FILTER = ["On Track", "At Risk of Delay", "Delayed", "Not Yet Assessed", "At Risk of Delay/Delayed"];
-const STANDING_FILTER = ["Active", "On Leave", "AWOL", "Withdrawn"];
+const STANDING_FILTER = [{ value: "Active", label: "Active (not completed or withdrawn)" }, "On Leave", "AWOL", "Withdrawn"];
 
 // I-075: what stands between a student and the Compre exam, in the API's own words. The eligibility rule is by
 // category (the units needed differ by program), so no unit total is printed here.
@@ -169,7 +169,7 @@ export default function Students() {
             {filterControls.map((f) => (
               <Select
                 key={f.label}
-                aria-label={f.label}
+                aria-label={f.value ? f.label : `All ${f.label.toLowerCase()}`} // the name matches what is shown (I-395)
                 placeholder={`All ${f.label.toLowerCase()}`}
                 value={f.value}
                 onChange={(e) => f.onChange(e.target.value)}
@@ -195,6 +195,12 @@ export default function Students() {
           </button>
         )}
       </Card>
+
+      {data && (
+        <p className="text-sm text-slate-500">
+          Showing <span className="font-semibold text-ink">{data.items.length ? `${(data.page - 1) * PAGE_SIZE + 1}–${(data.page - 1) * PAGE_SIZE + data.items.length}` : 0}</span> of <span className="font-semibold text-ink">{data.total}</span> students
+        </p>
+      )}
 
       {data?.integrity && (
         <InlineNotice tone={data.integrity.issue_count ? "warning" : "success"} icon={data.integrity.issue_count ? AlertTriangle : ShieldCheck}>

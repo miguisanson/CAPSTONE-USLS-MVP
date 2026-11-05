@@ -123,7 +123,7 @@ export function EditHistoryDialog({ edit, onClose }) {
 }
 
 /** The text with its Edited chip and Edit button. `children` can replace the plain text (it receives the current value). */
-export function EditableText({ edit, value, onSaved, className = "", empty = "None", children }) {
+export function EditableText({ edit, value, onSaved, className = "", empty = "None", editLabel = "Edit", children }) {
   const [shown, setShown] = useState(null);
   const [count, setCount] = useState(null);
   const [open, setOpen] = useState(null); // "edit" | "history"
@@ -150,7 +150,7 @@ export function EditableText({ edit, value, onSaved, className = "", empty = "No
         )}
         {edit.can && (
           <Button variant="secondary" size="sm" icon={Pencil} onClick={() => setOpen("edit")} data-edit-button="">
-            Edit
+            {editLabel}
           </Button>
         )}
       </div>

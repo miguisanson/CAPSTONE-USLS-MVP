@@ -123,9 +123,17 @@ test("subject withdrawal windows count only when they close within 14 days", () 
   const sub = (id, deadline) => ({ id, course_code: `C-${id}`, term_label: "AY 2026-2027 1st", withdrawal_eligible: true, withdrawal_window: { deadline } });
   const items = studentActions(base({ subject_enrollments: [sub(1, "2026-10-20"), sub(2, "2026-12-30"), { id: 3, course_code: "C-3", withdrawal_eligible: false, withdrawal_window: { deadline: "2026-10-19" } }] }), opts);
   assert.equal(items.length, 1);
-  assert.match(items[0].title, /C-1/);
+  assert.match(items[0].title, /withdrawal window closes/i);
   assert.equal(items[0].dueAt, "2026-10-20");
   assert.deepEqual(items[0].target, { view: "withdrawal" });
+});
+
+test("three subjects with the same window give one item with the earliest date (I-393)", () => {
+  const sub = (id, deadline) => ({ id, course_code: `C-${id}`, term_label: "AY 2026-2027 1st", withdrawal_eligible: true, withdrawal_window: { deadline } });
+  const items = studentActions(base({ subject_enrollments: [sub(1, "2026-10-22"), sub(2, "2026-10-20"), sub(3, "2026-10-22")] }), opts);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].dueAt, "2026-10-20");
+  assert.doesNotMatch(items[0].title, /C-\d/);
 });
 
 test("order: replies, banner, tasks, recommendations, documents, deadlines", () => {

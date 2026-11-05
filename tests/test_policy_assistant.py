@@ -583,5 +583,38 @@ class SuggestionTests(AssistantBase):
         self.assertIn(len(items), (3, 4), items)
 
 
+class PlainOfflineAnswerTests(AssistantBase):
+    """I-392: the offline answer quotes the rule, not the "Purpose" line, and a student sees no office wording."""
+
+    QUESTION = "what happens if I stop coming to class"
+
+    def test_a_purpose_line_is_not_the_answer(self):
+        data = self.ask(STUDENT_A_EMAIL, self.QUESTION)
+        self.assertNotIn("To state what happens", data["answer"])
+        for citation in data["citations"]:
+            self.assertFalse(citation["section"].endswith("Purpose"), citation["section"])
+
+    def test_a_student_answer_uses_plain_words_for_the_source_and_the_draft(self):
+        data = self.ask(STUDENT_A_EMAIL, self.QUESTION)
+        text = data["answer"] + json.dumps(data["citations"])
+        self.assertNotIn("pending Graduate School validation", text)
+        self.assertNotIn("draft for validation", text)
+        self.assertIn("Graduate School practice (being finalised)", text)
+
+    def test_a_student_handbook_answer_says_which_page(self):
+        data = self.ask(STUDENT_A_EMAIL, COVERED_QUESTION)
+        self.assertIn("Answer from the Graduate School Handbook", data["answer"])
+        self.assertRegex(data["answer"], r"Handbook[^\n]*, p\. \d+")
+        self.assertNotIn("Source:", data["answer"])
+
+    def test_staff_keep_the_draft_wording(self):
+        data = self.ask("dean@usls.edu.ph", self.QUESTION)
+        self.assertIn("pending Graduate School validation", data["answer"] + json.dumps(data["citations"]))
+
+    def test_a_student_source_has_no_keyword_search_wording(self):
+        source = self.ask(STUDENT_A_EMAIL, self.QUESTION)["source"]
+        self.assertEqual(source.get("audience"), "student")
+
+
 if __name__ == "__main__":
     unittest.main()
