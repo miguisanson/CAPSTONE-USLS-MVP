@@ -160,7 +160,7 @@ function DecisionForm({ row, mode, forceException, busy, onCancel, onSubmit }) {
         requireComment: true,
         confirm: {
           title: "Return this application?",
-          message: `${who}: the application is not approved and the student sees your reason. They may nominate again.`,
+          message: `${who}: the application is not approved and the student sees your reason. The student may nominate again.`,
           confirmLabel: "Return application",
           tone: "danger",
         },

@@ -416,7 +416,7 @@ export default function CourseAdjustments() {
               </Field>
             </div>
             <InlineNotice tone="info" title="Subject needs are calculated automatically">
-              Counts below update with the selected program and semester. They support the decision; they do not publish an offering or assign a faculty member by themselves.
+              Counts below update with the selected program and semester. The counts support the decision; the counts do not publish an offering or assign a faculty member by themselves.
             </InlineNotice>
           </SectionCard>
 

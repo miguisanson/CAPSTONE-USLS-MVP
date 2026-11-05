@@ -14,7 +14,7 @@ import { defenseScheduleLocked } from "../../lib/studentHome.js";
 export const REQUEST_GROUPS = [
   {
     title: "Research & Defense",
-    description: "Upload your milestone files, submit them for review, then request scheduling after a panel is assigned.",
+    description: "Upload your milestone files, submit the files for review, then request scheduling after a panel is assigned.",
     items: [
       { id: "research", label: PAGE.researchProgress, icon: FileCheck },
       {

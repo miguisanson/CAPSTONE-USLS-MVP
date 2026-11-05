@@ -327,7 +327,7 @@ function SingleWorkflowPage() {
 function workflowGuidance(slug) {
   const map = {
     "student-handoff":
-      "Official source data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, their program and curriculum, and marks the subjects already completed automatically — no manual typing. A NOTE of LOA, AWOL or withdrawn on a new student is taken in as their standing. Subjects a student is enrolled in this semester come from the class list (Enrollment), not from this sheet.",
+      "Official source data arrives as a file. Upload the AC Student Monitoring sheet and the platform creates each student, with the program and curriculum, and marks the subjects already completed automatically — no manual typing. A NOTE of LOA, AWOL or withdrawn on a new student is taken in as the student's standing. Subjects a student is enrolled in this semester come from the class list (Enrollment), not from this sheet.",
     "course-audit":
       "Run at the end of the semester. Pick a subject to see its enrolled students, then tick who completed it. Saving updates each student's course audit and missing count; a student who clears all subjects advances to Proposal Development.",
     "research-gate":

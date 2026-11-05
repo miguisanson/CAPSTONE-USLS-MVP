@@ -132,14 +132,14 @@ export default function Dashboard() {
       actionsAll={actions.total > actions.items.length ? { to: queue, label: `View all ${actions.total}` } : undefined}
       waiting={{
         title: "Waiting on others",
-        subtitle: "Another office or the student holds these. Nothing to do here until they act.",
+        subtitle: "Another office or the student holds these. Nothing to do here until that office or the student acts.",
         items: waiting.items.map(toRow),
         all: { to: "/work-queue", label: "View all" },
       }}
       stats={stats}
       activity={activity}
       activityAll={activity && isGraduateSchool ? { to: "/activity", label: "View all" } : undefined}
-      activityEmpty={{ title: "No activity yet", hint: "Complete a workflow to populate this feed." }}
+      activityEmpty={{ title: "No activity yet", hint: "Submissions, decisions and replies will appear here." }}
       notice={
         notice && (
           <InlineNotice tone={notice.tone} onDismiss={() => setNotice(null)}>

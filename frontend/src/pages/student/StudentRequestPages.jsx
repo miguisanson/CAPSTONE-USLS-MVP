@@ -42,7 +42,7 @@ import { PAGE } from "../../lib/labels.js";
 const REQUEST_PAGES = {
   research: {
     title: PAGE.researchProgress,
-    description: "Upload your milestone files, submit them for review, and follow your title, proposal and final defense requirements.",
+    description: "Upload your milestone files, submit the files for review, and follow your title, proposal and final defense requirements.",
     icon: FileCheck,
     render: (data, onSaved) => <ResearchRequestForm data={data} onSaved={onSaved} />,
   },

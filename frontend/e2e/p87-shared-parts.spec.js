@@ -601,7 +601,7 @@ test.describe("Defense scheduling parts (staff)", () => {
     await expect(items.nth(0)).toContainText("Asked on Oct 20, 2026; waiting for an answer.");
     await expect(items.nth(1)).toContainText("Entered - updated Oct 1, 2026");
     // the ask form: not sent
-    await expect(panel.getByText("Ask the adviser and the panel for their available dates")).toBeVisible();
+    await expect(panel.getByText("Ask the adviser and the panel for available dates")).toBeVisible();
     await expect(panel.getByLabel("Dates needed from")).toBeVisible();
     await expect(panel.getByLabel("Until")).toBeVisible();
     await expect(panel.getByLabel("Message (optional)")).toBeVisible();

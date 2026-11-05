@@ -153,7 +153,7 @@ export default function StudentOverview() {
       actionsSubtitle="What is waiting on you now, most pressing first"
       waiting={{
         title: "Waiting on the Graduate School",
-        subtitle: "Offices are working on these. Nothing to do on your side unless they ask.",
+        subtitle: "Offices are working on these. Nothing to do on your side unless an office asks.",
         items: waiting,
         all: { to: "/student/requests", label: "View all" },
       }}

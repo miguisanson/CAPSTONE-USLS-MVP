@@ -196,7 +196,7 @@ export default function StudentCalendarPage() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.researchCalendar}
-        description="Your defense date, the deadlines that lead to it, and a link to put them in your own calendar. All times are Philippine time."
+        description="Your defense date, the deadlines that lead to it, and a link to add the dates to your calendar. All times are Philippine time."
         icon={CalendarDays}
       />
       {error && <LoadError title="Could not load your calendar" onRetry={refetch}>{error}</LoadError>}

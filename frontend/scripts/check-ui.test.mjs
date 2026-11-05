@@ -8,14 +8,14 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { METRICS, countMetrics, isExcluded, ratchet } from "./check-ui.mjs";
+import { METRICS, countMetrics, isExcluded, pronounHits, ratchet } from "./check-ui.mjs";
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "check-ui.mjs");
 const file = (path, text) => ({ path, text });
 const count = (files, allow = {}) => countMetrics(files, allow);
 
-test("the six metrics are exactly the ones the spec names", () => {
-  assert.deepEqual(METRICS, ["arbitraryText", "offScaleText", "rawTable", "rawModal", "rawH1", "localStatusStyle"]);
+test("the metrics are exactly the ones the spec names (six habits plus the Rule 6 pronoun guard)", () => {
+  assert.deepEqual(METRICS, ["arbitraryText", "offScaleText", "rawTable", "rawModal", "rawH1", "localStatusStyle", "personPronoun"]);
 });
 
 test("arbitraryText: counts text-[13px], text-[0.8rem], text-[1.1em]; ignores text-xs and text-[#fff]", () => {
@@ -215,4 +215,13 @@ test("CLI: the ui/ folder and lib/status.js inside the src folder are skipped", 
   } finally {
     rmSync(s.dir, { recursive: true, force: true });
   }
+});
+
+test("personPronoun: counts pronouns in strings and JSX text; ignores comments and identifiers", () => {
+  assert.equal(pronounHits(`const a = "until they act"; // she said
+/* his */ const their = 1;`).length, 1);
+  assert.equal(pronounHits(`<p>Ask the student; the Dean can reach them.</p>`).length, 1);
+  assert.equal(pronounHits(`<p>The student's record, the Dean's note, other things.</p>`).length, 0);
+  assert.equal(count([file("pages/UiGallery.jsx", `<p>their</p>`)]).personPronoun, 0, "gallery skipped");
+  assert.equal(count([file("pages/A.jsx", `<p>their</p>`)], { personPronoun: { "pages/A.jsx": ["their"] } }).personPronoun, 0);
 });

@@ -79,7 +79,7 @@ export default function StudentRecordPanel({ studentId, focusCourseId, termLabel
             </h2>
             {student && (
               <p className="meta mt-1 flex flex-wrap items-center gap-2">
-                <span>IDNO {student.student_number}</span>
+                <span>Student ID {student.student_number}</span>
                 <span>·</span>
                 <span>{student.program_code}</span>
                 <span>·</span>
@@ -165,7 +165,7 @@ function SubjectsTab({ data, canEdit, focusCourseId, termLabels, currentTermLabe
   async function bulkAdd() {
     const ok = await confirm({
       title: "Add remaining subjects as Planned?",
-      message: `${notTaken} curriculum subject(s) this student has not taken will get a Planned row. Removed rows are left alone. You can edit or remove any of them afterwards.`,
+      message: `${notTaken} curriculum subject(s) this student has not taken will get a Planned row. Removed rows are left alone. You can edit or remove any of these rows afterwards.`,
       confirmLabel: "Add Planned rows",
     });
     if (!ok) return;
@@ -606,7 +606,7 @@ function DetailsTab({ data, canEdit, termLabels, studentValues, onChanged }) {
         ) : (
           <p className="text-xs text-slate-500">You can view this record but not change it.</p>
         )}
-        <p className="text-xs text-slate-500">Lifecycle stage, enrollment status, leave, AWOL and withdrawal are changed through their own workflows, not here.</p>
+        <p className="text-xs text-slate-500">Lifecycle stage, enrollment status, leave, AWOL and withdrawal are changed through the workflow for each, not here.</p>
       </div>
     );
   }

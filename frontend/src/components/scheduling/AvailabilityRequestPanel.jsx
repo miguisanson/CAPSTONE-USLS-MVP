@@ -13,7 +13,7 @@ export function InvitationChip({ invitation }) {
       <StatusChip status={invitation.status === "Invited" ? "Invited" : invitation.status} dot={false} />
       {invitation.status === "Declined" && (
         <InlineNotice tone="warning" className="!px-3 !py-2 text-xs">
-          Declined{invitation.reason ? `: ${invitation.reason}` : ""}. Replace this panelist or ask them to accept.
+          Declined{invitation.reason ? `: ${invitation.reason}` : ""}. Replace this panelist or ask the panelist to accept.
         </InlineNotice>
       )}
     </div>
@@ -51,7 +51,7 @@ export default function AvailabilityRequestPanel({ context, studentId, refetch }
       const body = await api.requestPanelAvailability({
         student_id: studentId, window_start: windowStart, window_end: windowEnd, message,
       });
-      setDone(`Asked ${body.requests?.length || 0} people to enter their availability.`);
+      setDone(`Asked ${body.requests?.length || 0} people to enter available dates.`);
       setMessage("");
       await refetch?.();
     } catch (err) {
@@ -87,7 +87,7 @@ export default function AvailabilityRequestPanel({ context, studentId, refetch }
         })}
       </ul>
       <div className="space-y-3 rounded-xl bg-slate-50 p-3">
-        <p className="eyebrow flex items-center gap-2"><BellRing className="h-3.5 w-3.5" aria-hidden="true" />Ask the adviser and the panel for their available dates</p>
+        <p className="eyebrow flex items-center gap-2"><BellRing className="h-3.5 w-3.5" aria-hidden="true" />Ask the adviser and the panel for available dates</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Dates needed from"><Input type="date" value={windowStart} onChange={(e) => setWindowStart(e.target.value)} /></Field>
           <Field label="Until"><Input type="date" value={windowEnd} min={windowStart} onChange={(e) => setWindowEnd(e.target.value)} /></Field>
@@ -105,7 +105,7 @@ export default function AvailabilityRequestPanel({ context, studentId, refetch }
         <div>
           <p className="eyebrow mb-1.5">Who answered</p>
           <DataTable
-            caption="Availability requests and who answered them"
+            caption="Availability requests and the answers received"
             columns={ANSWER_COLUMNS}
             rows={requests}
             pageSize={0}

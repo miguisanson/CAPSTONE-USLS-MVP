@@ -90,7 +90,7 @@ export function FacultyDashboard() {
         actionsEmpty={{ title: "Nothing is waiting on you", hint: "No signatures, verdicts, invitations or adviser requests need you right now." }}
         waiting={{
           title: "Waiting on others",
-          subtitle: "The student or the Research Coordinator holds these. Nothing to do until they act.",
+          subtitle: "The student or the Research Coordinator holds these. Nothing to do until that office or the student acts.",
           items: waiting.items.map(toRow),
           all: waiting.total > MAX_WAITING ? { to: "/faculty-portal/advisees", label: "View all" } : undefined,
         }}
@@ -120,7 +120,7 @@ export function FacultyAdviseesPage() {
       <PageHeader
         title="My Advisees"
         forms="adviser-designation"
-        description="Students you advise, their stage, and the research documents that need your signature."
+        description="Students you advise, the stage of each, and the research documents that need your signature."
         icon={Users}
         actions={<Button as={Link} variant="secondary" icon={FileSignature} to="/faculty-portal/signatures">Signatures</Button>}
       />

@@ -99,7 +99,7 @@ export default {
       ],
       doneWhen: { status: from(PRACTICUM_ORDER, "Additional Certificates Requested") },
       branches: [
-        { status: ["Additional Certificates Requested"], goto: "pr-resubmit", note: "The Coordinator asked for more certificates. The student uploads them and sends the stage again; then staff forward the documents again." },
+        { status: ["Additional Certificates Requested"], goto: "pr-resubmit", note: "The Coordinator asked for more certificates. The student uploads the certificates and sends the stage again; then staff forward the documents again." },
       ],
       rule: "A reason is required when certificates are requested.",
       ifAsked: [

@@ -305,7 +305,7 @@ function PlanCards() {
   );
 }
 
-const COURSE_ADJUSTMENTS_COPY = "Course offering plans submitted by the Academic Coordinator. Approve them or return them for revision.";
+const COURSE_ADJUSTMENTS_COPY = "Course offering plans submitted by the Academic Coordinator. Approve each plan or return it for revision.";
 
 export function DeanProcessPage() {
   const { process } = useParams();

@@ -142,7 +142,7 @@ export default function PolicyDocuments() {
   async function remove(item) {
     const ok = await confirm({
       title: "Remove this policy document?",
-      message: `${item.title}\n\nThe document and all ${item.versions?.length || 1} stored version(s) will be deleted and the Policy Assistant will stop using them. To keep the record without searching it, set the status to Archived instead. This cannot be undone.`,
+      message: `${item.title}\n\nThe document and all ${item.versions?.length || 1} stored version(s) will be deleted and the Policy Assistant will stop using the document. To keep the record without searching it, set the status to Archived instead. This cannot be undone.`,
       confirmLabel: "Remove document",
       tone: "danger",
     });

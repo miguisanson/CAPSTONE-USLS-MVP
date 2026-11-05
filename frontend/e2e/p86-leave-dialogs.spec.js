@@ -209,7 +209,7 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       const confirm = top(page);
       await expect(confirm.getByRole("heading", { level: 2, name: "Confirm AWOL (leave ended, no return)", exact: true })).toBeVisible();
       await expect(confirm).toContainText("Confirming records that the student did not come back.");
-      await expect(confirm.getByLabel("Confirm the student is AWOL: what did you do to reach them?")).toBeVisible();
+      await expect(confirm.getByLabel("Confirm the student is AWOL: what did you do to reach the student?")).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog")).toHaveCount(1);
       await expect(button).toBeFocused();
@@ -370,7 +370,7 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       const dialog = page.getByRole("dialog");
       await expect(dialog).toHaveCount(1);
       await expect(dialog.getByRole("heading", { level: 2, name: "Confirm AWOL (leave ended, no return)" })).toBeVisible();
-      await expect(dialog.getByLabel("Confirm the student is AWOL: what did you do to reach them?")).toBeVisible();
+      await expect(dialog.getByLabel("Confirm the student is AWOL: what did you do to reach the student?")).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(dialog).toHaveCount(0);
       await expect(confirm).toBeFocused();

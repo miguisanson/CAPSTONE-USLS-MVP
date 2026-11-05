@@ -111,7 +111,7 @@ test.describe("P2.2 Monitoring Sheet dialogs", () => {
     // ---- Record panel of the new (manual) student --------------------------------------------------------------
     const panel = page.getByRole("dialog", { name: /Testwell, Pia/ });
     await expect(panel).toBeVisible();
-    await expect(panel.getByText("IDNO 7700123")).toBeVisible();
+    await expect(panel.getByText("Student ID 7700123")).toBeVisible();
     const headerBadge = panel.locator('[aria-label^="Manual entry"]').first();
     await expect(headerBadge).toHaveText("Manual entry");
     await expect(headerBadge).toHaveAttribute("title", /^Manual entry by .+ on .+/);

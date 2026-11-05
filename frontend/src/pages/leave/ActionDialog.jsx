@@ -9,7 +9,7 @@ const COMMENT_LABELS = {
   return: "What should the student fix? (the student will see this)",
   deny: "Why is it denied? (the student will see this)",
   revoke: "Why is this leave being cancelled? (the student will see this)",
-  confirm_awol: "Confirm the student is AWOL: what did you do to reach them?",
+  confirm_awol: "Confirm the student is AWOL: what did you do to reach the student?",
 };
 
 const CONFIRM_TEXT = {

@@ -4,7 +4,7 @@ export default {
   id: "research-title",
   process: NO_CASE,
   title: "Research Title and Form 1",
-  summary: "A student sends Form 1 and three concept papers, staff verify them, and the Academic Coordinator endorses Form 1 with a signature.",
+  summary: "A student sends Form 1 and three concept papers, staff verify the papers, and the Academic Coordinator endorses Form 1 with a signature.",
   studentNumber: "2260004",
   walkthrough: "12_research_gate",
   accounts: {

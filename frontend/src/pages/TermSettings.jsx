@@ -233,14 +233,14 @@ export default function TermSettings() {
       />
 
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
-      {data && !canManage && <InlineNotice tone="neutral">You can read the semesters and their dates here. Graduate School staff change them.</InlineNotice>}
+      {data && !canManage && <InlineNotice tone="neutral">You can read the semesters and dates here. Only Graduate School staff can change a semester.</InlineNotice>}
       {notice.text && <InlineNotice tone={notice.tone} onDismiss={() => say("")}>{notice.text}</InlineNotice>}
 
       {loading ? (
         <Spinner label="Loading academic semesters…" />
       ) : (
         <DataTable
-          caption="Academic semesters, newest first, with their dates and actions"
+          caption="Academic semesters, newest first, with dates and actions"
           columns={canManage ? columns : columns.filter((column) => column.key !== "actions")}
           rows={data?.items || []}
           minWidth="md"

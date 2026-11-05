@@ -349,7 +349,7 @@ test.describe("P82 student pages (pinned)", () => {
     const { page, finish } = await studentPage(browser);
     try {
       for (const [path, title, desc] of [
-        ["/student/research", "Research Progress", "Upload your milestone files, submit them for review, and follow your title, proposal and final defense requirements."],
+        ["/student/research", "Research Progress", "Upload your milestone files, submit the files for review, and follow your title, proposal and final defense requirements."],
         ["/student/defense-schedule", "Defense Schedule", "Request a defense date once your panel is matched."],
         ["/student/requests/leave-of-absence", "Leave of Absence", "Ask for a leave of absence, or for more time on a leave you are already on."],
         ["/student/requests/readmission", "Readmission", "Ask to come back to your studies when your leave of absence is ending."],

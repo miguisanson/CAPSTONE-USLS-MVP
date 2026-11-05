@@ -268,7 +268,7 @@ export function WorkflowMessageModal({ slug, row, context, replyTo = null, onClo
       reasonLabel={replyTo ? "Reply" : remarksOnly ? "Remarks" : form.action_type === "return" || form.template === "Other / Custom comment" ? "Comment / reason" : "Optional details"}
       reasonHint={commentRequired ? "Required for this step." : "Kept with this message."}
       reasonPlaceholder={remarksOnly ? "Type your remarks or message." : "Add the exact file, record, or detail that needs attention."}
-      requiredMessage={replyTo ? "Write your reply first. It is required." : remarksOnly ? "Write your remarks first. They are required to return the case." : undefined}
+      requiredMessage={replyTo ? "Write your reply first. It is required." : remarksOnly ? "Write your remarks first. Remarks are required to return the case." : undefined}
       extra={canRequireGraduationDocument && (
         <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${form.require_document_resubmission ? "border-red-300 bg-red-50" : "border-slate-200 bg-white hover:border-red-200 hover:bg-red-50/40"}`}>
           <input

@@ -69,7 +69,7 @@ export function facultyActions(data, { limit = MAX_ACTIONS } = {}) {
       key: "adviser-requests",
       kind: "adviser",
       title: `${plural(requests, "adviser request")} waiting for your answer`,
-      detail: "Students asking you to be their research adviser",
+      detail: "Students asking you to be the research adviser",
       units: requests,
       tone: "warning",
       status: "Applied",

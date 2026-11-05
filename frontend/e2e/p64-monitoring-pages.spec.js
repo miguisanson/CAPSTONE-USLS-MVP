@@ -92,7 +92,7 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     // notices
     await expect(page.getByText("Select a subject cell or the pencil beside a name to add or edit a row.")).toBeVisible();
     await expect(page.getByText(/Imported values are never overwritten silently/)).toBeVisible();
-    await expect(page.getByText(/Enrollment and student profiles are synchronized \(\d+ rows checked\)/)).toBeVisible();
+    await expect(page.getByText(/Records match \(\d+ checked\)/)).toBeVisible();
 
     // legend
     for (const word of ["Officially completed", "Taken", "Enrolled", "Failed", "Dropped", "Planned", "INC", "Withdrawn", "Not taken", "Manual entry"]) {
@@ -111,7 +111,7 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     // a seeded row, by content
     const row = rowOf(page, "Salonga, Bea");
     await expect(row).toHaveCount(1);
-    await expect(row).toContainText(`IDNO ${salonga.student_number}`);
+    await expect(row).toContainText(`Student ID ${salonga.student_number}`);
     await expect(row).toContainText(salonga.risk);
     await expect(row).toContainText(salonga.academic_year_entry);
     await expect(row.getByRole("button", { name: "Open flags for Salonga, Bea" })).toBeVisible();
@@ -237,7 +237,7 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     expect(raw.charCodeAt(0)).toBe(0xfeff);
     const text = raw.slice(1);
     const lines = text.split("\r\n");
-    expect(lines[0]).toBe(["Student", "IDNO", "AY Entry", "YR", ...courses.map((c) => c.code), "Completed", "Total", "% Complete"].map((v) => `"${v}"`).join(","));
+    expect(lines[0]).toBe(["Student", "Student ID", "AY Entry", "YR", ...courses.map((c) => c.code), "Completed", "Total", "% Complete"].map((v) => `"${v}"`).join(","));
     expect(lines.length).toBeGreaterThan(grid.students.length);
     expect(lines[1]).toContain('"Bernardo, Camille"');
     expect(text).toContain('"Salonga, Bea"');
@@ -437,7 +437,7 @@ test.describe("Enrollment Class List (GS staff)", () => {
 
     const table = page.locator("main table");
     await expect(table).toHaveCount(1);
-    expect(await headTexts(table)).toEqual(["Student", "IDNO", "Program", "Enrollment status", "Enrolled", "Source"]);
+    expect(await headTexts(table)).toEqual(["Student", "Student ID", "Program", "Enrollment status", "Enrolled", "Source"]);
     const mendoza = rowOf(page, "Mendoza, Bianca");
     await expect(mendoza).toHaveCount(1);
     await expect(mendoza).toContainText("2560052");
@@ -465,7 +465,7 @@ test.describe("Enrollment Class List (GS staff)", () => {
     const singleRaw = readFileSync(await single.path(), "utf8");
     expect(singleRaw.charCodeAt(0), "byte-order mark (P6.4)").toBe(0xfeff);
     const singleText = singleRaw.slice(1).split("\r\n");
-    expect(singleText[0]).toBe('"Subject","Faculty","Student","IDNO","Program","Status","Enrolled at","Source"');
+    expect(singleText[0]).toBe('"Subject","Faculty","Student","Student ID","Program","Status","Enrolled at","Source"');
     expect(singleText.join("\r\n")).toContain('"Mendoza, Bianca","2560052","DBA","Enrolled"');
 
     await page.getByLabel("Class list view", { exact: true }).selectOption("all");
@@ -480,7 +480,7 @@ test.describe("Enrollment Class List (GS staff)", () => {
     for (const list of data.class_lists) {
       await expect(page.getByRole("heading", { level: 3, name: `${list.offering.course_code} — ${list.offering.course_title}` })).toBeVisible();
     }
-    expect(await headTexts(page.locator("main table").first())).toEqual(["Student", "IDNO", "Program", "Enrollment status", "Enrolled", "Source"]);
+    expect(await headTexts(page.locator("main table").first())).toEqual(["Student", "Student ID", "Program", "Enrollment status", "Enrolled", "Source"]);
     await shotAll(page, "class-list-all");
 
     const [all] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export CSV" }).click()]);

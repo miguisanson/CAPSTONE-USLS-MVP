@@ -180,7 +180,7 @@ export function PanelMatchingForm({ context, studentId, submit, submitting, refe
     <form onSubmit={onSubmit} className="space-y-5">
       <SectionTitle
         title="Panel recommendation workspace"
-        subtitle="Review why each faculty member ranks where they do, adjust the suggested panel, then finalize it"
+        subtitle="Review why each faculty member ranks where shown, adjust the suggested panel, then finalize it"
         icon={Users}
         action={<Button as={Link} to="/faculty" variant="secondary" icon={Users}>Faculty profiles</Button>}
       />
@@ -384,7 +384,7 @@ export function PanelMatchingForm({ context, studentId, submit, submitting, refe
         <Button type="submit" disabled={!profile.ready || !selectionComplete} loading={submitting} icon={CheckCircle2} className="w-full sm:w-auto" aria-describedby="finalize-panel-note">
           {submitting ? "Finalizing…" : finalizedPanel.length === roles.length ? "Update final panel" : "Finalize selected panel"}
         </Button>
-        <p id="finalize-panel-note" className="meta">Each new panel member is invited at once (Panel Invitations and their bell) and can accept or decline.</p>
+        <p id="finalize-panel-note" className="meta">Each new panel member is invited at once (Panel Invitations and the bell) and can accept or decline.</p>
       </div>
     </form>
   );

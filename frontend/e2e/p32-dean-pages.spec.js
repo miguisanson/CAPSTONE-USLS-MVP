@@ -268,7 +268,7 @@ test.describe("P3.2 Dean pages", () => {
     await page.goto("/dean/approvals/course-adjustments");
     await expect(page.getByRole("heading", { level: 1, name: "Course Adjustments" })).toBeVisible();
     await expect(page.getByText(/^\d+ waiting$/).first()).toBeVisible();
-    await expect(page.getByText("Course offering plans submitted by the Academic Coordinator. Approve them or return them for revision.")).toBeVisible();
+    await expect(page.getByText("Course offering plans submitted by the Academic Coordinator. Approve each plan or return it for revision.")).toBeVisible();
     await expect(page.getByRole("main").getByRole("link", { name: "All approvals" })).toHaveAttribute("href", "/dean/approvals");
 
     // The seed has an MIT plan waiting as well (I-062); this test is about the MSCS plan put in front of the Dean above.

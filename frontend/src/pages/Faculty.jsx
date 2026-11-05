@@ -155,7 +155,7 @@ export default function Faculty() {
           {filtered.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-slate-500">Showing <span className="font-semibold text-ink">{filtered.length}</span> of <span className="font-semibold text-ink">{faculty.length}</span> faculty</p>
-              <p className="meta">Select a faculty member to open their profile</p>
+              <p className="meta">Select a faculty member to open the profile</p>
             </div>
           )}
           <DataTable
@@ -282,7 +282,7 @@ function FacultyFormModal({ faculty, departments = [], onClose, onSaved }) {
           <Field label="Email (also the login)"><Input type="email" value={form.email} onChange={(event) => set("email", event.target.value)} /></Field>
           <Field label="Status"><Select placeholder="" value={form.status} onChange={(event) => set("status", event.target.value)} options={STATUS_OPTIONS} /></Field>
           <div className="sm:col-span-2">
-            <Field label={isNew ? "Temporary password (at least 8 characters)" : "New password (leave blank to keep the current one)"} hint={isNew ? "Made for this person. Give it to them; they change it after the first sign-in." : undefined}>
+            <Field label={isNew ? "Temporary password (at least 8 characters)" : "New password (leave blank to keep the current one)"} hint={isNew ? "Made for this person. Give it to the faculty member, who changes it after the first sign-in." : undefined}>
               <Input type={isNew ? "text" : "password"} autoComplete="new-password" value={form.password} onChange={(event) => set("password", event.target.value)} />
             </Field>
           </div>
@@ -381,7 +381,7 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
                 <p className="mt-3 text-xs leading-relaxed text-slate-600">
                   {calendar.connected
                     ? "Google busy periods are the source used by Defense Scheduling. Event names and details remain private."
-                    : "This faculty member must connect Google Calendar from their own Faculty Portal. Until then, only the hours they enter in their own portal are used."}
+                    : "This faculty member must connect Google Calendar from the Faculty Portal. Until then, only the hours the faculty member enters in the Faculty Portal are used."}
                 </p>
                 <Button as="a" variant="secondary" icon={ExternalLink} className="mt-3 w-full justify-center" href={feedUrl} target="_blank" rel="noreferrer">View availability feed</Button>
               </div>
@@ -481,7 +481,7 @@ function ExpertiseEditor({ faculty, onChanged }) {
   return (
     <section aria-labelledby={`expertise-${faculty.id}`}>
       <div className="mb-2 flex items-center gap-2"><Microscope className="h-4 w-4 text-brand-700" /><h3 id={`expertise-${faculty.id}`} className="text-sm font-semibold text-ink">Expertise records</h3><span className="rounded-full bg-slate-100 px-2 py-0.5 text-2xs font-semibold text-slate-600">{items.length}</span></div>
-      <p className="meta mb-3">Research interests, publications, past advisee and panel titles, and degrees. Panel Matching reads all of them, so the more accurate they are the better the panel recommendations. Records marked <span className="font-semibold text-amber-800">Demo data</span> are sample entries; editing one turns it into a manual entry.</p>
+      <p className="meta mb-3">Research interests, publications, past advisee and panel titles, and degrees. Panel Matching reads all of these, so the more accurate the records the better the panel recommendations. Records marked <span className="font-semibold text-amber-800">Demo data</span> are sample entries; editing one turns it into a manual entry.</p>
       {loading && !data ? <p className="meta" role="status">Loading expertise records…</p> : error ? <InlineNotice tone="danger">{error}</InlineNotice> : (
         <div className="space-y-2">
           {!items.length && <p className="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-500">No expertise records yet. Add the first one below.</p>}
@@ -623,7 +623,7 @@ function WeeklyCalendar({ faculty }) {
 
       {!hasAnything && (
         <InlineNotice tone="warning" title="Not entered">
-          The faculty member enters their weekly hours in their own portal. Until then, Defense Scheduling does not assume any free time for them.
+          The faculty member enters weekly hours in the Faculty Portal. Until then, Defense Scheduling does not assume any free time for the faculty member.
         </InlineNotice>
       )}
 
