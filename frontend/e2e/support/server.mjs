@@ -40,6 +40,9 @@ const env = {
   RAG_PREWARM: "0",
   PYTHONUNBUFFERED: "1",
   PYTHONIOENCODING: "utf-8",
+  // One shared database: specs sign different roles in separate browser contexts and must see each other's work
+  // (the per-visitor demo sandbox is for the public site; p125 mocks its reset route).
+  DEMO_SANDBOX: "0",
   // The run is keyless on every machine: an empty value wins over the developer's .env
   // (load_dotenv never overrides a variable that is already set), so the assistant takes the offline path.
   GOOGLE_API_KEY: "",
