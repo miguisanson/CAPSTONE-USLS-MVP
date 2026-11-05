@@ -91,3 +91,16 @@ Owner's words (summary): review Natalie's v6.0 changes (Google Calendar, .env), 
 | IM39 | Faculty submit teaching availability by semester in a Schedule tab with a calendar view; teaching availability is distinct from defense availability. | Available/preferred/unavailable weekly periods, copy previous term and explicit confirmation; no student availability form. Current collection practice is unknown, so confirm how the portal replaces coordination during stakeholder validation. |
 | IM40 | Approved paired days: Monday/Thursday, Tuesday/Friday, Wednesday/Saturday. | The implementation uses the proposed 07:30–21:00 / 90-minute / 15-minute grid as configurable defaults; the owner explicitly confirmed the paired days, not every timing detail. Single-day fallback remains an explicit coordinator opt-in. Confirmed enrollment conflicts are hard; curriculum forecasts remain warnings/soft ranking inputs. |
 | IM41 | Room management remains free-text input; do not touch it. | No room inventory, room capacity or reservation/conflict engine is added. Existing defense venue behavior stays intact. |
+
+
+## 2026-11-05 — final loop: stakeholder-agreed policy defaults (owner, v6.4.1-test)
+
+Owner 2026-11-05: "all the questions you have needed the stakeholder said yes to them last meeting ... just go through
+with it". Every open `question` row takes the policy-faithful default from `.planning/research/FABLE-REVIEW-2026-11-05.md`
+section "Decisions for the question rows" (source cited per row there). Summary:
+
+| # | Decision |
+|---|---|
+| IM42 | Build now: I-167 message only (no all-subjects withdrawal; file a LOA); I-170 one 20 % drop rule, no free-text exception; I-174 hard 14-day lead time (the "Skip date waits" demo switch also skips it); I-273 AWOL return checks the four returnee items; I-277 enrollment status derived from subject rows; I-278 window/fee judged from the first submission; I-284 one Form 4 at the proposal gate; I-285 Miguel Yu label fixed; I-297 Dean cannot approve readmission before clearance + interview are confirmed; I-299 residency purpose from the stage, checker runs by itself; I-302 two-week no-grant check re-run at Dean approval; I-306 subject tagged Withdrawn automatically on Dean approval; I-313 manuscript-received date derived and read-only; I-324 + F5-06 Graduation and Withdrawal get Sent to Registrar / Acknowledged like LOA; I-326 Failed/Deferred refuse a passing score; I-327 Turnitin similarity % recorded, above 15 refused; I-334 keep DEMO_SHOW_ACCOUNTS=1, fix UAT.md; I-348 restore `?student_id=` deep link; I-369 one sentence on sign-in, no share code. |
+| IM43 | Build if time (M): I-248 three concept-paper titles at upload + pick list; I-252 verified practicum hours entered by the Academic Coordinator; I-304 Advise Slip on readmission approval; I-335 staff record the comprehensive exam result with provenance. |
+| IM44 | Close, no build: I-053 (no batch for Withdrawal/Practicum), I-158 (Research Gate columns are the overview, AD12). Defer and name as known gaps in the Ops Manual: I-279 several subjects per withdrawal, I-293 Public Final Defense / Form 4.3 / Form 8, I-317 change of title, I-319 AC panel recommendation, I-326 per-member Form 7, I-346 student residency request page. |
