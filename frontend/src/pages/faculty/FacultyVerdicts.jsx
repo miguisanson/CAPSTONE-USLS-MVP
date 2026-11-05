@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { BookOpen, CalendarClock, CheckCircle2, Eye, Gavel, Hourglass, History } from "lucide-react";
 import { api } from "../../api";
-import { Button, Card, EApprovalNote, EditableText, EmptyState, Field, Input, InlineNotice, SectionTitle, Select, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Card, EApprovalNote, EditableText, EmptyState, Field, Input, InlineNotice, SectionTitle, StatusChip } from "../../components/ui/index.js";
 import { formatClock, formatDate, formatDateTime } from "../../lib/format";
-import { PanelStamp } from "../../components/process";
+import { PanelStamp, PROVISIONAL, VerdictFields } from "../../components/process";
 
 // The Verdicts page (I-090). Three groups, most urgent first:
 //   1. "Needs your verdict"   - defenses where this member can record the verdict (with the papers and the form)
@@ -12,7 +12,6 @@ import { PanelStamp } from "../../components/process";
 // Verdict words, follow-ups and who acts next come from the API (`verdict_options` per panel); nothing is hard-coded.
 const TITLE_GATE = "Form 1 - Title Defense";
 const FINAL_GATE = "Final Defense";
-const PROVISIONAL = "Provisional pass - revisions or re-defense";
 const HISTORY_OPEN = 5;
 
 const whenOf = (panel) => `${panel.defense.preferred_date || ""}T${panel.defense.start_time || "00:00"}`;
@@ -150,43 +149,14 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
     const draft = drafts[scheduleId] || {};
     const options = panel.verdict_options || [];
     const result = draft.result || options[0]?.value || "";
-    const chosen = options.find((option) => option.value === result);
     return (
       <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50 p-4">
         <div className="flex items-center gap-2">
           <Gavel className="h-4 w-4 text-brand-700" aria-hidden="true" />
           <p className="text-sm font-semibold text-ink">Submit panel chair verdict</p>
         </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label="Verdict result">
-            <Select placeholder={null} options={options} value={result} onChange={(event) => setDraft(scheduleId, { result: event.target.value, provisional_follow_up: "" })} />
-          </Field>
-          {chosen?.summary && <p className="meta sm:col-span-2">{chosen.summary}</p>}
-          {result === PROVISIONAL && (
-            <Field label="Required follow-up">
-              <Select
-                placeholder="Choose revisions or re-defense"
-                options={[{ value: "revisions", label: "Revisions for panel approval" }, { value: "re-defense", label: "Re-defense" }]}
-                value={draft.provisional_follow_up || ""}
-                onChange={(event) => setDraft(scheduleId, { provisional_follow_up: event.target.value })}
-              />
-            </Field>
-          )}
-          <Field label="Remarks or conditions">
-            <Textarea rows={3} value={draft.remarks || ""} onChange={(event) => setDraft(scheduleId, { remarks: event.target.value })} placeholder="Optional conditions, revisions, or notes" />
-          </Field>
-          {panel.gate === TITLE_GATE && result === "Passed" && (
-            <div className="sm:col-span-2">
-              <Field label="Title selected by the panel (from the three submitted)">
-                <Input value={draft.selected_title || ""} onChange={(event) => setDraft(scheduleId, { selected_title: event.target.value })} placeholder="Recorded as the title of the study" />
-              </Field>
-            </div>
-          )}
-          {panel.gate === FINAL_GATE && (
-            <Field label="Evaluation score (Form 7, optional)">
-              <Input type="number" min="0" max="100" step="0.01" value={draft.evaluation_score || ""} onChange={(event) => setDraft(scheduleId, { evaluation_score: event.target.value })} placeholder="Below 85 thesis / 90 dissertation cannot be a pass" />
-            </Field>
-          )}
+        <div className="mt-3">
+          <VerdictFields options={options} result={result} values={draft} onChange={(patch) => setDraft(scheduleId, patch)} showTitle={panel.gate === TITLE_GATE} showScore={panel.gate === FINAL_GATE} />
         </div>
         <Button icon={Gavel} className="mt-3" disabled={busy || (result === PROVISIONAL && !draft.provisional_follow_up)} onClick={() => submitVerdict(panel)}>{busy ? "Submitting…" : "Submit final verdict"}</Button>
         <EApprovalNote className="mt-2" />
@@ -204,19 +174,9 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
         <p className="text-sm font-semibold text-ink">Entered the wrong verdict?</p>
         <p className="mt-1 text-xs text-slate-600">You can correct it until the student or staff act on it. The reason is recorded.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label="Correct verdict">
-            <Select placeholder={null} options={options} value={correction.result || options[0]?.value || ""} onChange={(event) => setCorrection(verdict.id, { result: event.target.value, provisional_follow_up: "" })} />
-          </Field>
-          {(correction.result || options[0]?.value) === PROVISIONAL && (
-            <Field label="Required follow-up">
-              <Select
-                placeholder="Choose revisions or re-defense"
-                options={[{ value: "revisions", label: "Revisions for panel approval" }, { value: "re-defense", label: "Re-defense" }]}
-                value={correction.provisional_follow_up || ""}
-                onChange={(event) => setCorrection(verdict.id, { provisional_follow_up: event.target.value })}
-              />
-            </Field>
-          )}
+          <div className="sm:col-span-2">
+            <VerdictFields options={options} result={correction.result || options[0]?.value || ""} values={correction} onChange={(patch) => setCorrection(verdict.id, patch)} showRemarks={false} />
+          </div>
           <Field label="Reason for the correction" required>
             <Input value={correction.reason || ""} onChange={(event) => setCorrection(verdict.id, { reason: event.target.value })} placeholder="Required" />
           </Field>

@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, CheckCircle2, Clock, FileCheck, Gavel, UserRoundCheck } from "lucide-react";
 import { api } from "../../api";
-import { Button, Card, Field, InlineNotice, Input, SectionTitle, Select, StatCard, Stepper, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Card, Field, InlineNotice, Input, SectionTitle, Select, StatCard, Stepper, StatusChip } from "../../components/ui/index.js";
 import { formatDate, todayISO } from "../../lib/format";
 import { toneOf } from "../../lib/tone";
 import { useAuth } from "../../auth";
+import { PROVISIONAL, VerdictFields } from "../../components/process";
 import { Form1EndorsementQueue } from "../Form1Endorsements";
 import { SubmitButton, WorkflowSubmitFeedback } from "./shared";
 
@@ -14,7 +15,6 @@ import { SubmitButton, WorkflowSubmitFeedback } from "./shared";
 // ---------------------------------------------------------------------------
 const TITLE_GATE = "Form 1 - Title Defense";
 const FINAL_GATE = "Final Defense";
-const PROVISIONAL = "Provisional pass - revisions or re-defense";
 
 export function ResearchGateForm({ context, studentId, submit, submitting, result, submitError, refetch }) {
   const { user } = useAuth();
@@ -111,7 +111,7 @@ export function ResearchGateForm({ context, studentId, submit, submitting, resul
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form id="research-gate-record" onSubmit={onSubmit} className="scroll-mt-24 space-y-5">
       <SectionTitle
         title="Research Gate record"
         subtitle="The stage and checklist are calculated from uploads, endorsements, and workflow results"
@@ -264,37 +264,16 @@ export function ResearchGateForm({ context, studentId, submit, submitting, resul
           )}
           {(staffAction.can_submit || staffAction.can_correct) && (
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Field label="Defense verdict">
-                <Select
-                  placeholder={null}
+              <div className="sm:col-span-2">
+                <VerdictFields
                   options={verdictOptions}
-                  value={verdictResult}
-                  onChange={(event) => setStaffVerdict((current) => ({ ...current, result: event.target.value, provisional_follow_up: "" }))}
+                  result={verdictResult}
+                  values={staffVerdict}
+                  onChange={(patch) => setStaffVerdict((current) => ({ ...current, ...patch }))}
+                  showTitle={staffAction.gate === TITLE_GATE}
+                  showScore={staffAction.gate === FINAL_GATE}
                 />
-              </Field>
-              {verdictResult === PROVISIONAL && (
-                <Field label="Required follow-up">
-                  <Select
-                    placeholder="Choose revisions or re-defense"
-                    options={[{ value: "revisions", label: "Revisions for panel approval" }, { value: "re-defense", label: "Re-defense" }]}
-                    value={staffVerdict.provisional_follow_up || ""}
-                    onChange={(event) => setStaffVerdict((current) => ({ ...current, provisional_follow_up: event.target.value }))}
-                  />
-                </Field>
-              )}
-              {staffAction.gate === TITLE_GATE && verdictResult === "Passed" && (
-                <Field label="Title selected by the panel">
-                  <Input value={staffVerdict.selected_title || ""} onChange={(event) => setStaffVerdict((current) => ({ ...current, selected_title: event.target.value }))} />
-                </Field>
-              )}
-              {staffAction.gate === FINAL_GATE && (
-                <Field label="Evaluation score (Form 7)">
-                  <Input type="number" min="0" max="100" step="0.01" value={staffVerdict.evaluation_score || ""} onChange={(event) => setStaffVerdict((current) => ({ ...current, evaluation_score: event.target.value }))} />
-                </Field>
-              )}
-              <Field label="Panel remarks">
-                <Textarea rows={3} value={staffVerdict.remarks || ""} onChange={(event) => setStaffVerdict((current) => ({ ...current, remarks: event.target.value }))} placeholder="Record the panel's remarks or conditions" />
-              </Field>
+              </div>
               {staffAction.can_submit && (
                 <Field label="Reason for recording for the panel" required>
                   <Input value={staffVerdict.reason || ""} onChange={(event) => setStaffVerdict((current) => ({ ...current, reason: event.target.value }))} placeholder="For example: the chair is away; signed result received" />

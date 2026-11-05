@@ -36,19 +36,6 @@
         "them"
       ],
       "reason": "Rule 6 hit in a file another packet owns (P-B boards / P-D research gate); that packet removes the words and this entry"
-    },
-    "pages/workflow/DefenseScheduling.jsx": {
-      "hits": [
-        "their"
-      ],
-      "reason": "Rule 6 hit in a file another packet owns (P-B boards / P-D research gate); that packet removes the words and this entry"
-    },
-    "pages/workflow/ResearchGateOverview.jsx": {
-      "hits": [
-        "they",
-        "their"
-      ],
-      "reason": "Rule 6 hit in a file another packet owns (P-B boards / P-D research gate); that packet removes the words and this entry"
     }
   }
 }
