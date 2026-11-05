@@ -18,7 +18,10 @@
 - Running (Sonnet, 3 helpers): `pkt/rules5` in `wt/rules5` (P-F questions round 2, owns app.py), `pkt/follow5` in `wt/follow5`
   (P-H frontend follows P-C: withdrawal guide, Send/Acknowledge buttons, timeline, RC home), `pkt/docs5` in `wt/docs5` (Ops Manual
   today's rules + known gaps, UAT.md I-334). MERGED d2587b0d `pkt/ux5` (hover lift, phone filter chips, I-091, I-370); its specs
-  re-running on merged code -> `E:/Temp/claude/e2e-batch2.log`. Old ux5 note: `pkt/ux5` in `wt/ux5` (motion pass, Research Gate "Still to do" line, I-091, phone filter chips, from 2973d56),
+  re-running on merged code -> 14 failed: fixed in bf9ac8a0 (I-087 chip kept, p82/p42 Field helpers; gallery specs need
+  `e2e.mjs --build`, a plain `npm run build:web` dist has no /__ui). OPEN: p121 alone fails 2/17, Research Gate shows "0 of 0"
+  intermittently (API 200) -> `pkt/gatedebug` in `wt/gatedebug` (Sonnet, debugging). `pkt/docs5` (c70ebe14) done, merge AFTER
+  pkt/rules5 (it documents P-F rules); .docx/.pdf not rebuilt (throwaway venv E:/Temp/claude/opsman-venv has python-docx; no LibreOffice). Old ux5 note: `pkt/ux5` in `wt/ux5` (motion pass, Research Gate "Still to do" line, I-091, phone filter chips, from 2973d56),
   `pkt/logic5` in `wt/logic5` (P-C backend logic, owns app.py), `pkt/boards5` in `wt/boards5` (P-B boards, phone list, deep links).
   Rung note: subagents write the failing tests themselves from the packet brief (brief = contract); main session reviews + gates.
 - Next after these: P-D research gate polish, P-F questions round 2 (app.py, after P-C merges), P-G derived inputs, P-E loading states.
