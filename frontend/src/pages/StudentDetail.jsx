@@ -167,7 +167,9 @@ export default function StudentDetail() {
           {student.monitoring_new_student && (
             <StatusChip status="New Student" tone="success" dot={false} label={<><UserPlus className="h-3.5 w-3.5" aria-hidden="true" /> New Student</>} />
           )}
+          {student.current_stage && <StatusChip status={student.current_stage} tone="neutral" dot={false} />}
           {student.enrollment_tag && <StatusChip status={student.enrollment_tag} dot={false} />}
+          {data.approved_leave && <StatusChip status="Leave" tone="info" dot={false} label={`${data.approved_leave.kind}: ${data.approved_leave.status}, ${data.approved_leave.period}`} />}
           <StatusChip status={student.standing} dot={false} />
           <StatusChip status={student.risk_level} />
           <StatusChip

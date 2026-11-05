@@ -8047,7 +8047,7 @@ def leave_available_actions(case: LeaveCase, role: str) -> list[dict]:
             "to": leave_resolved_target(case, move),
             "needs_comment": move["needs_comment"],
             "tone": move["tone"],
-            "batch": move["batch"],
+            "batch": move["batch"] and not returnee_group_forward_reason(move["action"], case.kind),
         })
     return actions
 
@@ -9787,7 +9787,7 @@ def process_actions_for(slug: str, kind: str, status: str, role: str, record=Non
             "targets": [target],
             "needs_comment": move["needs_comment"],
             "tone": move["tone"],
-            "batch": move["batch"],
+            "batch": move["batch"] and not returnee_group_forward_reason(move["action"], kind),
             "confirm": move["confirm"],
             "opens": move["opens"],
         })
@@ -14600,6 +14600,10 @@ def register_routes(app: Flask) -> None:
                 "graduation_eligibility": graduation_eligibility(student),
                 "graduation_review_windows": graduation_school_year_options(),
                 "graduation_default_review_window": default_graduation_school_year(),
+                "approved_leave": (
+                    {"status": leave.status, "period": leave_period_text(leave), "kind": KIND_LABELS[leave.kind]}
+                    if (leave := active_leave_case(student.id)) else None
+                ),
                 "awol_case": awol_case_dict(awol_case, include_student=False) if awol_case else None,
                 "residency_record": residency_enrollment_dict(residency_record) if residency_record else None,
                 "tasks": [task_dict(t) for t in tasks],
@@ -20996,6 +21000,9 @@ def register_routes(app: Flask) -> None:
         batchable = {item["action"] for item in _lw.TRANSITIONS if item["batch"]}
         if action not in batchable:
             return jsonify({"error": "That step cannot be applied to several requests at once."}), 400
+        returnee = LeaveCase.query.filter(LeaveCase.id.in_(case_ids), LeaveCase.kind == KIND_READMISSION).first()
+        if returnee and returnee_group_forward_reason(action, returnee.kind):
+            return jsonify({"error": returnee_group_forward_reason(action, returnee.kind)}), 400
         comment = (data.get("comment") or "").strip()
         move_needs_comment = any(
             item["action"] == action and item["needs_comment"] for item in _lw.TRANSITIONS if item["batch"]
@@ -21198,6 +21205,8 @@ def register_routes(app: Flask) -> None:
         batchable = {item["action"] for item in _sp.TRANSITIONS[slug] if item["batch"]}
         if action not in batchable:
             return jsonify({"error": "That step cannot be applied to several requests at once."}), 400
+        if returnee_group_forward_reason(action, _sp.KIND_AWOL if slug == _sp.SLUG_AWOL else ""):
+            return jsonify({"error": returnee_group_forward_reason(action, _sp.KIND_AWOL)}), 400
         comment = (data.get("comment") or "").strip()
         if any(item["action"] == action and item["needs_comment"] for item in _sp.TRANSITIONS[slug]) and not comment:
             return jsonify({"error": "Enter the required reason before applying this step."}), 400
@@ -27406,6 +27415,7 @@ def summary_tiles(args) -> tuple[dict, list[dict]]:
     tile_waiting = {
         "key": "waiting", "label": f"Requests waiting more than {REPORT_WAITING_DAYS} days", "value": len(waiting_cases), "unit": "requests",
         "scope": "all offices",  # the Dean's own home counts only the Dean's queue; this counts every office
+        "note": "Counts how long a request has been open, not task due dates (the staff home counts tasks past their due date).",
         "comparison": _target_comparison(len(waiting_cases), REPORT_TARGET_WAITING),
         "rows": [
             _student_row(scope["by_id"][c["student_id"]], f"{c['label']}: waiting {c['age_days']} days, next {c['next_owner'] or 'not named'}", age_days=c["age_days"])
@@ -27851,6 +27861,14 @@ def graduation_candidate_payload() -> list[dict]:
                 else "Awaiting Student Application"
             ),
             "has_submitted_documents": application_submitted,
+            # the same test the export applies, so the page never calls a row ready that the export would refuse (I-374)
+            "export_blocked_reason": (
+                "No longer eligible: " + "; ".join(
+                    eligibility["missing_coursework"] + eligibility["missing_research_requirements"]
+                    + [eligibility["missing_practicum_requirement"]] * bool(eligibility["missing_practicum_requirement"])
+                )[:240]
+                if endorsement and endorsement.endorsement_status == "Dean Approved" and not eligibility["eligible"] else ""
+            ),
             **case_meta,
             "next_action_owner": (
                 case_meta["next_action_owner"]
@@ -38164,6 +38182,13 @@ def returnee_checks_missing(confirmed) -> str:
     return " and ".join(word for item, word in _RETURNEE_CHECK_WORDS.items() if item not in confirmed)
 
 
+def returnee_group_forward_reason(action: str, kind: str) -> str:
+    """Why a readmission or AWOL return cannot be forwarded as a group: staff confirm the two checks for each returnee (I-379)."""
+    if action == "forward" and kind in (KIND_READMISSION, _sp.KIND_AWOL):
+        return "Forward one at a time: staff confirm the interview and the Business Office clearance for each returnee (Handbook p.45)."
+    return ""
+
+
 def readmission_requirements() -> list[str]:
     return READMISSION_SYSTEM_ITEMS + READMISSION_STAFF_ITEMS
 
@@ -41844,8 +41869,11 @@ def seed_report_history(today: date | None = None) -> int:
                     db.session.add(GraduationEndorsement(
                         student_id=student.id, review_window=term.label, batch_name=f"Batch {index % 3 + 1} {decided:%B %Y}",
                         coursework_status="Complete", research_status="Complete", practicum_status="Not Required",
-                        endorsement_status="Dean Approved" if approved else "Returned for Revision",
-                        registrar_status="Pending", submitted_at=forwarded, dean_decision_at=decided,
+                        # a past approval is already handled: the Registrar has the list, so nothing waits for the Dean's export
+                        endorsement_status="Registrar Received" if approved else "Returned for Revision",
+                        registrar_status="Acknowledged" if approved else "Pending",
+                        registrar_received_at=decided + timedelta(days=3) if approved else None,
+                        submitted_at=forwarded, dean_decision_at=decided,
                         updated_at=decided, dean_remarks="Seeded history.",
                     ))
                 elif process == "adviser" and faculty_ids:
