@@ -1080,6 +1080,7 @@ class AwolCase(db.Model):
     dean_decision = db.Column(db.String(40), nullable=False, default="Not Submitted")
     staff_notes = db.Column(db.Text)
     dean_remarks = db.Column(db.Text)
+    staff_checks_json = db.Column(db.Text)  # {"item": true/false}: the returnee office checks staff confirmed (I-273)
     decided_at = db.Column(db.DateTime)
     # Registrar handoff of the approved return, same states as a leave (LEAVE_REGISTRAR_STATUSES).
     registrar_status = db.Column(db.String(40), nullable=False, default="Not Ready")
@@ -1481,6 +1482,7 @@ class ResearchEvidenceFile(db.Model):
     compliance_score = db.Column(db.Integer)
     compliance_summary = db.Column(db.Text)
     compliance_result_json = db.Column(db.Text)
+    similarity_percent = db.Column(db.Float)  # Turnitin similarity typed at upload (CMP-03: 15 or less)
     uploaded_at = db.Column(db.DateTime, default=now_utc)
 
 
@@ -6945,6 +6947,19 @@ def leave_checklist_state(case: LeaveCase) -> list[dict]:
     ]
 
 
+def awol_staff_checklist(case: AwolCase) -> list[dict]:
+    """The returnee office checks staff confirm before the Dean decides a return from AWOL (same items as readmission)."""
+    try:
+        checked = json.loads(case.staff_checks_json or "{}")
+    except (TypeError, ValueError):
+        checked = {}
+    return [
+        {"item": item, "source": "staff", "confirmed": bool(checked.get(item)),
+         "detail": "Graduate School staff confirm this during review."}
+        for item in READMISSION_STAFF_ITEMS
+    ]
+
+
 def leave_student_brief(student: Student) -> dict:
     return {
         "id": student.id,
@@ -9936,6 +9951,7 @@ def awol_process_case(item: AwolCase, role: str = "staff", detail: bool = False)
             "sent_at": iso(item.registrar_sent_at), "acknowledged_at": iso(item.registrar_acknowledged_at),
         },
         "actions": process_actions_for("awol", _sp.KIND_AWOL, item.status, role, item),
+        "staff_checklist": awol_staff_checklist(item),
         "timeline": _sp.timeline_steps("awol", _sp.KIND_AWOL, item.status, {row["new_status"] for row in logs if row.get("new_status")}),
         "unresolved_messages": open_messages,
         "latest_message": awol_latest_message(item.student_id),
@@ -10251,6 +10267,8 @@ def process_case_apply(slug: str, kind: str, record, action: str, account: UserA
                 if action == "forward":
                     payload["workflow_action"] = "forward_return_to_dean"
                     payload["case_id"] = str(record.id)
+                    items = data.getlist("confirmed_items") if hasattr(data, "getlist") else (data.get("confirmed_items") or [])
+                    payload.setlist("confirmed_items", list(items))
                 elif action == "complete_reenrollment":
                     payload["workflow_action"] = "complete_reenrollment"
                     payload["case_id"] = str(record.id)
@@ -14811,7 +14829,8 @@ def register_routes(app: Flask) -> None:
                 revoke_form1_endorsement(student.id)
             if item_name == "Three concept papers":
                 revoke_form1_endorsement(student.id)
-            evidence = store_research_evidence(student, gate, item_name, uploaded)
+            similarity = turnitin_similarity_or_error(request.form.get("similarity_percent")) if item_name == TURNITIN_ITEM else None
+            evidence = store_research_evidence(student, gate, item_name, uploaded, similarity_percent=similarity)
             if item_name == "Ethics Clearance":
                 replaced_paths = replace_research_evidence_files(evidence.document_check, evidence)
                 ethics_record = DocumentCheck.query.filter_by(
@@ -17455,6 +17474,13 @@ def register_routes(app: Flask) -> None:
                         "provisional pass with major revisions, not a pass."
                     )
                 }), 400)
+            if result in (VERDICT_FAILED, VERDICT_DEFERRED) and score >= threshold:
+                return None, (jsonify({
+                    "error": (
+                        f"A score of {score:g} is {threshold} or above (Form 7), which is a passing score. "
+                        f"It cannot go with a {result} result."
+                    )
+                }), 400)
             if result == VERDICT_PROVISIONAL and score >= threshold:
                 return None, (jsonify({
                     "error": (
@@ -18222,8 +18248,7 @@ def register_routes(app: Flask) -> None:
             # Past the add/drop week a subject leaves through Withdrawal (the student files it) or, with absence
             # evidence, as a Drop recorded by the Academic Coordinator. Staff cannot just untick it.
             if account and account.role == "academic_coordinator":
-                removal_evidence, _evidence_error = drop_evidence(
-                    data.get("unexcused_absence_percent"), data.get("drop_exception_reason"))
+                removal_evidence, _evidence_error = drop_evidence(data.get("unexcused_absence_percent"))
             if not removal_evidence:
                 codes = ", ".join(sorted(current_active[cid].course.code for cid in removing if current_active[cid].course))
                 return jsonify({"error": (
@@ -19531,6 +19556,11 @@ def register_routes(app: Flask) -> None:
                 return jsonify({"error": "This AWOL return request is not awaiting a Dean decision."}), 400
             student = item.student
             previous_status = item.status
+            if decision == "approve" and not all(row["confirmed"] for row in awol_staff_checklist(item)):
+                # I-273: like readmission (I-297), the Dean decides only after staff confirmed the office checks.
+                return jsonify({"error": (
+                    "Graduate School staff have not confirmed the Business Office clearance and the interview yet, "
+                    "so this return cannot be approved. Return it to staff to confirm them.")}), 400
             if decision == "approve":
                 if item.full_reenrollment_required:
                     item.status = "Re-enrollment Required"
@@ -21526,8 +21556,7 @@ def register_routes(app: Flask) -> None:
         payload["student_id"] = str(schedule.student_id)
         payload["defense_type"] = schedule.defense_type
         # What the booking already says is kept unless the request gives a new value.
-        for key, kept in (("mode", schedule.mode), ("venue", schedule.venue),
-                          ("manuscript_received_on", schedule.manuscript_received_on and schedule.manuscript_received_on.isoformat())):
+        for key, kept in (("mode", schedule.mode), ("venue", schedule.venue)):
             if kept and not str(payload.get(key) or "").strip():
                 payload[key] = kept
         try:
@@ -21776,8 +21805,6 @@ def register_routes(app: Flask) -> None:
         try:
             day = parse_date(str(data.get("preferred_date") or ""))
             start, end = parse_time(data.get("selected_start")), parse_time(data.get("selected_end"))
-            received_raw = str(data.get("manuscript_received_on") or "").strip()
-            received_on = parse_date(received_raw) if received_raw else None
         except ValueError:
             return jsonify({"error": "Enter dates as YYYY-MM-DD and times as HH:MM."}), 400
         if not (data.get("preferred_date") and start and end) or end <= start:
@@ -21786,14 +21813,10 @@ def register_routes(app: Flask) -> None:
         defense_type = str(data.get("defense_type") or RESEARCH_GATE_DEFENSE_TYPES.get(gate) or "").strip()
         if defense_type not in SCHEDULABLE_DEFENSE_TYPES:
             return jsonify({"error": "Choose the Title, Proposal or Final Defense."}), 400
-        if defense_type == "Title Defense":
-            received_on = None
         panel = active_panel_assignments(student, gate)
         if not panel:
             return jsonify({"error": "Complete Panel Matching before checking a slot."}), 400
-        evaluation = evaluate_schedule_slot(
-            student, panel, defense_type, day, start, end, str(data.get("venue") or ""), received_on,
-        )
+        evaluation = evaluate_schedule_slot(student, panel, defense_type, day, start, end, str(data.get("venue") or ""))
         return jsonify(evaluation)
 
     # ---- adviser appointment ------------------------------------------------------------------
@@ -25421,18 +25444,15 @@ CASE_CLOSED_OWNER_VALUES = {"", "none", "closed", "complete", "completed", "n/a"
 
 def workflow_case_is_closed(slug: str, student_id: int, latest_entry: TransactionLog | None = None) -> bool:
     """True when a case needs nobody: the last step named no next owner, or the case record itself
-    has reached its end (an exported withdrawal, a reviewed practicum, an exported endorsement)."""
+    has reached its end (an acknowledged withdrawal or graduation list, a reviewed practicum)."""
     if latest_entry is not None and (latest_entry.next_owner or "").strip().casefold() in CASE_CLOSED_OWNER_VALUES:
         return True
     record = workflow_case_record(slug, student_id) if slug in {"withdrawal", "practicum", "graduation"} else None
     if record is None:
         return False
     if slug == "graduation":
-        return (
-            getattr(record, "registrar_status", None) == "Exported - Ready to Send"
-            or record.endorsement_status in {"Sent to Registrar", "Registrar Received"}
-        )
-    return record.status in WORKFLOW_FINAL_STATUSES.get(slug, ())
+        return record.endorsement_status == "Registrar Received"  # like LOA: open until the Registrar acknowledged
+    return record.status in WORKFLOW_FINAL_STATUSES.get(slug, ()) and record.status not in {"Exported - Ready to Send", "Sent to Registrar"}
 
 
 def queue_open_cases(student_ids: list[int]) -> list[dict]:
@@ -27905,6 +27925,8 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
                 "venue": ask.venue, "constraints": ask.constraints, "requested_at": iso(ask.created_at),
             }
             context["lead_reference"] = {"date": iso(lead_reference), "label": lead_reference_label, "days": lead_days}
+            # I-313: shown read-only; worked out from the adviser's signed Form 4, never typed.
+            context["manuscript_received_on"] = iso(student_manuscript_received_on(selected_student, stage_defense_type or progress["stage"]))
             context["change_requesters"] = list(SCHEDULE_CHANGE_REQUESTERS)
             current_booking = ScheduleRequest.query.filter(
                 ScheduleRequest.student_id == selected_student.id,
@@ -28479,16 +28501,12 @@ def _class_list_date(text: str) -> date | None:
     raise ValueError(value)
 
 
-DROP_EXCEPTION_MIN_LENGTH = 10
-
-
-def drop_evidence(percent_value, exception_reason) -> tuple[str | None, str | None]:
+def drop_evidence(percent_value) -> tuple[str | None, str | None]:
     """Evidence that a subject may be recorded Dropped, as (evidence text, error message).
 
-    Handbook rule: a subject is dropped by the professor when the student's unexcused absences
-    exceed the register value (20% of class hours). Every path that records a drop asks for the
-    absence percentage above that line, or for a documented exception with its reason, so a drop
-    can never be recorded without one or the other.
+    Handbook p.52 (DRP-01..03): a subject is dropped by the professor when the student's unexcused
+    absences exceed the register value (20% of class hours). Every path that records a drop asks for
+    that percentage; there is no other way in (I-170: no free-text exception).
     """
     limit = rule_value("dropping.absence_limit_percent", 20)
     cite = rule_citation("dropping.absence_limit_percent") or "Graduate School Handbook 2022-2023"
@@ -28501,19 +28519,16 @@ def drop_evidence(percent_value, exception_reason) -> tuple[str | None, str | No
             percent = None
         if percent is not None and not 0 <= percent <= 100:
             percent = None
-    exception = " ".join(str(exception_reason or "").split())
     if percent is not None and percent > limit:
         return f"Unexcused absences {percent:g}% of class hours, above the {limit}% limit ({cite}).", None
-    if len(exception) >= DROP_EXCEPTION_MIN_LENGTH:
-        return f"Documented exception to the {limit}% absence rule ({cite}): {exception}.", None
     if percent is not None:
         return None, (
             f"A subject is dropped only when unexcused absences are more than {limit}% of the class hours "
-            f"({cite}); {percent:g}% was entered. If an approved exception applies, record it with its reason."
+            f"({cite}); {percent:g}% was entered. Absences with an excuse (illness with a medical certificate, "
+            "a death in the family, a Dean-endorsed activity) are not counted."
         )
     return None, (
-        f"A drop needs the student's unexcused absences as a percentage of class hours, above {limit}% "
-        f"({cite}), or a documented exception with its reason."
+        f"A drop needs the student's unexcused absences as a percentage of class hours, above {limit}% ({cite})."
     )
 
 
@@ -28668,7 +28683,6 @@ def evaluate_class_list_row(row: dict, term: AcademicTerm, academic_year: str, s
         return fail("already_dropped", f"Already recorded {existing.status}; nothing to change.", "warning")
     evidence, evidence_error = drop_evidence(
         class_list_value(row, "UNEXCUSEDABSENCEPERCENT", "UNEXCUSEDABSENCES", "ABSENCEPERCENT", "ABSENCES"),
-        class_list_value(row, "DROPEXCEPTIONREASON", "EXCEPTIONREASON", "DROPEXCEPTION"),
     )
     if evidence_error:
         return fail("drop_evidence", evidence_error)
@@ -29964,9 +29978,6 @@ def monitoring_portal_create_student(data: dict) -> tuple[Student, UserAccount]:
                 "name and entry year. Confirm to add this as a separate student.",
                 409, possible_match=student_brief(possible),
             )
-    enrollment_tag = _monitoring_clean(data.get("enrollment_tag")) or "Enrolled"
-    if enrollment_tag not in {"Enrolled", "Not Enrolled"}:
-        raise MonitoringEntryError("Only Enrolled or Not Enrolled can be set here; LOA, AWOL and withdrawal have their own workflows.")
     email = _monitoring_clean(data.get("email"), 160).lower()
     if email:
         check_email_address(email)
@@ -29983,7 +29994,7 @@ def monitoring_portal_create_student(data: dict) -> tuple[Student, UserAccount]:
         academic_year_entry=ay_entry,
         current_stage="Admission",
         standing="Active",
-        enrollment_tag=enrollment_tag,
+        enrollment_tag="Not Enrolled",
         adviser_name=_monitoring_clean(_monitoring_adviser_from(data).get("adviser_name"), 120) or None,
         monitoring_new_student=True,
     )
@@ -30003,6 +30014,12 @@ def monitoring_portal_create_student(data: dict) -> tuple[Student, UserAccount]:
     login = ensure_student_account(student, student.email)
     sync_student_curriculum(student)
     db.session.flush()
+    # I-277: derived, never picked. Enrolled only with subject rows in the active semester (AIMS is the source).
+    if term and SubjectEnrollment.query.filter(
+        SubjectEnrollment.student_id == student.id, SubjectEnrollment.term_id == term.id,
+        SubjectEnrollment.status.in_(ACTIVE_SUBJECT_ENROLLMENT_STATUSES),
+    ).count():
+        student.enrollment_tag = "Enrolled"
     recompute_risk(student)
     change_id = uuid4().hex
     _monitoring_edit(
@@ -30165,7 +30182,7 @@ def _monitoring_row_values(data: dict) -> dict:
 
 def _monitoring_drop_reason(data: dict, reason: str) -> str:
     """The change reason for a manual Dropped status, with the absence evidence the rule needs."""
-    evidence, error = drop_evidence(data.get("unexcused_absence_percent"), data.get("drop_exception_reason"))
+    evidence, error = drop_evidence(data.get("unexcused_absence_percent"))
     if error:
         raise MonitoringEntryError(error)
     return f"{reason} {evidence}".strip() if reason else evidence
@@ -31404,25 +31421,25 @@ def evaluate_schedule_slot(
     start: time,
     end: time,
     venue: str,
-    manuscript_received_on: date | None = None,
     participants: list[dict] | None = None,
     ignore_schedule: ScheduleRequest | None = None,
 ) -> dict:
     """Every warning for one candidate slot, split into hard (blocks) and soft (needs a reason).
 
-    hard: slot in the past, a participant who entered hours that do not cover the slot or marked
-    the date unavailable, a panelist / adviser / student double-booked, the room already booked.
-    soft: before the protocol lead time, a participant who has not entered any availability.
+    hard: slot in the past, before the protocol lead time (I-174; the demo switch skips it), a participant
+    who entered hours that do not cover the slot or marked the date unavailable, a panelist / adviser /
+    student double-booked, the room already booked.
+    soft: a participant who has not entered any availability.
     """
     participants = participants if participants is not None else defense_participants(student, panel)
     hard: list[str] = []
     soft: list[str] = []
     if datetime.combine(day, start) <= manila_now():
         hard.append("That date and time is already in the past.")
-    earliest, _reference, reference_label = student_earliest_defense_date(student, defense_type, manuscript_received_on)
+    earliest, _reference, reference_label = student_earliest_defense_date(student, defense_type)
     lead_days = defense_lead_days(defense_type)
-    if day < earliest:
-        soft.append(
+    if day < earliest and not demo_skip_date_waits():
+        hard.append(
             f"{defense_type} needs at least {lead_days} days after {reference_label}; "
             f"the earliest date is {earliest.isoformat()}"
         )
@@ -31559,15 +31576,10 @@ def book_defense_schedule(
         )
     participants = defense_participants(student, panel)
 
-    received_raw = (data.get("manuscript_received_on") or "").strip() if isinstance(data.get("manuscript_received_on"), str) else ""
-    received_on = parse_date(received_raw) if received_raw else None
-    if received_on and received_on > ph_today():
-        raise ValueError("The date the panel received the manuscript cannot be in the future.")
-    if defense_type == "Title Defense":
-        received_on = None
+    received_on = student_manuscript_received_on(student, defense_type)  # I-313: never typed in
     evaluation = evaluate_schedule_slot(
         student, panel, defense_type, preferred_date, selected_start, selected_end, venue,
-        received_on, participants=participants, ignore_schedule=replaces,
+        participants=participants, ignore_schedule=replaces,
     )
     matched_count = evaluation["matched_count"]
     status_reason = evaluation["soft"]
@@ -33469,6 +33481,12 @@ def handle_awol(data: MultiDict) -> int:
             raise ValueError("Only a submitted AWOL return intent can be forwarded to the Dean.")
         if not item.return_intent:
             raise ValueError("The student's structured written return declaration is required before Dean review.")
+        # I-273: the same returnee office checks as a readmission (Handbook p.45); an item not listed was not confirmed.
+        confirmed = set(data.getlist("confirmed_items")) if hasattr(data, "getlist") else set(data.get("confirmed_items") or [])
+        unknown = sorted(confirmed - set(READMISSION_STAFF_ITEMS))
+        if unknown:
+            raise ValueError("Unknown returnee checklist item: " + ", ".join(unknown))
+        item.staff_checks_json = json.dumps({name: name in confirmed for name in READMISSION_STAFF_ITEMS})
         review = awol_policy_review(student, {
             "workflow_action": "return_from_awol",
             "application_reference": "Structured portal return declaration",
@@ -34740,12 +34758,33 @@ def parse_title_defense_text(text: str) -> dict:
     }
 
 
+TURNITIN_ITEM = "Turnitin Certificate with SIR not more than 15%"
+
+
+def turnitin_similarity_or_error(raw) -> float:
+    """CMP-03: the similarity index is typed at upload (0-100) and must be at most the Protocol limit."""
+    limit = rule_value("research.turnitin_max_percent", 15)
+    try:
+        percent = float(str(raw if raw is not None else "").strip().rstrip("%"))
+    except ValueError:
+        percent = None
+    if percent is None or not 0 <= percent <= 100:
+        raise ValueError("Enter the similarity percentage shown on the Turnitin certificate (a number from 0 to 100).")
+    if percent > limit:
+        raise ValueError(
+            f"The similarity index is {percent:g}%. It must be {limit}% or less before the paper goes to the editor "
+            f"({rule_citation('research.turnitin_max_percent') or 'Research Protocol, Closed-door Final Defense'}, CMP-03)."
+        )
+    return percent
+
+
 def store_research_evidence(
     student: Student,
     gate: str,
     item_name: str,
     uploaded,
     doc: DocumentCheck | None = None,
+    similarity_percent: float | None = None,
 ) -> ResearchEvidenceFile:
     original_name = secure_filename(uploaded.filename or "")
     if not original_name.lower().endswith(".pdf"):
@@ -34780,6 +34819,7 @@ def store_research_evidence(
         stored_name=stored_name,
         mime_type="application/pdf",
         extracted_text=extracted_text,
+        similarity_percent=similarity_percent,
     )
     db.session.add(evidence)
     doc.status = "Submitted"
@@ -36563,7 +36603,6 @@ RESEARCH_PORTAL_STAGE_SEQUENCE = [
 ADVISER_APPROVAL_DOCUMENTS = {
     "Form 4 - Endorsement for Proposal Defense",
     "Proposal manuscript",
-    "Adviser e-signature/endorsement",
     "Form 4 - Endorsement for Final Defense",
     "Final manuscript",
 }
@@ -36650,12 +36689,6 @@ RESEARCH_REQUIREMENTS = {
         "source_type": "ethics_clearance_record",
         "required_file_count": 0,
     },
-    "Adviser e-signature/endorsement": {
-        "label": "Proposal manuscript endorsement",
-        "description": "Upload the proposal manuscript endorsement. The assigned adviser reviews and signs the exact uploaded file in-system.",
-        "source_type": "student_upload",
-        "required_file_count": 1,
-    },
     "Form 4.1 Statistical Consultation Form or qualitative exemption": {
         "label": "Statistical consultation form or qualitative exemption",
         "description": "Upload Form 4.1 or the approved qualitative-research exemption.",
@@ -36712,7 +36745,7 @@ RESEARCH_REQUIREMENTS = {
     },
     "Turnitin Certificate with SIR not more than 15%": {
         "label": "Turnitin certificate (SIR 15% or below)",
-        "description": "Upload the final Turnitin certificate showing the required similarity result.",
+        "description": "Upload the final Turnitin certificate and enter the similarity percentage it shows. It must be 15% or less.",
         "source_type": "student_upload",
         "required_file_count": 1,
     },
@@ -36943,6 +36976,7 @@ def research_milestone_payload(student: Student, gate: str) -> dict:
                     "url": f"/api/research-evidence/{item.id}/file",
                     "compliance_status": item.compliance_status,
                     "compliance_score": item.compliance_score,
+                    "similarity_percent": item.similarity_percent,
                     "compliance_summary": item.compliance_summary,
                     "compliance": json.loads(item.compliance_result_json) if item.compliance_result_json else None,
                     "adviser_approval": adviser_approval_dict(
@@ -37392,7 +37426,6 @@ def required_documents_for_gate(gate: str) -> list[str]:
             "Recommended panel set",
             "Form 4 - Endorsement for Proposal Defense",
             "Form 4.1 Statistical Consultation Form or qualitative exemption",
-            "Adviser e-signature/endorsement",
             "Agreed defense schedule in Form 4",
             "Proposal defense result",
             FORM_5_1_ITEM,
@@ -37433,7 +37466,6 @@ def research_evidence_aliases(gate: str) -> dict[str, list[str]]:
         "Proposal manuscript": ["proposal manuscript", "proposal paper", "proposal draft", "adviser signed proposal manuscript"],
         "Ethics Clearance": ["ethics clearance", "rerc clearance", "research protocol form 5.2"],
         "Ethics clearance status and date": ["ethics status", "clearance date", "cleared"],
-        "Adviser e-signature/endorsement": ["adviser endorsement", "adviser e-signature", "endorsed by adviser", "adviser signed proposal manuscript endorsement"],
         "Form 4.1 Statistical Consultation Form or qualitative exemption": [
             "form 4.1",
             "statistical consultation",
@@ -37832,9 +37864,26 @@ def earliest_defense_date(defense_type: str, reference_date: date | None = None)
     return (reference_date or ph_today()) + timedelta(days=defense_lead_days(defense_type))
 
 
-def student_earliest_defense_date(
-    student: Student, defense_type: str, manuscript_received_on: date | None = None
-) -> tuple[date, date, str]:
+def student_manuscript_received_on(student: Student, defense_type: str) -> date | None:
+    """FIN-03 / PRP-02: the manuscript goes to the panel with the adviser's signed Form 4, so that
+    signature date is the day the panel received it. None until the adviser has signed."""
+    gate = next((key for key, value in RESEARCH_GATE_DEFENSE_TYPES.items() if value == defense_type), None)
+    item = {RESEARCH_GATE_PROPOSAL: "Form 4 - Endorsement for Proposal Defense",
+            RESEARCH_GATE_FINAL: "Form 4 - Endorsement for Final Defense"}.get(gate)
+    if not item:
+        return None
+    approval = (
+        AdviserDocumentApproval.query
+        .join(ResearchEvidenceFile, ResearchEvidenceFile.id == AdviserDocumentApproval.evidence_file_id)
+        .join(DocumentCheck, DocumentCheck.id == ResearchEvidenceFile.document_check_id)
+        .filter(AdviserDocumentApproval.student_id == student.id, AdviserDocumentApproval.status == "Signed",
+                DocumentCheck.gate == gate, DocumentCheck.item_name == item)
+        .order_by(AdviserDocumentApproval.signed_at.desc()).first()
+    )
+    return approval.signed_at.date() if approval and approval.signed_at else None
+
+
+def student_earliest_defense_date(student: Student, defense_type: str) -> tuple[date, date, str]:
     """(earliest allowed date, reference date, what the reference is) for one student."""
     today = ph_today()
     if defense_type == "Title Defense":
@@ -37842,8 +37891,9 @@ def student_earliest_defense_date(
         reference = endorsement.endorsed_at.date() if endorsement and endorsement.endorsed_at else today
         label = "the Academic Coordinator endorsed Form 1"
     else:
-        reference = manuscript_received_on or today
-        label = "the panel received the manuscript" if manuscript_received_on else "today (no manuscript receipt date recorded)"
+        received = student_manuscript_received_on(student, defense_type)
+        reference = received or today
+        label = "the adviser signed Form 4 and the panel received the manuscript" if received else "today (the adviser has not signed Form 4 yet)"
     return max(today, earliest_defense_date(defense_type, reference)), reference, label
 
 
@@ -40192,6 +40242,8 @@ def seed_maed_personas() -> None:
             evidence.document_check_id = document.id
             evidence.original_name = original_name
             evidence.extracted_text = extracted_text
+            if document.item_name == TURNITIN_ITEM:
+                evidence.similarity_percent = 8.0  # I-327: the seeded certificate carries its number
             evidence.compliance_status = "Compliant"
             evidence.compliance_score = 95
             evidence.compliance_summary = "Verified MAED archive fixture with readable PDF evidence."
@@ -41014,6 +41066,7 @@ def seed_dean_review_cases() -> int:
             years_in_program=2, normal_residence_years=5, absolute_residence_years=7,
             policy_classification="Within Maximum Residence",
             staff_notes="Return declaration checked against the residence limits; forwarded to the Dean.",
+            staff_checks_json=json.dumps({name: True for name in READMISSION_STAFF_ITEMS}),
         ))
         add_task(student.id, "Decide structured AWOL return declaration", "Dean", 3, 70)
         add_log(
@@ -41796,7 +41849,7 @@ WORKFLOW_DEMO_STUDENTS = {
         "email": "student@usls.edu.ph",
         "program_code": "MAED",
         "preserve_student_email": True,
-        "ready_label": "Ready to submit Title Defense requirements",
+        "ready_label": "At Final Defense - ready to request the date",
     },
     "practicum-andrea": {
         "workflow": "practicum",

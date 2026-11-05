@@ -337,7 +337,8 @@ class AwolRegistrarHandoffTests(Audit4Base):
             student.standing, student.enrollment_tag, student.current_stage = "AWOL", "AWOL", "AWOL"
             case = AwolCase(student_id=student.id, status="Dean Review", dean_decision="Pending", prior_stage="Coursework",
                             awol_effective_date=date.today() - timedelta(days=200), return_intent="I wish to return.",
-                            target_return_term="Term One")
+                            target_return_term="Term One",
+                            staff_checks_json='{"Clearance from Business Office": true, "Interview (reason for delay, residency requirements)": true}')  # I-273
             db.session.add(case)
             db.session.commit()
             case_id = case.id

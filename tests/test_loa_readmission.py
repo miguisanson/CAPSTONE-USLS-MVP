@@ -1053,6 +1053,7 @@ class LeaveCaseTests(unittest.TestCase):
             self.assertEqual(awol.prior_stage, "Final Defense")
             awol.status, awol.dean_decision = "Dean Review", "Pending"
             awol.refresher_required = awol.full_reenrollment_required = False
+            awol.staff_checks_json = '{"Clearance from Business Office": true, "Interview (reason for delay, residency requirements)": true}'  # I-273
             awol_id = awol.id
             db.session.commit()
         decided = self.dean_client().post(

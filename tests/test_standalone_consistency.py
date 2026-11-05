@@ -377,7 +377,7 @@ class StandaloneConsistencyTests(unittest.TestCase):
 
     def test_awol_return_goes_to_the_dean_and_the_dean_decides(self):
         ref = self.make_awol_case()
-        forward = self.move("awol", ref, "forward")
+        forward = self.move("awol", ref, "forward", confirmed_items=CHECKLIST[2:])  # I-273: the returnee office checks
         self.assertEqual(forward.status_code, 200, forward.get_json())
         self.assertEqual(forward.get_json()["case"]["status"], "Dean Review")
         approve = self.move("awol", ref, "approve", client=self.dean())
