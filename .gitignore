@@ -31,6 +31,11 @@ server/uploads/*
 !server/uploads/.gitkeep
 # Every runtime upload (AGENTS.md Rule 4); the seed reads Documents/Sample_Data, never uploads/.
 uploads/*
+# Except the built-in policy library the seed and the assistant start from (test_policy_documents).
+!uploads/policy_documents/
+uploads/policy_documents/*
+!uploads/policy_documents/997a09cc6a-GRADUATE-SCHOOL-HANDBOOK-22-23.pdf
+!uploads/policy_documents/556e4ad322-Complete-GS-Research-Protocol-Updated-for-AY2024-2025-without-publication-protocol-1.docx
 uploads/research_evidence/*
 uploads/student_requests/*
 *.sqlite3
