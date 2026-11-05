@@ -402,7 +402,7 @@ test.describe("Signatures, Panels, Verdicts", () => {
       "Failed",
     ]);
     await outcome.selectOption("Provisional pass - revisions or re-defense");
-    await needs.getByLabel("Required follow-up").selectOption("re-defense");
+    await needs.getByRole("combobox", { name: /^Required follow-up/ }).selectOption("re-defense");
     await needs.getByRole("button", { name: "Submit final verdict" }).click();
     await expect.poll(() => calls.length).toBe(1);
     expect(calls[0].url).toBe("/faculty-portal/defense-verdicts/777");

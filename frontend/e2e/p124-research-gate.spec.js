@@ -109,7 +109,7 @@ test("Graduate School staff can record one of the five verdicts for the panel", 
       "Failed",
     ]);
     await outcome.selectOption("Provisional pass - revisions or re-defense");
-    await panel.getByLabel("Required follow-up").selectOption("re-defense");
+    await panel.getByRole("combobox", { name: /^Required follow-up/ }).selectOption("re-defense");
     await panel.getByLabel("Remarks or conditions").fill("Recorded from the signed panel result.");
     // Merge v6.4 (owner decision M3): staff give a reason when recording for the panel.
     await panel.getByLabel("Reason for recording for the panel").fill("The chair is away; signed result received.");
