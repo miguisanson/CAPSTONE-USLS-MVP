@@ -14493,7 +14493,7 @@ def register_routes(app: Flask) -> None:
             {
                 "items": [
                     {**brief, "compre_eligibility": eligibility[student.id]}
-                    for student, brief in zip(items, student_directory_briefs(items))
+                    for student, brief in zip(items, student_directory_briefs(items, live_readiness=request.args.get("readiness") == "live"))
                 ],
                 "total": total,
                 "page": page,
@@ -28213,8 +28213,10 @@ def student_search_label(student: Student | None) -> str:
     return f"{student.student_number} - {student.last_name}, {student.first_name} - {student.program.code}"
 
 
-def student_directory_briefs(students: list[Student]) -> list[dict]:
-    """student_directory_brief() for a page of students with the lookups done once for the whole page."""
+def student_directory_briefs(students: list[Student], live_readiness: bool = False) -> list[dict]:
+    """student_directory_brief() for a page of students with the lookups done once for the whole page.
+    `live_readiness` (the student picker asks for it): the Research Gate status of each row, I-387; it costs queries per
+    research student, so the plain list keeps the stored case status."""
     if not students:
         return []
     active_term = get_active_term()
@@ -28224,10 +28226,18 @@ def student_directory_briefs(students: list[Student]) -> list[dict]:
         .order_by(ResearchCase.opened_at.desc()).all()
     ):
         cases.setdefault(case.student_id, case)
-    return [student_directory_brief(item, research_case=cases.get(item.id), active_term=active_term) for item in students]
+    token = _research_exam_memo.set({}) if live_readiness else None
+    try:
+        return [
+            student_directory_brief(item, research_case=cases.get(item.id), active_term=active_term, live_readiness=live_readiness)
+            for item in students
+        ]
+    finally:
+        if token is not None:
+            _research_exam_memo.reset(token)
 
 
-def student_directory_brief(student: Student, research_case=_TERM_NOT_GIVEN, active_term=_TERM_NOT_GIVEN) -> dict:
+def student_directory_brief(student: Student, research_case=_TERM_NOT_GIVEN, active_term=_TERM_NOT_GIVEN, live_readiness: bool = True) -> dict:
     payload = student_brief(student, active_term)
     if research_case is _TERM_NOT_GIVEN:
         research_case = (
@@ -28243,7 +28253,10 @@ def student_directory_brief(student: Student, research_case=_TERM_NOT_GIVEN, act
         "Completion Evidence": "Completed",
     }
     payload["research_stage"] = stage_by_gate.get(gate, student.current_stage)
-    payload["readiness_status"] = live_readiness_status(student, research_case)
+    if live_readiness:
+        payload["readiness_status"] = live_readiness_status(student, research_case)
+    else:
+        payload["readiness_status"] = research_case.status if research_case else "Research Gate not started"
     return payload
 
 

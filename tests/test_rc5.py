@@ -56,6 +56,13 @@ class Rc5Tests(unittest.TestCase):
                     student = db.session.get(Student, other["student"]["id"])
                     self.assertEqual(student_directory_brief(student)["readiness_status"], "Ready", other["student"]["name"])
 
+    def test_the_picker_asks_for_the_live_status_and_the_plain_list_stays_cheap(self):
+        # the student picker sends readiness=live (I-387); the plain list keeps the stored status so its query
+        # count does not grow with the page size (test_v53_backend2)
+        staff = self.client_for("staff@usls.edu.ph", "staff")
+        live = staff.get("/api/students", query_string={"q": "Ana Abad", "readiness": "live"}).get_json()["items"]
+        self.assertEqual([row["readiness_status"] for row in live if row["name"] == "Ana Abad"], ["Ready"])
+
     # I-389
     def test_panel_load_is_one_count_on_both_screens(self):
         with app.app_context():

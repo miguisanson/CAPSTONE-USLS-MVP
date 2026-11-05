@@ -32,7 +32,7 @@ export default function StudentPicker({ value, onChange, selectedLabel, meta }) 
     setLoading(true);
     const t = setTimeout(() => {
       api
-        .students({ q, program_id: programId, stage, page_size: 50 })
+        .students({ q, program_id: programId, stage, page_size: 50, readiness: "live" })
         .then((res) => {
           if (!active) return;
           setResults(res.items);
