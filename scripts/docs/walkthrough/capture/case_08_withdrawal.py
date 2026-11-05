@@ -229,31 +229,15 @@ def run(rt: Runtime) -> None:
 
     rt.step("Dean approves the withdrawal", dean_decide)
 
-    # ---- Part F: staff tag, export -----------------------------------------------------------------
+    # ---- Part F: export, then mark as sent (the Dean's approval already tagged the subject) ---------
     def staff_after_approval():
         _open_board(rt, staff, "/workflow/withdrawal")
-        _board_into_view(staff)
-        rt.shot(staff, s(20))
-        _card_button(staff).click()
-        staff.get_by_role("dialog").get_by_text(re.compile("Tag the subject as Withdrawn")).first.wait_for()
-        staff.wait_for_timeout(1000)
-        rt.note("STAFF APPROVED DETAIL: " + staff.get_by_role("dialog").inner_text().replace(chr(10), " | ")[-1500:])
-
-    rt.step("Staff reopen the approved request", staff_after_approval)
-
-    def staff_tag():
-        _dialog_button(staff, re.compile("Tag the subject as Withdrawn")).click()
-        staff.wait_for_timeout(1000)
-        rt.note("TAG DIALOG: " + staff.get_by_role("dialog").last.inner_text().replace(chr(10), " | ")[:700])
-        rt.shot(staff, s(21))
-        _dialog_button(staff, re.compile("Tag the subject as Withdrawn")).last.click()
-        staff.wait_for_timeout(2500)
-        rt.settle(staff)
-        rt.note("AFTER TAG: " + visible_text(staff, "main", 8000).replace(chr(10), " | ")[:1500])
         _board_into_view(staff, rights=1)
+        rt.shot(staff, s(20))
+        rt.note("STAFF AFTER APPROVAL: " + visible_text(staff, "main", 8000).replace(chr(10), " | ")[:1500])
         rt.shot(staff, s(22))
 
-    rt.step("Staff tag the subject as withdrawn", staff_tag)
+    rt.step("Staff see the approved request already tagged, ready for export", staff_after_approval)
 
     def staff_export():
         staff.get_by_role("button", name="Prepare Excel export").first.scroll_into_view_if_needed()
@@ -295,6 +279,21 @@ def run(rt: Runtime) -> None:
         rt.shot(staff, s(26))
 
     rt.step("Acknowledge the export notice", got_it)
+
+    def staff_send():
+        _card_button(staff).click()
+        staff.get_by_role("dialog").get_by_text(re.compile("Mark as sent to the Registrar")).first.wait_for()
+        staff.wait_for_timeout(1000)
+        _dialog_button(staff, re.compile("Mark as sent to the Registrar")).click()
+        staff.wait_for_timeout(1000)
+        rt.note("SEND DIALOG: " + staff.get_by_role("dialog").last.inner_text().replace(chr(10), " | ")[:700])
+        rt.shot(staff, s(21))
+        _dialog_button(staff, re.compile("Mark as sent to the Registrar")).last.click()
+        staff.wait_for_timeout(2500)
+        rt.settle(staff)
+        rt.note("AFTER SEND: " + visible_text(staff, "main", 8000).replace(chr(10), " | ")[:1500])
+
+    rt.step("Staff mark the list as sent to the Registrar", staff_send)
 
     # ---- Part G: verify in Enrollment ---------------------------------------------------------------
     def enrollment_check():
