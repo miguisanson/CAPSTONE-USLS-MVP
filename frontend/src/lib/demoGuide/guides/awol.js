@@ -53,6 +53,8 @@ export default {
         { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Maya Torres" } } },
         { click: { role: "menuitem", name: "With the Dean" } },
         { type: { css: "textarea", in: "dialog" }, text: "Within the normal residence period for a master's student. Forwarded for the Dean's decision.", optional: true },
+        { check: { role: "checkbox", in: "dialog", nth: 0 } },
+        { check: { role: "checkbox", in: "dialog", nth: 1 } },
         { click: { role: "button", name: "Forward to Dean", exact: true, in: "dialog" } },
       ],
       doneWhen: { status: from(AWOL_ORDER, "Dean Review") },

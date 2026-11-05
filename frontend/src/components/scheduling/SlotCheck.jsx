@@ -6,7 +6,7 @@ import { longDate } from "./dates";
 
 // Live conflict check for a chosen slot. Waits ~400 ms after the last change, ignores
 // answers that arrive after a newer change, and stays silent until date + both times are set.
-export function useSlotCheck({ studentId, date, start, end, defenseType, venue, manuscriptReceivedOn }) {
+export function useSlotCheck({ studentId, date, start, end, defenseType, venue }) {
   const [state, setState] = useState({ result: null, error: "", pending: false });
   const ticket = useRef(0);
   const ready = Boolean(studentId && date && start && end);
@@ -28,7 +28,6 @@ export function useSlotCheck({ studentId, date, start, end, defenseType, venue, 
           selected_end: end,
           defense_type: defenseType || undefined,
           venue: venue || "",
-          manuscript_received_on: manuscriptReceivedOn || "",
         });
         if (mine === ticket.current) setState({ result, error: "", pending: false });
       } catch (err) {
@@ -38,7 +37,7 @@ export function useSlotCheck({ studentId, date, start, end, defenseType, venue, 
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [ready, studentId, date, start, end, defenseType, venue, manuscriptReceivedOn]);
+  }, [ready, studentId, date, start, end, defenseType, venue]);
 
   const hard = state.result?.hard || [];
   const soft = state.result?.soft || [];

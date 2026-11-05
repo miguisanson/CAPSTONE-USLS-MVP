@@ -13,7 +13,6 @@ const EMPTY = {
   academic_year_entry: "",
   email: "",
   adviser_faculty_id: "",
-  enrollment_tag: "Enrolled",
 };
 
 // "Add student" form: same required fields and duplicate checks as the sheet import.
@@ -119,7 +118,7 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
               <AyEntrySelect value={form.academic_year_entry} onChange={set("academic_year_entry")} termLabels={termLabels} studentValues={studentValues} required />
             </Field>
             <Field label="Enrollment status">
-              <Select value={form.enrollment_tag} onChange={set("enrollment_tag")} options={["Enrolled", "Not Enrolled"]} placeholder="" />
+              <p aria-label="Enrollment status" className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">Set from the subjects. Not Enrolled until subjects are added.</p>
             </Field>
             <Field label="Email" hint={emailError ? undefined : "Leave blank to generate the school address."} error={emailError || undefined}>
               <Input type="email" value={form.email} onChange={set("email")} maxLength={160} autoComplete="off" />

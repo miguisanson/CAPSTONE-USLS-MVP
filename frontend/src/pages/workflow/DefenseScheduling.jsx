@@ -40,7 +40,6 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
     override_requirements: false,
     override_conflicts: false,
     override_reason: "",
-    manuscript_received_on: "",
     panel_change_reason: "",
     reason: "",
     requested_by: "GS Office",
@@ -91,7 +90,6 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
     end: form.selected_end,
     defenseType: form.defense_type,
     venue: form.venue,
-    manuscriptReceivedOn: usesManuscriptDate ? form.manuscript_received_on : "",
   });
   const softWithoutOverride = check.needsOverride && !form.override_conflicts;
 
@@ -222,7 +220,6 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
           mode: form.mode,
           venue: form.venue,
           constraints: form.constraints,
-          manuscript_received_on: form.manuscript_received_on,
           override_requirements: form.override_requirements,
           override_conflicts: form.override_conflicts,
           override_reason: form.override_reason,
@@ -402,7 +399,8 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
           </Field>
           {usesManuscriptDate && (
             <Field label="Date the panel received the manuscript">
-              <Input type="date" value={form.manuscript_received_on} max={availability.today} onChange={set("manuscript_received_on")} />
+              <p aria-label="Date the panel received the manuscript" className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">{context.manuscript_received_on ? shortDate(context.manuscript_received_on) : "Not yet signed"}</p>
+              <p className="meta mt-1">From the adviser's signed Form 4.</p>
             </Field>
           )}
           <Field label="Mode" required>
@@ -422,7 +420,7 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
         <SlotCheck check={check} />
         <label className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 text-sm ${softWithoutOverride ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
           <input type="checkbox" checked={form.override_conflicts} onChange={(e) => setForm((current) => ({ ...current, override_conflicts: e.target.checked }))} className={checkbox} />
-          <span><strong>Warning override:</strong> finalize despite the warnings (before the lead time, or a panelist who has not entered availability) and record why. Double-booked panelists or rooms, people outside the hours entered, a declined invitation, and slots in the past cannot be overridden.</span>
+          <span><strong>Warning override:</strong> book although a panelist has not entered available dates, and record why. The lead time, double-booked panelists or rooms, people outside the hours entered, a declined invitation, and slots in the past cannot be overridden.</span>
         </label>
         {overrideNeedsReason && (
           <Field label="Reason for the staff override (required, recorded with the schedule)" required>

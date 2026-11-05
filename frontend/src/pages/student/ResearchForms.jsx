@@ -150,6 +150,8 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
   const titlePackageItem = requirement.item_name === "Form 1 - Application for Title Defense" || requirement.item_name === "Three concept papers";
   const titlePackageLocked = panelLocked && titlePackageItem;
   const replacesExistingUpload = requirement.item_name === "Ethics Clearance";
+  const needsSimilarity = /turnitin/i.test(requirement.item_name);
+  const [similarity, setSimilarity] = useState("");
 
   async function upload(file) {
     if (titlePackageLocked) {
@@ -164,7 +166,7 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
     setBusy(true);
     setError("");
     try {
-      const result = await api.uploadResearchEvidence(gate, requirement.item_name, file);
+      const result = await api.uploadResearchEvidence(gate, requirement.item_name, file, needsSimilarity ? similarity : undefined);
       await onSaved(result);
     } catch (err) {
       setError(err.message || "Could not upload this evidence.");
@@ -223,6 +225,13 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
           </Button>
         </div>
       </div>
+      {needsSimilarity && !files.length && (
+        <div className="mt-2 max-w-xs">
+          <Field label="Similarity (%)" hint="The percentage shown on the Turnitin certificate, 0 to 100. Enter it before choosing the file.">
+            <Input type="number" min="0" max="100" step="0.1" value={similarity} onChange={(e) => setSimilarity(e.target.value)} />
+          </Field>
+        </div>
+      )}
       {files.length > 0 && (
         <div className="mt-2 space-y-2">
           {files.map((file) => (
