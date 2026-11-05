@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { BookOpenCheck, CalendarClock, Eye, Lightbulb, Plus, Save, Trash2 } from "lucide-react";
 import { api } from "../api";
 import TeachingSchedule from "./TeachingSchedule";
+import SemesterSchedulePanel from "../components/SemesterSchedulePanel";
 import { Button, Card, DataTable, Field, InlineNotice, Input, Select, SectionCard, Spinner } from "../components/ui/index.js";
 import { useConfirm } from "../components/confirm";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
@@ -253,6 +254,8 @@ export default function CourseOfferings() {
 
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       {notice && <InlineNotice tone="success" onDismiss={() => setNotice("")}>{notice}</InlineNotice>}
+
+      {canManage && data?.term?.id && <SemesterSchedulePanel termId={data.term.id} setError={setError} setNotice={setNotice} />}
 
       {canManage && (
         <Card>
