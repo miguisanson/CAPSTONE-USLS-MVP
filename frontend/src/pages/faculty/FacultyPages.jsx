@@ -252,6 +252,7 @@ export function FacultyDefensesPage() {
         rowKey={(panel) => `${panel.student.id}-${panel.gate}-${panel.panel_role}`}
         pageSize={0}
         minWidth="lg"
+        stackOnPhone="md"
         empty={{ icon: CalendarClock, title: "No defenses scheduled", hint: "You will see a defense here once the Research Coordinator schedules one for a panel you sit on." }}
       />
     </div>

@@ -160,7 +160,7 @@ export function adviseeRows(appointments = [], portalAdvisees = []) {
 
 function ContractCell({ row }) {
   const status = contractStatus(row.contract);
-  if (status === "Not applicable") return <span className="meta">Not applicable</span>;
+  if (status === "Not applicable") return <span className="meta">No contract needed</span>;
   const overdue = status === "Overdue";
   const showDue = row.contract?.due_on && status !== "Received";
   return (
@@ -184,7 +184,7 @@ function SignatureCell({ row }) {
       </Link>
     </>
   ) : (
-    <span className="meta">None</span>
+    <span className="meta">No signature needed</span>
   );
 }
 

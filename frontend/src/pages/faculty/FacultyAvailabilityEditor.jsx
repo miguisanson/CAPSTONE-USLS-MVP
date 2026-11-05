@@ -24,6 +24,12 @@ function toRows(workingHours) {
   });
 }
 
+// A neutral line for a page that was only opened: what is on file, not "entered", which reads as just saved.
+function hoursOnFile(workingHours) {
+  const days = (workingHours || []).filter((item) => item.enabled).length;
+  return days ? `Weekly hours on file: ${days} day${days === 1 ? "" : "s"} a week.` : "No weekly hours on file, only specific dates.";
+}
+
 function rangeProblem(start, end) {
   if (!start || !end) return "Enter both a start and an end time.";
   if (end <= start) return "The end time must be later than the start time.";
@@ -366,7 +372,7 @@ export default function FacultyAvailabilityEditor() {
       />
       {data.entered ? (
         <InlineNotice>
-          {data.updated_at ? `Last updated ${formatDateTime(data.updated_at)}.` : "Availability entered."}{data.google_connected ? " Google Calendar connected." : ""}
+          {data.updated_at ? `Last updated ${formatDateTime(data.updated_at)}. ` : ""}{hoursOnFile(data.working_hours)}{data.google_connected ? " Google Calendar connected." : ""}
         </InlineNotice>
       ) : (
         <InlineNotice tone="warning">

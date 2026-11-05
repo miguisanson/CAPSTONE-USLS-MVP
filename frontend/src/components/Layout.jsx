@@ -193,7 +193,7 @@ function SidebarContent({ onNavigate, onClose, user, identity, onSignOut }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-3 px-5 py-5">
+      <div className="flex items-center gap-3 px-5 py-5 [@media(max-height:520px)]:py-2">
         <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-white shadow-sm">
           <GraduationCap className="h-6 w-6" />
         </span>
@@ -205,7 +205,7 @@ function SidebarContent({ onNavigate, onClose, user, identity, onSignOut }) {
       </div>
       {/* In the phone menu: who is signed in (the header chip is hidden below sm) and a labelled way out (F-05) */}
       {onSignOut && (
-        <p data-testid="drawer-identity" className="mx-5 mb-3 break-words rounded-xl bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700" title={identity}>
+        <p data-testid="drawer-identity" className="mx-5 mb-3 break-words [@media(max-height:520px)]:hidden rounded-xl bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700" title={identity}>
           {identity}
         </p>
       )}
@@ -223,10 +223,10 @@ function SidebarContent({ onNavigate, onClose, user, identity, onSignOut }) {
         ))}
       </nav>
 
-      <div className="shrink-0 border-t border-slate-200 px-5 py-4">
-        {onSignOut && <Button variant="secondary" icon={LogOut} onClick={onSignOut} className="mb-3 w-full max-sm:min-h-11">Sign out</Button>}
+      <div className="shrink-0 border-t border-slate-200 px-5 py-4 [@media(max-height:520px)]:py-2">
+        {onSignOut && <Button variant="secondary" icon={LogOut} onClick={onSignOut} className="mb-3 w-full max-sm:min-h-11 [@media(max-height:520px)]:mb-1">Sign out</Button>}
         <p className="mb-1 text-xs font-semibold text-brand-700">{ROLE_LABELS[user?.role] || "Graduate School Staff"}</p>
-        <p className="micro leading-relaxed">
+        <p className="micro leading-relaxed [@media(max-height:520px)]:hidden">
           {PORTAL_FOOTERS[user?.role] || "Figures are computed live from recorded transactions."}
         </p>
       </div>
@@ -312,7 +312,7 @@ export default function Layout({ children }) {
           <Button variant="icon" icon={Menu} aria-label="Open menu" onClick={() => setMobileOpen(true)} className="lg:hidden" />
           <Breadcrumb path={location.pathname} current={current} role={user?.role} recordTitle={recordTitle} />
           <div className="ml-auto flex min-w-0 shrink-0 items-center gap-3">
-            <span className="hidden max-w-[16rem] truncate rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-block xl:max-w-[24rem]" title={identity}>
+            <span className="hidden max-w-[16rem] truncate rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 md:inline-block xl:max-w-[24rem]" title={identity}>
               {identity}
             </span>
             <DemoGuide />
@@ -366,7 +366,7 @@ function Breadcrumb({ path, current, role, recordTitle }) {
             {crumb.to ? (
               <Link to={crumb.to} className="truncate font-semibold text-slate-500 hover:text-brand-700 hover:underline">{crumb.label}</Link>
             ) : (
-              <span className={`truncate font-semibold ${crumb.page ? "text-ink" : "text-slate-500"}`} aria-current={crumb.page ? "page" : undefined}>{crumb.label}</span>
+              <span className={`font-semibold ${crumb.page ? "break-words text-ink" : "truncate text-slate-500"}`} aria-current={crumb.page ? "page" : undefined}>{crumb.label}</span>
             )}
           </li>
         ))}

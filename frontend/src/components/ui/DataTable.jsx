@@ -12,6 +12,11 @@ const cx = (...parts) => parts.filter(Boolean).join(" ").replace(/\s+/g, " ").tr
 
 // Class strings are written out in full so Tailwind sees them.
 const MIN_WIDTH = { sm: "min-w-[640px]", md: "min-w-[760px]", lg: "min-w-[960px]" };
+// stackOnPhone: true stacks below sm (640 px); "md" stacks below 768 px, for a page whose table must not scroll at 200 % zoom (I-390).
+const STACK_BY = {
+  sm: { table: "max-sm:block max-sm:min-w-0", head: "max-sm:sr-only", body: "max-sm:block", row: "max-sm:block max-sm:px-1 max-sm:py-2", cell: "max-sm:block max-sm:!py-1 max-sm:before:block max-sm:before:text-[11px] max-sm:before:font-semibold max-sm:before:uppercase max-sm:before:tracking-wide max-sm:before:text-slate-500 max-sm:before:content-[attr(data-label)]" },
+  md: { table: "max-md:block max-md:min-w-0", head: "max-md:sr-only", body: "max-md:block", row: "max-md:block max-md:px-1 max-md:py-2", cell: "max-md:block max-md:!py-1 max-md:before:block max-md:before:text-[11px] max-md:before:font-semibold max-md:before:uppercase max-md:before:tracking-wide max-md:before:text-slate-500 max-md:before:content-[attr(data-label)]" },
+};
 const HIDE_BELOW = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidden lg:table-cell", xl: "hidden xl:table-cell" };
 const ALIGN = { left: "text-left", right: "text-right", center: "text-center" };
 const JUSTIFY = { left: "justify-start", right: "justify-end", center: "justify-center" };
@@ -87,7 +92,7 @@ function SortIcon({ dir }) {
  *                  caller fetches the page. (Default server page size is 25.)
  * @param csv       true | { filename, columns: [{ header, value(row) }] }: Export CSV button. Exports every row that
  *                  matches the search and sort (client mode), or the rows given (server mode)
- * @param stackOnPhone  on a phone (below sm) each row becomes a block of "Header: value" lines, so nothing scrolls sideways
+ * @param stackOnPhone  on a phone (below sm; "md" = below 768 px) each row becomes a block of "Header: value" lines, so nothing scrolls sideways
  * @param sortable  false turns off the default sorting for the whole table (a column can still say `sortable: true`)
  * @param sort      { key, dir: "asc" | "desc" } to control sorting; with onSort(key, dir) (dir null = cleared) the
  *                  caller sorts, otherwise the table sorts its own rows
@@ -117,6 +122,7 @@ export function DataTable({
   className = "",
   ...rest
 }) {
+  const STACK = STACK_BY[stackOnPhone === "md" ? "md" : "sm"];
   const serverPaged = Boolean(pagination);
   const sortControlled = typeof onSort === "function";
   const searchControlled = Boolean(searchable && typeof searchable === "object" && "value" in searchable);
@@ -287,9 +293,9 @@ export function DataTable({
         ) : noRows ? (
           <EmptyState {...emptyCopy} size="sm" />
         ) : (
-          <table className={cx("w-full text-sm", MIN_WIDTH[minWidth] || MIN_WIDTH.sm, stackOnPhone && "max-sm:block max-sm:min-w-0")}>
+          <table className={cx("w-full text-sm", MIN_WIDTH[minWidth] || MIN_WIDTH.sm, stackOnPhone && STACK.table)}>
             {caption && <caption className="sr-only">{caption}</caption>}
-            <thead className={cx("bg-slate-50", stickyHeader && "sticky top-0 z-10", stackOnPhone && "max-sm:sr-only")}>
+            <thead className={cx("bg-slate-50", stickyHeader && "sticky top-0 z-10", stackOnPhone && STACK.head)}>
               <tr>
                 {columns.map((col, ci) => {
                   const dir = sortState && sortState.key === col.key ? sortState.dir : null;
@@ -331,7 +337,7 @@ export function DataTable({
                 })}
               </tr>
             </thead>
-            <tbody className={stackOnPhone ? "max-sm:block" : undefined}>
+            <tbody className={stackOnPhone ? STACK.body : undefined}>
               {visibleRows.map((row, ri) => (
                 <tr
                   key={getKey(row, ri)}
@@ -348,7 +354,7 @@ export function DataTable({
                         }
                       : undefined
                   }
-                  className={cx("border-t border-slate-100 hover:bg-slate-50", clickable && "cursor-pointer", stackOnPhone && "max-sm:block max-sm:px-1 max-sm:py-2")}
+                  className={cx("border-t border-slate-100 hover:bg-slate-50", clickable && "cursor-pointer", stackOnPhone && STACK.row)}
                 >
                   {columns.map((col, ci) => (
                     <td
@@ -356,7 +362,7 @@ export function DataTable({
                       data-label={typeof col.header === "string" ? col.header : undefined}
                       className={cx(
                         "min-w-0 break-words px-3 text-slate-700",
-                        stackOnPhone && "max-sm:block max-sm:!py-1 max-sm:before:block max-sm:before:text-[11px] max-sm:before:font-semibold max-sm:before:uppercase max-sm:before:tracking-wide max-sm:before:text-slate-500 max-sm:before:content-[attr(data-label)]",
+                        stackOnPhone && STACK.cell,
                         pad,
                         ALIGN[col.align || "left"],
                         stickyFirst && ci === 0 && "sticky left-0 z-[1] bg-white",

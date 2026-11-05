@@ -76,6 +76,7 @@ export function FacultyClasses({ subjects, terms }) {
           rowKey="student_id"
           pageSize={0}
           minWidth="md"
+          stackOnPhone="md"
           empty={{ icon: ClipboardCheck, title: "No students in this class", hint: "The Academic Coordinator must add students through Enrollment first." }}
         />
         {students.length > 0 && (
