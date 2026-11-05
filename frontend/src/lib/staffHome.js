@@ -88,6 +88,24 @@ export const canOpen = (to, role) => {
 const OPEN_REQUEST_BOARDS = new Set(["leave-of-absence", "readmission", "awol", "withdrawal", "practicum", "graduation"].map((slug) => `/workflow/${slug}`));
 const onOpenRequests = (to) => (OPEN_REQUEST_BOARDS.has(to) ? `${to}?show=open` : to);
 
+// A task about one student's request on a standalone board opens that request's window (?student_id=, I-348).
+const ONE_REQUEST_BOARDS = new Set(["leave-of-absence", "readmission", "awol", "withdrawal"].map((slug) => `/workflow/${slug}`));
+const onTaskRequest = (to, task) =>
+  ONE_REQUEST_BOARDS.has(to) && task.student_id ? `${to}?show=open&student_id=${encodeURIComponent(task.student_id)}` : onOpenRequests(to);
+
+/** The workflow page a task belongs to (its own action_url, else the page its title names), or null; only if the role can open it. */
+function pageTarget(task, role) {
+  if (task.action_url && canOpen(task.action_url, role)) return { to: onTaskRequest(task.action_url, task), label: openPageLabel(task.action_url, task.action_label || "Open") };
+  for (const [pattern, to, withStudent] of TITLE_TARGETS) {
+    if (pattern.test(task.title || "")) {
+      if (!canOpen(to, role)) return null; // the page the title names is not this role's
+      const path = withStudent && task.student_id ? `${to}?student_id=${encodeURIComponent(task.student_id)}` : onTaskRequest(to, task);
+      return { to: path, label: openPageLabel(to) };
+    }
+  }
+  return null;
+}
+
 /**
  * Where "Open" leads for one of the viewer's own tasks: the task's own action_url, else the workflow page its title
  * names - either only if the role can open it - else the student's record (when the role has a Students page), else
@@ -95,16 +113,8 @@ const onOpenRequests = (to) => (OPEN_REQUEST_BOARDS.has(to) ? `${to}?show=open` 
  * @returns { to, label }
  */
 export function taskTarget(task, role) {
-  if (task.action_url && canOpen(task.action_url, role)) return { to: onOpenRequests(task.action_url), label: openPageLabel(task.action_url, task.action_label || "Open") };
-  for (const [pattern, to, withStudent] of TITLE_TARGETS) {
-    if (pattern.test(task.title || "")) {
-      if (canOpen(to, role)) {
-        const path = withStudent && task.student_id ? `${to}?student_id=${encodeURIComponent(task.student_id)}` : onOpenRequests(to);
-        return { to: path, label: openPageLabel(to) };
-      }
-      break; // the page the title names is not this role's: fall through to the record or the queue
-    }
-  }
+  const page = pageTarget(task, role);
+  if (page) return page;
   if (task.student_id && CAN_OPEN_STUDENTS.has(role)) return { to: `/students/${task.student_id}`, label: openPageLabel(`/students/${task.student_id}`) };
   return { to: "/work-queue", label: openPageLabel("/work-queue") };
 }
@@ -176,7 +186,7 @@ export function aboutOwnProcess(task, role) {
 /**
  * "Waiting on others": open tasks the viewer's office does not hold (another office, or the student). The viewer has
  * nothing to do for them, so they never appear under "Needs your action". Each row opens that owner's work queue.
- * A coordinator sees only the ones about their own process (aboutOwnProcess); the other offices' work is not theirs.
+ * A coordinator sees only the ones about that office's own process (aboutOwnProcess); the other offices' work is not theirs.
  * I-083: tasks with the same title held by the same owner (the system's automatic alerts) are ONE row with a count.
  * @returns { items (overdue first), total (the tasks, not the rows) }
  */
@@ -203,7 +213,8 @@ export function officeWaiting(tasks, role) {
       tone: "neutral",
       status: overdue ? "Overdue" : task.status || "Pending",
       // I-116: the grouped row opens that owner's queue already searching for the alert's title
-      target: { to: workQueuePath(owner, many ? String(task.title || "").trim() : ""), label: openPageLabel("/work-queue") },
+      // F5-16: a single task opens its board/request like "Needs your action" does; no board named: the owner's queue
+      target: (!many && pageTarget(task, role)) || { to: workQueuePath(owner, many ? String(task.title || "").trim() : ""), label: openPageLabel("/work-queue") },
       ...(many ? { count: group.length } : {}),
     };
   });
@@ -212,7 +223,7 @@ export function officeWaiting(tasks, role) {
 
 /**
  * The key numbers (3-4, each once). The Graduate School office and the administrator have the school-wide dashboard
- * figures; a coordinator has the same, except "Students with open work" (their own caseload, which links to their work queue); every
+ * figures; a coordinator has the same, except "Students with open work" (the office's own caseload, which links to that office's work queue); every
  * number links to a list page that role can open and counts the students that list shows (I-339).
  * Without `kpis` the numbers come from the work queue alone.
  * @param own      officeActions() result
@@ -226,7 +237,7 @@ export function officeStats({ role, own, waiting, kpis }) {
     key: "tasks",
     label: "Your open tasks",
     value: own.total,
-    sub: `${own.overdue} past their due date`,
+    sub: `${own.overdue} overdue`,
     tone: own.overdue ? "danger" : own.total ? "warning" : "neutral",
     to: queue,
   };
@@ -236,7 +247,7 @@ export function officeStats({ role, own, waiting, kpis }) {
       key: "students",
       label: "Students with open work",
       value: kpis.total_students,
-      sub: "Your tasks are about them",
+      sub: "Your tasks are about these students",
       tone: "success",
       to: queue, // the caseload is the students behind the work queue; the school-wide lists would show other numbers
     };

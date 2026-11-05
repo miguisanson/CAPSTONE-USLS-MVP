@@ -47,6 +47,14 @@ test.describe("staff boards on a phone (I-199)", () => {
       await expect(page.getByRole("button", { name: /^Scroll board/ })).toHaveCount(0);
       const groups = list.locator("section").filter({ has: page.getByRole("heading", { level: 3 }) });
       expect(await groups.count(), "at least one stage group with cards").toBeGreaterThan(0);
+      // CHANGED BY p126 (F5-05): stages with no card for this role start closed; open them all to check every card.
+      const closed = list.locator("section h3 button[aria-expanded=false]");
+      while (await closed.count()) await closed.first().click();
+      const show = list.getByRole("button", { name: /^Show finished/ });
+      if (await show.count()) {
+        await show.click();
+        while (await closed.count()) await closed.first().click();
+      }
       const cards = list.locator("div[draggable]");
       const count = await cards.count();
       expect(count, "the demo data puts cards on this board").toBeGreaterThan(0);
