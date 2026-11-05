@@ -25,6 +25,7 @@ import { Button, Card, DataTable, EmptyState, HistoryPanel, PageHeader, SectionC
 import { ProgressBar } from "../components/ui/ProgressBar.jsx";
 import { formatDate, relativeDays, SEVERITY } from "../lib/format";
 import { activityTitle } from "../lib/staffHome.js";
+import ComprehensiveExamSection from "./ComprehensiveExamSection.jsx";
 
 // The server's severity words stand in for status words on the recommendation chips.
 const SEVERITY_TONE = { high: "danger", medium: "warning", low: "success" };
@@ -108,7 +109,7 @@ function CourseAuditTiles({ audit }) {
 
 export default function StudentDetail() {
   const { id } = useParams();
-  const { data, loading, error } = useApi(() => api.student(id), [id]);
+  const { data, loading, error, refetch } = useApi(() => api.student(id), [id]);
 
   if (loading) return <Skeleton lines={6} />;
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load student" hint={error} />;
@@ -278,6 +279,8 @@ export default function StudentDetail() {
               </HistoryPanel>
             )}
           </SectionCard>
+
+          <ComprehensiveExamSection student={student} exam={data.comprehensive_exam} onChanged={refetch} />
 
           {/* Research case + documents */}
           <SectionCard title="Research case & evidence" subtitle="Milestone gate and required document checklist" icon={FlaskConical}>

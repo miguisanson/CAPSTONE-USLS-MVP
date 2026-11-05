@@ -76,6 +76,7 @@ export default function CaseDetailModal({ caseId, focus = "", slug, vocabulary, 
         <div className="space-y-4">
           {error && <InlineNotice tone="danger">{error}</InlineNotice>}
           <CaseHeadline item={detail} />
+          {detail.advise_slip_url && <p><a href={detail.advise_slip_url} target="_blank" rel="noreferrer" data-testid="advise-slip-link" className="btn-ghost inline-flex items-center gap-2">Open the Advise Slip (a page to print)</a></p>}
           <LeaveTimeline steps={detail.timeline} />
           <CaseSummary item={detail} onEdited={() => setEdited((n) => n + 1)} />
           {requirements.length > 0 && <RequirementBoxes items={requirements} ariaLabel="Requirements for this request" className="" />}

@@ -223,6 +223,11 @@ export function LeaveCaseCard({ item, current = true, onChanged }) {
         </InlineNotice>
       )}
 
+      {item.advise_slip_url && (
+        <p className="mt-3">
+          <a href={item.advise_slip_url} target="_blank" rel="noreferrer" data-testid="advise-slip-link" className="btn-ghost inline-flex items-center gap-2">Open your Advise Slip (a page to print)</a>
+        </p>
+      )}
       <dl className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <Fact label="Filed">{item.submitted_at ? formatDate(item.submitted_at) : null}</Fact>
         <Fact label="Sent to the Dean">{item.forwarded_at ? formatDate(item.forwarded_at) : null}</Fact>

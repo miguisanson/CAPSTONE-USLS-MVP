@@ -4,7 +4,7 @@ import { api } from "../../api";
 import StageBoard, { BoardNotice, useBoardNotice } from "../../components/StageBoard";
 import { useApi } from "../../hooks";
 import { useAuth } from "../../auth";
-import { Button, Card, DataTable, InlineNotice, Modal, SectionTitle, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, DataTable, InlineNotice, Modal, SectionTitle, SkeletonBoard, StatusChip } from "../../components/ui/index.js";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
 import { CaseCardFacts, CaseCardShell, NextOwner, PanelStamp, StageColumnHeader } from "../../components/process";
@@ -200,11 +200,11 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
             <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={rows.length} total={allRows.length} noun="students" />
           </BoardFilterRow>
           {view === "board" ? (
-            <StageBoard
+            loading && !data ? <SkeletonBoard columns={COLUMNS.length} label="Loading the Research Gate board" /> : <StageBoard
               ariaLabel="Research Gate board"
               phoneAriaLabel="Research Gate students by stage"
               columns={COLUMNS}
-              items={loading && !data ? [] : rows}
+              items={rows}
               getItemId={(row) => row.student.id}
               getColumnKey={(row) => String(row.column)}
               renderCard={(row) => <GateCard key={row.student.id} row={row} canAct={canAct} onView={setViewing} onAct={(mode, target) => setDialog({ mode, row: target })} />}
