@@ -10,7 +10,8 @@
 - Fable review DONE (28f9d52): `.planning/research/FABLE-REVIEW-2026-11-05.md`; question-row defaults recorded as IM42-IM44.
 - MERGED 2969867: `pkt/words` (P-A: plain words, pronoun guard `personPronoun` in check:ui; build + check:ui 0; edited e2e spec lines
   not run yet -> run with the next e2e batch). Worktree removed.
-- Running (Sonnet, 3 helpers): `pkt/rgate5` in `wt/rgate5` (P-D Research Gate polish, from 2969867),
+- MERGED 3d09151: `pkt/rgate5` (P-D: Research Gate cards n-of-m line, page 5,300 -> 1,253 px; VerdictFields; no Source reference). Worktree removed.
+- Running (Sonnet, 3 helpers): `pkt/polish5` in `wt/polish5` (P-E skeletons + residency dialog auto-fill, from 3d09151),
   `pkt/logic5` in `wt/logic5` (P-C backend logic, owns app.py), `pkt/boards5` in `wt/boards5` (P-B boards, phone list, deep links).
   Rung note: subagents write the failing tests themselves from the packet brief (brief = contract); main session reviews + gates.
 - Next after these: P-D research gate polish, P-F questions round 2 (app.py, after P-C merges), P-G derived inputs, P-E loading states.
