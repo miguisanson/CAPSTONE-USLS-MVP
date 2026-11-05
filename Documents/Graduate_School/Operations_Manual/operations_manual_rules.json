@@ -3158,7 +3158,7 @@
       "id": "SCH-09",
       "process": "Defense scheduling and rescheduling",
       "process_section": "4.16",
-      "rule": "A defense is confirmed only when all required panel members and the adviser are available on the date; the lead time is a warning that staff may override with a recorded reason; the student may send a scheduling request with preferred dates; a reschedule or cancellation needs a recorded reason and the name of who asked for it.",
+      "rule": "A defense is confirmed only when all required panel members and the adviser are available on the date; the 14-day lead time is a hard rule that staff cannot override; the student may send a scheduling request with preferred dates; a reschedule or cancellation needs a recorded reason and the name of who asked for it.",
       "source": "Group working notes, BPM accurate flow, section 9; Platform (current build)",
       "sources": [
         {

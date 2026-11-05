@@ -279,7 +279,7 @@ QUESTIONS = [
          options=["A. No (Handbook and Protocol).", "B. Yes, for some programs."],
          affects=["TTL-03"]),
     dict(id="OQ-43", topic="Waivers of the two-week rules", kind="Silent",
-         says=["Handbook 2022-2023, pp. 59, 63, 65 and Research Protocol AY2024-2025: applications must be made at least two weeks before the defense; no waiver is described.", "Platform now: a 14-day lead time applies to the title, proposal and final defenses; it is a warning, and staff can proceed with an override and a recorded reason."],
+         says=["Handbook 2022-2023, pp. 59, 63, 65 and Research Protocol AY2024-2025: applications must be made at least two weeks before the defense; no waiver is described.", "Platform now: a 14-day lead time applies to the title, proposal and final defenses; it is a hard rule with no waiver."],
          question="May the Research Coordinator or the Dean accept an application with less notice, and on what grounds?",
          options=["A. No waivers.", "B. The Dean may waive for a stated reason."],
          affects=["TTL-01", "PRP-02", "SCH-03"]),

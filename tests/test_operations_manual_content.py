@@ -244,5 +244,44 @@ class OperationsManualJsonTest(unittest.TestCase):
                 self.assertIn(key, item)
 
 
+
+def _chapter_text(proc):
+    parts = [proc.purpose, proc.platform, proc.platform_diff] + proc.exceptions
+    parts += [x for st in proc.steps for x in (st[1], st[3])]
+    for extra in proc.extras:
+        parts += [extra["title"]] + [c for row in extra["rows"] for c in row]
+    return " ".join(parts)
+
+
+class FinalLoopManualTests(unittest.TestCase):
+    """IM42-IM44 (2026-11-05): the manual matches the server and names the deferred features."""
+
+    def test_known_gaps_list_names_every_deferred_and_planned_item(self):
+        text = _chapter_text(DATAEXCHANGE)
+        self.assertIn("Known gaps (not built in this version)", text)
+        for ref in ("I-279", "I-293", "I-317", "I-319", "I-326", "I-346"):
+            self.assertIn(ref, text)
+        for ref in ("I-248", "I-252", "I-304", "I-335"):
+            self.assertIn(ref, text)
+        self.assertIn("planned", text.lower())
+
+    def test_withdrawal_chapter_follows_the_new_rules(self):
+        text = _chapter_text(WITHDRAWAL)
+        self.assertIn("tags the subject Withdrawn automatically", text)
+        self.assertIn("Sent to Registrar", text)
+        self.assertIn("keeps its first submission date", text)
+        self.assertIn("file a Leave of Absence", text)
+
+    def test_readmission_and_awol_need_clearance_and_interview_before_the_dean(self):
+        for proc in (READMISSION, AWOL):
+            text = _chapter_text(proc)
+            self.assertIn("Business Office clearance", text, proc.key)
+            self.assertIn("interview", text, proc.key)
+
+    def test_defense_lead_time_is_a_hard_rule(self):
+        text = _chapter_text(SCHEDULING)
+        self.assertIn("hard rule", text)
+        self.assertNotIn("a warning that staff may override", text)
+
 if __name__ == "__main__":
     unittest.main()
