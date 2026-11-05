@@ -19,8 +19,9 @@
   (P-H frontend follows P-C: withdrawal guide, Send/Acknowledge buttons, timeline, RC home), `pkt/docs5` in `wt/docs5` (Ops Manual
   today's rules + known gaps, UAT.md I-334). MERGED d2587b0d `pkt/ux5` (hover lift, phone filter chips, I-091, I-370); its specs
   re-running on merged code -> 14 failed: fixed in bf9ac8a0 (I-087 chip kept, p82/p42 Field helpers; gallery specs need
-  `e2e.mjs --build`, a plain `npm run build:web` dist has no /__ui). OPEN: p121 alone fails 2/17, Research Gate shows "0 of 0"
-  intermittently (API 200) -> `pkt/gatedebug` in `wt/gatedebug` (Sonnet, debugging). MERGED f9e105d8 `pkt/rules5` (P-F, 11 items, **RESEED NEEDED**:
+  `e2e.mjs --build`, a plain `npm run build:web` dist has no /__ui). p121 flake FIXED 91613959 (`pkt/gatedebug`: exam eligibility
+  memo per request, overview 4.0 -> 1.2 s; pre-existing, not a regression). Running `pkt/im43` in `wt/im43` (I-335 staff record the
+  comprehensive exam, I-304 Advise Slip, Research Gate loading skeleton). MERGED f9e105d8 `pkt/rules5` (P-F, 11 items, **RESEED NEEDED**:
   new columns ResearchEvidenceFile.similarity_percent, AwolCase.staff_checks_json; tests/test_final_loop2.py). MERGED f7a43d8e
   `pkt/docs5` + 2414cf21 manual .docx/.pdf rebuilt (`E:/Temp/claude/opsman-venv/Scripts/python.exe scripts/docs/build_operations_manual.py --pdf`,
   LibreOffice at E:/LibreOffice). Running: `pkt/derive5` in `wt/derive5` (P-G: frontend follows P-F — AWOL forward checks,
