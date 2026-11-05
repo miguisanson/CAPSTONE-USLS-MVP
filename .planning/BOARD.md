@@ -1,5 +1,20 @@
 # USLS GS Platform — board
 
+## Final polish loop (2026-11-05, branch `v6.4.1-test`) — submission 2026-11-07
+
+**Done today:** a Fable review of the whole app, then 11 packets merged. Wording is plain everywhere and an automatic check
+blocks pronouns. Research Gate is short and clear. Phone boards are filtered and finished cases fold away. Withdrawal and
+Graduation now record "Sent to Registrar". The Dean's approval tags a withdrawn subject by itself. Hand-typed fields that the
+system knows are now filled in by it (manuscript date, enrollment status, residency purpose, semester). Staff can record the
+comprehensive exam result. The Advise Slip prints after a readmission is approved. The Ops Manual is updated, with a
+"Known gaps" table. Details: `.planning/CHANGELOG-2026-11-05.md`.
+
+**Your questions:** all answered with the policy default, as the stakeholders agreed (IM42-IM44 in DECISIONS.md).
+
+**After pulling:** run `npm run seed` (new columns). Live site: `deploy/UPDATE-SITE.cmd` (it reseeds).
+
+---
+
 ## Owner-requested teaching scheduling (2026-11-03)
 
 Implemented on `v6.1-migui`, final checks in progress: semester-specific faculty
