@@ -11,7 +11,9 @@
 - MERGED 2969867: `pkt/words` (P-A: plain words, pronoun guard `personPronoun` in check:ui; build + check:ui 0; edited e2e spec lines
   not run yet -> run with the next e2e batch). Worktree removed.
 - MERGED 3d09151: `pkt/rgate5` (P-D: Research Gate cards n-of-m line, page 5,300 -> 1,253 px; VerdictFields; no Source reference). Worktree removed.
-- Running (Sonnet, 3 helpers): `pkt/polish5` in `wt/polish5` (P-E skeletons + residency dialog auto-fill, from 3d09151),
+- MERGED 5486732 `pkt/boards5` (P-B) and 2973d56 `pkt/polish5` (P-E: skeletons, residency auto-fill; skeleton specs were not red first).
+  Worktrees removed. e2e batch of every touched spec running -> `E:/Temp/claude/e2e-batch1.log`.
+- Running (Sonnet): `pkt/ux5` in `wt/ux5` (motion pass, Research Gate "Still to do" line, I-091, phone filter chips, from 2973d56),
   `pkt/logic5` in `wt/logic5` (P-C backend logic, owns app.py), `pkt/boards5` in `wt/boards5` (P-B boards, phone list, deep links).
   Rung note: subagents write the failing tests themselves from the packet brief (brief = contract); main session reviews + gates.
 - Next after these: P-D research gate polish, P-F questions round 2 (app.py, after P-C merges), P-G derived inputs, P-E loading states.
