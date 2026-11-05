@@ -1029,6 +1029,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                         "gate": "Completion Evidence",
                         "item_name": item_name,
                         "file": (BytesIO(b"%PDF-1.4\ncompletion evidence\n%%EOF\n"), f"{item_name}.pdf"),
+                        **({"similarity_percent": "9.5"} if item_name.startswith("Turnitin") else {}),  # I-327
                     },
                     content_type="multipart/form-data",
                 )
@@ -3299,6 +3300,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "student_id": student.id,
                 "case_id": item.id,
                 "workflow_action": "forward_return_to_dean",
+                "confirmed_items": ["Clearance from Business Office", "Interview (reason for delay, residency requirements)"],  # I-273
                 "staff_notes": "Written intent verified.",
             })
             self.assertEqual(response.status_code, 200, response.get_json())
@@ -3350,7 +3352,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             "return_reason": "My circumstances have stabilized and I am ready to continue.",
         }
         self.assertEqual(self.student_awol_client.post("/api/student-portal/requests/awol-return", json=payload).status_code, 200)
-        forward = {"student_id": student.id, "case_id": item.id, "workflow_action": "forward_return_to_dean"}
+        forward = {"student_id": student.id, "case_id": item.id, "workflow_action": "forward_return_to_dean",
+                   "confirmed_items": ["Clearance from Business Office", "Interview (reason for delay, residency requirements)"]}  # I-273
         self.assertEqual(self._staff_client().post("/api/transactions/awol", json=forward).status_code, 200)
         return student, item, forward
 
@@ -3420,6 +3423,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 "student_id": student.id,
                 "case_id": item.id,
                 "workflow_action": "forward_return_to_dean",
+                "confirmed_items": ["Clearance from Business Office", "Interview (reason for delay, residency requirements)"],  # I-273
             }).status_code, 200)
             response = self._dean_client().post(
                 f"/api/approvals/workflow/awol-return/{item.id}/decide",

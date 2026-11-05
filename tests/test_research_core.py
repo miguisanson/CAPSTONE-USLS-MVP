@@ -38,6 +38,7 @@ from app import (  # noqa: E402
     sync_panel_invitations,
     Task,
     TransactionLog,
+    UPLOAD_ROOT,
     UserAccount,
     app,
     db,
@@ -775,6 +776,17 @@ class SchedulingRuleTests(ResearchCoreBase):
         patcher = patch("app.faculty_calendar_blocks", return_value=[], create=True)
         patcher.start()
         self.addCleanup(patcher.stop)
+        # I-174: the demo switch also skips the 14-day lead time; these tests check the real rule.
+        env = patch.dict(os.environ, {"DEMO_SKIP_DATE_WAITS": "0"})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def sign_form_4(self, days_ago, item="Form 4 - Endorsement for Proposal Defense"):
+        """Date the adviser's signature on the Form 4 upload (the manuscript goes to the panel then, FIN-03)."""
+        with app.app_context():
+            for approval in AdviserDocumentApproval.query.filter_by(document_name=item).all():
+                approval.signed_at = datetime.now() - timedelta(days=days_ago)
+            db.session.commit()
 
     def ready_for_proposal(self):
         with app.app_context():
@@ -863,28 +875,63 @@ class SchedulingRuleTests(ResearchCoreBase):
         ok = self.book(defense_type="Title Defense", day=future_weekday(2))
         self.assertEqual(ok.status_code, 200, ok.get_json())
 
-    def test_manuscript_lead_time_is_measured_from_the_day_the_panel_received_it(self):
+    def test_manuscript_lead_time_is_measured_from_the_advisers_form_4_signature(self):
+        """I-313: the receipt date is the adviser's Form 4 signature date, worked out on the server."""
         self.ready_for_proposal()
-        soon = self.book(day=future_weekday(10))  # no received date: counts from today
+        soon = self.book(day=future_weekday(10))  # signed today: 14 days from today
         self.assertEqual(soon.status_code, 400, soon.get_json())
-        received = (date.today() - timedelta(days=12)).isoformat()
-        ok = self.book(day=future_weekday(10), manuscript_received_on=received)
+        self.sign_form_4(12)
+        ok = self.book(day=future_weekday(10))
         self.assertEqual(ok.status_code, 200, ok.get_json())
         with app.app_context():
-            self.assertEqual(self.schedules()[-1].manuscript_received_on.isoformat(), received)
+            self.assertEqual(self.schedules()[-1].manuscript_received_on, date.today() - timedelta(days=12))
 
-    def test_a_future_received_date_is_rejected(self):
+    def test_a_client_sent_received_date_is_ignored(self):
+        """I-313: back-dating the receipt cannot remove the lead-time check; a future date is not an error."""
         self.ready_for_proposal()
-        response = self.book(manuscript_received_on=(date.today() + timedelta(days=3)).isoformat())
-        self.assertEqual(response.status_code, 400)
+        back_dated = self.book(day=future_weekday(10), manuscript_received_on=(date.today() - timedelta(days=30)).isoformat())
+        self.assertEqual(back_dated.status_code, 400, back_dated.get_json())
+        future = self.book(manuscript_received_on=(date.today() + timedelta(days=3)).isoformat())
+        self.assertEqual(future.status_code, 200, future.get_json())
+        with app.app_context():
+            self.assertEqual(self.schedules()[-1].manuscript_received_on, date.today())
 
-    def test_override_needs_a_recorded_reason_and_is_stored(self):
+    def test_the_scheduling_context_shows_the_derived_received_date(self):
+        self.ready_for_proposal()
+        self.sign_form_4(5)
+        context = self.staff().get(f"/api/transactions/defense-scheduling/context?student_id={self.student_id}").get_json()
+        self.assertEqual(context["manuscript_received_on"], (date.today() - timedelta(days=5)).isoformat())
+
+    def test_the_lead_time_cannot_be_overridden_but_the_demo_switch_skips_it(self):
+        """I-174: staff override covers only a panelist without entered availability."""
         self.ready_for_proposal()
         day = future_weekday(9)
+        overridden = self.book(day=day, override_conflicts=True, override_requirements=True, override_reason="Urgent")
+        self.assertEqual(overridden.status_code, 400, overridden.get_json())
+        self.assertIn("14 days", overridden.get_json()["error"])
+        check = self.staff().post("/api/defense-schedules/check", json={
+            "student_id": self.student_id, "preferred_date": day.isoformat(), "selected_start": "09:00",
+            "selected_end": "11:00", "defense_type": "Proposal Defense"}).get_json()
+        self.assertTrue(any("14 days" in line for line in check["hard"]), check)
+        self.assertFalse(check["ok"])
+        with patch.dict(os.environ, {"DEMO_MODE": "1", "DEMO_SKIP_DATE_WAITS": "1"}):
+            skipped = self.book(day=day)
+        self.assertEqual(skipped.status_code, 200, skipped.get_json())
+
+    def test_override_needs_a_recorded_reason_and_is_stored(self):
+        """I-174: the one soft warning left is a panelist who has not entered availability."""
+        from app import FacultyWorkingHour
+        self.ready_for_proposal()
+        with app.app_context():
+            FacultyWorkingHour.query.filter_by(faculty_id=self.faculty_ids["External Person"]).delete()
+            db.session.commit()
+        day = future_weekday(21)
+        no_override = self.book(day=day)
+        self.assertEqual(no_override.status_code, 400, no_override.get_json())
         no_reason = self.book(day=day, override_conflicts=True)
         self.assertEqual(no_reason.status_code, 400, no_reason.get_json())
         self.assertIn("reason", no_reason.get_json()["error"].lower())
-        ok = self.book(day=day, override_conflicts=True, override_reason="Adviser and panel agreed; manuscript was sent earlier")
+        ok = self.book(day=day, override_conflicts=True, override_reason="Adviser and panel agreed; hours were confirmed by email")
         self.assertEqual(ok.status_code, 200, ok.get_json())
         with app.app_context():
             self.assertIn("agreed", self.schedules()[-1].override_reason)
@@ -969,11 +1016,12 @@ class SchedulingRuleTests(ResearchCoreBase):
             self.assertEqual(new.start_time, time(13, 0))
             self.assertTrue(TransactionLog.query.filter(TransactionLog.result.like("%rescheduled%")).count() >= 1)
 
-    def test_reschedule_keeps_venue_mode_and_manuscript_date_unless_new_ones_are_given(self):
+    def test_reschedule_keeps_venue_and_mode_and_records_the_derived_manuscript_date(self):
         self.ready_for_proposal()
-        received = date.today() - timedelta(days=3)
-        response = self.book(manuscript_received_on=received.isoformat())
+        self.sign_form_4(3)
+        response = self.book()
         self.assertEqual(response.status_code, 200, response.get_json())
+        received = date.today() - timedelta(days=3)
         with app.app_context():
             old_id = self.schedules()[-1].id
         body = {"preferred_date": future_weekday(28).isoformat(), "selected_start": "13:00", "selected_end": "15:00",
@@ -1858,3 +1906,82 @@ class StaffForPanelTests(ResearchCoreBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RulesRound2Tests(ResearchCoreBase):
+    """IM42 questions round 2: one Form 4 at the proposal gate, Form 7 score for Failed / Deferred, Turnitin %."""
+
+    TURNITIN = "Turnitin Certificate with SIR not more than 15%"
+
+    def test_the_proposal_gate_asks_for_one_adviser_endorsement_form_4(self):
+        """I-284: the Protocol has one Form 4; the second 'Proposal manuscript endorsement' upload is gone."""
+        from app import RESEARCH_REQUIREMENTS
+        items = required_documents_for_gate(PROPOSAL)
+        self.assertIn("Form 4 - Endorsement for Proposal Defense", items)
+        self.assertNotIn("Adviser e-signature/endorsement", items)
+        self.assertNotIn("Adviser e-signature/endorsement", RESEARCH_REQUIREMENTS)
+        self.assertNotIn("Adviser e-signature/endorsement", ADVISER_APPROVAL_DOCUMENTS)
+
+    def final_ready(self):
+        with app.app_context():
+            self.pass_gate(self.student_id, TITLE, "Title Defense")
+            self.pass_gate(self.student_id, PROPOSAL, "Proposal Defense")
+            self.fill_uploads(self.student_id, FINAL)
+            names = ["Chair Person", "Content Person", "Method Person", "External Person"]
+            self.panel(self.student_id, FINAL, names)
+            schedule = self.schedule(self.student_id, "Final Defense", names=names)
+            db.session.commit()
+            return schedule.id
+
+    def test_failed_and_deferred_refuse_a_passing_form_7_score(self):
+        """I-326 (score part): a score on the passing line cannot go with Failed or Deferred."""
+        schedule_id = self.final_ready()
+        for result in ("Failed", "Deferred"):
+            refused = self.faculty_client("Chair Person").post(
+                f"/api/faculty-portal/defense-verdicts/{schedule_id}", json={"result": result, "evaluation_score": 95})
+            self.assertEqual(refused.status_code, 400, (result, refused.get_json()))
+            self.assertIn("score", refused.get_json()["error"].lower())
+        low = self.faculty_client("Chair Person").post(
+            f"/api/faculty-portal/defense-verdicts/{schedule_id}", json={"result": "Failed", "evaluation_score": 70})
+        self.assertEqual(low.status_code, 200, low.get_json())
+
+    def completion_student(self):
+        with app.app_context():
+            self.pass_gate(self.student_id, TITLE, "Title Defense")
+            four = ["Chair Person", "Content Person", "Method Person", "External Person"]
+            self.pass_gate(self.student_id, PROPOSAL, "Proposal Defense", four)
+            self.pass_gate(self.student_id, FINAL, "Final Defense", four)
+            db.session.add(ResearchCase(
+                student_id=self.student_id, case_type="Thesis", title="Completion test", current_gate=FINAL, status="Complete"))
+            db.session.commit()
+
+    def upload_turnitin(self, **form):
+        from io import BytesIO
+        data = {"gate": "Completion Evidence", "item_name": self.TURNITIN,
+                "file": (BytesIO(b"%PDF-1.4\nturnitin\n%%EOF\n"), "turnitin.pdf"), **form}
+        return self.student().post("/api/student-portal/research-evidence/upload", data=data, content_type="multipart/form-data")
+
+    def test_the_turnitin_upload_records_the_similarity_and_refuses_above_15(self):
+        """I-327 (CMP-03): the percentage is a number 0-100; above 15 the paper cannot go to the editor."""
+        self.completion_student()
+        missing = self.upload_turnitin()
+        self.assertEqual(missing.status_code, 400, missing.get_json())
+        self.assertIn("similarity", missing.get_json()["error"].lower())
+        for bad in ("abc", "-1", "101"):
+            self.assertEqual(self.upload_turnitin(similarity_percent=bad).status_code, 400, bad)
+        too_high = self.upload_turnitin(similarity_percent="15.5")
+        self.assertEqual(too_high.status_code, 400, too_high.get_json())
+        self.assertIn("15%", too_high.get_json()["error"])
+        with app.app_context():
+            self.assertEqual(ResearchEvidenceFile.query.filter_by(student_id=self.student_id).filter(
+                ResearchEvidenceFile.original_name.like("turnitin%")).count(), 0, "a refused upload stores nothing")
+        ok = self.upload_turnitin(similarity_percent="12.5")
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        with app.app_context():
+            stored = ResearchEvidenceFile.query.filter_by(student_id=self.student_id, original_name="turnitin.pdf").one()
+            self.assertEqual(stored.similarity_percent, 12.5)
+        edge = self.upload_turnitin(similarity_percent="15")
+        self.assertEqual(edge.status_code, 200, edge.get_json())
+        with app.app_context():
+            for stored in ResearchEvidenceFile.query.filter_by(student_id=self.student_id, original_name="turnitin.pdf").all():
+                (UPLOAD_ROOT / stored.stored_name).unlink(missing_ok=True)

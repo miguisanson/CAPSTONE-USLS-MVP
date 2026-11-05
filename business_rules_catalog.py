@@ -162,8 +162,8 @@ BUSINESS_RULE_CATALOG = [
         "A student may withdraw subjects until the end of the second week from the start of "
         "classes (14 calendar days), whether or not classes were attended. The request needs "
         "the Dean's approval. It is not free: the fee consequence below applies. After the "
-        "window a single subject can no longer be withdrawn; the student may still withdraw "
-        "from all subjects (paying the full fees for the semester) or file a Leave of Absence.",
+        "window a single subject cannot be withdrawn. To leave the semester, file a Leave of "
+        "Absence (full fees apply, Handbook p.51).",
         14, "int", "days", HANDBOOK, "Registration - Withdrawal of Subject", "49",
     ),
     _rule(
@@ -194,9 +194,9 @@ BUSINESS_RULE_CATALOG = [
     _rule(
         "withdrawal.fee_percent_after_window", "withdrawal",
         "Fee charged after the second week",
-        "After the second week the student may still withdraw all subjects at any time of the "
-        "semester but pays the full enrollment fees for the semester (a justifiable reason "
-        "limits the charge to the last month of attendance).",
+        "After the second week a single subject cannot be withdrawn. To leave the semester, file a "
+        "Leave of Absence (full fees apply, Handbook p.51); a justifiable reason limits the "
+        "charge to the last month of attendance.",
         100, "int", "percent", HANDBOOK, "Fees and Expenses - Refund of Fees", "51",
         enforced=False,
         reason="The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).",
@@ -421,8 +421,6 @@ BUSINESS_RULE_CATALOG = [
         "The final draft undergoes Turnitin scanning and a similarity index rating of not more "
         "than 15% is required before the paper goes to the editor.",
         15, "int", "percent", PROTOCOL, "Closed-door Final Defense - After the defense (Turnitin scanning)", None,
-        enforced=False,
-        reason="Staff check the uploaded Turnitin certificate; the percentage is not read from the file automatically.",
         document="protocol",
     ),
     _rule(

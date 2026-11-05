@@ -8,7 +8,9 @@ The set-up (temp SQLite database, accounts, faculty, panels, schedules) is share
 tests/test_research_core.py.
 """
 import json
+import os
 import unittest
+from unittest.mock import patch
 from datetime import date, datetime, time, timedelta
 
 from tests import test_research_core as rc
@@ -284,11 +286,16 @@ class ConflictWarningTests(CalendarBase):
         self.assertTrue(any("past" in item.lower() for item in body["hard"]), body)
         self.assertFalse(body["ok"])
 
-    def test_before_the_lead_time_is_soft(self):
+    def test_before_the_lead_time_is_hard_unless_the_demo_switch_skips_it(self):
+        """I-174 (IM42): the 14-day lead time blocks; the sign-in page switch skips it on demo day."""
         self.ready_for_title(endorsed_days_ago=2)
-        body = self.check(day=future_weekday(3)).get_json()
-        self.assertEqual(body["hard"], [], body)
-        self.assertTrue(any("days after" in item for item in body["soft"]), body)
+        with patch.dict(os.environ, {"DEMO_SKIP_DATE_WAITS": "0"}):
+            body = self.check(day=future_weekday(3)).get_json()
+        self.assertEqual(body["soft"], [], body)
+        self.assertTrue(any("days after" in item for item in body["hard"]), body)
+        self.assertFalse(body["ok"])
+        with patch.dict(os.environ, {"DEMO_SKIP_DATE_WAITS": "1"}):
+            self.assertEqual(self.check(day=future_weekday(3)).get_json()["hard"], [])
 
     def test_outside_a_panelists_entered_hours_is_hard(self):
         self.ready_for_title()
@@ -989,7 +996,9 @@ class StudentResearchCalendarTests(CalendarDataBase):
         self.assertEqual(body["next_defense"]["countdown_days"], (day - date.today()).days)
         self.assertEqual(body["next_defense"]["ics_url"], f"/api/defense-schedules/{schedule_id}/event.ics")
         self.assertTrue(body["next_defense"]["panel"])
-        self.assertIn("manuscript_to_panel", [d["kind"] for d in body["deadlines"]])
+        # I-313: the manuscript date comes from the adviser's signed Form 4, which a valid booking always
+        # precedes by 14 days, so that deadline is already done; the verdict deadline is the open one.
+        self.assertIn("verdict_due", [d["kind"] for d in body["deadlines"]])
         self.assertEqual(self.other_student().get("/api/student-portal/research-calendar").get_json()["next_defense"], None)
 
     def test_a_single_defense_can_be_added_to_any_calendar_app(self):

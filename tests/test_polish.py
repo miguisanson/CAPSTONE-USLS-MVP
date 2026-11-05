@@ -303,17 +303,13 @@ class DropRuleEverywhereTests(PolishBase):
             log = TransactionLog.query.filter_by(student_id=self.student_id).order_by(TransactionLog.id.desc()).first()
             self.assertIn("25%", log.notes)
 
-    def test_a_manual_drop_can_use_a_documented_exception_with_a_reason(self):
+    def test_a_manual_drop_cannot_use_a_documented_exception(self):
+        """I-170 (IM42): the Handbook p.52 has no free-text exception; the text is ignored."""
         record_id = self._enrolled_row()
-        short = self._patch(record_id, status="Dropped", reason="x", drop_exception_reason="n/a")
-        self.assertEqual(short.status_code, 400, "an exception needs a real reason")
-        ok = self._patch(record_id, status="Dropped", reason="Approved by Associate Dean",
-                         drop_exception_reason="Subject dissolved by the college before the second week")
-        self.assertEqual(ok.status_code, 200, ok.get_json())
-        with app.app_context():
-            edit = MonitoringEdit.query.filter_by(student_id=self.student_id, field="status").order_by(MonitoringEdit.id.desc()).first()
-            self.assertIn("exception", edit.reason.lower())
-            self.assertIn("Subject dissolved", edit.reason)
+        refused = self._patch(record_id, status="Dropped", reason="Approved by Associate Dean",
+                              drop_exception_reason="Subject dissolved by the college before the second week")
+        self.assertEqual(refused.status_code, 400, refused.get_json())
+        self.assertNotIn("exception", refused.get_json()["error"].lower())
 
     def test_adding_a_subject_row_as_dropped_needs_the_same_evidence(self):
         staff = self.client("staff")
@@ -376,18 +372,16 @@ class DropRuleEverywhereTests(PolishBase):
             log = TransactionLog.query.filter_by(student_id=self.student_id).order_by(TransactionLog.id.desc()).first()
             self.assertIn("35%", log.notes)
 
-    def test_a_class_list_drop_can_carry_a_documented_exception(self):
+    def test_a_class_list_drop_cannot_carry_a_documented_exception(self):
+        """I-170 (IM42): the exception column is no longer read; only the absence percentage counts."""
         body = self._csv(
             [self._row("PLS-501", ",,Subject dissolved by the college"), self._row("PLS-502", ",,no")],
             ",Unexcused Absence Percent,Drop Exception Reason",
         )
         imported = self._import(body).get_json()
-        self.assertEqual(imported["dropped"], 1, imported)
-        self.assertEqual(imported["drop_evidence_count"], 1, imported)
+        self.assertEqual(imported["dropped"], 0, imported)
         with app.app_context():
-            row = SubjectEnrollment.query.filter_by(status="Dropped").one()
-            self.assertIn("exception", row.status_note.lower())
-            self.assertIn("Subject dissolved", row.status_note)
+            self.assertEqual(SubjectEnrollment.query.filter_by(status="Dropped").count(), 0)
 
 
 # =========================================================================== 6 business rules
