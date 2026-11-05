@@ -51,6 +51,10 @@
 - MERGED ea0903ca im45 (IM45 done; F6-06 not a bug: now_utc() is naive Manila time) + d0877db8 manual rebuilt. Running
   `pkt/seedfix` in `wt/seedfix` (I-374 seed history + ready count = export filter, I-378 finished Registrar column, I-376 server,
   I-379 group forward vs returnee checks; owns app.py).
+- MERGED 0f0bdc2e persona5 (I-375, I-377, I-240 staff export/print). Persona round 2 (student-thesis, coordinator-academic) ->
+  I-380..I-384. Running: `pkt/persona6` in `wt/persona6` (frontend: I-380, I-381, I-382, I-384 parts). Queued for app.py after
+  seedfix: I-383 (seed a practicum case at Documents Under Review; Isabel Mendoza missing from the coordinator board), server parts
+  of I-384 (rule badge wording if server-side).
 - Persona UAT (dean-phone, staff-rushed; reports in E:/Temp/claude/persona-uat/) -> I-374..I-378. I-374 (P1: Dean export says 4
   ready, exports none — "Seeded history" endorsements app.py ~41815 are Dean Approved + registrar Pending for Coursework students)
   and I-376/I-378 wait for app.py after im45.
