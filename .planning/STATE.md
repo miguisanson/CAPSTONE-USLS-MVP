@@ -16,7 +16,9 @@
 - MERGED 685f32f1 `pkt/logic5` (P-C, tests/test_final_loop.py 17 OK; 4 assertions changed for I-306, listed in the merge's branch report).
   Full Python gate on 685f32f1 running -> `E:/Temp/claude/pygate-685f32f.log`.
 - Running (Sonnet, 3 helpers): `pkt/rules5` in `wt/rules5` (P-F questions round 2, owns app.py), `pkt/follow5` in `wt/follow5`
-  (P-H frontend follows P-C: withdrawal guide, Send/Acknowledge buttons, timeline, RC home), `pkt/ux5` in `wt/ux5` (motion pass, Research Gate "Still to do" line, I-091, phone filter chips, from 2973d56),
+  (P-H frontend follows P-C: withdrawal guide, Send/Acknowledge buttons, timeline, RC home), `pkt/docs5` in `wt/docs5` (Ops Manual
+  today's rules + known gaps, UAT.md I-334). MERGED d2587b0d `pkt/ux5` (hover lift, phone filter chips, I-091, I-370); its specs
+  re-running on merged code -> `E:/Temp/claude/e2e-batch2.log`. Old ux5 note: `pkt/ux5` in `wt/ux5` (motion pass, Research Gate "Still to do" line, I-091, phone filter chips, from 2973d56),
   `pkt/logic5` in `wt/logic5` (P-C backend logic, owns app.py), `pkt/boards5` in `wt/boards5` (P-B boards, phone list, deep links).
   Rung note: subagents write the failing tests themselves from the packet brief (brief = contract); main session reviews + gates.
 - Next after these: P-D research gate polish, P-F questions round 2 (app.py, after P-C merges), P-G derived inputs, P-E loading states.
