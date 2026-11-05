@@ -37,7 +37,12 @@
   the gate ran 78 min while the manual was rebuilt in the same checkout, so these 5 are being re-run on HEAD.
   Running: `pkt/im43b` in `wt/im43b` (I-248 three concept titles + pick list, I-252 verified practicum hours).
   RULE: never `git stash` in worktrees (shared stash list; derive5 and im43 swapped stashes once, both recovered).
-- Next: full Python gate on the final commit; full `npm run e2e` (with `--build` the e2e dist has the /__ui gallery);
+- MERGED 8dc8adf8 teachspec (p84 new UI), 7b9125b0 coordpub (coordinator approve/publish panel, I-372 screen part),
+  70704d19 im43b (I-248 concept titles + pick list, I-252 verified practicum hours; **RESEED NEEDED**).
+- Full e2e on bffa7d5f: 1,012 passed, 8 failed (p110/p84 fixed since; p73 x2, p79, p88, p90, p94), autopilot (35) did not run.
+  -> `pkt/fix6` in `wt/fix6` (Sonnet): those 6 + test_crosscut queue aging (fails since today) + I-372 server guard + autopilot run.
+- Full Python gate on 70704d19 running in the isolated worktree `CAPSTONE-USLS-MVP-wt/gate` (detached) -> `E:/Temp/claude/pygate-70704d1.log`.
+- Next (old line): full Python gate on the final commit; full `npm run e2e` (with `--build` the e2e dist has the /__ui gallery);
   changelog; push v6.4.1-test (owner allows pushing the current branch).
 - (old) Next after these: P-D research gate polish, P-F questions round 2 (app.py, after P-C merges), P-G derived inputs, P-E loading states.
 
