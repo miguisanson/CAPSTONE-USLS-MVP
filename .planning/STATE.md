@@ -51,6 +51,9 @@
 - MERGED ea0903ca im45 (IM45 done; F6-06 not a bug: now_utc() is naive Manila time) + d0877db8 manual rebuilt. Running
   `pkt/seedfix` in `wt/seedfix` (I-374 seed history + ready count = export filter, I-378 finished Registrar column, I-376 server,
   I-379 group forward vs returnee checks; owns app.py).
+- MERGED eb1021b2 seedfix (I-374 graduation export, I-378 withdrawal column, I-379 returnees one at a time; **RESEED NEEDED**)
+  + 33411eac graduation "Finished - ..." wording. Running `pkt/seed2` in `wt/seed2` (I-383 practicum seed + board, I-378
+  graduation column, I-376 staff home label, I-384 rule badge wording; owns app.py) and `pkt/persona6` (frontend).
 - MERGED 0f0bdc2e persona5 (I-375, I-377, I-240 staff export/print). Persona round 2 (student-thesis, coordinator-academic) ->
   I-380..I-384. Running: `pkt/persona6` in `wt/persona6` (frontend: I-380, I-381, I-382, I-384 parts). Queued for app.py after
   seedfix: I-383 (seed a practicum case at Documents Under Review; Isabel Mendoza missing from the coordinator board), server parts
