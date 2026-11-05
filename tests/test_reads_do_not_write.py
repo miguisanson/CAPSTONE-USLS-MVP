@@ -249,6 +249,31 @@ class ReadsDoNotWriteTests(unittest.TestCase):
                 event.remove(db.engine, "before_cursor_execute", trace)
         self.assertEqual(sorted(set(writes)), [])
 
+    def test_student_profile_and_portal_get_leave_the_research_state_alone(self):
+        """I-373: GET /api/students/<id> and the student portal context ran sync_research_progress, which
+        rewrote current_stage and created document rows. Every student, not only ids 1 and 3."""
+        from app import Student
+        with app.app_context():
+            ids = [row.id for row in Student.query.order_by(Student.id).all()]
+            db.session.remove()
+        staff, student = sign_in("staff@usls.edu.ph"), sign_in("student@usls.edu.ph")
+        writes = []  # traced, not diffed: a GET's write that is rolled back still counts (it held the write lock)
+
+        def trace(conn, cursor, statement, parameters, context, executemany):
+            if statement.lstrip()[:6].upper() in ("INSERT", "UPDATE", "DELETE"):
+                writes.append(statement.strip()[:90] + " " + str(parameters)[:60])
+
+        with app.app_context():
+            event.listen(db.engine, "before_cursor_execute", trace)
+        try:
+            for student_id in ids:
+                self.assertIn(staff.get(f"/api/students/{student_id}").status_code, (200, 404), student_id)
+            self.assertEqual(student.get("/api/student-portal/context").status_code, 200)
+        finally:
+            with app.app_context():
+                event.remove(db.engine, "before_cursor_execute", trace)
+        self.assertEqual(writes[:5], [])
+
     def test_the_explicit_refresh_actions_work(self):
         """The sweeps a GET used to run (I-071) are now these two POSTs."""
         client = sign_in("staff@usls.edu.ph")
