@@ -29,7 +29,11 @@
   in the UI are broken on v6.4.1-test). Leftover folder `CAPSTONE-USLS-MVP-wt/rules5` (delete failed, permission; already pruned from git). Old ux5 note: `pkt/ux5` in `wt/ux5` (motion pass, Research Gate "Still to do" line, I-091, phone filter chips, from 2973d56),
   `pkt/logic5` in `wt/logic5` (P-C backend logic, owns app.py), `pkt/boards5` in `wt/boards5` (P-B boards, phone list, deep links).
   Rung note: subagents write the failing tests themselves from the packet brief (brief = contract); main session reviews + gates.
-- Next after these: P-D research gate polish, P-F questions round 2 (app.py, after P-C merges), P-G derived inputs, P-E loading states.
+- MERGED 2a5a3c4d `pkt/derive5` (P-G screens follow P-F) + 6ac1bddb (Turnitin picker waits for the %, p75), ac9471c3
+  `pkt/follow5` (P-H) + 7e843f5e (p91/p114/p105 follow-ups). All packets of the Fable plan are merged except `pkt/im43` (running).
+- Next: merge im43; full Python gate on the final commit; full `npm run e2e` (with `--build` the e2e dist has the /__ui gallery);
+  changelog; push v6.4.1-test (owner allows pushing the current branch).
+- (old) Next after these: P-D research gate polish, P-F questions round 2 (app.py, after P-C merges), P-G derived inputs, P-E loading states.
 
 ## 2026-11-05 - v6.4-migui: merge with Natalie + private demo sandbox + Demo Guide from the top (session "v6.4 merge")
 
