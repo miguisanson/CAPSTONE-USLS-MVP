@@ -384,7 +384,7 @@ export function PanelMatchingForm({ context, studentId, submit, submitting, refe
         <Button type="submit" disabled={!profile.ready || !selectionComplete} loading={submitting} icon={CheckCircle2} className="w-full sm:w-auto" aria-describedby="finalize-panel-note">
           {submitting ? "Finalizing…" : finalizedPanel.length === roles.length ? "Update final panel" : "Finalize selected panel"}
         </Button>
-        <p id="finalize-panel-note" className="meta">Each new panel member is invited at once (Panel Invitations and the bell) and can accept or decline.</p>
+        <p id="finalize-panel-note" className="meta">Finalizing makes this the final panel, so Defense Scheduling can book a date.{!profile.ready ? " It is blocked until the research file above is ready." : ""} Each new panel member is invited at once (Panel Invitations and the bell) and can accept or decline.</p>
       </div>
     </form>
   );

@@ -354,7 +354,12 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
             })}
           </div>
         ) : (
-          <InlineNotice tone="warning">No final panel is available. Complete Panel Matching before scheduling.</InlineNotice>
+          <InlineNotice tone="warning" title="No final panel yet">
+            <p>The panel is finalized in Panel Matching. Scheduling opens once it is.</p>
+            <Button as={Link} to={`/workflow/panel-matching?student_id=${studentId}`} variant="secondary" size="sm" icon={ArrowUpRight} className="mt-2">
+              Open Panel Matching for {context.selected_student?.name || "this student"}
+            </Button>
+          </InlineNotice>
         )}
       </SectionCard>
 

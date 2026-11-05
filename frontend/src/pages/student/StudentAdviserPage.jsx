@@ -283,7 +283,6 @@ export default function StudentAdviserPage() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.researchAdviser}
-        forms="adviser-designation"
         icon={UserCheck}
         description={tracker?.current
           ? `Your adviser: ${tracker.current.faculty_name}.`
