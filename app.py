@@ -37570,12 +37570,17 @@ def sync_research_progress(student: Student, submitted_title: str = "") -> tuple
             "milestone": locked_milestone,
             "prerequisite": prerequisite,
         }
-    progress = detected_research_progress(student)
+    # A page view only reads (I-071, I-373): in a GET, compute the progress and save nothing; the write paths
+    # (verdict, gate, upload, schedule, ...) call this in their own POST and keep the stored stage current.
+    read_only = has_request_context() and request.method in ("GET", "HEAD")
+    progress = detected_research_progress(student, ensure_checks=not read_only)
     research_case = (
         ResearchCase.query.filter_by(student_id=student.id)
         .order_by(ResearchCase.opened_at.desc())
         .first()
     )
+    if read_only:
+        return research_case, progress
     clean_title = re.sub(r"\s+", " ", submitted_title or "").strip()[:220]
     if not research_case:
         research_case = ResearchCase(

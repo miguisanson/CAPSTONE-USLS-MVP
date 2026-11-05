@@ -1795,6 +1795,21 @@ class StaffForPanelTests(ResearchCoreBase):
         student = self.student().get("/api/student-portal/context").get_json()
         self.assertIn("Recorded by Test staff for the panel", str(student))
 
+    def test_the_profile_shows_the_new_stage_after_a_verdict_though_a_get_saves_nothing(self):
+        """I-373: a page view no longer syncs research progress, so the verdict POST must keep it current."""
+        schedule_id = self.title_defense()
+        with app.app_context():
+            student_id = self.student_id
+        self.assertEqual(self.record(self.staff(), schedule_id).status_code, 200)
+        body = self.staff().get(f"/api/students/{student_id}").get_json()
+        with app.app_context():
+            stored = db.session.get(Student, student_id).current_stage
+            case = ResearchCase.query.filter_by(student_id=student_id).one()
+            self.assertEqual(body["research_case"]["current_gate"], case.current_gate)
+        self.assertEqual(case.current_gate, PROPOSAL)  # the passed title defense moved the case on
+        self.assertEqual(body["student"]["current_stage"], stored)
+        self.assertEqual(stored, "Proposal Defense")
+
     def test_research_coordinator_can_record_too_and_others_cannot(self):
         schedule_id = self.proposal_defense()
         for client in (self.student(), self.academic(), self.faculty_client("Adviser Person"), self.faculty_client("Chair Person")):
