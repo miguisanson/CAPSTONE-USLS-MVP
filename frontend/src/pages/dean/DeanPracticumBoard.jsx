@@ -63,7 +63,7 @@ function PracticumCard({ item }) {
   const updated = item.last_activity_at || item.submitted_at;
   return (
     <CaseCardShell ready={isWaiting(item)}>
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
         <div className="min-w-0">
           <p className="break-words text-sm font-semibold text-ink">{item.student.name}</p>
           <p className="meta">{item.student.student_number} · {item.student.program_code}</p>

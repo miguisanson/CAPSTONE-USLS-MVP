@@ -63,7 +63,7 @@ function GateCard({ row, canAct, onView, onAct }) {
   const ready = row.state === "ready";
   return (
     <CaseCardShell ready={ready}>
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
         <div className="min-w-0">
           <p className="break-words text-sm font-semibold text-ink">{row.student.name}</p>
           <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code} · {row.stage}</p>

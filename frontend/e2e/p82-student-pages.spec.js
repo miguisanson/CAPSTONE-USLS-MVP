@@ -244,9 +244,9 @@ test.describe("P82 student pages (pinned)", () => {
     try {
       await open(s.page, "/student/adviser", "adviser");
       await expect(h1(s.page)).toHaveText("Research Adviser");
-      await expect(main(s.page)).toContainText("You nominate an adviser on Form 3.");
       await expect(h2s(s.page)).toHaveText(["Your research adviser"]);
       const tracker = await (await s.context.request.get("/api/student-portal/adviser")).json();
+      await expect(main(s.page)).toContainText(`Your adviser: ${tracker.current.faculty_name}`); // I-381: with an adviser, one line; the Form 3 intro is for students without one
       const card = cardOf(s.page, "Your research adviser");
       await expect(card).toContainText(tracker.current.faculty_name);
       await expect(card).toContainText(tracker.current.status);

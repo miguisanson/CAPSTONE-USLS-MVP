@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Check, CheckCircle2, Circle, ClipboardList, Download, Eye, Send, Settings2, Users } from "lucide-react";
 import { api } from "../api";
 import {
@@ -423,6 +423,7 @@ export default function CourseAdjustments() {
           <Card className="space-y-4">
             <Stepper steps={planSteps} title="Offering plan progress" />
             <p className="text-sm text-slate-600">{planStatusNote(data.latest_plan)}</p>
+            <p className="meta">This is the Dean's approval of which subjects are offered. The Academic Coordinator approves and publishes the class schedule on <Link to="/course-adjustments?view=offerings" className="font-semibold text-brand-700 underline">Offering setup</Link>.</p>
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-4">
               <p className="text-sm text-slate-600">
                 Demand numbers are guidance. Every curriculum subject remains available for a manual offering decision.
