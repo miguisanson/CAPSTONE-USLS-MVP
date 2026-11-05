@@ -64,10 +64,9 @@ test.describe("I-362: the Research Gate board (staff)", () => {
     await expect(nico).toContainText("2691201");
     await expect(nico).toContainText("MBA");
     await expect(nico).toContainText("Adviser:");
-    await expect(nico).toContainText("Proposal Defense:"); // the booked defense and its date
-    await expect(nico).toContainText(/Missing:|Nothing missing/);
+    await expect(nico).toContainText(/\d+ of \d+ requirements · (Missing:|Nothing missing)/); // F5-03: one line, tiles live in View
     await expect(nico).toContainText("Next:");
-    await expect(nico.getByLabel(/^Requirements of Nico Barrientos/)).toBeVisible();
+    await expect(nico.getByLabel(/^Requirements of Nico Barrientos/)).toHaveCount(0);
     await expect(nico.getByRole("button", { name: `Open the Research Gate record of ${NICO}` })).toBeVisible();
     await expect(nico.getByRole("button", { name: `Record the verdict for the panel for ${NICO}` })).toBeVisible();
   });
@@ -81,6 +80,8 @@ test.describe("I-362: the Research Gate board (staff)", () => {
     await expect(page.getByRole("region", { name: BOARD }).locator("article")).toHaveCount(shown);
     await page.locator("#research-gate-overview").getByLabel("Filter by program").selectOption("");
     await card(page, NICO).getByRole("button", { name: `Open the Research Gate record of ${NICO}` }).click();
+    await expect(page.getByRole("dialog").getByLabel(/^Requirements of Nico Barrientos/)).toBeVisible();
+    await page.getByRole("dialog").getByRole("button", { name: "Open the full record" }).click();
     await expect(page.getByRole("heading", { level: 2, name: "Research Gate record" })).toBeVisible();
     await expect(page).toHaveURL(/student_id=\d+/);
   });
@@ -142,7 +143,6 @@ test.describe("I-361: staff record, and correct, the verdict for the panel", () 
 
     const gab = card(page, GAB);
     await expect(gab.getByTestId("panel-stamp")).toContainText(/Recorded by .+ for the panel/);
-    await expect(gab).toContainText("Proposal Defense verdict: Passed");
     await expect(gab.getByRole("button", { name: `Record the verdict for the panel for ${GAB}` })).toHaveCount(0);
     await shot(page, "after-record-1366.png");
   });

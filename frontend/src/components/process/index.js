@@ -10,3 +10,4 @@ export * from "./MemberList.jsx";
 export * from "./GroupOverview.jsx";
 export * from "./ProcessScopeNote.jsx";
 export * from "./PanelStamp.jsx";
+export * from "./VerdictFields.jsx";

@@ -290,7 +290,7 @@ test.describe("Defense scheduling and the availability workspace", () => {
     await expect(main(page).getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
     await main(page).getByRole("button", { name: "Close", exact: true }).click();
     await expect(main(page).getByText(/Reassign the defense panel/)).toHaveCount(0);
-    for (const label of [/Selected date/, /Start time/, /End time/, /Defense type/, /Mode/, /Venue/, /Scheduling constraints/, /Reason for rescheduling/, /Requested by/, /Source reference/]) {
+    for (const label of [/Selected date/, /Start time/, /End time/, /Defense type/, /Mode/, /Venue/, /Scheduling constraints/, /Reason for rescheduling/, /Requested by/]) {
       await expect(main(page).getByLabel(label).first(), String(label)).toBeVisible();
     }
     // I-259: the stage allows one defense type, so it is text, not a one-option select

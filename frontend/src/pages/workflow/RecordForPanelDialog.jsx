@@ -2,8 +2,8 @@ import { useState } from "react";
 import { CalendarClock, CheckCircle2, Gavel } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, EditableText, Field, HistoryList, InlineNotice, Input, Modal, Select, StatusChip, Textarea } from "../../components/ui/index.js";
-import { PanelStamp } from "../../components/process";
+import { Button, EditableText, Field, HistoryList, InlineNotice, Modal, StatusChip, Textarea } from "../../components/ui/index.js";
+import { PanelStamp, PROVISIONAL, VerdictFields } from "../../components/process";
 import { formatClock, formatDate } from "../../lib/format";
 
 // Staff and the Research Coordinator act for the Panel Chair (I-361). One dialog, three jobs:
@@ -13,7 +13,6 @@ import { formatClock, formatDate } from "../../lib/format";
 // Every one needs a reason. The server stamps the verdict "Recorded by <you> for the panel"; the chair, the adviser and
 // the student see the stamp, and every later change is in the history.
 const TITLE_GATE = "Form 1 - Title Defense";
-const PROVISIONAL = "Provisional pass - revisions or re-defense"; // merge v6.4 M1: the panel picks the follow-up
 
 const JOBS = {
   record: { title: "Record the verdict for the panel", button: "Record for the panel", busy: "Recording…", reasonLabel: "Why are you recording this for the panel?", reasonHint: "For example: the panel chair is away and sent the result by email." },
@@ -39,16 +38,13 @@ export default function RecordForPanelDialog({ mode, row, onClose, onDone }) {
   const verdict = row.verdict;
   const options = (row.verdict_options || []).map((option) => ({ value: option.value, label: option.label }));
   const [result, setResult] = useState(mode === "correct" ? "" : options[0]?.value || "");
-  const [remarks, setRemarks] = useState("");
-  const [title, setTitle] = useState("");
-  const [score, setScore] = useState("");
-  const [followUp, setFollowUp] = useState("");
+  const [fields, setFields] = useState({ remarks: "", selected_title: "", evaluation_score: "", provisional_follow_up: "" }); // remarks, selected_title, evaluation_score, provisional_follow_up
+  const { remarks, selected_title: title, evaluation_score: score, provisional_follow_up: followUp } = fields;
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const history = useApi(() => (verdict ? api.editHistory("defense_verdict", verdict.id) : Promise.resolve({ items: [] })), [verdict?.id]);
-  const chosen = (row.verdict_options || []).find((option) => option.value === result);
   const isTitle = defense?.defense_type === "Title Defense" || verdict?.gate === TITLE_GATE;
   const isFinal = defense?.defense_type === "Final Defense";
   const needsResult = mode !== "confirm";
@@ -118,36 +114,15 @@ export default function RecordForPanelDialog({ mode, row, onClose, onDone }) {
         )}
 
         {needsResult && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Verdict" required hint={chosen?.summary}>
-              <Select placeholder={mode === "correct" ? "Choose the correct verdict" : null} options={options} value={result} onChange={(event) => { setResult(event.target.value); setFollowUp(""); }} />
-            </Field>
-            {result === PROVISIONAL && (
-              <Field label="Required follow-up" required>
-                <Select
-                  placeholder="Choose revisions or re-defense"
-                  options={[{ value: "revisions", label: "Revisions for panel approval" }, { value: "re-defense", label: "Re-defense" }]}
-                  value={followUp}
-                  onChange={(event) => setFollowUp(event.target.value)}
-                />
-              </Field>
-            )}
-            <Field label="Remarks or conditions">
-              <Textarea rows={3} value={remarks} onChange={(event) => setRemarks(event.target.value)} placeholder="Optional conditions, revisions, or notes" />
-            </Field>
-            {isTitle && result === "Passed" && (
-              <div className="sm:col-span-2">
-                <Field label="Title selected by the panel (from the three submitted)">
-                  <Input value={title} maxLength={220} onChange={(event) => setTitle(event.target.value)} placeholder="Saved as the title of the study" />
-                </Field>
-              </div>
-            )}
-            {(isFinal || verdict?.gate === "Final Defense") && (
-              <Field label="Evaluation score (Form 7)" hint="A pass needs the passing score for the paper type.">
-                <Input type="number" min="0" max="100" step="0.01" value={score} onChange={(event) => setScore(event.target.value)} />
-              </Field>
-            )}
-          </div>
+          <VerdictFields
+            options={options}
+            result={result}
+            values={fields}
+            onChange={({ result: next, ...patch }) => { if (next !== undefined) setResult(next); setFields((current) => ({ ...current, ...patch })); }}
+            resultPlaceholder={mode === "correct" ? "Choose the correct verdict" : null}
+            showTitle={isTitle}
+            showScore={isFinal || verdict?.gate === "Final Defense"}
+          />
         )}
         {mode === "confirm" && (
           <Field label="Note about the revisions (optional)">

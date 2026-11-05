@@ -1,18 +1,18 @@
 import { useMemo, useState } from "react";
-import { ClipboardList, Eye, Gavel } from "lucide-react";
+import { ClipboardList, Eye, FolderOpen, Gavel } from "lucide-react";
 import { api } from "../../api";
 import StageBoard, { BoardNotice, useBoardNotice } from "../../components/StageBoard";
 import { useApi } from "../../hooks";
 import { useAuth } from "../../auth";
-import { Button, Card, DataTable, InlineNotice, SectionTitle, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, DataTable, InlineNotice, Modal, SectionTitle, StatusChip } from "../../components/ui/index.js";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
-import { CaseCardFacts, CaseCardShell, NextOwner, PanelStamp, RequirementBoxes, StageColumnHeader } from "../../components/process";
+import { CaseCardFacts, CaseCardShell, NextOwner, PanelStamp, StageColumnHeader } from "../../components/process";
 import { formatClock, formatDate } from "../../lib/format";
 import RecordForPanelDialog from "./RecordForPanelDialog";
 
 // The Research Gate as a board (I-205, I-362): three numbered columns, one card per student. A student sits in the column of the
-// stage they are at; the stage moves by itself when its requirements are complete, so the board is read-only (no dragging).
+// stage that student is at; the stage moves by itself when its requirements are complete, so the board is read-only (no dragging).
 // Staff and the Research Coordinator can record, correct and confirm for the panel from a card (I-361).
 // Merge v6.4 (M5): the columns share the page width and scroll inside a fixed height (Natalie), so every card is there
 // and the student record below stays close; the count beside each stage is the unfiltered total.
@@ -37,35 +37,90 @@ function defenseFact(row) {
   return "No defense booked yet";
 }
 
-function GateCard({ row, canAct, onOpen, onAct }) {
+// GOV.UK task-list words (F5-03): the requirements are met in order, so the first one still open is the one being worked on
+// and the ones after it cannot start yet.
+function requirementStatuses(row) {
+  let open = 0;
+  return row.requirements.map((item) => {
+    if (item.met) return { label: item.label, status: "Completed", tone: "done", why: "" };
+    open += 1;
+    if (open > 1) return { label: item.label, status: "Cannot start yet", tone: "neutral", why: "Starts after the step before it is complete." };
+    return row.state === "waiting"
+      ? { label: item.label, status: "In progress", tone: "info", why: row.reason }
+      : { label: item.label, status: "Not started", tone: "attention", why: row.reason };
+  });
+}
+
+function progressLine(row) {
+  const total = row.requirements.length;
+  const done = row.requirements.filter((item) => item.met).length;
+  return `${done} of ${total} requirements · ${row.missing.length ? `Missing: ${row.missing.join(", ")}` : "Nothing missing"}`;
+}
+
+function GateCard({ row, canAct, onView, onAct }) {
   const ready = row.state === "ready";
   return (
     <CaseCardShell ready={ready}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="break-words text-sm font-semibold text-ink">{row.student.name}</p>
-          <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
+          <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code} · {row.stage}</p>
         </div>
         <span title={STATE_HELP[row.state]}><StatusChip status={STATE_LABEL[row.state]} size="sm" dot={false} /></span>
       </div>
       <CaseCardFacts
         facts={[
-          row.adviser_name ? `Adviser: ${row.adviser_name}` : "No adviser yet",
-          { text: row.research_title || "Title not submitted yet", wide: true },
-          { text: defenseFact(row), wide: true },
-          { text: row.missing.length ? `Missing: ${row.missing.join("; ")}` : "Nothing missing", wide: true },
+          { text: row.adviser_name ? `Adviser: ${row.adviser_name}` : "No adviser yet", wide: true },
+          { text: progressLine(row), wide: true, testId: "gate-progress" },
         ]}
       />
       <PanelStamp verdict={row.verdict} />
-      <RequirementBoxes items={row.requirements} ariaLabel={`Requirements of ${row.student.name} for ${row.stage}`} />
       <NextOwner owner={row.waiting_on || "No one, this stage is complete"} />
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button variant="secondary" size="sm" icon={Eye} onClick={() => onOpen(row.student)} className="flex-1" aria-label={`Open the Research Gate record of ${row.student.name}, ${row.student.student_number}`}>View</Button>
+        <Button variant="secondary" size="sm" icon={Eye} onClick={() => onView(row)} className="flex-1" aria-label={`Open the Research Gate record of ${row.student.name}, ${row.student.student_number}`}>View</Button>
         {canAct && row.can_record_verdict && <Button size="sm" icon={Gavel} onClick={() => onAct("record", row)} className="flex-1" aria-label={`Record the verdict for the panel for ${row.student.name}`}>Record for the panel</Button>}
         {canAct && row.can_confirm_revisions && <Button size="sm" icon={Gavel} onClick={() => onAct("confirm", row)} className="flex-1" aria-label={`Confirm the revisions for the panel for ${row.student.name}`}>Confirm revisions</Button>}
         {canAct && row.can_correct_verdict && <Button variant="secondary" size="sm" onClick={() => onAct("correct", row)} className="flex-1" aria-label={`Correct the verdict for the panel for ${row.student.name}`}>Correct verdict</Button>}
       </div>
     </CaseCardShell>
+  );
+}
+
+// The View window: what the card leaves out - the title, the defense and one line per requirement with its status.
+function GateView({ row, onClose, onOpenRecord }) {
+  return (
+    <Modal
+      title={`${row.student.name} · ${row.stage}`}
+      subtitle={`${row.student.student_number} · ${row.student.program_code}`}
+      icon={ClipboardList}
+      size="md"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+          <Button icon={FolderOpen} onClick={() => onOpenRecord(row.student)}>Open the full record</Button>
+        </>
+      }
+    >
+      <ul className="space-y-1 text-sm text-slate-700">
+        <li>{row.adviser_name ? `Adviser: ${row.adviser_name}` : "No adviser yet"}</li>
+        <li>{row.research_title || "Title not submitted yet"}</li>
+        <li>{defenseFact(row)}</li>
+        <li className="font-semibold">{progressLine(row)}</li>
+      </ul>
+      <PanelStamp verdict={row.verdict} />
+      <ul className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200" aria-label={`Requirements of ${row.student.name} for ${row.stage}`}>
+        {requirementStatuses(row).map((item) => (
+          <li key={item.label} data-requirement-status={item.status} className="flex flex-wrap items-start justify-between gap-2 px-3 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-ink">{item.label}</p>
+              {item.why && <p className="meta">{item.why}</p>}
+            </div>
+            <StatusChip status={item.status} tone={item.tone} size="sm" dot={false} />
+          </li>
+        ))}
+      </ul>
+    </Modal>
   );
 }
 
@@ -76,6 +131,7 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [view, setView] = useState("board");
   const [dialog, setDialog] = useState(null); // { mode, row }
+  const [viewing, setViewing] = useState(null);
   const boardNotice = useBoardNotice();
   const allRows = data?.items || [];
   const programs = useMemo(() => [...new Set(allRows.map((row) => row.student.program_code))].sort(), [allRows]);
@@ -129,8 +185,8 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
       <SectionTitle
         title="Who is at the Research Gate"
         subtitle={canAct
-          ? "Every active student with research records, in the column of the stage they are at. Graduate School staff and the Research Coordinator can record the panel's verdict from a card if the panel chair cannot."
-          : "Every active student with research records, in the column of the stage they are at."}
+          ? "Every active student with research records, in the column of the stage each is at. Graduate School staff and the Research Coordinator can record the panel's verdict from a card if the panel chair cannot."
+          : "Every active student with research records, in the column of the stage each one is at."}
         icon={ClipboardList}
       />
       {error && !data ? (
@@ -149,7 +205,7 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
               items={loading && !data ? [] : rows}
               getItemId={(row) => row.student.id}
               getColumnKey={(row) => String(row.column)}
-              renderCard={(row) => <GateCard key={row.student.id} row={row} canAct={canAct} onOpen={onOpen} onAct={(mode, target) => setDialog({ mode, row: target })} />}
+              renderCard={(row) => <GateCard key={row.student.id} row={row} canAct={canAct} onView={setViewing} onAct={(mode, target) => setDialog({ mode, row: target })} />}
               renderColumnHeader={(column) => <StageColumnHeader column={column} count={shownOf(column.key)} total={totalOf(column.key)} number={Number(column.key)} />}
               columnClassName=""
               columnBodyClassName="max-h-[26rem] overflow-y-auto overscroll-contain pr-1 max-sm:max-h-72"
@@ -162,7 +218,7 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
             <>
               <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />
               <DataTable
-                caption="Students at each Research Gate stage, with their status and what they are waiting for"
+                caption="Students at each Research Gate stage, with the status and what each is waiting for"
                 columns={tableColumns}
                 rows={rows}
                 rowKey={(row) => row.student.id}
@@ -175,6 +231,7 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
           )}
         </div>
       )}
+      {viewing && <GateView row={viewing} onClose={() => setViewing(null)} onOpenRecord={(student) => { setViewing(null); onOpen(student); }} />}
       {dialog && <RecordForPanelDialog mode={dialog.mode} row={dialog.row} onClose={() => setDialog(null)} onDone={done} />}
     </Card>
   );

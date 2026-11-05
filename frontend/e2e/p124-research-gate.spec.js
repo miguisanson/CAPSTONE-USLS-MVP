@@ -100,7 +100,7 @@ test("Graduate School staff can record one of the five verdicts for the panel", 
     const panel = page.getByRole("region", { name: "Panel verdict fallback" });
     await expect(panel).toBeVisible();
     await expect(panel.getByText("Panel chair: Dr. Spec Chair")).toBeVisible();
-    const outcome = panel.getByLabel("Defense verdict");
+    const outcome = panel.getByLabel("Verdict result");
     await expect(outcome.locator("option")).toHaveText([
       "Passed",
       "Passed with minor revisions",
@@ -110,7 +110,7 @@ test("Graduate School staff can record one of the five verdicts for the panel", 
     ]);
     await outcome.selectOption("Provisional pass - revisions or re-defense");
     await panel.getByLabel("Required follow-up").selectOption("re-defense");
-    await panel.getByLabel("Panel remarks").fill("Recorded from the signed panel result.");
+    await panel.getByLabel("Remarks or conditions").fill("Recorded from the signed panel result.");
     // Merge v6.4 (owner decision M3): staff give a reason when recording for the panel.
     await panel.getByLabel("Reason for recording for the panel").fill("The chair is away; signed result received.");
     await panel.getByRole("button", { name: "Record panel verdict" }).click();

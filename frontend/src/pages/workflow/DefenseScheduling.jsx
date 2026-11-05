@@ -17,6 +17,8 @@ import { availabilityLabel, isAvailabilityEntered } from "../../components/sched
 import { AvailabilityWorkspace } from "./AvailabilityWorkspace";
 import { WorkflowSubmitFeedback, panelSeatIds, shortDate, timeRange } from "./shared";
 
+const PANEL_REQUESTER = "Panel member"; // one of the SCHEDULE_CHANGE_REQUESTERS the server accepts
+
 // ---------------------------------------------------------------------------
 // Defense Scheduling
 // ---------------------------------------------------------------------------
@@ -35,7 +37,6 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
     mode: "On-site",
     venue: "",
     constraints: "",
-    source_reference: "",
     override_requirements: false,
     override_conflicts: false,
     override_reason: "",
@@ -72,6 +73,8 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
   const schedulableTypes = context.schedulable_types || [];
   const stageOutcome = context.verdict_outcome || null;
   const activeSchedule = schedules.find((schedule) => schedule.is_active && schedule.defense_type === form.defense_type);
+  // F5-08: a booking flagged "needs re-confirmation" was reopened by a panel change, so who asked is known, not picked.
+  const openedByPanel = Boolean(activeSchedule?.needs_reconfirmation);
   const flaggedSchedule = schedules.find((schedule) => schedule.needs_reconfirmation && schedule.defense_type === form.defense_type);
   const isRetry = !activeSchedule && schedules.some(
     (schedule) => schedule.defense_type === form.defense_type && ["Failed", "Provisional pass - re-defense required", "Provisional pass - revisions or re-defense"].includes(schedule.defense_outcome)
@@ -224,7 +227,7 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
           override_conflicts: form.override_conflicts,
           override_reason: form.override_reason,
           reason: form.reason,
-          requested_by: form.requested_by,
+          requested_by: openedByPanel ? PANEL_REQUESTER : form.requested_by,
         }),
         "Defense rescheduled. The previous booking is kept in the history."
       );
@@ -359,7 +362,7 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
       </SectionCard>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <span className="meta">Availability comes only from what each person entered (weekly hours and dates) or their connected Google Calendar. Nobody is assumed free. All times are Philippine time.</span>
+        <span className="meta">Availability comes only from what each person entered (weekly hours and dates) or the connected Google Calendar. Nobody is assumed free. All times are Philippine time.</span>
         <span className="flex flex-wrap items-center gap-3">
           <Link to="/workflow/defense-scheduling?view=calendar" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-800">Open the defense calendar <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
           <Link to="/faculty" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-800">View faculty profiles <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
@@ -419,7 +422,7 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
         <SlotCheck check={check} />
         <label className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 text-sm ${softWithoutOverride ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
           <input type="checkbox" checked={form.override_conflicts} onChange={(e) => setForm((current) => ({ ...current, override_conflicts: e.target.checked }))} className={checkbox} />
-          <span><strong>Warning override:</strong> finalize despite the warnings (before the lead time, or a panelist who has not entered availability) and record why. Double-booked panelists or rooms, people outside their entered hours, a declined invitation, and slots in the past cannot be overridden.</span>
+          <span><strong>Warning override:</strong> finalize despite the warnings (before the lead time, or a panelist who has not entered availability) and record why. Double-booked panelists or rooms, people outside the hours entered, a declined invitation, and slots in the past cannot be overridden.</span>
         </label>
         {overrideNeedsReason && (
           <Field label="Reason for the staff override (required, recorded with the schedule)" required>
@@ -435,21 +438,22 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
             <Field label="Reason for rescheduling" required>
               <Input value={form.reason} onChange={set("reason")} placeholder="e.g. panelist unavailable" required />
             </Field>
-            <Field label="Requested by" required>
-              <Select value={form.requested_by} onChange={set("requested_by")} placeholder="" options={context.change_requesters || ["GS Office"]} />
+            <Field label="Requested by" required hint={openedByPanel ? "A panel change reopened this booking." : undefined}>
+              {openedByPanel ? (
+                <p aria-label="Requested by" className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">{PANEL_REQUESTER}</p>
+              ) : (
+                <Select value={form.requested_by} onChange={set("requested_by")} placeholder="" options={context.change_requesters || ["GS Office"]} />
+              )}
             </Field>
             <div className="sm:col-span-2">
               <Button variant="secondary" size="sm" disabled={actionBusy} onClick={() => cancelActiveSchedule(activeSchedule)}>Cancel this booking instead</Button>
             </div>
           </div>
         )}
-        <Field label="Source reference">
-          <Input value={form.source_reference} onChange={set("source_reference")} />
-        </Field>
         <Button type="submit" loading={submitting || actionBusy} disabled={submitDisabled} className="w-full sm:w-auto" aria-describedby="schedule-notify-note">
           {submitting || actionBusy ? "Saving…" : activeSchedule ? "Reschedule defense" : isRetry ? "Book the re-defense" : "Set defense schedule"}
         </Button>
-        <p id="schedule-notify-note" className="meta">The student and every panel member are told the date at once (their calendar and bell).</p>
+        <p id="schedule-notify-note" className="meta">The student and every panel member are told the date at once (in the calendar and the bell).</p>
         {!schedulableTypes.length && <p className="text-xs font-semibold text-amber-800">No defense can be booked at this stage right now{stageOutcome && !stageOutcome.complete ? ` (${stageOutcome.label})` : ""}.</p>}
         {actionMessage && <InlineNotice tone="success" icon={CheckCircle2}>{actionMessage}</InlineNotice>}
         {actionError && <InlineNotice tone="danger">{actionError}</InlineNotice>}

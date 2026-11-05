@@ -245,11 +245,11 @@ function SingleWorkflowPage() {
               setStudentId(student.id);
               setStudentLabel("");
               setResult(null);
-              window.setTimeout(() => document.getElementById("workflow-student")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+              window.setTimeout(() => document.getElementById("research-gate-record")?.scrollIntoView({ behavior: "smooth", block: "start" }), 600);
             }}
           />
         )}
-        {!subview && needsStudent && (
+        {!subview && needsStudent && slug !== "research-gate" && ( // the Research Gate opens a record from a board card (F5-03)
           <Card pad="lg" id="workflow-student" className="scroll-mt-24">
             <SectionTitle title="Choose a student" subtitle="Pick the record this action applies to" icon={Users} />
             <StudentPicker
@@ -270,11 +270,11 @@ function SingleWorkflowPage() {
           </Card>
         )}
 
-        {subview ? null : needsStudent && !studentId ? (
+        {subview ? null : needsStudent && !studentId ? (slug === "research-gate" ? null : (
           <Card pad="lg">
             <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
           </Card>
-        ) : loading && !context ? (
+        )) : loading && !context ? (
           BOARD_SLUGS.has(slug) ? (
             <SkeletonBoard columns={4} label="Loading board" />
           ) : (
