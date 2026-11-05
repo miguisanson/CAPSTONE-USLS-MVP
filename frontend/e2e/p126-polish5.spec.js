@@ -11,6 +11,8 @@ const json = (body) => ({ status: 200, contentType: "application/json", body: JS
 
 test.describe("P-E polish", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
+  // the routed /api calls can still be in flight when a test ends; drop them so they do not fail the next test
+  test.afterEach(async ({ page }) => page.unrouteAll({ behavior: "ignoreErrors" }));
 
   async function pickStudent(page, stage) {
     await page.route(/\/api\/students\/\d+$/, async (route) => {

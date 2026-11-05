@@ -117,7 +117,7 @@ export default function Dashboard() {
     : waiting.items;
   // the tasks API counts every open task; the page of 200 may hold fewer than the total
   const heldByOthers = Math.max((data.all.total ?? 0) - (data.own.total ?? 0), waiting.total);
-  const stats = officeStats({ role, own: { ...actions, total: (data.own.total ?? taskActions.total) + (researchReady?.total || 0) }, waiting: { total: heldByOthers }, kpis: data.dashboard?.kpis || null });
+  const stats = officeStats({ role, own: { ...actions, total: data.own.total ?? taskActions.total }, waiting: { total: heldByOthers }, kpis: data.dashboard?.kpis || null });
   const queue = `/work-queue?owner=${encodeURIComponent(office)}`;
   const activity = data.dashboard
     ? officeActivity(data.dashboard.recent_logs, undefined, role).map((entry) => ({
