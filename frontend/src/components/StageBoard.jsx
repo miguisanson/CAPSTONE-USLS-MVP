@@ -78,6 +78,7 @@ export default function StageBoard({
   const boardId = useId().replace(/:/g, "");
   const [phoneOpen, setPhoneOpen] = useState({}); // phone list: stage key -> opened/closed by the viewer
   const [showFinished, setShowFinished] = useState(false);
+  const [chip, setChip] = useState(null); // phone filter: "mine" | "others" | "done"; null = not chosen yet (default below)
   const [dragging, setDragging] = useState(null); // { id, from }
   const [hoverColumn, setHoverColumn] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -286,7 +287,7 @@ export default function StageBoard({
         data-card-id={id}
         aria-busy={busyId === id}
         data-locked={!readOnly && !movable ? "true" : undefined}
-        className={`rounded-xl transition-[opacity,transform] duration-150 ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
+        className={`rounded-xl transition-[opacity,transform] duration-150 ease-out motion-safe:hover:-translate-y-0.5 hover:relative hover:z-10 focus-within:relative focus-within:z-10 ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
           dragging?.id === id ? "scale-95 opacity-60" : busyId === id ? "opacity-60" : ""
         } ${pending?.id === id ? "ring-2 ring-brand-400" : ""} ${settledId === id ? "animate-card-settle" : ""}`}
       >
@@ -320,12 +321,22 @@ export default function StageBoard({
     // F5-05: only the stages that hold a card waiting on the signed-in role start open; finished stages wait behind
     // "Show finished (n)" at the end. A card is "mine" when the viewer can move it (canDrag); a stage is finished when
     // every card in it reads "Finished ..." (lockReason).
-    const groups = columns.map((column) => ({ column, columnItems: items.filter((item) => getColumnKey(item) === column.key) })).filter((group) => group.columnItems.length);
+    // Filter chips (like Slate bins): what waits on me, what waits on others, what is finished. Default: mine when any, else all.
+    const isMine = (item) => needsMe(item);
+    const isDone = (item) => isFinished(item) && !needsMe(item);
+    const kinds = {
+      mine: items.filter(isMine),
+      others: items.filter((item) => !isMine(item) && !isDone(item)),
+      done: items.filter(isDone),
+    };
+    const chosen = chip === null ? (kinds.mine.length ? "mine" : "all") : chip;
+    const shown = chosen === "all" ? items : kinds[chosen];
+    const groups = columns.map((column) => ({ column, columnItems: shown.filter((item) => getColumnKey(item) === column.key) })).filter((group) => group.columnItems.length);
     const stageFinished = ({ columnItems }) => columnItems.every((item) => isFinished(item) && !needsMe(item));
     const live = groups.filter((group) => !stageFinished(group));
     const finished = groups.filter(stageFinished);
     const finishedCount = finished.reduce((sum, group) => sum + group.columnItems.length, 0);
-    const isOpen = (group) => (group.column.key in phoneOpen ? phoneOpen[group.column.key] : group.columnItems.some((item) => needsMe(item)));
+    const isOpen = (group) => (group.column.key in phoneOpen ? phoneOpen[group.column.key] : chosen !== "all" || group.columnItems.some((item) => needsMe(item)));
     const renderGroup = (group) => {
       const { column, columnItems } = group;
       const open = isOpen(group);
@@ -360,21 +371,38 @@ export default function StageBoard({
       <div data-testid="stage-board">
         <BoardNotice notice={activeNotice.notice} onDismiss={activeNotice.dismiss} />
         <StatusLegend className="mb-3" />
+        {items.length > 0 && (
+          <div role="group" aria-label="Filter cards" className="mb-3 flex flex-wrap gap-2">
+            {[["mine", "Needs my action"], ["others", "Waiting on others"], ["done", "Finished"]].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={chosen === key}
+                onClick={() => setChip(chosen === key ? "all" : key)}
+                className={`inline-flex min-h-11 cursor-pointer items-center rounded-full px-3 text-sm font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 motion-safe:active:scale-[0.97] ${
+                  chosen === key ? "bg-brand-600 text-white" : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {`${label} (${kinds[key].length})`}
+              </button>
+            ))}
+          </div>
+        )}
         <div ref={regionRef} role="region" aria-label={phoneAriaLabel} className="space-y-5">
           {groups.length ? (
             <>
               {live.map(renderGroup)}
               {finished.length > 0 && (
                 <div data-testid="finished-stages" className="space-y-3">
-                  <button
+                  {chosen === "all" && <button
                     type="button"
                     aria-expanded={showFinished}
                     onClick={() => setShowFinished((current) => !current)}
                     className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                   >
                     {showFinished ? `Hide finished (${finishedCount})` : `Show finished (${finishedCount})`}
-                  </button>
-                  {showFinished && finished.map(renderGroup)}
+                  </button>}
+                  {(showFinished || chosen !== "all") && finished.map(renderGroup)}
                 </div>
               )}
             </>

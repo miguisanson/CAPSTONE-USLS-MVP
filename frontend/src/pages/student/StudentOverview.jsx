@@ -162,9 +162,9 @@ export default function StudentOverview() {
         {
           key: "research",
           label: "Research",
-          // the stage in the figure (like the other three cards show a number); the status is a chip in the sub-line
+          // the stage in the figure (like the other three cards show a number); the status is the hint line
           value: researchCase ? data.research_progress?.stage || researchCase.current_gate_label || "Not started" : "Not started",
-          sub: researchCase?.status ? <StatusChip status={researchCase.status} dot={false} size="sm" /> : "Open the Research page to begin",
+          sub: researchCase?.status || "Open the Research page to begin",
           tone: "info",
           to: "/student/research",
         },
