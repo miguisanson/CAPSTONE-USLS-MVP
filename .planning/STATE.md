@@ -51,6 +51,10 @@
 - MERGED ea0903ca im45 (IM45 done; F6-06 not a bug: now_utc() is naive Manila time) + d0877db8 manual rebuilt. Running
   `pkt/seedfix` in `wt/seedfix` (I-374 seed history + ready count = export filter, I-378 finished Registrar column, I-376 server,
   I-379 group forward vs returnee checks; owns app.py).
+- MERGED b7ff69df persona6 (I-380..I-382, I-384 frontend). Persona round 3 (student-leave, coordinator-research) -> I-385..I-389.
+  Running `pkt/persona7` in `wt/persona7` (frontend: I-385 office tasks on student pages, I-386 AWOL page words/layout,
+  I-387 scheduling dead end -> Panel Matching link). Queued for app.py after seed2: I-388 (RC home Ready students), I-389
+  (panel load counts differ, duplicate chair, Overloaded suggested), I-387 server part if any.
 - MERGED eb1021b2 seedfix (I-374 graduation export, I-378 withdrawal column, I-379 returnees one at a time; **RESEED NEEDED**)
   + 33411eac graduation "Finished - ..." wording. Running `pkt/seed2` in `wt/seed2` (I-383 practicum seed + board, I-378
   graduation column, I-376 staff home label, I-384 rule badge wording; owns app.py) and `pkt/persona6` (frontend).
