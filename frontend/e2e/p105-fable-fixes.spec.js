@@ -293,8 +293,9 @@ test.describe("rule badges for the Dean and the student (F-11)", () => {
       await page.goto("/workflow/leave-of-absence");
       const rules = page.getByRole("region", { name: "Rules applied on this screen" });
       await rules.getByRole("button").first().click();
-      await expect(rules).toContainText(/Prototype rule/);
-      await expect(rules).toContainText(/Needs review/);
+      await expect(rules).toContainText(/Proposed rule \(agreed with the Graduate School, awaiting sign-off\)/);
+      await expect(rules).toContainText(/Awaiting sign-off/);
+      await expect(rules).not.toContainText(/Prototype rule|pending Graduate School validation/);
     });
   });
 });

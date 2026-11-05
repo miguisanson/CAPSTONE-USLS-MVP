@@ -20,7 +20,7 @@ const STANDING_FILTER = ["Active", "On Leave", "AWOL", "Withdrawn"];
 // category (the units needed differ by program), so no unit total is printed here.
 function compreProgress(compre) {
   const left = compre?.missing_subjects || 0;
-  if (left > 0) return `${left} subject${left === 1 ? "" : "s"} left`;
+  if (left > 0) return `${left} subject${left === 1 ? "" : "s"} to finish`;
   const failed = compre?.failed_subjects || 0;
   return failed > 0 ? `Not eligible: ${failed} failed subject${failed === 1 ? "" : "s"}` : "Not eligible";
 }

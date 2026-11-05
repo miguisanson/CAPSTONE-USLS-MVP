@@ -272,8 +272,8 @@ async function checkRules(page, { staffLink }) {
   const toggle = rules.getByRole("button");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   // "needs review" is the Graduate School's own to-do: staff see it, the student does not (Fable F-11)
-  if (staffLink) await expect(rules).toContainText("2 rules from the Graduate School policies · 1 needs review");
-  else await expect(rules).not.toContainText("needs review");
+  if (staffLink) await expect(rules).toContainText("2 rules from the Graduate School policies · 1 awaiting sign-off");
+  else await expect(rules).not.toContainText("awaiting sign-off");
   await expect(rules.getByText("Spec: filing window")).toHaveCount(0);
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -287,8 +287,8 @@ async function checkRules(page, { staffLink }) {
   await expect(two).toContainText("Yes");
   await expect(two).toContainText("Source: Research Protocol");
   await expect(two).toContainText("Documented only");
-  if (staffLink) await expect(two).toContainText("Needs review");
-  else await expect(two).not.toContainText("Needs review");
+  if (staffLink) await expect(two).toContainText("Awaiting sign-off");
+  else await expect(two).not.toContainText("Awaiting sign-off");
   await expect(two).toContainText("Spec: the office does this by hand.");
   const link = rules.getByRole("link", { name: "See every business rule and its history" });
   await expect(link).toHaveCount(staffLink ? 1 : 0);

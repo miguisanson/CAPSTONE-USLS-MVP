@@ -65,7 +65,7 @@ test.describe("Students directory", () => {
       else if (c.eligible) await expect(cell, `${s.name}: eligible`).toContainText("Eligible to take");
       else if (c.missing_subjects > 0) {
         sawLeft += 1;
-        await expect(cell, `${s.name}: ${c.missing_subjects} subjects left`).toContainText(new RegExp(`^\\s*${c.missing_subjects} subjects? left\\s*$`));
+        await expect(cell, `${s.name}: ${c.missing_subjects} subjects to finish`).toContainText(new RegExp(`^\\s*${c.missing_subjects} subjects? to finish\\s*$`));
       } else await expect(cell, `${s.name}: not eligible (a failed or in-progress subject)`).toContainText(/Not eligible/);
     }
     expect(sawLeft, "the demo page has students who are not yet eligible").toBeGreaterThan(0);

@@ -25,7 +25,7 @@ export function RuleBadges({ rule, showReview = true }) {
       ) : (
         <StatusChip status="Documented only" tone="muted" size="sm" dot={false} />
       )}
-      {showReview && rule.status === "needs_review" && <StatusChip status="Needs review" size="sm" dot={false} />}
+      {showReview && rule.status === "needs_review" && <StatusChip status="Needs review" label="Awaiting sign-off" size="sm" dot={false} />}
     </span>
   );
 }
@@ -45,7 +45,8 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
   // Staff always see the count (even "none need review"), so every board's panel reads the same (I-207).
   const gsStaff = canOpenPage && user.role !== "dean";
   const needsReview = gsStaff ? items.filter((rule) => rule.status === "needs_review").length : 0;
-  const sourceOf = (rule) => (!gsStaff && /^Prototype rule/i.test(rule.citation || "") ? "Graduate School policy" : rule.citation);
+  // Staff see it in calm words: the defaults were agreed with the Graduate School and only await the written sign-off (I-384).
+  const sourceOf = (rule) => (/^Prototype rule/i.test(rule.citation || "") ? (gsStaff ? "Proposed rule (agreed with the Graduate School, awaiting sign-off)" : "Graduate School policy") : rule.citation);
 
   return (
     <section className={`rounded-2xl border border-brand-100 bg-brand-50/40 ${className}`} aria-label={title}>
@@ -60,7 +61,7 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-ink">{title}</span>
             <span className="meta block break-words">
-              {items.length} rule{items.length === 1 ? "" : "s"} from the Graduate School policies{gsStaff ? ` · ${needsReview || "none"} need${needsReview === 1 ? "s" : ""} review` : ""}
+              {items.length} rule{items.length === 1 ? "" : "s"} from the Graduate School policies{gsStaff ? ` · ${needsReview || "none"} awaiting sign-off` : ""}
             </span>
           </span>
         </span>

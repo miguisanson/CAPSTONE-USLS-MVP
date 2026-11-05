@@ -38,6 +38,7 @@ import { GraduationRequestForm, PracticumRequestForm } from "./CompletionForms";
 import { NOT_SUBMITTED, REQUEST_GROUPS, STUDENT_REQUEST_PATHS, findRequestItem, lockedReasonFor, requestStateLabel } from "./requestMeta";
 import { leaveRequestStatus } from "./LeaveCaseCards";
 import { PAGE } from "../../lib/labels.js";
+import { defenseToRequest } from "../../lib/studentHome.js";
 
 const REQUEST_PAGES = {
   research: {
@@ -172,7 +173,7 @@ export function StudentRequestPage({ id, aside = null }) {
         description={page.description}
         forms={FORMS_KEY[id] || id}
         icon={Icon}
-        badge={<StatusChip status={requestStateLabel(requestStatus(id, data))} dot={false} />}
+        badge={<StatusChip status={id === "research" && defenseToRequest(data) ? "Waiting on you" : requestStateLabel(requestStatus(id, data))} dot={false} />}
         actions={
           <Button as={Link} to="/student/requests" variant="secondary" icon={ArrowLeft}>
             All requests

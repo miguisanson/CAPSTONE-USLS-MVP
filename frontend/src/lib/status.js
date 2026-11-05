@@ -27,7 +27,7 @@ export const STATUS_GROUPS = {
   attention: ["Returned","Returned for Revision","Returned for Clarification","Returned to student","Needs Revision",
     "Revisions Required","Revisions Pending","Resubmission Required","Needs Re-confirmation","Return Due","Upload required",
     "Missing Requirements","Additional Certificates Requested","Hours Incomplete","Re-enrollment Required",
-    "Requirements Pending","Needs Availability","Awaiting revisions"],
+    "Requirements Pending","Needs Availability","Awaiting revisions","Waiting on you"],
   // Red: refused, failed, or gone wrong.
   danger: ["Delayed","AWOL","AWOL Declared","Denied","Return Denied","Declined","Not approved","Not Cleared","Not met","Fail",
     "Failed","Missing","Overdue","Not Enough Evidence","Blocked","Not Accepted - New Organization Required",

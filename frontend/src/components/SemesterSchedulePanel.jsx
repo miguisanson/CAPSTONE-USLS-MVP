@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { CalendarCheck } from "lucide-react";
 import { api } from "../api";
 import { Button, SectionCard, StatusChip } from "./ui/index.js";
@@ -40,6 +41,7 @@ export default function SemesterSchedulePanel({ termId, setError, setNotice }) {
   const problems = status === "Draft" ? plan.errors || [] : [];
   return <SectionCard as="section" aria-label="Semester schedule" icon={CalendarCheck} title="Semester schedule" subtitle={HELP[status || "none"]}
     action={status ? <StatusChip status={status} /> : <StatusChip status="Not Started" label="Not prepared" />}>
+    <p className="meta">The Academic Coordinator approves and publishes the class schedule here. The Dean approves which subjects are offered on <Link to="/course-adjustments?view=adjustments" className="font-semibold text-brand-700 underline">Course Adjustments</Link>.</p>
     {when && <p className="text-sm text-slate-600">{status} on {formatDateTime(when)}</p>}
     {problems.length > 0 && <ul className="list-inside list-disc text-sm text-amber-800">{problems.slice(0, 3).map((p) => <li key={p}>{p}</li>)}</ul>}
     <div className="flex flex-wrap gap-2">

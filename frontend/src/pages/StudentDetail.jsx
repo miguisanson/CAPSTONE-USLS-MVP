@@ -67,8 +67,12 @@ function CourseAuditTiles({ audit }) {
   const [openKey, setOpenKey] = useState("");
   const chosen = AUDIT_TILES.find((tile) => tile.key === openKey);
   const rows = chosen ? audit[chosen.key] : [];
+  const toFinish = audit.current.length + audit.incomplete.length + audit.missing.length;
   return (
     <>
+      <p data-testid="subjects-to-finish" className="text-sm font-semibold text-slate-700">
+        {toFinish} subject{toFinish === 1 ? "" : "s"} to finish ({audit.current.length} current, {audit.missing.length} missing)
+      </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {AUDIT_TILES.map((tile) => {
           const count = audit[tile.key].length;
@@ -451,7 +455,7 @@ function WorkflowRecordsCard({ practicum, withdrawal, graduation, eligibility, h
   rows.push({
     key: "withdrawal",
     icon: LogOut,
-    label: "Withdrawal",
+    label: withdrawal ? "Last subject withdrawal" : "Subject withdrawal",
     status: withdrawal?.status || "No request",
     detail: withdrawal ? `Dean: ${withdrawal.dean_decision} · fees: ${withdrawal.fee_status}` : "No active withdrawal request",
   });

@@ -285,7 +285,9 @@ export default function StudentAdviserPage() {
         title={PAGE.researchAdviser}
         forms="adviser-designation"
         icon={UserCheck}
-        description="You nominate an adviser on Form 3. The Academic Coordinator notes it, the Dean decides, and the adviser accepts. Then you email Forms 3.2 and 3.3 to the Research Coordinator within a few days."
+        description={tracker?.current
+          ? `Your adviser: ${tracker.current.faculty_name}.`
+          : "You nominate an adviser on Form 3. The Academic Coordinator notes it, the Dean decides, and the adviser accepts. Then you email Forms 3.2 and 3.3 to the Research Coordinator within a few days."}
       />
       {loading && !tracker && <Card pad="lg"><Spinner /></Card>}
       {error && <LoadError title="Could not load your adviser" onRetry={refetch}>{error}</LoadError>}

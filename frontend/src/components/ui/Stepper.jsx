@@ -11,8 +11,8 @@ import { toneOf } from "../../lib/tone";
 
 /** The state words read by assistive technology. */
 const STATE_WORDS = {
-  complete: "Complete",
-  current: "Current",
+  complete: "Done",
+  current: "Now",
   upcoming: "Upcoming",
   returned: "Returned",
   denied: "Denied",

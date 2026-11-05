@@ -16,6 +16,7 @@ export function CourseAuditPanel() {
       <InlineNotice tone="success" title="Use the dedicated coursework modules:">
         Enrollment tags students into declared offerings. The Monitoring Sheet then reflects the term-scoped source records automatically and remains read-only.
       </InlineNotice>
+      <p className="meta mt-3">The Academic Coordinator changes a student's course record on the student's own page (open the student from the <Link to="/students" className="font-semibold text-brand-700 underline">Students</Link> list) and decides which subjects are offered on <Link to="/course-adjustments?view=adjustments" className="font-semibold text-brand-700 underline">Course Adjustments</Link>.</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button as={Link} to="/monitoring-sheet" icon={Table2}>Open Monitoring Sheet</Button>
         <Button as={Link} to="/enrollment" variant="secondary" icon={BookOpenCheck}>Open Enrollment</Button>

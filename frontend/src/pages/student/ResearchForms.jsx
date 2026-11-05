@@ -76,7 +76,8 @@ export function ResearchRequestForm({ data, onSaved }) {
     <form noValidate onSubmit={onSubmit} className="space-y-4">
       <ErrorSummary errors={errors} />
       <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow text-brand-700">Automatically detected stage</p><p className="section-title mt-1">{progress.stage || "Title Defense"}</p><p className="mt-1 text-xs text-slate-600">{milestone.description}</p></div><StatusChip status={progress.status || "Pending"} dot={false} /></div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow text-brand-700">Automatically detected stage</p><p className="section-title mt-1">{progress.stage || "Title Defense"}</p><p className="mt-1 text-xs text-slate-600">{milestone.description}</p></div><StatusChip status={requestDefenseDate ? "Waiting on you" : progress.status || "Pending"} dot={false} /></div>
+        {requestDefenseDate && <p className="mt-2 text-sm font-semibold text-ink">Your next step: <Link to="/student/defense-schedule" className="text-brand-700 underline">Request your {progress.stage} date</Link></p>}
         <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><p className="eyebrow">Research title</p><p className="mt-1 text-sm font-semibold text-ink">{data.research_case?.title || "Complete Form 1 to set the title"}</p></div><div className="rounded-lg bg-white/80 px-3 py-2"><p className="eyebrow">Adviser</p><p className="mt-1 text-sm font-semibold text-ink">{data.student.adviser_name || "Not assigned"}</p></div></div>
       </div>
       <div className="grid gap-2 sm:grid-cols-4">
@@ -226,10 +227,10 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
         </div>
         <div className="flex items-center gap-2">
           <StatusChip status={requirement.status_label} dot={false} />
-          <Button as="label" variant="secondary" icon={titlePackageLocked ? Lock : FileUp} className={titlePackageLocked || similarityMissing || paperTitleMissing ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
+          {!(requirement.status === "Complete" && files.length >= needed && !replacesExistingUpload) && <Button as="label" variant="secondary" icon={titlePackageLocked ? Lock : FileUp} className={titlePackageLocked || similarityMissing || paperTitleMissing ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
             {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading…" : similarityMissing ? "Enter the similarity first" : paperTitleMissing ? "Enter the paper title first" : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
             <input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={busy || titlePackageLocked || similarityMissing || paperTitleMissing} onChange={(e) => upload(e.target.files?.[0])} />
-          </Button>
+          </Button>}
         </div>
       </div>
       {needsSimilarity && !titlePackageLocked && requirement.status !== "Complete" && (
