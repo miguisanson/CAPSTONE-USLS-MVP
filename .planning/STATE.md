@@ -51,6 +51,9 @@
 - MERGED ea0903ca im45 (IM45 done; F6-06 not a bug: now_utc() is naive Manila time) + d0877db8 manual rebuilt. Running
   `pkt/seedfix` in `wt/seedfix` (I-374 seed history + ready count = export filter, I-378 finished Registrar column, I-376 server,
   I-379 group forward vs returnee checks; owns app.py).
+- GATES 2026-11-05 night: full Python on cf42ba9c 1,257 OK; full e2e on 2f19f624 1,041 passed / 3 failed -> fixed in 5bf5e7bc
+  (RC tile counts tasks only; p126-polish5 route leak; p79 load-flaky) -> 34 re-run passed; autopilot project 34/34 passed.
+  Final Python gate on 16056e36 running in `wt/gate` -> `E:/Temp/claude/pygate-final.log`.
 - MERGED 15f62948 rc5 (I-387 search shows live gate status, I-388 RC home Ready students, I-389 one panel-load count) and
   2f19f624 fix7 (23 e2e failures on cf42ba9c: specs follow intended changes + AWOL badge plain words). Final full e2e on
   2f19f624 running -> `E:/Temp/claude/e2e-full3.log`; Python gate on cf42ba9c running in `wt/gate`; then one Python gate on
