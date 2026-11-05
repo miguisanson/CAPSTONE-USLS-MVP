@@ -1498,6 +1498,7 @@ class ResearchEvidenceFile(db.Model):
     compliance_summary = db.Column(db.Text)
     compliance_result_json = db.Column(db.Text)
     similarity_percent = db.Column(db.Float)  # Turnitin similarity typed at upload (CMP-03: 15 or less)
+    paper_title = db.Column(db.String(220))  # I-248: the title of this concept paper, typed by the student at upload
     uploaded_at = db.Column(db.DateTime, default=now_utc)
 
 
@@ -1554,7 +1555,11 @@ class PracticumRecord(db.Model):
     practicum_site = db.Column(db.String(180))
     supervisor_name = db.Column(db.String(160))
     required_hours = db.Column(db.Integer, default=0)
-    completed_hours = db.Column(db.Integer, default=0)
+    completed_hours = db.Column(db.Integer, default=0)  # what the student reports (a claim); never decides a status
+    verified_hours = db.Column(db.Integer)  # I-252: the total the Academic Coordinator verified from the certificates
+    hours_verified_by = db.Column(db.String(160))
+    hours_verified_at = db.Column(db.DateTime)
+    hours_verified_note = db.Column(db.Text)
     document_status = db.Column(db.String(60), nullable=False, default="Missing")
     certificate_count = db.Column(db.Integer, default=0)
     remarks = db.Column(db.Text)
@@ -3141,6 +3146,7 @@ def document_check_dict(doc: DocumentCheck) -> dict:
                 "mime_type": item.mime_type,
                 "uploaded_at": iso(item.uploaded_at),
                 "url": f"/api/research-evidence/{item.id}/file",
+                "paper_title": item.paper_title,
             }
             for item in files
         ],
@@ -3547,7 +3553,12 @@ def practicum_record_dict(record: PracticumRecord | None, include_student: bool 
         "supervisor_name": record.supervisor_name,
         "edits": record_edit_info("practicum_record", record),
         "required_hours": record.required_hours or 0,
-        "completed_hours": record.completed_hours or 0,
+        "completed_hours": record.verified_hours or 0,  # I-252: the verified total only; the student's claim is reported_hours
+        "reported_hours": record.completed_hours or 0,
+        "verified_hours": record.verified_hours,
+        "hours_verified_by": record.hours_verified_by,
+        "hours_verified_at": iso(record.hours_verified_at),
+        "hours_verified_note": record.hours_verified_note,
         "document_status": record.document_status,
         "certificate_count": len(completion_attachments),
         "remarks": record.remarks,
@@ -3556,7 +3567,7 @@ def practicum_record_dict(record: PracticumRecord | None, include_student: bool 
         "practicum_eligibility_status": eligibility["status"],
         "moa_upload_status": "Submitted" if record.moa_uploaded else "Missing",
         "practicum_documents_upload_status": "Submitted" if record.certificate_attachment_id else "Missing",
-        "practicum_hours_completed": record.completed_hours or 0,
+        "practicum_hours_completed": record.verified_hours or 0,
         "practicum_hours_required": record.required_hours or 0,
         "coordinator_review_status": coordinator_status,
         "dean_report_status": dean_report_status,
@@ -14897,6 +14908,9 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "This requirement is completed by staff or by the system and does not accept a student upload."}), 400
         if not uploaded or not uploaded.filename:
             return jsonify({"error": "Choose a PDF file to upload."}), 400
+        paper_title = (request.form.get("paper_title") or "").strip()[:220]
+        if item_name == "Three concept papers" and not paper_title:
+            return jsonify({"error": "Enter the title of this concept paper. The panel picks the title of the study from the three."}), 400
         replaced_paths: list[Path] = []
         try:
             if title_item and active_panel_assignments(student, gate):
@@ -14907,6 +14921,8 @@ def register_routes(app: Flask) -> None:
                 revoke_form1_endorsement(student.id)
             similarity = turnitin_similarity_or_error(request.form.get("similarity_percent")) if item_name == TURNITIN_ITEM else None
             evidence = store_research_evidence(student, gate, item_name, uploaded, similarity_percent=similarity)
+            if item_name == "Three concept papers":
+                evidence.paper_title = paper_title
             if item_name == "Ethics Clearance":
                 replaced_paths = replace_research_evidence_files(evidence.document_check, evidence)
                 ethics_record = DocumentCheck.query.filter_by(
@@ -14942,7 +14958,8 @@ def register_routes(app: Flask) -> None:
                 evidence.original_name,
                 f"{item_name} submitted",
                 "Research Coordinator",
-                f"Student uploaded file-backed evidence for {gate}. Staff evaluation is derived from stored files.",
+                f"Student uploaded file-backed evidence for {gate}. Staff evaluation is derived from stored files."
+                + (f" Concept paper title entered by the student: {paper_title}." if paper_title else ""),
             )
             db.session.commit()
             for path in replaced_paths:
@@ -15471,12 +15488,9 @@ def register_routes(app: Flask) -> None:
             if student_remark:
                 record.remarks = student_remark
             record.updated_at = now_utc()
-            if record.completed_hours < record.required_hours:
-                record.status = "Hours Incomplete"
-                message = "Documents submitted. Graduate School staff will record and forward them to the Academic Coordinator."
-            else:
-                record.status = "Documents Submitted"
-                message = "Documents and hours submitted. Graduate School staff will record and forward them to the Academic Coordinator."
+            # I-252: the number is the student's claim; the Academic Coordinator verifies the hours from the certificates.
+            record.status = "Documents Submitted"
+            message = "Documents and reported hours submitted. Graduate School staff will record and forward them to the Academic Coordinator."
             add_task(student.id, "Record and forward practicum documents", "Graduate School Staff", 3, 45)
             next_owner = "Graduate School Staff"
             bind_workflow_attachment(certificate, record, "Practicum Document Submission", account)
@@ -17121,6 +17135,7 @@ def register_routes(app: Flask) -> None:
                 "venue_history": defense_venue_history(schedule) if schedule and is_chair else [],
                 "can_submit_verdict": can_submit,
                 "verdict_options": verdict_options_for_gate(assignment.gate),
+                "concept_titles": concept_paper_titles(student.id) if assignment.gate == RESEARCH_GATE_TITLE else [],
                 "verdict_blocked_reason": (
                     "The panel changed after booking: the schedule must be re-confirmed first."
                     if schedule and is_chair and not schedule_verdict and schedule.status == RECONFIRM_DEFENSE_STATUS
@@ -23721,7 +23736,8 @@ def apply_practicum_payload(record: PracticumRecord, data: MultiDict, student: S
 def practicum_notes(record: PracticumRecord) -> str:
     return (
         f"MOA: {record.moa_status}; site: {record.practicum_site or 'Not specified'}; "
-        f"hours: {record.completed_hours or 0}/{record.required_hours or 0}; "
+        f"hours: {record.verified_hours if record.verified_hours is not None else 'not verified'}/{record.required_hours or 0} "
+        f"(reported by the student: {record.completed_hours or 0}); "
         f"documents: {record.document_status}; certificates: {record.certificate_count or 0}; "
         f"remarks: {record.remarks or 'None'}."
     )
@@ -24218,12 +24234,12 @@ def graduation_eligibility(student: Student) -> dict:
     if practicum_required:
         if practicum_record:
             practicum_known = True
-            enough_hours = (practicum_record.completed_hours or 0) >= (practicum_record.required_hours or 0)
+            enough_hours = (practicum_record.verified_hours or 0) >= (practicum_record.required_hours or 0)
             practicum_complete = enough_hours and practicum_record.status in {"Completed", "Report Sent to Dean", "Dean Reviewed"}
             practicum_status = practicum_record.status
             if not practicum_complete:
                 missing_practicum = (
-                    f"Practicum incomplete: {practicum_record.completed_hours or 0}/"
+                    f"Practicum incomplete: {practicum_record.verified_hours or 0} verified of "
                     f"{practicum_record.required_hours or 0} hours, status {practicum_record.status}."
                 )
         else:
@@ -24237,7 +24253,7 @@ def graduation_eligibility(student: Student) -> dict:
         "practicum_site": practicum_record.practicum_site if practicum_record else None,
         "supervisor_name": practicum_record.supervisor_name if practicum_record else None,
         "required_hours": (practicum_record.required_hours or 0) if practicum_record else 0,
-        "completed_hours": (practicum_record.completed_hours or 0) if practicum_record else 0,
+        "completed_hours": (practicum_record.verified_hours or 0) if practicum_record else 0,  # verified only (I-252)
         "moa_status": practicum_record.moa_status if practicum_record else "Not Required" if not practicum_required else "Missing",
         "document_status": practicum_record.document_status if practicum_record else "Not Required" if not practicum_required else "Missing",
         "certificate_count": (practicum_record.certificate_count or 0) if practicum_record else 0,
@@ -24945,7 +24961,7 @@ def workflow_approval_item(kind: str, item) -> dict:
             "id": item.id,
             "type": kind,
             "title": f"Practicum status report · {student.name}",
-            "subtitle": f"{student.program.code} · {item.completed_hours}/{item.required_hours} hours · {item.status}",
+            "subtitle": f"{student.program.code} · {item.verified_hours or 0}/{item.required_hours} hours · {item.status}",
             "status": item.status,
             "student": student_brief(student),
             "submitted_at": iso(item.report_sent_at or item.updated_at),
@@ -27757,7 +27773,7 @@ def practicum_roster_payload() -> list[dict]:
             "moa_status": record.moa_status if record else "Not Submitted",
             "documents_status": record.document_status if record else "Not Submitted",
             "hours_status": (
-                "Complete" if record and record.required_hours and record.completed_hours >= record.required_hours
+                "Complete" if record and record.required_hours and (record.verified_hours or 0) >= record.required_hours
                 else "Incomplete" if record else "Not Started"
             ),
             "coordinator_review_status": (
@@ -33387,6 +33403,38 @@ def handle_practicum(data: MultiDict) -> int:
         record.status = "Documents Under Review"
         next_owner = "Academic Coordinator"
         add_task(student.id, "Review practicum certificates and hours", "Academic Coordinator", 5, 45)
+    elif requested_status == "Record Verified Hours":
+        account = require_workflow_actor("academic_coordinator")
+        if record.status != "Documents Under Review":
+            raise ValueError("Verify the hours after Graduate School staff have forwarded the practicum documents.")
+        raw_hours = data.get("verified_hours")
+        if raw_hours is None or not str(raw_hours).strip():
+            raise ValueError("Enter the total hours you verified from the certificates.")
+        verified = checked_whole_hours(raw_hours, record.required_hours or practicum_required_hours())
+        note = (data.get("verified_note") or "").strip()
+        if verified != (record.completed_hours or 0) and not note:
+            raise ValueError("The verified hours differ from the hours the student reported. Add a note saying why.")
+        record.verified_hours = verified
+        record.hours_verified_by = account.full_name
+        record.hours_verified_at = now_utc()
+        record.hours_verified_note = note or None
+        transition_comment = transition_comment or note
+        if verified < (record.required_hours or 0):
+            record.status = "Hours Incomplete"
+            record.completion_status = "Incomplete - verified hours below the requirement"
+            workflow_message_record(
+                "practicum", student, account, "Student",
+                "Verified practicum hours are below the requirement",
+                f"The Academic Coordinator verified {verified} of {record.required_hours} hours. "
+                + (note or "Upload the additional certificates."), "return",
+                previous_status, record.status, visibility="student_visible",
+            )
+            transition_message_added = True
+            add_task(student.id, "Submit additional practicum certificates", "Student", 7, 45)
+            recompute_risk(student)
+            next_owner = "Student"
+        else:
+            next_owner = "Academic Coordinator"
     elif requested_status in {"Hours Incomplete", "Additional Certificates Requested"}:
         account = require_workflow_actor("academic_coordinator")
         if record.status != "Documents Under Review":
@@ -33440,8 +33488,8 @@ def handle_practicum(data: MultiDict) -> int:
             raise ValueError("The Academic Coordinator must receive the submitted documents before recording completion.")
         if requested_status == "Completed" and not record.certificate_attachment_id:
             raise ValueError("Practicum cannot be completed until a completion certificate is on file.")
-        if record.completed_hours < record.required_hours:
-            raise ValueError("Practicum cannot be completed until the required hours are met.")
+        if (record.verified_hours or 0) < record.required_hours:
+            raise ValueError("Practicum cannot be completed until the Academic Coordinator has verified the required hours from the certificates.")
         if record.document_status not in {"Verified", "Complete"} and requested_status == "Report Sent to Dean":
             raise ValueError("Verify the practicum documents before sending the report to the Dean.")
         record.status = requested_status
@@ -33458,6 +33506,8 @@ def handle_practicum(data: MultiDict) -> int:
         raise ValueError("Choose the next available practicum workflow action.")
 
     result = f"Practicum status updated: {record.status}"
+    if requested_status == "Record Verified Hours":
+        result = f"Practicum hours verified: {record.verified_hours} of {record.required_hours}"
     if transition_comment and not transition_message_added:
         add_transition_comment_message(
             "practicum",
@@ -34547,6 +34597,18 @@ def concept_paper_file_count(student_id: int) -> int:
         )
         .count()
     )
+
+
+def concept_paper_titles(student_id: int) -> list[str]:
+    """I-248: the titles the student typed with the concept papers, oldest first, for the panel's pick list."""
+    rows = (
+        ResearchEvidenceFile.query.join(DocumentCheck)
+        .filter(ResearchEvidenceFile.student_id == student_id, DocumentCheck.item_name == "Three concept papers",
+                ResearchEvidenceFile.paper_title.isnot(None))
+        .order_by(ResearchEvidenceFile.uploaded_at.asc(), ResearchEvidenceFile.id.asc())
+        .all()
+    )
+    return [row.paper_title for row in rows if row.paper_title][-3:]
 
 
 def concept_paper_package_ready(student_id: int) -> bool:
@@ -37101,6 +37163,7 @@ def research_milestone_payload(student: Student, gate: str) -> dict:
                     "compliance_status": item.compliance_status,
                     "compliance_score": item.compliance_score,
                     "similarity_percent": item.similarity_percent,
+                    "paper_title": item.paper_title,
                     "compliance_summary": item.compliance_summary,
                     "compliance": json.loads(item.compliance_result_json) if item.compliance_result_json else None,
                     "adviser_approval": adviser_approval_dict(
@@ -37301,6 +37364,7 @@ def research_gate_defense_facts(student: Student, gate: str) -> dict:
         } if schedule else None,
         "verdict": defense_verdict_dict(verdict),
         "verdict_options": verdict_options_for_gate(defense_gate) if defense_type else [],
+        "concept_titles": concept_paper_titles(student.id) if defense_gate == RESEARCH_GATE_TITLE else [],
         "can_record_verdict": can_record,
         "can_correct_verdict": bool(verdict and not verdict_is_acted_on(verdict)),
         "can_confirm_revisions": bool(
@@ -37353,6 +37417,7 @@ def staff_defense_action_for_student(student: Student, gate: str) -> dict:
             verdict and verdict_effect(verdict) in REVISION_EFFECTS and verdict.revision_status == REVISION_SUBMITTED
         ),
         "verdict_options": verdict_options_for_gate(gate),
+        "concept_titles": concept_paper_titles(student.id) if gate == RESEARCH_GATE_TITLE else [],
     }
 
 
@@ -40037,6 +40102,7 @@ def _panel_demo_evidence(student: Student, gate: str, item_name: str, number: in
         stored_name=stored_name,
         mime_type="application/pdf",
         extracted_text=extracted,
+        paper_title=label if item_name == "Three concept papers" else None,
         compliance_status="Compliant",
         compliance_score=90,
         compliance_summary="Demonstration document written for the Panel Matching demo.",
@@ -40374,6 +40440,8 @@ def seed_maed_personas() -> None:
             evidence.document_check_id = document.id
             evidence.original_name = original_name
             evidence.extracted_text = extracted_text
+            if document.item_name == "Three concept papers":
+                evidence.paper_title = title if file_number == 1 else f"{title} (alternative {file_number})"
             if document.item_name == TURNITIN_ITEM:
                 evidence.similarity_percent = 8.0  # I-327: the seeded certificate carries its number
             evidence.compliance_status = "Compliant"
@@ -41259,6 +41327,7 @@ def seed_dean_review_cases() -> int:
             student_id=student.id, moa_status="Approved", moa_uploaded=True,
             practicum_site="USLS Partner Institution", supervisor_name="Demo Practicum Supervisor",
             required_hours=practicum_required_hours(), completed_hours=practicum_required_hours(),
+            verified_hours=practicum_required_hours(), hours_verified_by="Demo seed (Academic Coordinator)", hours_verified_at=now_utc(),
             document_status="Verified", certificate_count=0, completion_status="Completed and accepted",
             status="Report Sent to Dean", report_sent_at=now_utc(),
         ))
@@ -41722,6 +41791,7 @@ def seed_report_history(today: date | None = None) -> int:
                         student_id=student.id, moa_status="Verified", moa_uploaded=True,
                         practicum_site="Community Counselling Center", supervisor_name="Ms. Rina Lopez",
                         required_hours=practicum_required_hours(), completed_hours=practicum_required_hours(),
+                        verified_hours=practicum_required_hours(), hours_verified_by="Demo seed (Academic Coordinator)", hours_verified_at=now_utc(),
                         document_status="Verified", certificate_count=2, completion_status="Completed and accepted",
                         status="Dean Reviewed", remarks="Seeded history.", report_sent_at=forwarded,
                         dean_reviewed_at=decided, updated_at=decided,
@@ -42692,6 +42762,9 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
     practicum.supervisor_name = practicum.supervisor_name or "Demo Practicum Supervisor"
     practicum.required_hours = 200
     practicum.completed_hours = 200
+    practicum.verified_hours = 200
+    practicum.hours_verified_by = practicum.hours_verified_by or "Demo seed (Academic Coordinator)"
+    practicum.hours_verified_at = practicum.hours_verified_at or now_utc()
     practicum.document_status = "Verified"
     practicum.completion_status = "Completed"
     practicum.status = "Dean Reviewed"

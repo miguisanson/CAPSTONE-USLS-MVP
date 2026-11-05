@@ -143,7 +143,7 @@ test.describe("I-004 Form 1 endorsement", () => {
     const upload = async (itemName, file) =>
       okJson(
         await student.post("/api/student-portal/research-evidence/upload", {
-          multipart: { gate: "Form 1 - Title Defense", item_name: itemName, file },
+          multipart: { gate: "Form 1 - Title Defense", item_name: itemName, file, ...(itemName === "Three concept papers" ? { paper_title: `Spec title of ${file.name}` } : {}) },
         }),
         `upload ${file.name}`,
       );

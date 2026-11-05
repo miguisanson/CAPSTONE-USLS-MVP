@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, Eye, MessageSquare } from "lucide-react";
-import { Button, DataTable, EditableText, EmptyState, StatCard, StatusChip } from "../../components/ui/index.js";
+import { Button, DataTable, EditableText, EmptyState, Field, InlineNotice, Input, StatCard, StatusChip, Textarea } from "../../components/ui/index.js";
 import StepDialog from "../../components/StepDialog";
 import WorkflowTimeline from "../../components/WorkflowTimeline";
 import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
@@ -10,6 +10,51 @@ import { useOpenFilters } from "../leave/useOpenFilter";
 import { formatDate } from "../../lib/format";
 import { CaseCardFacts, CaseCardShell, MessageNote, NextOwner, ProcessScopeNote, ReadyMark } from "../../components/process";
 import { CaseMessageHistory, DemoResetButton, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, uniqueValues, useDemoCaseReset } from "./shared";
+
+// I-252: the student's hours are a claim; the Academic Coordinator's verified total is what counts.
+function hoursText(record) {
+  if (!record) return "No hours yet";
+  const reported = record.reported_hours ?? record.completed_hours;
+  if (record.verified_hours == null) return reported ? `${reported} hrs reported, not verified` : "No hours reported yet";
+  return `${record.verified_hours}/${record.required_hours} hrs verified`;
+}
+
+// The Academic Coordinator enters the hours verified from the certificates (and says why if they differ from the claim).
+function VerifiedHoursForm({ record, student, onSave }) {
+  const reported = record.reported_hours ?? record.completed_hours ?? 0;
+  const [hours, setHours] = useState(record.verified_hours == null ? "" : String(record.verified_hours));
+  const [note, setNote] = useState(record.hours_verified_note || "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const differs = hours !== "" && Number(hours) !== Number(reported);
+  async function save() {
+    setBusy(true);
+    setError("");
+    try {
+      await onSave({ student_id: student.id, status: "Record Verified Hours", verified_hours: hours, verified_note: note.trim() });
+    } catch (err) {
+      setError(err.message || "Could not save the verified hours.");
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="rounded-xl border border-brand-200 bg-brand-50 p-4" aria-label="Verify practicum hours">
+      <p className="eyebrow">Verify the hours</p>
+      <p className="meta mt-1">Reported by the student: <span className="font-semibold">{reported} hours</span> of {record.required_hours}. Count the hours on the certificates and enter the verified total.</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Field label="Verified hours (total)" required>
+          <Input type="number" min="0" step="1" inputMode="numeric" value={hours} onChange={(event) => setHours(event.target.value)} />
+        </Field>
+        <Field label="Note" required={differs} hint={differs ? "Required because the total differs from what the student reported." : "Optional when the total matches the report."}>
+          <Textarea rows={2} value={note} onChange={(event) => setNote(event.target.value)} />
+        </Field>
+      </div>
+      {error && <InlineNotice tone="danger" className="mt-3">{error}</InlineNotice>}
+      <Button className="mt-3" disabled={busy || hours === "" || (differs && !note.trim())} onClick={save}>{busy ? "Saving…" : record.verified_hours == null ? "Save verified hours" : "Update verified hours"}</Button>
+      {record.verified_hours != null && record.hours_verified_by && <p className="meta mt-2">Last verified by {record.hours_verified_by}{record.hours_verified_at ? ` on ${formatDate(record.hours_verified_at)}` : ""}.</p>}
+    </div>
+  );
+}
 
 // The confirm window of a practicum step: the one StepDialog. `onConfirm(payload)` throws to refuse (the message is shown inside).
 function WorkflowTransitionModal({ slug, student, action, onClose, onConfirm }) {
@@ -86,7 +131,7 @@ function PracticumBoardCard({ row, onOpen, onMessage }) {
       <CaseCardFacts
         facts={[
           record?.practicum_site || "Site pending",
-          record ? `${record.completed_hours}/${record.required_hours} hrs` : "No hours yet",
+          hoursText(record),
           row.eligibility.status,
           updated ? `Updated ${formatDate(updated)}` : "",
           { text: record ? `Submitted ${formatDate(record.created_at)}` : "No practicum documents submitted", wide: true },
@@ -140,7 +185,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
     if (accountRole === "academic_coordinator" && record.status === "MOA Under Review") {
       return { label: "Mark practicum in progress", payload: { ...base, status: "Practicum In Progress", moa_status: "Verified" } };
     }
-    if (accountRole === "staff" && ["Hours Incomplete", "Documents Submitted"].includes(record.status)) {
+    if (accountRole === "staff" && record.status === "Documents Submitted") {
       return { label: "Forward documents to Academic Coordinator", payload: { ...base, status: "Documents Under Review" } };
     }
     if (accountRole === "academic_coordinator" && record.status === "Documents Under Review" && row.hours_status !== "Complete") {
@@ -271,7 +316,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
               sortValue: (row) => row.record?.completed_hours ?? -1,
               cell: (row) => (
                 <div className="space-y-1">
-                  <p>{row.record ? `${row.record.completed_hours}/${row.record.required_hours}` : "—"}</p>
+                  <p>{row.record ? hoursText(row.record) : "—"}</p>
                   <StatusChip status={row.hours_status} dot={false} />
                 </div>
               ),
@@ -313,6 +358,9 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
           )}
         >
           <div className="space-y-4">
+            {accountRole === "academic_coordinator" && selectedRow.record?.status === "Documents Under Review" && (
+              <VerifiedHoursForm key={`${selectedRow.student.id}-${selectedRow.record.verified_hours ?? "none"}`} record={selectedRow.record} student={selectedRow.student} onSave={confirmStep} />
+            )}
             <PracticumCaseDetails row={selectedRow} />
             <CaseMessageHistory messages={selectedRow.messages} onReply={(message) => { setReplyTo(message); setMessageRow(selectedRow); }} />
             <WorkflowActivityList logs={selectedRow.history || []} />
@@ -338,7 +386,7 @@ function PracticumCaseDetails({ row }) {
         <StatCard size="sm" label="Eligibility" value={row.eligibility.status} badge />
         <StatCard size="sm" label="MOA" value={row.moa_status} badge />
         <StatCard size="sm" label="Documents" value={row.documents_status} badge />
-        <StatCard size="sm" label="Hours" value={record ? `${record.completed_hours}/${record.required_hours}` : "Not started"} />
+        <StatCard size="sm" label="Hours" value={record ? (record.verified_hours == null ? `Not verified (reported ${record.reported_hours ?? record.completed_hours})` : `${record.verified_hours}/${record.required_hours} verified`) : "Not started"} />
         <StatCard size="sm" label="Supervisor" value={record?.supervisor_name || "Not provided"} />
         <StatCard size="sm" label="Completion" value={record?.completion_status || "Pending"} />
       </div>
@@ -363,6 +411,8 @@ function PracticumCaseDetails({ row }) {
           <p className="mt-2 text-sm font-semibold text-ink">{record?.practicum_site || "No site submitted"}</p>
           <p className="meta mt-1">Supervisor: {record?.supervisor_name || "Not provided"}</p>
           <p className="meta mt-1">System-detected certificate submissions: {record?.certificate_count || 0}</p>
+          {record && <p className="meta mt-1">Hours: {record.reported_hours ?? record.completed_hours} reported by the student · {record.verified_hours == null ? "not verified yet" : `${record.verified_hours} verified${record.hours_verified_by ? ` by ${record.hours_verified_by}` : ""}`}</p>}
+          {record?.hours_verified_note && <p className="meta mt-1">Verification note: {record.hours_verified_note}</p>}
           {record?.remarks && (
             <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
               <p className="eyebrow">Latest student submission remark</p>

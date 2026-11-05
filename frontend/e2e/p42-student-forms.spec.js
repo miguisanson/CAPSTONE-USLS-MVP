@@ -662,7 +662,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(main.locator('input[type="file"]')).toHaveCount(2);
       await expect(main.locator('input[type="file"]').first()).toHaveAttribute("accept", "application/pdf,.pdf");
       await expect(main.getByText("Add another", { exact: true })).toHaveCount(1); // Form 1 has all its files: the button offers another
-      await expect(main.getByText("Upload PDF", { exact: true })).toHaveCount(1); // the concept papers still need two more
+      await expect(main.getByText("Enter the paper title first", { exact: true })).toHaveCount(1); // the concept papers still need two more, and each needs its title (I-248)
       // the compliance of the first concept paper
       await expect(main).toContainText("88%");
       const compliance = main.locator("details").filter({ hasText: "Spec compliance summary" });
@@ -690,6 +690,12 @@ test.describe("P4.2 student request forms", () => {
       expect(upload.raw).toContain(FORM1);
       expect(upload.raw).toContain('filename="spec.pdf"');
       await expect(main.getByText("Please choose a PDF file.", { exact: true })).toHaveCount(0);
+      // I-248: a concept paper is uploaded with its title; the file waits for the title
+      await expect(main.locator('input[type="file"]').nth(1)).toBeDisabled();
+      await ctl(page, "Title of the concept paper").fill("Spec Concept Title Two");
+      await main.locator('input[type="file"]').nth(1).setInputFiles(PDF);
+      await expect.poll(() => lastWrite(writes, "research-evidence/upload").raw).toContain('name="paper_title"');
+      expect(lastWrite(writes, "research-evidence/upload").raw).toContain("Spec Concept Title Two");
 
       // Submit: the exact payload
       await ctl(page, "Message to the Research Coordinator").fill("Spec message.");
@@ -729,12 +735,14 @@ test.describe("P4.2 student request forms", () => {
       const main = page.locator("main");
       await expect(main).toContainText("0 of 1 file uploaded");
       await expect(main).toContainText("0 of 3 files uploaded");
-      await expect(main.getByText("Upload PDF", { exact: true })).toHaveCount(2);
+      await expect(main.getByText("Upload PDF", { exact: true })).toHaveCount(1);
+      await expect(main.getByText("Enter the paper title first", { exact: true })).toHaveCount(1);
       await expect(ctl(page, "Research title from uploaded Form 1")).toHaveValue("");
       const submit = submitButton(page, "Submit Form 1 for review");
       await expect(submit).toBeDisabled();
       await expect(main).toContainText("Upload all required files before submitting this milestone.");
       await snap(page, "research-empty");
+      await ctl(page, "Title of the concept paper").fill("Spec Concept Title");
       await main.locator('input[type="file"]').nth(1).setInputFiles(PDF);
       await expect(main.getByText("Spec: the file is too big.", { exact: true })).toBeVisible();
       expect(writes.filter((w) => w.path === "research-evidence/upload")).toHaveLength(1);
@@ -957,7 +965,7 @@ test.describe("P4.2 student request forms", () => {
 
   test("Practicum (completion step): hours, certificate count, the new PDF and the payload; MOA read-only", async ({ browser }) => {
     const record = {
-      id: 21, status: "Practicum In Progress", updated_at: "2026-10-02T09:00:00", practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec", required_hours: 200, completed_hours: 50,
+      id: 21, status: "Practicum In Progress", updated_at: "2026-10-02T09:00:00", practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec", required_hours: 200, completed_hours: 0, reported_hours: 50,
       certificate_count: 1, moa_attachment: { id: 6001, name: "moa-spec.pdf", url: "/spec/moa.pdf", file_exists: true, uploaded_by: "Spec Student", uploaded_at: "2026-09-01T09:00:00" },
       certificate_attachment: null, completion_attachments: [], attachments: [],
     };
@@ -975,12 +983,12 @@ test.describe("P4.2 student request forms", () => {
       await expect(main.getByRole("link", { name: "View file" })).toHaveAttribute("href", "/spec/moa.pdf");
       // the completion step
       await expect(main).toContainText("What you need to submit now: completed hours and one PDF containing the required completion documents.");
-      await expectRequired(page, "Completed hours", true);
+      await expectRequired(page, "Hours you completed (your own report)", true);
       await expect(main.getByText("Required hours", { exact: true })).toBeVisible(); // text, not an input
       await expect(main.getByText("Required hours", { exact: true }).locator("xpath=following-sibling::p[1]")).toHaveText("200");
       await expect(page.getByLabel("Required hours")).toHaveCount(0);
-      await expect(ctl(page, "Completed hours")).toHaveAttribute("min", "0");
-      await expect(ctl(page, "Completed hours")).toHaveValue("50");
+      await expect(ctl(page, "Hours you completed (your own report)")).toHaveAttribute("min", "0");
+      await expect(ctl(page, "Hours you completed (your own report)")).toHaveValue("50");
       await expect(main).toContainText("Certificates are counted automatically");
       await expect(main).toContainText("The system currently detects 1 submitted certificate file. Uploading an additional file updates this count.");
       await expect(fieldOf(page, "Completion certificates / forms / hours proof PDF")).toBeVisible();
@@ -992,7 +1000,7 @@ test.describe("P4.2 student request forms", () => {
       await snap(page, "practicum-completion");
       await main.locator('input[type="file"]').setInputFiles(PDF);
       await expect(submit).toBeEnabled();
-      await ctl(page, "Completed hours").fill("200");
+      await ctl(page, "Hours you completed (your own report)").fill("200");
       await submit.click();
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();

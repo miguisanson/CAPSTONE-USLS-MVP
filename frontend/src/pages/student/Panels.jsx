@@ -63,7 +63,7 @@ export function WorkflowStatusPanel({ data }) {
       icon: Briefcase,
       status: data.practicum_record?.status || "Missing",
       detail: data.practicum_record
-        ? `${data.practicum_record.completed_hours}/${data.practicum_record.required_hours} hours · ${data.practicum_record.document_status}`
+        ? `${data.practicum_record.verified_hours == null ? "hours not verified yet" : `${data.practicum_record.completed_hours}/${data.practicum_record.required_hours} verified hours`} · ${data.practicum_record.document_status}`
         : "No practicum MOA or certificates submitted yet.",
     });
   }

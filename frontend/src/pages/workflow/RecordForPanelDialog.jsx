@@ -121,6 +121,7 @@ export default function RecordForPanelDialog({ mode, row, onClose, onDone }) {
             onChange={({ result: next, ...patch }) => { if (next !== undefined) setResult(next); setFields((current) => ({ ...current, ...patch })); }}
             resultPlaceholder={mode === "correct" ? "Choose the correct verdict" : null}
             showTitle={isTitle}
+            conceptTitles={row.concept_titles}
             showScore={isFinal || verdict?.gate === "Final Defense"}
           />
         )}

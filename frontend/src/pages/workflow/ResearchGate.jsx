@@ -271,6 +271,7 @@ export function ResearchGateForm({ context, studentId, submit, submitting, resul
                   values={staffVerdict}
                   onChange={(patch) => setStaffVerdict((current) => ({ ...current, ...patch }))}
                   showTitle={staffAction.gate === TITLE_GATE}
+                  conceptTitles={staffAction.concept_titles}
                   showScore={staffAction.gate === FINAL_GATE}
                 />
               </div>

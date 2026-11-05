@@ -7,7 +7,13 @@ import { Field, Input, Select, Textarea } from "../ui/index.js";
 export const PROVISIONAL = "Provisional pass - revisions or re-defense";
 const FOLLOW_UPS = [{ value: "revisions", label: "Revisions for panel approval" }, { value: "re-defense", label: "Re-defense" }];
 
-export function VerdictFields({ options = [], result, values = {}, onChange, resultPlaceholder = null, showRemarks = true, showTitle = false, showScore = false }) {
+// I-248: the student's three concept-paper titles. With titles, the panel picks one or sets a new title (free text only then).
+export const NEW_TITLE = "A new title set by the panel";
+
+export function VerdictFields({ options = [], result, values = {}, onChange, resultPlaceholder = null, showRemarks = true, showTitle = false, showScore = false, conceptTitles = [] }) {
+  const pickList = conceptTitles.length > 0;
+  const typedTitle = values.selected_title || "";
+  const picked = !pickList ? "" : values.title_choice || (conceptTitles.includes(typedTitle) ? typedTitle : typedTitle ? NEW_TITLE : "");
   const chosen = options.find((option) => option.value === result);
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -27,8 +33,24 @@ export function VerdictFields({ options = [], result, values = {}, onChange, res
       {showTitle && result === "Passed" && (
         <div className="sm:col-span-2">
           <Field label="Title selected by the panel (from the three submitted)">
-            <Input value={values.selected_title || ""} maxLength={220} onChange={(event) => onChange({ selected_title: event.target.value })} placeholder="Saved as the title of the study" />
+            {pickList ? (
+              <Select
+                placeholder="Choose the title"
+                options={[...conceptTitles.map((title) => ({ value: title, label: title })), { value: NEW_TITLE, label: NEW_TITLE }]}
+                value={picked}
+                onChange={(event) => onChange({ title_choice: event.target.value, selected_title: event.target.value === NEW_TITLE ? "" : event.target.value })}
+              />
+            ) : (
+              <Input value={typedTitle} maxLength={220} onChange={(event) => onChange({ selected_title: event.target.value })} placeholder="Saved as the title of the study" />
+            )}
           </Field>
+          {pickList && picked === NEW_TITLE && (
+            <div className="mt-3">
+              <Field label="New title set by the panel" required>
+                <Input value={typedTitle} maxLength={220} onChange={(event) => onChange({ selected_title: event.target.value })} placeholder="Saved as the title of the study" />
+              </Field>
+            </div>
+          )}
         </div>
       )}
       {showScore && (

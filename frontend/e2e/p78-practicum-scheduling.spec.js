@@ -161,7 +161,7 @@ test.describe("Practicum (staff)", () => {
     const board = main(page).getByRole("region", { name: "Practicum workflow board" });
     const card = board.getByRole("article").filter({ hasText: "Andrea Villanueva" });
     await expect(card).toContainText("Community Counselling Center");
-    await expect(card).toContainText("0/200 hrs");
+    await expect(card).toContainText("No hours reported yet");
     await expect(card).toContainText("Next: Graduate School Staff");
     // CHANGED BY conC (I-126): a card has one button, "View details", like the process boards; Message / Return is in the case window.
     // CHANGED BY khloe-ui: Khloe's card has View details and Message again (Message / Return also stays in the case window).
@@ -176,7 +176,7 @@ test.describe("Practicum (staff)", () => {
     }
     const row = table.getByRole("row", { name: /Andrea Villanueva/ });
     await expect(row).toContainText("2690201");
-    await expect(row).toContainText("0/200");
+    await expect(row).toContainText("No hours reported yet");
     await shotsAt(page, "practicum-table");
 
     await row.getByRole("button", { name: "View details for Andrea Villanueva" }).click(); // CHANGED BY p98 (I-155): "Open case" is "View", like the other tables

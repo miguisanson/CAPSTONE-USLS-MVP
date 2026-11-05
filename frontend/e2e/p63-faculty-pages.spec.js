@@ -580,7 +580,7 @@ test.describe("Form 1 endorsement queue (Academic Coordinator)", () => {
     // Setup: Elena Mendoza (comprehensive exam passed) uploads Form 1 and three concept papers.
     const student = await apiAs(playwright, "elena.mendoza@student.usls.edu.ph");
     const upload = async (itemName, file) =>
-      okJson(await student.post("/api/student-portal/research-evidence/upload", { multipart: { gate: "Form 1 - Title Defense", item_name: itemName, file } }), `upload ${file.name}`);
+      okJson(await student.post("/api/student-portal/research-evidence/upload", { multipart: { gate: "Form 1 - Title Defense", item_name: itemName, file, ...(itemName === "Three concept papers" ? { paper_title: `Spec title of ${file.name}` } : {}) } }), `upload ${file.name}`);
     await upload(
       "Form 1 - Application for Title Defense",
       pdfFile("Mendoza_Elena_Form1.pdf", [

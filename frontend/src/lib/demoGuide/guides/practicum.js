@@ -61,7 +61,7 @@ export default {
     },
     {
       id: "pr-hours", title: "The student sends hours and certificates", role: "student", route: "/student/practicum", page: "Practicum",
-      do: "Enter the completed hours (200 for the straight path; fewer shows the Hours Incomplete detour), choose the certificates PDF, add a remark and select Submit completion stage, then Send request.",
+      do: "Enter the hours you completed (200 for the straight path; the number is the student's own report), choose the certificates PDF, add a remark and select Submit completion stage, then Send request.",
       actions: [
         { type: "#practicum-hours", text: "200" },
         { upload: "#practicum-certificates", fixture: "practicum-certificates.pdf" },
@@ -70,9 +70,9 @@ export default {
         { click: { role: "button", name: "Send request", in: "dialog" } },
       ],
       doneWhen: { status: from(PRACTICUM_ORDER, "Hours Incomplete") },
-      rule: "The required hours (200 for MSGC) are shown by the system. Fewer documented hours leave the case at Hours Incomplete.",
+      rule: "The required hours (200 for MSGC) are shown by the system. The hours the student types are a claim; the Academic Coordinator verifies the total from the certificates.",
       ifAsked: [
-        { q: "What if fewer than 200 hours are entered?", a: "The case is recorded as Hours Incomplete and the practicum cannot be completed. The Coordinator then asks for additional certificates." },
+        { q: "What if fewer than 200 hours are verified?", a: "The case is recorded as Hours Incomplete and the practicum cannot be completed. The student then uploads additional certificates." },
         { q: "Can the student type the required hours?", a: "No. The required hours come from the system, so nobody types a value that is already known." },
       ],
     },
@@ -90,8 +90,11 @@ export default {
     },
     {
       id: "pr-check", title: "The Coordinator checks the hours", role: "academic_coordinator", route: "/workflow/practicum", page: "Practicum",
-      do: "With fewer hours than required, select Request additional certificates and type the reason. With all hours documented, select Verify completion instead.",
+      do: "Enter the verified hours from the certificates (200 for the straight path) and select Save verified hours. Then open the card again and select Verify completion. With fewer verified hours the case goes back to the student as Hours Incomplete; Request additional certificates is the other way back.",
       actions: [
+        { click: { role: "button", name: "View details for Paolo Ramirez" } },
+        { type: { label: "Verified hours (total)" }, text: "200" },
+        { click: { role: "button", name: "Save verified hours", exact: true } },
         { click: { role: "button", name: "View details for Paolo Ramirez" } },
         { click: { role: "button", name: "Verify completion", exact: true, in: "dialog" } },
         { click: { role: "button", name: "Verify completion", exact: true, in: "dialog" } },
