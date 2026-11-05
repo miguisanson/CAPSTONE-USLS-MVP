@@ -115,8 +115,9 @@ test.describe("student", () => {
       expect(height, "suggestion tap target").toBeGreaterThanOrEqual(43);
     }
     await suggestions(page).filter({ hasText: "What is my next step?" }).click();
-    await expect(page.getByRole("log")).toContainText("From your own record", { timeout: 60_000 });
-    await expect(page.getByTestId("answer-badge").last()).toContainText("Offline answer");
+    await expect(page.getByRole("log")).toContainText("From your record", { timeout: 60_000 });
+    await expect(page.getByTestId("answer-badge").last()).toContainText("From your record", { timeout: 60_000 }); // a student reads plain words (I-392)
+    await expect(page.getByTestId("answer-badge").last()).not.toContainText("Gemini");
     await expect(page.getByTestId("source-list")).toHaveCount(0);
     expect(await noOverflow(page), "no sideways scroll at 390 after a personal answer").toBe(true);
     await shot(page, "student-personal-390.png");

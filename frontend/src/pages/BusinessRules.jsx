@@ -86,7 +86,7 @@ export default function BusinessRules() {
         <StatCard icon={Scale} label="Rules in the register" value={data?.summary?.total ?? 0} />
         <StatCard icon={ShieldCheck} label="Enforced by the system" value={data?.summary?.enforced ?? 0} />
         <StatCard icon={FileText} label="Documented only" value={data?.summary?.documented_only ?? 0} />
-        <StatCard icon={AlertTriangle} label="Need review" value={data?.summary?.needs_review ?? 0} tone="warning" />
+        <StatCard icon={AlertTriangle} label="Needs review" value={data?.summary?.needs_review ?? 0} tone="warning" />
       </div>
 
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}

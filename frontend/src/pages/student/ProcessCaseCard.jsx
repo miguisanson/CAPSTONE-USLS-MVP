@@ -14,8 +14,17 @@ import { Fact } from "./shared";
 
 const RETURNED = ["Returned for Revision", "Returned for Clarification", "Returned"];
 // Office-only facts and placeholders the student does not need (I-386).
-const OFFICE_LABELS = new Set(["Type", "Detection source", "Policy classification", "Residence limits", "Years in the program", "Dean decision", "Dean decided"]);
+const OFFICE_LABELS = new Set(["Type", "Detection source", "Policy classification", "Residence limits", "Years in the program", "Dean decision", "Dean decided", "Registrar list"]);
 const plainWords = (text) => String(text || "").replace(/AWOL \(flagged by the system\)/i, "Absent without leave (AWOL)");
+// The office's step names, in the words a student uses (I-393).
+const STEP_WORDS = {
+  "Dean decision": "The Dean decides",
+  "Staff forwards it": "The Graduate School sends it to the Dean",
+  "Subject tagged Withdrawn": "The subject is marked withdrawn",
+  "Excel list exported": "The Graduate School prepares the Registrar list",
+  "Emailed to the Registrar": "The Registrar is told",
+};
+const plainSteps = (steps) => (steps || []).map((step) => ({ ...step, label: STEP_WORDS[step.label] || step.label }));
 const ICONS = { AWOL: UserX, RESIDENCY: UserX, WITHDRAWAL: LogOut };
 
 // One stage event of the case as a history entry. The status change is shown only when the status really changed.
@@ -80,13 +89,13 @@ export function ProcessCaseCard({ item, current = true, onChanged }) {
         <div key={row.label} className="mt-3">
           <p className="eyebrow">{row.label}</p>
           <div className="mt-0.5 text-sm text-slate-600">
-            {row.edit ? <EditableText edit={row.edit} value={row.value} onSaved={onChanged} /> : <p className="whitespace-pre-line">{row.value}</p>}
+            {row.edit ? <EditableText edit={row.edit} value={row.value} onSaved={onChanged} editLabel="Edit your message" /> : <p className="whitespace-pre-line">{row.value}</p>}
           </div>
         </div>
       ))}
 
       <div className="mt-4 border-t border-slate-100 pt-4">
-        <LeaveTimeline steps={item.timeline || []} />
+        <LeaveTimeline steps={plainSteps(item.timeline)} />
       </div>
 
       <div className="mt-4 space-y-2">

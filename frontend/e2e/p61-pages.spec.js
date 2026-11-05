@@ -80,7 +80,7 @@ test.describe("Students page", () => {
     await expect(rows(page).first()).toContainText(found.items[0].name);
 
     // ---- a filter: Stage. The option list comes from /api/meta; pick the second option
-    const stageSelect = page.getByRole("combobox", { name: "Stage", exact: true });
+    const stageSelect = page.getByRole("combobox", { name: /^(All )?stage$/i });
     const stageValue = await stageSelect.locator("option").nth(1).getAttribute("value");
     const staged = apiGet(page, "/api/students", (p) => p.get("stage") === stageValue && p.get("q") === word);
     await stageSelect.selectOption(stageValue);
@@ -95,7 +95,7 @@ test.describe("Students page", () => {
     }
 
     // ---- Risk filter as a third filter, then "Clear 3 filters" resets every control and the URL
-    const riskSelect = page.getByRole("combobox", { name: "Risk", exact: true });
+    const riskSelect = page.getByRole("combobox", { name: /^(All )?risk$/i });
     const risked = apiGet(page, "/api/students", (p) => p.get("risk") === "On Track");
     await riskSelect.selectOption("On Track");
     await risked;
@@ -113,14 +113,14 @@ test.describe("Students page", () => {
 
     // ---- the other filter controls exist with their "All ..." first option
     for (const [name, label] of [["Student status", "All student status"], ["Standing", "All standing"], ["Program", "All program"]]) {
-      const sel = page.getByRole("combobox", { name, exact: true });
+      const sel = page.getByRole("combobox", { name: new RegExp(`^(All )?${name}$`, "i") });
       await expect(sel, name).toBeVisible();
       await expect(sel.locator("option").first(), name).toHaveText(label);
     }
 
     // ---- the Standing filter sends standing=
     const standing = apiGet(page, "/api/students", (p) => p.get("standing") === "Active");
-    await page.getByRole("combobox", { name: "Standing", exact: true }).selectOption("Active");
+    await page.getByRole("combobox", { name: /^(All )?standing$/i }).selectOption("Active");
     await standing;
     const unset = apiGet(page, "/api/students", (p) => !p.get("standing"));
     await page.getByRole("button", { name: /Clear 1 filter/ }).click();

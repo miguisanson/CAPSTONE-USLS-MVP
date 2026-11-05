@@ -230,7 +230,7 @@ test.describe("Business Rules", () => {
     const main = page.locator("main");
     for (const [label, value] of [
       ["Rules in the register", json.summary.total], ["Enforced by the system", json.summary.enforced],
-      ["Documented only", json.summary.documented_only], ["Need review", json.summary.needs_review],
+      ["Documented only", json.summary.documented_only], ["Needs review", json.summary.needs_review],
     ]) {
       const tile = main.locator("div").filter({ hasText: new RegExp(`^\\s*(${value}\\s*${label}|${label}\\s*${value})\\s*$`) });
       await expect(tile.last(), `${label} shows ${value}`).toBeVisible();

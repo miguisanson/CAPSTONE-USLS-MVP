@@ -42,7 +42,7 @@ import { formatDate, formatDateTime } from "../lib/format";
 import { PAGE } from "../lib/labels.js";
 
 const ACCEPT = "application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,.docx";
-const STATUS_LABELS = { active: "Active", draft: "Draft", archived: "Archived" };
+const STATUS_LABELS = { active: "Active", draft: "Pending validation", archived: "Archived" };
 const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }));
 const TEST_QUESTIONS = [
   "What is the maximum residence period for a master's program?",
@@ -170,14 +170,14 @@ export default function PolicyDocuments() {
     <PageHeader
       icon={LibraryBig}
       title={PAGE.policyDocuments}
-      description="Manage the approved PDF and Word documents the Policy Assistant searches. Every answer names the document and page or section it came from. Drafts are searched but flagged as pending validation."
+      description="Manage the PDF and Word documents the Policy Assistant searches. Every answer names the document and page or section it came from. Documents pending validation are searched but flagged."
       actions={<Button icon={Plus} onClick={() => setEditor({})}>Add document</Button>}
     />
 
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <StatCard icon={Database} label="All sources" value={summary.total || 0} tone="neutral" />
       <StatCard icon={Upload} label="Staff uploads" value={summary.managed || 0} tone="info" />
-      <StatCard icon={FilePenLine} label="Drafts pending validation" value={summary.draft || 0} tone="warning" />
+      <StatCard icon={FilePenLine} label="Pending validation" value={summary.draft || 0} tone="warning" />
       <StatCard icon={BookOpenCheck} label="Ready for assistant" value={summary.ready || 0} tone="success" />
     </div>
 
@@ -203,7 +203,7 @@ export default function PolicyDocuments() {
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${item.file_type === "DOCX" ? "bg-blue-50 text-blue-700" : "bg-red-50 text-red-700"}`}><FileText className="h-5 w-5" aria-hidden="true" /></span>
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0"><h3 className="card-title truncate" title={item.title}>{item.title}</h3><p className="meta mt-0.5 truncate">{item.original_name}</p></div>
+              <div className="min-w-0"><h3 className="card-title break-words sm:truncate" title={item.title}>{item.title}</h3><p className="meta mt-0.5 truncate">{item.original_name}</p></div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <StatusPill status={item.status} />
                 {(item.url || item.can_edit || item.can_delete) && <div className="relative" onClick={(event) => event.stopPropagation()}>
@@ -379,7 +379,7 @@ function DocumentEditor({ initial, categories, maxMb, busy, onClose, onSave }) {
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Category"><Select value={category} onChange={(event) => setCategory(event.target.value)} placeholder={null} options={categories} /></Field>
         <Field label="Effective date"><Input type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} /></Field>
-        <Field label="Status"><Select value={status} onChange={(event) => setStatus(event.target.value)} placeholder={null} options={[{ value: "active", label: "Active" }, { value: "draft", label: "Draft (pending validation)" }, { value: "archived", label: "Archived (not searched)" }]} /></Field>
+        <Field label="Status"><Select value={status} onChange={(event) => setStatus(event.target.value)} placeholder={null} options={[{ value: "active", label: "Active" }, { value: "draft", label: "Pending validation" }, { value: "archived", label: "Archived (not searched)" }]} /></Field>
       </div>
       {status === "draft" && <Field label="Validation note (optional)"><Input maxLength={2000} value={validationNote} onChange={(event) => setValidationNote(event.target.value)} placeholder="Who still has to validate this, and by when?" /></Field>}
       <Field label="Description (optional)"><Textarea maxLength={2000} value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-20 resize-y" placeholder="What policies or procedures does this document cover?" /></Field>

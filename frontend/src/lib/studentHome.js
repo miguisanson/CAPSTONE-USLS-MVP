@@ -206,17 +206,21 @@ export function studentActions(data, { now = new Date(), researchGates = new Set
 
   // 7. subject withdrawal windows about to close
   const horizon = now.getTime() + WITHDRAWAL_WINDOW_DAYS * 86400000;
-  for (const subject of data.subject_enrollments || []) {
-    const deadline = subject.withdrawal_eligible ? subject.withdrawal_window?.deadline : null;
-    if (!deadline) continue;
-    const t = time(deadline);
-    if (!t || t < now.getTime() - 86400000 || t > horizon) continue;
+  // One item for the semester, with the earliest date: the window is the same for every subject (I-393).
+  const closing = (data.subject_enrollments || [])
+    .map((subject) => (subject.withdrawal_eligible ? subject.withdrawal_window?.deadline : null))
+    .filter((deadline) => {
+      const t = deadline && time(deadline);
+      return t && t >= now.getTime() - 86400000 && t <= horizon;
+    })
+    .sort((a, b) => time(a) - time(b));
+  if (closing.length) {
     items.push({
-      key: `withdraw-${subject.id}`,
+      key: "withdraw-window",
       kind: "deadline",
-      title: `Subject withdrawal window closes: ${subject.course_code}`,
-      detail: subject.term_label || "",
-      dueAt: deadline,
+      title: "Subject withdrawal window closes",
+      detail: (data.subject_enrollments || []).find((subject) => subject.term_label)?.term_label || "",
+      dueAt: closing[0],
       tone: "warning",
       target: { view: "withdrawal" },
     });

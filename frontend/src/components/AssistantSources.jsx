@@ -17,7 +17,10 @@ const withoutKeyAdvice = (text) => (text || "").replace(/[;,]?\s*add a Gemini ke
 export function AnswerBadge({ source, personal = false }) {
   if (!source) return null;
   const offline = Boolean(source.offline);
-  const chip = offline
+  const student = source.audience === "student"; // students read plain words, not the office labels (I-392)
+  const chip = student && offline
+    ? { status: personal ? "From your record" : "From the policy documents", tone: "neutral" }
+    : offline
     ? { status: "Offline answer", tone: "warning" }
     : source.ai_used
       ? { status: "Answered by Gemini", tone: "success" }
@@ -26,7 +29,7 @@ export function AnswerBadge({ source, personal = false }) {
     <div className="space-y-1" data-testid="answer-badge" data-offline={offline ? "true" : "false"}>
       <div className="flex flex-wrap items-center gap-1.5" title={withoutKeyAdvice(source.detail)}>
         <StatusChip status={chip.status} tone={chip.tone} dot={false} />
-        {personal && (
+        {personal && !(student && offline) && (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600">
             <UserRound className="h-3.5 w-3.5" aria-hidden="true" /> From your own record
           </span>
@@ -36,7 +39,7 @@ export function AnswerBadge({ source, personal = false }) {
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Only from the policy documents below
           </span>
         )}
-        {offline && (
+        {offline && !student && (
           <span className="inline-flex items-center gap-1 text-xs text-slate-600">
             <WifiOff className="h-3.5 w-3.5" aria-hidden="true" />
             {personal ? "Built from your record without Gemini" : "Found by keyword search; Gemini was not used"}

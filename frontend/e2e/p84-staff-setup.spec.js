@@ -277,13 +277,13 @@ test.describe("pins: the five set-up pages keep their behaviour (staff)", () => 
     await expect(page).toHaveURL(/\/policy-documents$/);
     await expect(heading1(page, "Policy Documents")).toBeVisible();
     const data = await loaded;
-    await expect(main(page).getByText("Manage the approved PDF and Word documents the Policy Assistant searches.")).toBeVisible();
+    await expect(main(page).getByText("Manage the PDF and Word documents the Policy Assistant searches.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Add document" })).toBeVisible();
 
     // the four figures
     await expect(tileOf(page, "All sources")).toContainText(String(data.summary.total || 0));
     await expect(tileOf(page, "Staff uploads")).toContainText(String(data.summary.managed || 0));
-    await expect(tileOf(page, "Drafts pending validation")).toContainText(String(data.summary.draft || 0));
+    await expect(tileOf(page, "Pending validation")).toContainText(String(data.summary.draft || 0));
     await expect(tileOf(page, "Ready for assistant")).toContainText(String(data.summary.ready || 0));
 
     // test a question: the box, the sample questions, a run
@@ -709,11 +709,11 @@ test.describe("P6.5: the library on the other pages", () => {
     await sidebarLink(page, "Policy Documents").click();
     await expect(heading1(page, "Policy Documents")).toBeVisible();
     const data = await loaded;
-    await expect(main(page).locator('[data-slot="label"]')).toHaveText(["All sources", "Staff uploads", "Drafts pending validation", "Ready for assistant"]);
+    await expect(main(page).locator('[data-slot="label"]')).toHaveText(["All sources", "Staff uploads", "Pending validation", "Ready for assistant"]);
     await expect(main(page).locator("[data-status-tone]").first()).toBeVisible();
     for (const item of data.items) {
       const card = main(page).locator("h3", { hasText: item.title }).locator("xpath=ancestor::*[contains(@class,'card')][1]");
-      await expect(card.locator("[data-status-tone]").first()).toContainText(/Active|Draft|Archived/);
+      await expect(card.locator("[data-status-tone]").first()).toContainText(/Active|Pending validation|Archived/);
     }
     const placeholder = await page.getByLabel("Question to test").getAttribute("placeholder");
     expect(placeholder).not.toMatch(/library|tablet/i);

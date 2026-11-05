@@ -13221,6 +13221,23 @@ ASSISTANT_OFFLINE_MODES = {
 }
 
 
+def _student_plain_policy(answer: str, citations: list[dict]) -> tuple[str, list[dict]]:
+    """A student reads "Answer from the Graduate School Handbook, p. 54" and "Graduate School practice (being finalised)",
+    never the office wording about draft validation or a "Source:" line (I-392)."""
+    answer = re.sub(r"Source: (Graduate School Handbook[^(\n]*?) \(p\. (\d+)[^)\n]*\)", r"Answer from the \1, p. \2", answer)
+    answer = answer.replace(POLICY_DRAFT_WARNING, "Graduate School practice (being finalised)").replace(" (draft for validation)", "")
+    plain = []
+    for citation in citations:
+        citation = dict(citation)
+        if citation.get("warning"):
+            citation["warning"] = "Graduate School practice (being finalised)"
+        for key in ("title", "source"):
+            if citation.get(key):
+                citation[key] = citation[key].replace(" (draft for validation)", "")
+        plain.append(citation)
+    return answer, plain
+
+
 def _assistant_source(mode: str, intent_ai_used: bool = False, role: str = "") -> dict:
     sources = {
         "database-rules": (
@@ -13286,7 +13303,7 @@ def _assistant_source(mode: str, intent_ai_used: bool = False, role: str = "") -
     offline = mode in ASSISTANT_OFFLINE_MODES
     return {
         "label": label, "detail": detail, "ai_used": ai_used, "ai_configured": ai_configured, "note": note,
-        "offline": offline, "badge": "Offline answer" if offline else None,
+        "offline": offline, "badge": "Offline answer" if offline else None, "audience": role,
     }
 
 
@@ -13862,6 +13879,7 @@ def generate_student_answer(question: str, student: Student) -> dict:
                 mode = "student-policy-fallback"
     else:
         answer = local_grounded_answer(question, student, payload, snippets)
+    answer, rag_citations = _student_plain_policy(answer, rag_citations)
     return {
         "answer": answer,
         "mode": mode,
@@ -23214,6 +23232,8 @@ def apply_standing_filter(query, value: str):
         return query.filter(on_leave_clause())
     if value == "Completed":
         return query.filter(Student.current_stage == "Completed")
+    if value == "Active":  # the dashboard's "active students": Active standing and not finished or withdrawn (I-394)
+        return query.filter(active_student_clause())
     return query.filter(Student.standing == value)
 
 

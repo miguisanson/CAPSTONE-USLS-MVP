@@ -23,6 +23,7 @@ const SLUG_LABEL = {
   withdrawal: PAGE.subjectWithdrawal,
   graduation: PAGE.graduationEndorsement,
   "aims-discrepancy": "AIMS discrepancy",
+  awol: PAGE.awolResidency,
   "academic-semesters": PAGE.academicSemesters,
 };
 
