@@ -6261,6 +6261,16 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(result["value"], 100.0, result["basis"])
             self.assertEqual(len(ASSISTANT_REFERENCE_SET), 6)
 
+    def test_research_gate_board_computes_exam_eligibility_once_per_student(self):
+        # gatedebug: it was recomputed for every requirement (~4 s for 50 students), so the board loaded empty under load.
+        with app.app_context():
+            db.session.add(ResearchCase(student_id=self.student_id, case_type="Thesis", title="Gate board", current_gate="Title Defense", status="Active"))
+            db.session.commit()
+            with patch("app.comprehensive_exam_eligibility", wraps=app_module.comprehensive_exam_eligibility) as spy:
+                rows = app_module.research_gate_overview_rows()
+            self.assertGreaterEqual(len(rows), 1)
+            self.assertLessEqual(spy.call_count, Student.query.count())
+
 
 if __name__ == "__main__":
     unittest.main()
