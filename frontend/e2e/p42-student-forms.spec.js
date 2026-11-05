@@ -107,7 +107,7 @@ function ctl(page, label) {
 /** The whole field (label, control, hint, error) whose label is `label`. */
 function fieldOf(page, label) {
   const name = new RegExp(`^${esc(label)}(\\s*\\*)?\\s*$`);
-  return page.locator("label.block").filter({ has: page.locator(".field-label", { hasText: name }) });
+  return page.locator("label.block").filter({ has: page.locator(".field-label", { hasText: name }) }).locator("..");  // the Field wrapper (I-370)
 }
 /** The red * of a label (a required field) shows once, an optional one has none. */
 async function expectRequired(page, label, required) {

@@ -78,20 +78,7 @@ test.describe("phone filter chips", () => {
   });
 });
 
-test.describe("student home", () => {
-  test.use({ storageState: { cookies: [], origins: [] }, viewport: { width: 1366, height: 800 } });
-
-  test("Research stat card has no status chip; the status is the hint line", async ({ page, context }) => {
-    const res = await context.request.post("/api/auth/login", { data: { email: "student@usls.edu.ph", password: PASSWORD } });
-    expect(res.ok()).toBeTruthy();
-    await page.goto("/student");
-    await expect(page.locator("main h1")).toContainText("Welcome,");
-    const card = page.locator("main").locator('[data-slot="label"]', { hasText: /^Research$/i }).locator("xpath=..");
-    await expect(card.locator('[data-slot="sub"]')).toBeVisible();
-    await expect(card.locator("[data-status-tone]"), "no chip in the Research card").toHaveCount(0);
-    await page.screenshot({ path: join(shots, "student-1366.png") });
-  });
-});
+// The student home Research card keeps I-087 (stage in the figure, status chip in the sub-line); p82 pins it.
 
 test.describe("I-370 Field", () => {
   test.use({ storageState: authFile("admin"), viewport: { width: 1366, height: 900 } });

@@ -724,7 +724,7 @@ async function formPage(browser, mutate, { failPath, failMessage = "Spec: the se
 }
 const lastWrite = (writes, prefix) => [...writes].reverse().find((w) => w.path.startsWith(prefix));
 const labelRe = (label) => new RegExp(`^${esc(label)}(\\s*\\*)?\\s*$`);
-const fieldOf = (page, label) => page.locator("label.block").filter({ has: page.locator(".field-label", { hasText: labelRe(label) }) });
+const fieldOf = (page, label) => page.locator("label.block").filter({ has: page.locator(".field-label", { hasText: labelRe(label) }) }).locator("..");  // the Field wrapper: hint and error sit beside the <label> (I-370)
 const ctl = (page, label) => fieldOf(page, label).locator("select, input:not([type=file]), textarea").first();
 const submitButton = (page, name) => page.getByRole("button", { name, exact: true });
 const summary = (page) => page.getByRole("alert").filter({ hasText: "There is a problem" });
