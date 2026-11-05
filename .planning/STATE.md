@@ -1,5 +1,16 @@
 # State
 
+## 2026-11-05 - v6.4-migui: merge with Natalie + sandbox + Demo Guide from the top (session "v6.4 merge")
+
+- **Branch `v6.4-migui`** = v6.2-migui + Natalie's `v6.3-natalie` (Research Gate), merged by the owner's decisions M1-M7 in
+  `.planning/MERGE-v6.4.md`. After pulling: `npm run seed` (Natalie added 5 `DefenseVerdict` columns; IM4).
+- Follow-ups landed: I-365 (Research Gate board only reads; columns share the width; coursework students whose research is
+  locked are not listed), the built-in policy library (Handbook, Research Protocol) is tracked in git again.
+- In progress: private demo sandbox per visitor (`pkt/sandbox`, contract `.planning/demo-sandbox/CONTRACT.md`, test
+  `tests/test_demo_sandbox.py`) and Demo Guide "Start over" / every start from step 1 / switch hides the list (`pkt/guide-reset`).
+- Next: merge both packets, full Python gate + `npm run e2e`, push `v6.4-migui`, main checkout on `v6.4-migui`,
+  `deploy/UPDATE-SITE.cmd`.
+
 ## 2026-11-04 evening - Demo Guide autopilot (packet `pkt/autopilot`, worktree `CAPSTONE-USLS-MVP-wt/kauto`, branch from v6.2-migui; not merged, not pushed)
 
 - A started demo (sign-in "Start a guided demo" or a demo picked in the panel) locks into a slideshow bar: Back / **Next** / Take over /
