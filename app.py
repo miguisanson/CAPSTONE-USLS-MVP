@@ -499,11 +499,17 @@ def demo_sandbox_dir() -> Path:
     return folder
 
 
-def refresh_demo_sandbox_template() -> None:
-    """Snapshot the main SQLite database as `_template.sqlite3`; new sandboxes start from it."""
+def refresh_demo_sandbox_template(drop_existing: bool = False) -> None:
+    """Snapshot the main SQLite database as `_template.sqlite3`; new sandboxes start from it.
+    `drop_existing` (after a seed): remove every visitor copy too, so none keeps an older schema."""
     source = _main_sqlite_path()
     if not source:
         return
+    if drop_existing:
+        dispose_demo_sandboxes()
+        for path in demo_sandbox_dir().glob("*.sqlite3"):
+            if SANDBOX_ID_RE.match(path.stem):
+                _forget_demo_sandbox(path.stem)
     target = demo_sandbox_dir() / "_template.sqlite3"
     partial = target.with_suffix(".partial")
     src, dst = sqlite3.connect(source), sqlite3.connect(partial)
@@ -540,6 +546,11 @@ def remove_idle_demo_sandboxes(max_idle_hours: float | None = None) -> None:
     for path in demo_sandbox_dir().glob("*.sqlite3"):
         if SANDBOX_ID_RE.match(path.stem) and path.stat().st_mtime < cutoff:
             _forget_demo_sandbox(path.stem)
+    # Cap the copies (a crawler without cookies would otherwise make one per request): the oldest go first.
+    limit = max(1, env_int("DEMO_SANDBOX_MAX", 300))
+    boxes = sorted((p for p in demo_sandbox_dir().glob("*.sqlite3") if SANDBOX_ID_RE.match(p.stem)), key=lambda p: p.stat().st_mtime)
+    for path in boxes[: max(0, len(boxes) - (limit - 1))]:
+        _forget_demo_sandbox(path.stem)
 
 
 def _open_demo_sandbox(sandbox_id: str):
@@ -550,6 +561,9 @@ def _open_demo_sandbox(sandbox_id: str):
     path = demo_sandbox_dir() / f"{sandbox_id}.sqlite3"
     with _SANDBOX_LOCK:
         engine = _SANDBOX_ENGINES.get(sandbox_id)
+        if engine is not None and not path.exists():  # removed by another worker (idle or cap): start a fresh copy
+            engine.dispose()
+            engine = None
         if engine is None:
             if not path.exists():
                 template = demo_sandbox_dir() / "_template.sqlite3"
@@ -569,8 +583,8 @@ def register_demo_sandbox(app: Flask) -> None:
             return None
         sandbox_id = request.cookies.get(SANDBOX_COOKIE, "")
         valid = bool(SANDBOX_ID_RE.match(sandbox_id))
-        if not valid and not request.path.startswith("/api/"):
-            return None  # page and asset fetches do not each make a database copy
+        if not valid and (not request.path.startswith("/api/") or request.path == "/api/health"):
+            return None  # page, asset and health-check fetches do not each make a database copy
         if not valid:
             sandbox_id = secrets.token_hex(16)
             flask_g.usls_sandbox_new = True
@@ -43004,7 +43018,7 @@ if __name__ == "__main__":
         with app.app_context():
             build_demo_database()
             if demo_sandbox_enabled():
-                refresh_demo_sandbox_template()
+                refresh_demo_sandbox_template(drop_existing=True)
             print(f"Seeded {Student.query.count()} student(s) and {Faculty.query.count()} faculty from imported source sheets.")
             fingerprint = _load_fingerprint_module().database_fingerprint(db.engine.url.database)
             print(f"Demo data fingerprint: {fingerprint}")
