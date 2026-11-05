@@ -389,7 +389,10 @@ test.describe("pins: the Academic Coordinator edits the offering setup", () => {
     const row = table.locator("tbody tr").filter({ hasText: code }).first();
     await expect(row.getByLabel(`Schedule for ${code}`)).toBeVisible();
     await expect(row.getByLabel(`Section for ${code}`)).toBeVisible();
-    await expect(row.getByRole("button", { name: /Save/ })).toBeVisible();
+    // saving is one page-level button (I-236): disabled until a row has a pending edit, then it names how many rows
+    const saveAll = page.getByRole("button", { name: "Save all changes" });
+    await expect(saveAll).toBeDisabled();
+    await expect(main(page).getByText("All changes saved")).toBeVisible();
 
     // choosing a faculty member is local until Save; it reveals View profile, which opens the profile dialog
     const select = row.getByLabel(`Faculty for ${code}`);
@@ -402,6 +405,9 @@ test.describe("pins: the Academic Coordinator edits the offering setup", () => {
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
 
+    await expect(main(page).getByText("1 offering(s) with unsaved changes")).toBeVisible();
+    await expect(saveAll).toBeEnabled();
+
     await row.getByRole("button", { name: `Remove ${code} from the offerings` }).click();
     const removal = page.getByRole("dialog", { name: "Remove this offering?" });
     await expect(removal).toBeVisible();
@@ -409,6 +415,34 @@ test.describe("pins: the Academic Coordinator edits the offering setup", () => {
     await expect(removal).toHaveCount(0);
     expect(await noOverflow(page)).toBe(true);
     await shotAll(page, "offering-setup-coordinator");
+  });
+});
+
+test.describe("I-236: the Academic Coordinator saves an offering row's schedule", () => {
+  test.use({ storageState: authFile("academic-coordinator"), viewport: { width: 1366, height: 768 } });
+
+  test("Offering setup: choosing a schedule is a pending edit; Save all changes sends the row's schedule", async ({ page }) => {
+    test.setTimeout(120_000);
+    // the schedule choices come from the timetable rules; answer them here so the test does not depend on faculty availability
+    const label = "Tuesday / Friday · 7:30–9:00 AM";
+    await page.route(/\/api\/teaching-schedules\?.*mode=options/, (route) => route.fulfill({ json: { options: [{ label, selectable: true, recommended: true }] } }));
+    let saved = null;
+    await page.route(/\/api\/course-offerings\/bulk$/, async (route) => {
+      saved = route.request().postDataJSON();
+      await route.fulfill({ json: { message: "Saved 1 offering." } });
+    });
+    const data = await openOfferingSetup(page);
+    test.skip(!data.offerings.length, "no offerings to edit on this database");
+    const code = data.offerings[0].code;
+    const row = main(page).locator("table").first().locator("tbody tr").filter({ hasText: code }).first();
+    const saveAll = page.getByRole("button", { name: "Save all changes" });
+    await expect(saveAll).toBeDisabled();
+    await row.getByLabel(`Schedule for ${code}`).selectOption({ label });
+    await expect(main(page).getByText("1 offering(s) with unsaved changes")).toBeVisible();
+    await saveAll.click();
+    await expect.poll(() => saved?.offerings?.length).toBe(1);
+    expect(saved.offerings[0]).toMatchObject({ id: data.offerings[0].id, schedule: label });
+    await expect(main(page).getByText("Saved 1 offering.")).toBeVisible();
   });
 });
 
