@@ -7225,10 +7225,14 @@ def leave_policy_review(case: LeaveCase) -> dict:
                 "detail": f"{leave_period_text(linked)} · {STATUS_BY_KEY.get(linked.status, {}).get('label', linked.status)}.",
             })
         else:
+            on_record = leave_loa_terms_on_record(student)
+            from_records = bool(on_record) and case.start_term_id == on_record[0].id and case.end_term_id == on_record[-1].id
             checks.append({
                 "label": "Linked leave of absence",
                 "status": "Needs Review",
-                "detail": "No leave case is on file; the student stated the previous leave period themselves. Confirm it with the Registrar record.",
+                "detail": "No leave case is on file; the previous leave period "
+                          + ("comes from the enrollment records" if from_records else "was entered in the request")
+                          + ". Confirm it with the Registrar record.",
             })
         end_date = leave_end_date(linked) if linked else None
         target = case.target_term

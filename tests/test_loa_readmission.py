@@ -771,6 +771,32 @@ class LeaveCaseTests(unittest.TestCase):
             case = db.session.get(LeaveCase, self.case())
             self.assertEqual((case.start_label, case.end_label), ("Past Term", "Running Term"))
 
+    def linked_leave_detail(self, case_id):
+        with app.app_context():
+            checks = app_module.leave_policy_review(db.session.get(LeaveCase, case_id))["checks"]
+            return next(c["detail"] for c in checks if c["label"] == "Linked leave of absence")
+
+    def test_policy_check_says_where_the_previous_leave_period_came_from(self):
+        # I-303: from the enrollment records when LOA rows exist, from the request otherwise; never a pronoun.
+        with app.app_context():
+            student = db.session.get(Student, self.student_id)
+            student.standing, student.enrollment_tag = "On Leave", "LOA"
+            for label in ("Past Term", "Running Term"):
+                db.session.add(TermEnrollment(student_id=self.student_id, term_id=self.term_ids[label], status="LOA"))
+            db.session.commit()
+        response = self.student_client().post("/api/student-portal/requests/readmission", json={
+            "target_return_term": "Term One", "return_intent": "Ready."})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        from_records = self.linked_leave_detail(self.case())
+        self.assertIn("enrollment records", from_records)
+        self.assertNotIn("themselves", from_records)
+        with app.app_context():
+            TermEnrollment.query.filter_by(student_id=self.student_id, status="LOA").delete()
+            db.session.commit()
+        entered = self.linked_leave_detail(self.case())
+        self.assertIn("entered in the request", entered)
+        self.assertNotIn("themselves", entered)
+
     def mark_awol(self, last_enrolled="Past Term"):
         with app.app_context():
             student = db.session.get(Student, self.student_id)

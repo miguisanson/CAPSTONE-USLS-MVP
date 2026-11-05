@@ -123,28 +123,33 @@ const GRADUATION_STATUS_PRIORITY = [
   "Returned for Clarification",
 ];
 
+// Past the Dean's yes (I-371): exported (registrar_status), then sent, then acknowledged. IM45 closes the card at Sent.
+const GRADUATION_EXPORTED = "Exported - Ready to Send";
+const GRADUATION_STAGE_AFTER_EXPORT = [GRADUATION_EXPORTED, "Sent to Registrar", "Registrar Received"];
+const GRADUATION_STAGE_AFTER_SEND = ["Sent to Registrar", "Registrar Received"];
+
 const GRADUATION_STAGE_AFTER_COMPILE = [
   "Coursework Review", "Coursework Incomplete", "Research Review", "Research Incomplete",
   "Practicum Incomplete", "Eligibility Confirmed", "Endorsement Prepared",
-  "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Not Eligible",
+  "Ready for Dean Review", "Returned for Revision", "Dean Approved", "Not Eligible", ...GRADUATION_STAGE_AFTER_EXPORT,
 ];
 const GRADUATION_STAGE_AFTER_RESEARCH = [
   "Eligibility Confirmed", "Endorsement Prepared", "Ready for Dean Review",
-  "Returned for Revision", "Dean Approved",
+  "Returned for Revision", "Dean Approved", ...GRADUATION_STAGE_AFTER_EXPORT,
 ];
-const GRADUATION_STAGE_AFTER_DEAN_HANDOFF = ["Ready for Dean Review", "Dean Approved"];
-const GRADUATION_STAGE_AFTER_DEAN_REVIEW = ["Dean Approved"];
+const GRADUATION_STAGE_AFTER_DEAN_HANDOFF = ["Ready for Dean Review", "Dean Approved", ...GRADUATION_STAGE_AFTER_EXPORT];
+const GRADUATION_STAGE_AFTER_DEAN_REVIEW = ["Dean Approved", ...GRADUATION_STAGE_AFTER_EXPORT];
 
 const GRADUATION_BATCH_STAGES = [
   {
     label: "Student submits graduation application",
     detail: "The signed application / review-window PDF is saved before the candidate can be selected.",
-    completeStatuses: GRADUATION_STATUS_PRIORITY.filter((status) => status !== "Not Prepared"),
+    completeStatuses: [...GRADUATION_STATUS_PRIORITY.filter((status) => status !== "Not Prepared"), ...GRADUATION_STAGE_AFTER_EXPORT],
   },
   {
     label: "GS Staff creates graduation batch",
     detail: "Candidates who submitted an application are grouped into one batch.",
-    completeStatuses: GRADUATION_STATUS_PRIORITY.filter((status) => status !== "Not Prepared"),
+    completeStatuses: [...GRADUATION_STATUS_PRIORITY.filter((status) => status !== "Not Prepared"), ...GRADUATION_STAGE_AFTER_EXPORT],
   },
   {
     label: "GS Staff forwards batch for coursework review",
@@ -159,7 +164,7 @@ const GRADUATION_BATCH_STAGES = [
     currentStatuses: ["Coursework Review"],
     completeStatuses: [
       "Research Review", "Research Incomplete", "Practicum Incomplete", "Eligibility Confirmed",
-      "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved",
+      "Endorsement Prepared", "Ready for Dean Review", "Returned for Revision", "Dean Approved", ...GRADUATION_STAGE_AFTER_EXPORT,
     ],
     attentionStatuses: ["Coursework Incomplete", "Not Eligible"],
   },
@@ -188,7 +193,14 @@ const GRADUATION_BATCH_STAGES = [
     label: "Export Dean-approved list",
     detail: "The approved candidates are ready for CSV download and manual Registrar email.",
     currentStatuses: ["Dean Approved"],
-    completeStatuses: [],
+    completeStatuses: GRADUATION_STAGE_AFTER_EXPORT,
+    attentionStatuses: ["Returned for Revision", "Not Eligible"],
+  },
+  {
+    label: "Sent to the Registrar",
+    detail: "GS Staff emails the exported list to the Registrar and marks it sent; the batch is finished there.",
+    currentStatuses: [GRADUATION_EXPORTED],
+    completeStatuses: GRADUATION_STAGE_AFTER_SEND,
     attentionStatuses: ["Returned for Revision", "Not Eligible"],
   },
 ];
@@ -306,7 +318,11 @@ export function graduationBatchGroups(rows, selectedIds = new Set()) {
 }
 
 function graduationBatchStageState(stage, group) {
-  const statuses = group.rows.map(graduationRowStatus);
+  // an approved row whose list was exported reads "Exported - Ready to Send" here, so the export step can finish
+  const statuses = group.rows.map((row) => {
+    const status = graduationRowStatus(row);
+    return status === "Dean Approved" && row.endorsement?.registrar_status === GRADUATION_EXPORTED ? GRADUATION_EXPORTED : status;
+  });
   const hasAttention = statuses.some((status) => stage.attentionStatuses?.includes(status));
   const allComplete = statuses.length > 0 && statuses.every((status) => stage.completeStatuses?.includes(status));
   const hasCurrent = statuses.some((status) => stage.currentStatuses?.includes(status));

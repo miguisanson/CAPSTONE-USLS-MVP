@@ -225,7 +225,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await shot(page, "batches-ready-390.png");
   });
 
-  // The shared stage check has eight steps (the Roster tab shows the same window).
+  // The shared stage check has nine steps (the Roster tab shows the same window).
   const SHARED_STEPS = [
     "Student submits graduation application",
     "GS Staff creates graduation batch",
@@ -253,14 +253,14 @@ test.describe("P3.3 Dean reports and graduation", () => {
   test("the stage check of the ready batch: which steps are complete, current, pending", async ({ page }) => {
     await page.goto("/dean/approvals/graduation?tab=batches");
     await cardOf(page).getByRole("button", { name: `View details for ${BATCH}` }).click();
-    await expectSharedStageCheck(page, ["Complete", "Complete", "Complete", "Complete", "Complete", "Complete", "Current", "Pending"]);
+    await expectSharedStageCheck(page, ["Complete", "Complete", "Complete", "Complete", "Complete", "Complete", "Current", "Pending", "Pending"]);
     await shot(page, "stage-check-ready-1366.png");
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("region", { name: "Graduation candidates by stage" }).getByRole("button", { name: `View details for ${BATCH}` }).click();
-    await expectSharedStageCheck(page, ["Complete", "Complete", "Complete", "Complete", "Complete", "Complete", "Current", "Pending"]);
+    await expectSharedStageCheck(page, ["Complete", "Complete", "Complete", "Complete", "Complete", "Complete", "Current", "Pending", "Pending"]);
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
     await shot(page, "stage-check-ready-390.png");
     await page.keyboard.press("Escape");
@@ -284,9 +284,9 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(approved).toContainText("Students: Isabel Flores");
     await shot(page, "batches-approved-1366.png");
 
-    // Its stage check: the seven steps before the export are complete, the export is next.
+    // Its stage check: the seven steps before the export are complete, the export is next, then the send.
     await approved.getByRole("button", { name: `View details for ${BATCH}` }).click();
-    await expectSharedStageCheck(page, ["Complete", "Complete", "Complete", "Complete", "Complete", "Complete", "Complete", "Current"]);
+    await expectSharedStageCheck(page, ["Complete", "Complete", "Complete", "Complete", "Complete", "Complete", "Complete", "Current", "Pending"]);
     await shot(page, "stage-check-approved-1366.png");
 
     // Export: a CSV is downloaded, the follow-up window names it, and the button becomes "Export approved list again".
