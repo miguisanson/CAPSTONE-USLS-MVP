@@ -12,7 +12,7 @@
   not run yet -> run with the next e2e batch). Worktree removed.
 - MERGED 3d09151: `pkt/rgate5` (P-D: Research Gate cards n-of-m line, page 5,300 -> 1,253 px; VerdictFields; no Source reference). Worktree removed.
 - MERGED 5486732 `pkt/boards5` (P-B) and 2973d56 `pkt/polish5` (P-E: skeletons, residency auto-fill; skeleton specs were not red first).
-  Worktrees removed. e2e batch of every touched spec running -> `E:/Temp/claude/e2e-batch1.log`.
+  Worktrees removed. e2e batch of every touched spec: 277 passed, 2 failed -> fixed (p51/p124 locator 76a6ec4; p82 one network blip) -> 63/63 re-run.
 - Running (Sonnet): `pkt/ux5` in `wt/ux5` (motion pass, Research Gate "Still to do" line, I-091, phone filter chips, from 2973d56),
   `pkt/logic5` in `wt/logic5` (P-C backend logic, owns app.py), `pkt/boards5` in `wt/boards5` (P-B boards, phone list, deep links).
   Rung note: subagents write the failing tests themselves from the packet brief (brief = contract); main session reviews + gates.
