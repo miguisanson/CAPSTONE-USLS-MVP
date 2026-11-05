@@ -168,8 +168,6 @@ def book_defense_soon(ctx: Ctx, staff, *, reason_text: str, defense_label: str, 
     staff.get_by_label(re.compile("Selected date")).fill(date_str)
     staff.get_by_label(re.compile("Start time")).fill(start_str)
     staff.get_by_label(re.compile("End time")).fill(end_str)
-    if manuscript_received:
-        staff.get_by_label(re.compile("Date the panel received the manuscript")).fill((now - timedelta(days=20)).strftime("%Y-%m-%d"))
     staff.get_by_label(re.compile("Venue")).fill("GS Conference Room")
     staff.wait_for_timeout(1500)
     # Only when the screen shows a warning ("Needs a reason": the Title Defense lead time) is the override ticked, as a user must.
@@ -277,7 +275,6 @@ def run_phases(rt, ctx: Ctx):
             ("Proposal manuscript", "Yu_Miguel_Proposal_Manuscript.pdf"),
             ("Proposal defense endorsement", "Yu_Miguel_Form4_Endorsement_for_Proposal_Defense.pdf"),
             ("Statistical consultation form or qualitative exemption", "Yu_Miguel_Form4-1_Qualitative_Exemption.pdf"),
-            ("Proposal manuscript endorsement", "Yu_Miguel_Proposal_Manuscript_Endorsement.pdf"),
         ], "Submit Proposal Defense")
 
     rt.step("student: upload the proposal documents and submit", proposal_uploads)
@@ -432,6 +429,8 @@ def upload_stage_files(ctx: Ctx, items: list[tuple[str, str]], submit_label: str
         if "manuscript" in label.lower() and "endorsement" not in label.lower():
             lines += list(h.CONCEPT_PAPERS[0]["body"].values())
         pdf = h.make_generic_pdf(file_name, label, lines)
+        if "Turnitin" in label:  # the similarity number is typed before the file is chosen
+            stu.get_by_text(label, exact=True).first.locator("xpath=ancestor::div[.//input[@type='file']][1]").get_by_label("Similarity (%)").fill("11")
         card_input = stu.get_by_text(label, exact=True).first.locator("xpath=ancestor::div[.//input[@type='file']][1]").locator("input[type=file]")
         card_input.set_input_files(str(pdf))
         rt.settle(stu)

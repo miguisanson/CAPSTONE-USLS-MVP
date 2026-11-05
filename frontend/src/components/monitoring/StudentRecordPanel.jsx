@@ -353,19 +353,12 @@ function SubjectsTab({ data, canEdit, focusCourseId, termLabels, currentTermLabe
   );
 }
 
-// A subject is dropped by the professor when unexcused absences exceed the handbook limit, so a
-// Dropped row needs the absence percentage or a documented exception with its reason.
+// One drop rule (I-326): more than 20 % unexcused absences. No free-text exception.
 function DropEvidenceFields({ form, setForm }) {
   return (
-    <div className="grid gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3 sm:grid-cols-2">
-      <p className="text-xs font-semibold text-amber-900 sm:col-span-2">
-        A subject is dropped by the professor when unexcused absences are more than 20% of class hours (Graduate School Handbook). Give the percentage, or explain the approved exception.
-      </p>
-      <Field label="Unexcused absences (% of class hours)">
+    <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+      <Field label="Unexcused absences (% of class hours)" hint="More than 20 % unexcused absences (Handbook p.52); excused absences do not count">
         <Input type="number" min="0" max="100" step="0.1" value={form.unexcused_absence_percent} onChange={(e) => setForm({ ...form, unexcused_absence_percent: e.target.value })} />
-      </Field>
-      <Field label="Or: documented exception and who approved it">
-        <Input value={form.drop_exception_reason} onChange={(e) => setForm({ ...form, drop_exception_reason: e.target.value })} maxLength={300} />
       </Field>
     </div>
   );
@@ -373,7 +366,7 @@ function DropEvidenceFields({ form, setForm }) {
 
 function dropEvidence(form) {
   return form.status === "Dropped"
-    ? { unexcused_absence_percent: form.unexcused_absence_percent, drop_exception_reason: form.drop_exception_reason }
+    ? { unexcused_absence_percent: form.unexcused_absence_percent }
     : {};
 }
 
@@ -387,7 +380,6 @@ function InlineEditor({ row, studentId, statuses, termLabels, defaultTerm, onCan
     remarks: row.remarks || "",
     reason: "",
     unexcused_absence_percent: "",
-    drop_exception_reason: "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -448,7 +440,7 @@ function InlineEditor({ row, studentId, statuses, termLabels, defaultTerm, onCan
 
 // Free-form subject (not in the curriculum), or re-adding a removed row (fixedCourse).
 function FreeFormForm({ studentId, subjects = [], statuses, termLabels, defaultTerm, fixedCourse, onCancel, onSaved }) {
-  const [form, setForm] = useState({ code: "", title: "", units: "3", status: "Completed", term_label: defaultTerm || "", remarks: "", unexcused_absence_percent: "", drop_exception_reason: "" });
+  const [form, setForm] = useState({ code: "", title: "", units: "3", status: "Completed", term_label: defaultTerm || "", remarks: "", unexcused_absence_percent: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 

@@ -32,8 +32,9 @@ const PANEL_TONE = { danger: "reject", warn: "return" };
  */
 export default function ActionDialog({ item, action, vocabulary, detail: detailProp = null, onCancel, onConfirm }) {
   const isForward = action.action === "forward";
-  const checklist = item.checklist || [];
-  const showChecklist = isForward && item.kind === "READMISSION" && checklist.length > 0;
+  // Readmission and Return from AWOL share the two office checks (Business Office clearance, interview).
+  const checklist = (item.kind === "AWOL" ? item.staff_checklist : item.checklist) || [];
+  const showChecklist = isForward && (item.kind === "READMISSION" || item.kind === "AWOL") && checklist.length > 0;
   // Only Leave and Readmission have an eligibility result to choose.
   const showEligibility = isForward && (vocabulary?.eligibility_results || []).length > 0;
 

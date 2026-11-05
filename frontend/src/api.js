@@ -527,11 +527,12 @@ export const api = {
     URL.revokeObjectURL(url);
     return { count: Number(res.headers.get("X-Exported-Count") || 0), filename };
   },
-  uploadResearchEvidence: async (gate, itemName, file) => {
+  uploadResearchEvidence: async (gate, itemName, file, similarityPercent) => {
     const form = new FormData();
     form.append("gate", gate);
     form.append("item_name", itemName);
     form.append("file", file);
+    if (similarityPercent !== undefined) form.append("similarity_percent", similarityPercent);
     const res = await announced(`${BASE}/student-portal/research-evidence/upload`, {
       method: "POST",
       body: form,

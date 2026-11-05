@@ -73,13 +73,12 @@ export default {
   steps: [
     {
       id: "pf-docs", title: "The student uploads the proposal documents", role: "student", route: "/student/research", page: "Research",
-      do: "The stage now reads Proposal Defense. Upload the four documents, each on its own card, and select Submit Proposal Defense for review.",
+      do: "The stage now reads Proposal Defense. Upload the three documents, each on its own card, and select Submit Proposal Defense for review.",
       actions: [
         { upload: CARD("Upload the proposal manuscript. The"), fixture: "proposal-manuscript.pdf" },
         { upload: CARD("Upload the proposal defense endorsement"), fixture: "proposal-endorsement.pdf" },
         { upload: CARD("Upload Form 4.1"), fixture: "proposal-qualitative-exemption.pdf" },
-        { upload: CARD("Upload the proposal manuscript endorsement"), fixture: "proposal-manuscript-endorsement.pdf" },
-        { pause: 1500, caption: "Four documents are in" },
+        { pause: 1500, caption: "Three documents are in" },
         ...SUBMIT("Submit Proposal Defense"),
       ],
       doneWhen: { apiWrite: "POST /student-portal/requests/research-gate" },
@@ -87,7 +86,7 @@ export default {
     },
     {
       id: "pf-sign", title: "The adviser signs each document", role: "faculty", route: "/faculty-portal/signatures", page: "Signatures & Endorsements",
-      do: "The adviser opens Signatures & Endorsements, reviews each of the three uploaded documents that need a signature, draws a signature, finalizes it and signs. The signature is saved with that exact file.",
+      do: "The adviser opens Signatures & Endorsements, reviews each of the uploaded documents that need a signature, draws a signature, finalizes it and signs. The signature is saved with that exact file.",
       actions: [...times(3, SIGN), { pause: 1500, caption: "All three documents are signed" }],
       doneWhen: { apiWrite: "POST /faculty-portal/adviser-approvals/*" },
       rule: "The adviser signs the exact file the student uploaded; replacing the file removes the signature.",
@@ -199,6 +198,7 @@ export default {
       actions: [
         { upload: CARD("Final manuscript for archiving"), fixture: "completion-archive-copy.pdf" },
         { upload: CARD("Panel approval confirmations"), fixture: "completion-panel-approvals.pdf" },
+        { type: { label: "Similarity (%)", in: { css: "div.rounded-xl.py-3", text: "Turnitin certificate" } }, text: "8" },
         { upload: CARD("Turnitin certificate"), fixture: "completion-turnitin-certificate.pdf" },
         { upload: CARD("Form 9 editor certification"), fixture: "completion-form9-editor.pdf" },
         { upload: CARD("Form 10 approval sheet"), fixture: "completion-form10-approval-sheet.pdf" },
