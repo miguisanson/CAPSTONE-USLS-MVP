@@ -75,6 +75,7 @@ test.describe("I-328 practicum: one column for waiting-for-staff documents", () 
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
 
   test("Hours Incomplete and Documents Submitted share Documents Review", async ({ page }) => {
+    let names = [];
     await page.route(/\/api\/transactions\/practicum\/context/, async (route) => {
       const response = await route.fetch();
       const body = await response.json();
@@ -91,7 +92,7 @@ test.describe("I-328 practicum: one column for waiting-for-staff documents", () 
         row.messages = [];
         row.history = [];
       }
-      body.__names = [first.student.name, second.student.name];
+      names = [first.student.name, second.student.name];
       await route.fulfill({ response, json: body });
     });
     await page.goto("/workflow/practicum");
@@ -99,8 +100,11 @@ test.describe("I-328 practicum: one column for waiting-for-staff documents", () 
     await expect(board).toBeVisible();
     const documents = board.locator("section").filter({ has: page.getByRole("heading", { name: "Documents Review", exact: true, level: 3 }) });
     const progress = board.locator("section").filter({ has: page.getByRole("heading", { name: "In Progress", exact: true, level: 3 }) });
-    await expect(documents.locator("div[draggable]")).toHaveCount(2);
-    await expect(progress.locator("div[draggable]")).toHaveCount(0);
+    // I-383: the seed also has a case waiting for verified hours in this column, so the count is not pinned: the two made-up cases are in it, not in In Progress
+    await expect(documents.locator("div[draggable]", { hasText: names[0] })).toHaveCount(1);
+    await expect(documents.locator("div[draggable]", { hasText: names[1] })).toHaveCount(1);
+    await expect(progress.locator("div[draggable]", { hasText: names[0] })).toHaveCount(0);
+    await expect(progress.locator("div[draggable]", { hasText: names[1] })).toHaveCount(0);
   });
 });
 

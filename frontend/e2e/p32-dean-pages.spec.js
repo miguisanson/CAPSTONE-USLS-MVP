@@ -57,8 +57,9 @@ async function putWorkInFrontOfTheDean(playwright) {
   await reset.dispose();
 
   const staff = await apiAs(playwright, "staff@usls.edu.ph");
+  // IM45 F6-02: a readmission goes to the Dean only with both returnee office checks ticked (the leave cases ignore the list).
   const forward = async (caseId) =>
-    okJson(await staff.post(`/api/leave-cases/${caseId}/transition`, { data: { action: "forward", eligibility_result: "Eligible" } }), `forward case ${caseId}`);
+    okJson(await staff.post(`/api/leave-cases/${caseId}/transition`, { data: { action: "forward", eligibility_result: "Eligible", confirmed_items: CHECKLIST.slice(2) } }), `forward case ${caseId}`);
 
   const maureen = await apiAs(playwright, "maureen.castillo@student.usls.edu.ph");
   const loa = await okJson(
@@ -513,26 +514,23 @@ test.describe("P3.2 Dean pages", () => {
     await expect(facts.getByText("What the student intends to do")).toBeVisible();
     await expect(facts).toContainText("Ready to come back early.");
 
-    // The checklist: four items; the system confirmed two from the records, staff have not verified the other two.
+    // The checklist: four items; the system confirmed two from the records, staff verified the other two (both are needed to reach the Dean).
     const checklist = page.getByRole("heading", { name: "Checklist", exact: true }).locator("xpath=ancestor::section[1]");
     for (const item of CHECKLIST) await expect(checklist).toContainText(item);
     await expect(checklist.getByText(/^Checked by the system:/)).toHaveCount(2);
-    await expect(checklist.getByText("Not verified by staff yet")).toHaveCount(2);
-    const ticked = await look(checklist.getByText(/^Checked by the system:/).first());
-    expect(await look(checklist.getByText("Not verified by staff yet").first()), "a missing tick is greyed").not.toBe(ticked);
+    // IM45 F6-02: a readmission reaches the Dean only with both office checks ticked, so no item is "not verified".
+    await expect(checklist.getByText("Verified by staff")).toHaveCount(2);
+    await expect(checklist.getByText("Not verified by staff yet")).toHaveCount(0);
 
-    // The policy chips: Pass/Provided green, the two Needs Review amber.
+    // The policy chips: Pass/Provided green, the early return amber.
     const policy = page.getByRole("heading", { name: "Policy check" }).locator("xpath=ancestor::section[1]");
     const row = (label) => policy.getByRole("listitem").filter({ hasText: label });
     await expect(row("Return semester after the leave").getByText("Needs Review", { exact: true })).toBeVisible();
-    await expect(row("Checklist verified by staff").getByText("Needs Review", { exact: true })).toBeVisible();
+    await expect(row("Checklist verified by staff").getByText("Pass", { exact: true })).toBeVisible();
     await expect(row("Required return documents").getByText("Pass", { exact: true })).toBeVisible();
     await expect(row("Readmission application/reference").getByText("Provided", { exact: true })).toBeVisible();
-    expect(await look(row("Return semester after the leave").getByText("Needs Review", { exact: true }))).toBe(
-      await look(row("Checklist verified by staff").getByText("Needs Review", { exact: true })),
-    );
     expect(await look(row("Required return documents").getByText("Pass", { exact: true }))).not.toBe(
-      await look(row("Checklist verified by staff").getByText("Needs Review", { exact: true })),
+      await look(row("Return semester after the leave").getByText("Needs Review", { exact: true })),
     );
 
     // The earlier leave of this student is listed with its decision date.

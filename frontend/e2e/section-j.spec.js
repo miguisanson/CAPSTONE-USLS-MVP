@@ -254,6 +254,7 @@ test.describe("I-008 Practicum: Dean marks a report reviewed", () => {
       "student submits completion documents",
     );
     await step(staff, "Documents Under Review");
+    await step(coordinator, "Record Verified Hours", { verified_hours: "200" }); // I-252
     await step(coordinator, "Completed");
     await step(coordinator, "Report Sent to Dean");
     await Promise.all([paolo, staff, coordinator].map((ctx) => ctx.dispose()));

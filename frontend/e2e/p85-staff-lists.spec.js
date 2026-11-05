@@ -179,7 +179,7 @@ test.describe("faculty advisees on a phone", () => {
       await expect(card).toContainText(entry.student.name);
       await expect(card).toContainText(entry.student.program_code);
       await expect(card).toContainText(entry.student.current_stage || "Not set");
-      await expect(card).toContainText(entry.pending_count ? `${entry.pending_count} pending` : "None");
+      await expect(card).toContainText(entry.pending_count ? `${entry.pending_count} pending` : "No signature needed");
       const signText = card.getByText("Needs signature");
       const sb = await signText.boundingBox();
       expect(sb.x + sb.width, `${entry.student.name}: the Needs signature label is on screen`).toBeLessThanOrEqual(391);

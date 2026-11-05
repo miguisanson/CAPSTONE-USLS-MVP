@@ -569,22 +569,17 @@ test.describe("P4.1 shared student parts", () => {
       await expect(c).toBeVisible();
       await expect(c).toContainText("Awaiting return intent");
       await expect(c).toContainText(/No return filed yet · AWOL since \d{4}-\d{2}-\d{2}/);
-      await expect(c.getByText("AWOL (flagged by the system)", { exact: true })).toBeVisible();
+      await expect(c.getByText("Absent without leave (AWOL)", { exact: true })).toBeVisible();
       await expect(c).toContainText("Waiting for: you.");
       await expect(c).not.toContainText("Correct your request and send it again.");
       for (const [label, value] of [
         ["AWOL effective date", /^AWOL effective date\s*[A-Z][a-z]{2} \d{1,2}, \d{4}$/i],
-        ["Detection source", /Recorded AWOL standing/],
         ["Last enrolled semester", /AY 2025-2026 2nd Semester/],
         ["Returning in", /Not chosen yet/],
-        ["Policy classification", /Awaiting return intent/],
-        ["Years in the program", /^Years in the program\s*\d+$/i], // CHANGED BY p105 (I-204): her own count, not "Not calculated"
-        ["Residence limits", /5 normal \/ 7 absolute \(Master's\)/],
-        ["Dean decision", /Not Submitted/],
       ]) await expect(fact(c, label), label).toHaveText(value);
-      await expect(c.locator("dt").filter({ hasText: /^(Type|Reason for return|Dean decided)$/i })).toHaveCount(0);
-      await expect(c).toContainText("Student's written intention");
-      await expect(c).toContainText("Not filed yet");
+      // I-386: office-only facts are hidden from the student
+      await expect(c.locator("dt").filter({ hasText: /^(Type|Reason for return|Dean decided|Detection source|Policy classification|Residence limits|Years in the program|Dean decision)$/i })).toHaveCount(0);
+      await expect(c).not.toContainText("Not filed yet");
       const steps = c.getByRole("region", { name: "Where this request is" }).getByRole("listitem");
       await expect(steps).toHaveCount(4);
       await expect(c.locator('[aria-current="step"]')).toContainText("AWOL flagged");
@@ -609,7 +604,7 @@ test.describe("P4.1 shared student parts", () => {
       await expect(c).toContainText("Why it was sent back");
       await expect(c).toContainText("Explain your plan to return.");
       // facts keep their order; rows with no real value are dropped; long texts get their own block
-      await expect(fact(c, "Detection source")).toContainText("Recorded AWOL standing");
+      await expect(c.locator("dt").filter({ hasText: /^Detection source$/i })).toHaveCount(0); // I-386
       await expect(c.locator("dt").filter({ hasText: /^(Empty note|Unrecorded note|Type)$/i })).toHaveCount(0);
       await expect(c).toContainText("Reason for return");
       await expect(c).toContainText("Spec: because I am ready.");

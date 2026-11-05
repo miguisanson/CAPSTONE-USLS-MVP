@@ -43,7 +43,7 @@ test.describe("(a) the chosen student does not carry over by itself", () => {
 
 test.describe("(b) every board's rules panel has the same summary line", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
-  const SUMMARY = /^\d+ rules? from the Graduate School policies · (none|\d+) needs? review$/;
+  const SUMMARY = /^\d+ rules? from the Graduate School policies · (none|\d+) awaiting sign-off$/;
 
   for (const [slug, title] of [
     ["leave-of-absence", "Leave of Absence"], ["readmission", "Readmission"], ["awol", "AWOL"], ["withdrawal", "Withdrawal"],

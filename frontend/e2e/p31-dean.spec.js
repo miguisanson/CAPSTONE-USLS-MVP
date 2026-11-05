@@ -87,8 +87,8 @@ async function practicumToDean(playwright) {
   );
   const staff = await apiAs(playwright, "staff@usls.edu.ph");
   const coordinator = await apiAs(playwright, "academic@usls.edu.ph");
-  const step = (ctx, status) => async () =>
-    okJson(await ctx.post("/api/transactions/practicum", { data: { student_id: studentId, status } }), `practicum -> ${status}`);
+  const step = (ctx, status, extra = {}) => async () =>
+    okJson(await ctx.post("/api/transactions/practicum", { data: { student_id: studentId, status, ...extra } }), `practicum -> ${status}`);
   await step(staff, "MOA Under Review")();
   await step(coordinator, "Practicum In Progress")();
   // The student submits the completion documents; staff forward them; the coordinator records completion and sends the
@@ -105,6 +105,8 @@ async function practicumToDean(playwright) {
       "student submits completion documents",
     );
     await step(staff, "Documents Under Review")();
+    // I-252: completion needs the hours the coordinator verified from the certificates
+    await step(coordinator, "Record Verified Hours", { verified_hours: "200" })();
     await step(coordinator, "Completed")();
     await step(coordinator, "Report Sent to Dean")();
   };

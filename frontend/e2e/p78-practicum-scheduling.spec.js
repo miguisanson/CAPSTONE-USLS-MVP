@@ -274,7 +274,9 @@ test.describe("Defense scheduling and the availability workspace", () => {
 
   test("a student with no panel: the notice, no options, the book button stays disabled", async ({ page }) => {
     await page.goto("/workflow/defense-scheduling?student_id=125");
-    await expect(main(page).getByText("No final panel is available. Complete Panel Matching before scheduling.")).toBeVisible();
+    // I-387: the notice names the next step and links to Panel Matching
+    await expect(main(page).getByText("No final panel yet")).toBeVisible();
+    await expect(main(page).getByRole("link", { name: /Open Panel Matching for/ })).toHaveAttribute("href", /\/workflow\/panel-matching\?student_id=125/);
     await expect(main(page).getByText("0 conflict-free found")).toBeVisible();
     await expect(main(page).getByText(/No conflict-free overlap appears in this window/)).toBeVisible();
     await expect(main(page).getByRole("button", { name: "Set defense schedule" })).toBeDisabled();
