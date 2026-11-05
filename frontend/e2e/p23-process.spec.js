@@ -204,7 +204,7 @@ test.describe("P2.3 shared process components", () => {
         const region = page.getByRole("region", { name: "Where this request is" });
         const items = region.getByRole("listitem");
         await expect(items).toHaveCount(4);
-        const labels = ["AWOL flagged", "Return filed", "Dean decision", "Back in the program"];
+        const labels = ["AWOL flagged", "Return filed", "The Dean decides", "Back in the program"]; // plain student words (I-393)
         for (let i = 0; i < labels.length; i++) await expect(items.nth(i)).toContainText(labels[i]);
         await expect(region.locator('[aria-current="step"]')).toHaveCount(1);
         await expect(region.locator('[aria-current="step"]')).toContainText("AWOL flagged");
