@@ -1,0 +1,454 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  FileUp,
+  Eye,
+  Lock,
+  Trash2,
+} from "lucide-react";
+import { api } from "../../api";
+import { Button, Field, InlineNotice, Input, Select, StatusChip, Textarea } from "../../components/ui/index.js";
+import { useConfirm } from "../../components/confirm";
+import { PanelStamp } from "../../components/process";
+import { formatDate, tomorrowISO } from "../../lib/format";
+import { PAGE } from "../../lib/labels.js";
+import { BOOKABLE_DEFENSES, defenseScheduleDone, defenseToRequest } from "../../lib/studentHome.js";
+import { ErrorSummary, useFormErrors, useSubmitRequest, SubmitState, isLiveSchedule } from "./shared";
+
+export function ResearchRequestForm({ data, onSaved }) {
+  const progress = data.research_progress || {};
+  const milestone = progress.milestone || {};
+  const gate = progress.gate || milestone.value || "";
+  // Treat the backend placeholder as empty, and never overwrite a title the student
+  // has typed or that was auto-filled from Form 1. A data refresh after each upload
+  // must not wipe it — otherwise submitting fails with "Enter the research title".
+  const PENDING_TITLE = "Research title pending Form 1 submission";
+  const savedTitle = data.research_case?.title && data.research_case.title !== PENDING_TITLE ? data.research_case.title : "";
+  const [form, setForm] = useState({ research_title: savedTitle, submitted_package: "" });
+  const { busy, error, message, submit } = useSubmitRequest("research-gate", onSaved);
+  const { errors, fail, clear, messageFor } = useFormErrors();
+  const [prefillNote, setPrefillNote] = useState("");
+  const uploadRequirements = (milestone.requirements || []).filter((item) => item.student_upload);
+  const managedRequirements = (milestone.requirements || []).filter((item) => !item.student_upload);
+  // Nothing left to send once staff verified every file of the milestone; the next step may be the defense date.
+  const allVerified = uploadRequirements.length > 0 && uploadRequirements.every((item) => item.status === "Complete");
+  const requestDefenseDate = Boolean(defenseToRequest(data));
+  // The title is typed (or read from Form 1) only at the Title Defense gate while none is on record; after that it is shown, never asked.
+  const askTitle = progress.stage === "Title Defense" && !savedTitle;
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      research_title: current.research_title && current.research_title !== PENDING_TITLE ? current.research_title : savedTitle,
+    }));
+  }, [data.student.id, savedTitle]);
+
+  function set(key) {
+    return (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  }
+
+  function onSubmit(e) {
+    e.preventDefault();
+    // Submit is off only when no answer can fix it (files still missing); a missing title is reported here.
+    if (askTitle && !form.research_title.trim()) {
+      fail([{ id: "research-title", message: "Upload Form 1 below so the research title can be read, or type the title." }]);
+      return;
+    }
+    clear();
+    submit(
+      {
+        ...(askTitle ? { research_title: form.research_title } : {}),
+        submitted_package: form.submitted_package,
+      },
+      { lines: [`${milestone.label || "Research milestone"} for review`, askTitle ? `Research title: ${form.research_title}` : ""] },
+    );
+  }
+
+  async function handleEvidenceSaved(result, requirement) {
+    if (requirement?.item_name === "Form 1 - Application for Title Defense" && result?.research_title) {
+      setForm((current) => ({ ...current, research_title: result.research_title }));
+      setPrefillNote(`Auto-filled from ${result.document?.evidence_reference || "the uploaded Form 1"}.`);
+    }
+    await onSaved();
+  }
+
+  return (
+    <form noValidate onSubmit={onSubmit} className="space-y-4">
+      <ErrorSummary errors={errors} />
+      <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow text-brand-700">Automatically detected stage</p><p className="section-title mt-1">{progress.stage || "Title Defense"}</p><p className="mt-1 text-xs text-slate-600">{milestone.description}</p></div><StatusChip status={progress.status || "Pending"} dot={false} /></div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><p className="eyebrow">Research title</p><p className="mt-1 text-sm font-semibold text-ink">{data.research_case?.title || "Complete Form 1 to set the title"}</p></div><div className="rounded-lg bg-white/80 px-3 py-2"><p className="eyebrow">Adviser</p><p className="mt-1 text-sm font-semibold text-ink">{data.student.adviser_name || "Not assigned"}</p></div></div>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-4">
+        {(progress.stages || []).map((stage, index) => <div key={stage.name} className={`rounded-lg border px-2.5 py-2 text-xs font-semibold ${index === progress.stage_index ? "border-brand-400 bg-brand-50 text-brand-800" : stage.complete ? "border-brand-200 bg-brand-50/60 text-brand-700" : "border-slate-200 text-slate-500"}`}>{stage.name}</div>)}
+      </div>
+      {askTitle && (
+        <Field label="Research title from uploaded Form 1" required hint="This fills automatically after the Form 1 application PDF is uploaded below." error={messageFor("research-title")}>
+          <Input id="research-title" maxLength={220} value={form.research_title} onChange={set("research_title")} placeholder="Upload Form 1 below to auto-fill" />
+          {prefillNote && <p className="meta mt-1 font-medium text-brand-700">{prefillNote}</p>}
+        </Field>
+      )}
+      <div>
+        <p className="field-label">Files you upload</p>
+        <p className="meta mb-2">Only these items require action from you for this milestone.</p>
+        <div className="space-y-2">
+          {uploadRequirements.map((requirement) => (
+            <ResearchEvidenceUpload
+              key={requirement.item_name}
+              gate={gate}
+              requirement={requirement}
+              panelLocked={Boolean(data.panel?.length)}
+              onSaved={(result) => handleEvidenceSaved(result, requirement)}
+            />
+          ))}
+        </div>
+      </div>
+      {managedRequirements.length > 0 && (
+        <div>
+          <p className="field-label">Completed by staff or the system</p>
+          <p className="meta mb-2">These update automatically after review, panel matching, or scheduling.</p>
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            {managedRequirements.map((requirement) => (
+              <div key={requirement.item_name} className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-3.5 py-3 last:border-b-0">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink">{requirement.label}</p>
+                  <p className="meta mt-0.5">
+                    {requestDefenseDate && requirement.source_type?.endsWith("_schedule") && requirement.status !== "Complete"
+                      ? <>Request your defense date on <Link to="/student/defense-schedule" className="font-semibold text-brand-700 underline">{PAGE.defenseSchedule}</Link>. It is added here once staff confirm it.</>
+                      : requirement.description}
+                  </p>
+                </div>
+                <StatusChip status={requirement.status_label} dot={false} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <Field label="Message to the Research Coordinator" hint="Optional context for this submission.">
+        <Textarea value={form.submitted_package} onChange={set("submitted_package")} />
+      </Field>
+      <SubmitState
+        busy={busy}
+        error={error}
+        message={message}
+        disabled={!milestone?.student_uploads_ready || allVerified}
+        label={`Submit ${milestone?.short_label || "milestone"} for review`}
+        disabledHint={allVerified ? "Every file for this milestone is already verified. Nothing is left to submit." : !milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : ""}
+      />
+    </form>
+  );
+}
+
+export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved }) {
+  const confirm = useConfirm();
+  const [busy, setBusy] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
+  const [checkingId, setCheckingId] = useState(null);
+  const [error, setError] = useState("");
+  const needed = requirement.required_file_count;
+  const files = requirement.files || [];
+  const titlePackageItem = requirement.item_name === "Form 1 - Application for Title Defense" || requirement.item_name === "Three concept papers";
+  const titlePackageLocked = panelLocked && titlePackageItem;
+  const replacesExistingUpload = requirement.item_name === "Ethics Clearance";
+
+  async function upload(file) {
+    if (titlePackageLocked) {
+      setError("Title-defense uploads are locked because a panel has already been matched.");
+      return;
+    }
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please choose a PDF file.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api.uploadResearchEvidence(gate, requirement.item_name, file);
+      await onSaved(result);
+    } catch (err) {
+      setError(err.message || "Could not upload this evidence.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeResearchFile(file) {
+    if (titlePackageLocked) return;
+    const confirmed = await confirm({
+      title: "Remove file?",
+      message: `Remove "${file.name}"? This will clear the current Panel Matching result for this stage.`,
+      confirmLabel: "Remove file",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setRemovingId(file.id);
+    setError("");
+    try {
+      await api.deleteResearchEvidence(file.id);
+      await onSaved();
+    } catch (err) {
+      setError(err.message || "Could not remove this concept paper.");
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  async function checkConceptPaper(file) {
+    setCheckingId(file.id);
+    setError("");
+    try {
+      await api.evaluateConceptPaper(file.id);
+      await onSaved();
+    } catch (err) {
+      setError(err.message || "Could not check concept paper compliance.");
+    } finally {
+      setCheckingId(null);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-ink">{requirement.label}</p>
+          <p className="meta mt-0.5">{requirement.description}</p>
+          <p className="mt-1 text-xs font-medium text-slate-600">{files.length} of {needed} file{needed > 1 ? "s" : ""} uploaded</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusChip status={requirement.status_label} dot={false} />
+          <Button as="label" variant="secondary" icon={titlePackageLocked ? Lock : FileUp} className={titlePackageLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
+            {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading…" : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
+            <input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={busy || titlePackageLocked} onChange={(e) => upload(e.target.files?.[0])} />
+          </Button>
+        </div>
+      </div>
+      {files.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {files.map((file) => (
+            <div key={file.id} className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Button as="a" variant="secondary" size="sm" href={file.url} target="_blank" rel="noreferrer">
+                    {file.name}<Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
+                  {requirement.student_upload && requirement.status !== "Complete" && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={Trash2}
+                      onClick={() => removeResearchFile(file)}
+                      disabled={titlePackageLocked || removingId === file.id}
+                      className="text-red-700 hover:bg-red-50"
+                      aria-label={`Remove ${file.name}`}
+                      title={titlePackageLocked ? "Locked after panel matching" : "Remove upload"}
+                    />
+                  )}
+                </span>
+                {file.compliance_status && (
+                  <div className="flex items-center gap-2">
+                    <StatusChip status={file.compliance_status} dot={false} />
+                    {Number.isFinite(file.compliance_score) && <span className="meta font-semibold">{file.compliance_score}%</span>}
+                  </div>
+                )}
+                {requirement.item_name === "Three concept papers" && (
+                  <Button variant="secondary" size="sm" onClick={() => checkConceptPaper(file)} loading={checkingId === file.id}>
+                    {checkingId === file.id ? "Checking…" : file.compliance_status ? "Recheck" : "Check compliance"}
+                  </Button>
+                )}
+              </div>
+              {file.compliance && <ConceptPaperCompliance compliance={file.compliance} />}
+            </div>
+          ))}
+        </div>
+      )}
+      {titlePackageItem && files.length > 0 && <p className={`meta mt-2 ${titlePackageLocked ? "font-semibold text-brand-700" : ""}`}>{titlePackageLocked ? "This title-defense package is read-only because a panel has already been matched." : "Removing Form 1 or any concept paper revokes the Academic Coordinator endorsement and clears Panel Matching. The complete title-defense package must be endorsed again."}</p>}
+      {error && <InlineNotice tone="danger" className="mt-2">{error}</InlineNotice>}
+    </div>
+  );
+}
+
+export function ConceptPaperCompliance({ compliance }) {
+  const checks = compliance.checks || [];
+  const citations = compliance.citations || [];
+  return (
+    <details className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
+      <summary className="cursor-pointer font-semibold text-slate-700">
+        {compliance.summary || "View concept paper compliance check"}
+      </summary>
+      <div className="mt-2 space-y-2">
+        {checks.length > 0 && (
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {checks.map((check) => (
+              <div key={check.id} className="rounded-md border border-slate-100 px-2 py-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-slate-700">{check.label}</span>
+                  <StatusChip status={check.status} dot={false} size="sm" />
+                </div>
+                {check.evidence && <p className="mt-1 text-slate-500">{check.evidence}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+        {citations.length > 0 && (
+          <div>
+            <p className="eyebrow">Sources</p>
+            <div className="mt-1 space-y-1">
+              {citations.slice(0, 3).map((citation) => (
+                <p key={citation.id} className="rounded-md bg-slate-50 px-2 py-1.5 text-slate-500">
+                  <span className="font-semibold text-slate-700">{citation.source}</span>: {citation.text}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
+export { BOOKABLE_DEFENSES };
+
+// After a verdict that asks for revisions: send the revised manuscript (and a note) for confirmation.
+function RevisionSubmitForm({ followUp, onSaved }) {
+  const [note, setNote] = useState("");
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const { errors, fail, clear, messageFor } = useFormErrors();
+  const verdictId = followUp.verdict?.id;
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    if (!note.trim() && !file) {
+      fail([{ id: "revision-note", message: "Attach the revised manuscript or describe what you revised." }]);
+      return;
+    }
+    clear();
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await api.submitDefenseRevisions(verdictId, { note: note.trim(), file });
+      setMessage(res.message || "Your revisions were sent.");
+      setNote("");
+      setFile(null);
+      onSaved();
+    } catch (err) {
+      setError(err.message || "Could not send your revisions.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form noValidate onSubmit={onSubmit} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4" aria-label="Submit revised manuscript">
+      <ErrorSummary errors={errors} />
+      <div>
+        <h3 className="card-title">Submit revised manuscript</h3>
+        {followUp.label && <p className="mt-1 text-xs font-semibold text-amber-900">Defense outcome: {followUp.label}</p>}
+        <PanelStamp verdict={followUp.verdict} className="mt-1" />
+        {followUp.summary && <p className="mt-1 text-xs leading-relaxed text-slate-600">{followUp.summary}</p>}
+        {followUp.confirmed_by_role && (
+          <p className="mt-1 text-xs text-slate-600">Your {followUp.confirmed_by_role} confirms the revisions. Only after that can you move to the next stage.</p>
+        )}
+      </div>
+      <Field label="What you revised" hint="Optional when you attach the manuscript." error={messageFor("revision-note")}>
+        <Textarea id="revision-note" value={note} onChange={(e) => setNote(e.target.value)} />
+      </Field>
+      <Field label="Revised manuscript" hint="Optional when you describe the revisions above.">
+        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-600 focus-within:ring-2 focus-within:ring-brand-500 hover:bg-slate-50">
+          <span className="flex min-w-0 items-center gap-2">
+            <FileUp className="h-4 w-4 shrink-0 text-brand-700" aria-hidden="true" />
+            <span className="truncate">{file?.name || "Choose file"}</span>
+          </span>
+          <span className="shrink-0 rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">Browse</span>
+          <input type="file" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        </label>
+      </Field>
+      <SubmitState busy={busy} error={error} message={message} label="Submit revisions" disabled={!verdictId} />
+    </form>
+  );
+}
+
+export function ScheduleRequestForm({ data, onSaved }) {
+  const stage = data.research_progress?.stage;
+  // The defense type follows the student's stage; the server works it out, so it is shown here and not sent.
+  const nextDefense = BOOKABLE_DEFENSES.includes(stage) ? stage : "";
+  const schedules = data.schedules || [];
+  const liveSchedule = schedules.find(isLiveSchedule) || null;
+  // The stage's defense already took place (e.g. revisions are due): the office schedules another only if the result requires it.
+  const tookPlace = !liveSchedule && defenseScheduleDone(data);
+  const closed = Boolean(liveSchedule) || tookPlace;
+  const earliest = data.defense_earliest; // the lead time the server enforces (14 days for a proposal or final defense)
+  const minDate = earliest?.date && earliest.date > tomorrowISO() ? earliest.date : tomorrowISO();
+  const followUp = data.defense_follow_up;
+  const [form, setForm] = useState({
+    preferred_date: "",
+    mode: "On-site",
+    venue: "",
+    constraints: "",
+  });
+  const { busy, error, message, submit } = useSubmitRequest("defense-scheduling", onSaved);
+  const { errors, fail, clear, messageFor } = useFormErrors();
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  function onSubmit(e) {
+    e.preventDefault();
+    if (closed) return;
+    if (!form.preferred_date) {
+      fail([{ id: "schedule-date", message: "Choose the date you want for your defense." }]);
+      return;
+    }
+    clear();
+    submit({ ...form }, { lines: [`${nextDefense || "Defense"} schedule request`, `Preferred date: ${formatDate(form.preferred_date)}`, `Mode: ${form.mode}`] });
+  }
+
+  return (
+    <div className="space-y-5">
+      {followUp?.can_submit_revisions && <RevisionSubmitForm followUp={followUp} onSaved={onSaved} />}
+      {liveSchedule && (
+        <InlineNotice tone="info" title="A defense is already booked, so you cannot send another request.">
+          <p className="text-xs">Your {liveSchedule.defense_type || "defense"} is {liveSchedule.status === "Needs Re-confirmation" ? "waiting for the Research Coordinator to confirm it again" : "scheduled"}. To change it, ask the Research Coordinator.</p>
+        </InlineNotice>
+      )}
+      {tookPlace && (
+        <InlineNotice tone="info" title="Your defense already took place, so you cannot send another request.">
+          <p className="text-xs">Submit any revisions the panel asked for. If the result requires another defense, the Graduate School will tell you.</p>
+        </InlineNotice>
+      )}
+      <form noValidate onSubmit={onSubmit} className="space-y-4">
+        <ErrorSummary errors={errors} />
+        <fieldset disabled={closed} className="space-y-4 disabled:opacity-60">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Preferred date" required error={messageFor("schedule-date")} hint={earliest ? `Earliest date: ${formatDate(earliest.date)}, ${earliest.days} days after ${earliest.label}.` : undefined}>
+              <Input id="schedule-date" type="date" min={minDate} value={form.preferred_date} onChange={set("preferred_date")} />
+            </Field>
+            <div className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+              <p className="eyebrow">Defense type</p>
+              <p className="mt-1 text-sm text-ink">{nextDefense ? <>Your next defense: <span className="font-semibold">{nextDefense}</span></> : "No defense is due at your current stage."}</p>
+            </div>
+            <Field label="Mode">
+              <Select value={form.mode} onChange={set("mode")} placeholder="" options={["On-site", "Online", "Hybrid"]} />
+            </Field>
+            <Field label="Venue / meeting link">
+              <Input value={form.venue} onChange={set("venue")} />
+            </Field>
+          </div>
+          <Field label="Scheduling constraints">
+            <Textarea value={form.constraints} onChange={set("constraints")} />
+          </Field>
+        </fieldset>
+        <SubmitState
+          busy={busy}
+          error={error}
+          message={message}
+          label="Submit schedule request"
+          disabled={closed}
+          disabledHint={liveSchedule ? "New requests are closed while a defense is booked." : tookPlace ? "New requests are closed: this defense already took place." : ""}
+        />
+      </form>
+    </div>
+  );
+}

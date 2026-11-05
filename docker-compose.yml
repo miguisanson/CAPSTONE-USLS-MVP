@@ -1,0 +1,51 @@
+# USLS Graduate School demo: `docker compose up -d --build` (see deploy/DOCKER.md).
+# `app` is the website; `tunnel` publishes it at https://miguisanson.dev through Cloudflare
+# and only starts when you ask for it with `--profile tunnel` (token in deploy/tunnel.env or .env).
+services:
+  app:
+    build: .
+    restart: "no"              # runs only when started (deploy/site-start.ps1); never comes back on its own
+    ports:
+      - "127.0.0.1:8080:5000"   # this PC only; the public door is the tunnel
+    env_file:
+      - path: .env              # optional: Gemini key, Google Calendar secrets, DEMO_PASSWORD, SECRET_KEY
+        required: false
+    environment:
+      # The site always uses its own SQLite file in the volume (IM3). Set here because a DATABASE_URL in .env
+      # (a local developer setting) would otherwise override the Dockerfile and point the site at another database.
+      DATABASE_URL: sqlite:////data/usls_gs_demo.sqlite3
+      USLS_UPLOAD_DIR: /data/uploads
+      SECRET_KEY_FILE: /data/secret_key
+      RAG_INDEX_DIR: /data/rag_index
+      DEMO_MODE: "1"
+      DEMO_SANDBOX_DIR: /data/demo_sandboxes   # one private database copy per visitor
+      DEMO_SHOW_ACCOUNTS: "1"   # owner decision IM36: the sign-in page lists the demo accounts
+      SESSION_COOKIE_SECURE: "1"
+      GOOGLE_CALENDAR_REDIRECT_URI: https://miguisanson.dev/api/integrations/google-calendar/callback
+    volumes:
+      - usls_data:/data         # database, uploads, session secret
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=4)"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+      start_period: 120s
+
+  tunnel:
+    image: cloudflare/cloudflared:2026.10.7
+    profiles: ["tunnel"]
+    restart: "no"
+    command: tunnel --no-autoupdate run
+    # Shares the app container's network, so the Cloudflare route "http://localhost:5000" is the same
+    # whether the site runs in Docker or natively (deploy/START-SITE.cmd).
+    network_mode: "service:app"
+    env_file:                   # TUNNEL_TOKEN=... in either file
+      - path: deploy/tunnel.env
+        required: false
+      - path: .env
+        required: false
+    depends_on:
+      - app
+
+volumes:
+  usls_data:

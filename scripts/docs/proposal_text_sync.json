@@ -1,0 +1,1058 @@
+{
+ "_note": "Reviewable text corrections for the proposal, applied by scripts/docs/sync_proposal_inventories.py (apply). Each entry: mode 'replace' (find a literal or a regex inside a paragraph), 'paragraph' (replace a whole paragraph found by the start of its old or new text), 'insert_after', 'delete'. {{tokens}} are filled from scripts/docs/proposal_inventory.json (counts, recorded test run, measured demonstration dataset). Entries are idempotent: already-applied text is skipped. 'note' gives the reason and the code evidence.",
+ "entries": [
+  {
+   "id": "ch1-residency-row",
+   "mode": "paragraph",
+   "match": "Residency pause tracking",
+   "replace": "Residency tracking (time on leave counts toward maximum residence)",
+   "note": "Ch.1 scope table. The clock is never paused (business_rules_catalog residency.includes_loa; app.py residence_limits counts years without subtracting leave).",
+   "expect": 1
+  },
+  {
+   "id": "ch1-residency-text",
+   "mode": "replace",
+   "find": "tracking pause in residency as a monitoring signal",
+   "replace": "recording that time on leave continues to count toward maximum residence",
+   "note": "Ch.1 module text. Same evidence as above.",
+   "expect": 1
+  },
+  {
+   "id": "ch1-residency-signals",
+   "mode": "replace",
+   "find": "Residency clock start; pause/resume markers; nearing limit flags",
+   "replace": "Residency clock start (continuous; leave does not pause it); nearing limit flags",
+   "note": "Ch.1 data table and its Appendix I copy. The UI has no pause or resume marker.",
+   "expect": 2
+  },
+  {
+   "id": "ch1-residency-loa-module",
+   "mode": "replace",
+   "find": "Track residency pause and readmission status",
+   "replace": "Track residency against the maximum-residence limits (time on leave counts) and readmission status",
+   "note": "Ch.1 module table and its Appendix K copy.",
+   "expect": 2
+  },
+  {
+   "id": "ch4-constraint-3",
+   "mode": "replace",
+   "find": "Corrections are raised as reported discrepancies and resolved at source, not overwritten locally.",
+   "replace": "Corrections are raised as reported discrepancies and resolved at source, not overwritten locally. (Revised after the consultations: since the owner decision of 2026-10-01 the monitoring sheet also accepts entries made in the portal, each marked Manual entry with the person, time and reason, and an import never overwrites such an entry silently; see Section 5.3.4.)",
+   "note": "Ch.4 constraint list. Records the owner decision in AGENTS.md Rule 4 and the monitoring_edit table.",
+   "expect": 1
+  },
+  {
+   "id": "5.1-layer",
+   "mode": "paragraph",
+   "match": "The portal is deliberately a coordination and decision-support layer",
+   "replace": "The portal is deliberately a coordination and decision-support layer, not a replacement for the institutional academic information system. AIMS remains the official record for student identity, enrollment, enrolled subjects, grades, and course completion. Authorized staff may import an approved monitoring workbook or add students and subject rows directly in the portal. Every value is labelled with its source (Imported, Manual entry or System); a value entered in the portal carries the name of the person, the time and, where required, a reason, and every change is kept with its previous value. A later import never silently overwrites a portal value: it raises a validation issue for staff to resolve, and a discrepancy in an official value can also be reported as a flag without changing the value. Grades are never entered in the portal. On top of that data the portal adds what the existing setup lacks: a controlled status vocabulary maintained through audited actions, explicit ownership of the next action, elapsed-time measurement, derived reporting, documents and lists prepared for the Registrar, and a policy-grounded assistant.",
+   "note": "5.1. Code: monitoring_record_source (app.py), MonitoringEdit, POST /api/monitoring/students, tests/test_monitoring_crud.py. Old text said values are read-only and corrected only at source.",
+   "expect": 1
+  },
+  {
+   "id": "5.1-counts",
+   "mode": "replace",
+   "regex": "exposing \\d+ routes, backed by a relational database of \\d+ tables",
+   "replace": "exposing {{routes}} routes, backed by a relational database of {{tables}} tables",
+   "note": "Generated counts (app.url_map and the data model, sync_proposal_inventories.py collect)."
+  },
+  {
+   "id": "5.1-database",
+   "mode": "replace",
+   "find": "It runs against MySQL in the demonstration deployment and against SQLite for isolated automated testing.",
+   "replace": "It is configured for MySQL in the demonstration deployment, uses a local SQLite file when no database is configured, and runs each automated test file against a temporary SQLite database.",
+   "note": "5.1. app.py database URL default (SQLite), tests create temporary SQLite files.",
+   "expect": 1
+  },
+  {
+   "id": "5.2-obj1",
+   "mode": "replace",
+   "find": "with the source of the official values labelled and those values held read-only.",
+   "replace": "with the source of every value labelled as Imported, Manual entry or System, and with any change to an imported value requiring a recorded reason.",
+   "note": "5.2.2 objective 1.",
+   "expect": 1
+  },
+  {
+   "id": "5.2-obj2",
+   "mode": "replace",
+   "find": "covering not taken, enrolled, taken, incomplete, failed, dropped, and withdrawn,",
+   "replace": "covering not taken, planned, enrolled, completed, incomplete, dropped, and withdrawn (taken and failed appear where other workflows set them),",
+   "note": "5.2.2 objective 2. MONITORING_MANUAL_STATUSES = Planned, Enrolled, Completed, Withdrawn, Dropped, INC (app.py).",
+   "expect": 1
+  },
+  {
+   "id": "5.2-obj6",
+   "mode": "replace",
+   "find": "panel matching against faculty specialization,",
+   "replace": "panel matching against faculty expertise records,",
+   "note": "5.2.2 objective 6. Panel matching reads faculty_expertise (TF-IDF or Gemini embeddings).",
+   "expect": 1
+  },
+  {
+   "id": "5.2-obj8",
+   "mode": "replace",
+   "find": "concluded by generating the document that conveys the approved change to the Registrar.",
+   "replace": "concluded by the document or list that conveys the approved change to the Registrar, which staff export and send through the official channel.",
+   "note": "5.2.2 objective 8. The portal sends nothing; leave and readmission use a Registrar list.",
+   "expect": 1
+  },
+  {
+   "id": "5.3.1",
+   "mode": "paragraph",
+   "match": "Imports the Academic Coordinator monitoring workbook",
+   "replace": "Imports the Academic Coordinator monitoring workbook and reconciles it against the existing student list. Students enter either through the import or through the Add student form on the monitoring sheet; both apply the same required fields and duplicate checks, both create the student login, and neither generates a student number, because student identity originates outside the Graduate School. Each import records an upload history with a downloadable backup, detects validation issues and duplicate records, and marks newly appearing students. Each import batch produces an onboarding report that the Dean approves or returns. Newly admitted students carry a risk state of Not Yet Assessed rather than a default risk level, since no monitoring signal yet exists for them.",
+   "note": "5.3.1. POST /api/monitoring/students (app.py monitoring_portal_create_student), onboarding_review routes; old text said there is no manual student creation.",
+   "expect": 1
+  },
+  {
+   "id": "5.3.2",
+   "mode": "replace",
+   "find": "so that demand is not confused with a decision to open a class.",
+   "replace": "so that demand is not confused with a decision to open a class. The Academic Coordinator saves a draft offering plan from the subject-needs report, submits it to the Dean, and publishes it once approved; publication creates the official offerings, to which schedule, section and faculty are attached. Offerings can also be added and edited directly, and only the Academic Coordinator and the administrator manage them.",
+   "note": "5.3.2. CourseOfferingPlan statuses Draft/Submitted/Returned/Approved/Published (app.py), approvals routes.",
+   "expect": 1
+  },
+  {
+   "id": "5.3.3",
+   "mode": "replace",
+   "find": "Tagging is validated on the server against the published offering list, so a student cannot be enrolled in a subject that is not offered.",
+   "replace": "Tagging is validated on the server against the published offering list: a class-list row for a subject that is not offered is refused, and in single-student enrollment such a subject is blocked unless the coordinator records a documented exception after a preview. The class list must name the faculty member, must match the selected semester, and is refused for students on leave, absent without leave or withdrawn. Students can also select offered subjects for themselves in the student portal, under the same guard.",
+   "note": "5.3.3. enrollment_class_list_import, enrollment guard tests (test_academic_fixes.py), POST /api/student-portal/enrollment.",
+   "expect": 1
+  },
+  {
+   "id": "5.3.4",
+   "mode": "paragraph",
+   "match": "Presents the consolidated cohort view: one row per student",
+   "replace": "Presents the consolidated cohort view: one row per student, one column per curriculum subject, grouped by Basic, Major, and Cognate, with the comprehensive examination and the research milestones, filtered by program, semester, progress, risk, and enrollment state. Graduate School staff and the Academic Coordinator add students and subject rows and edit statuses directly; each entry shows its source (Imported, Manual entry or System), the user and the time, and every change is kept in a per-student history, with a reason where an imported value is changed. The Research Coordinator and the Dean can only view. A flag records a discrepancy against a value without altering it, and a corrected import closes the flags whose category can be corrected at source. A later import that disagrees with a portal entry keeps the portal value and raises an issue for staff.",
+   "note": "5.3.4. MonitoringGrid.jsx, /api/monitoring/students..., MonitoringEdit; old text said imported values are read-only and changed only through the audited status action (POST /api/monitoring/subject-status now always answers 409).",
+   "expect": 1
+  },
+  {
+   "id": "5.3.5",
+   "mode": "paragraph",
+   "match": "Checks each student's required research submissions",
+   "replace": "Checks each student's required research submissions for the gate the student is currently at: title defense (Form 1), proposal defense readiness, final defense, and completion evidence. The ethics review (Form 5.1 and Form 5.2) forms part of the proposal gate and opens only after the proposal defense is passed. Required documents are defined per gate. The Academic Coordinator endorses Form 1 and the three concept papers with an in-system signature before panel matching opens, and a rule-based concept paper check reports missing sections as advice without blocking the endorsement. The assigned adviser signs the proposal and final manuscripts and endorsements in the system, each signature being tied to the exact uploaded file, so that a replacement file returns to the adviser. The panel chair records the defense result in the faculty portal: passed, passed with minor revisions, provisional pass with re-defense, provisional pass with revisions for panel approval, deferred, or failed (for the title defense, approved or disapproved). Revisions are submitted by the student and confirmed by the adviser or the panel chair before the stage completes.",
+   "note": "5.3.5. RESEARCH_MILESTONES (four gates), form1_endorsement_queue/endorse_form1, evaluate_concept_paper_text, ADVISER_APPROVAL_DOCUMENTS, faculty verdict routes, tests/test_research_core.py.",
+   "expect": 1
+  },
+  {
+   "id": "5.3.6",
+   "mode": "paragraph",
+   "match": "Recommends a defense panel by matching",
+   "replace": "Recommends a defense panel by comparing the body text of the student's current research paper (the concept papers, the proposal manuscript or the final manuscript, depending on the stage) with each faculty member's recorded expertise: the profile specialization and expertise records such as research interests, publications, past advisee and panel titles, and degrees. The research title and file names are excluded. Similarity is computed by TF-IDF cosine similarity, or by Gemini embeddings where a key is configured, with TF-IDF as the fallback. The score combines expertise match (60 points), availability (25, scored from the free windows in the connected Google Calendar or from the availability the faculty member entered; a member who has entered nothing scores zero) and workload (15), and the student's adviser and co-adviser are excluded. The recommendation is advisory: it produces a ranked shortlist with the reason and the matched passage for each suggestion, and a suggested panel seated by role. The coordinator makes the selection, and the server checks it against the panel composition rules of the Graduate School Research Protocol before it is saved.",
+   "note": "5.3.6. research_matching_profile, panel_tfidf_similarities, PANEL_MATCH_WEIGHTS, panel_composition_report (app.py); faculty_expertise table; old text said grounded in an uploaded CV.",
+   "expect": 1
+  },
+  {
+   "id": "5.3.7",
+   "mode": "paragraph",
+   "match": "Finds a defense slot at which the student and the panel",
+   "replace": "Finds a defense slot at which the research adviser and every panel member who has entered availability are simultaneously free. Availability is never assumed: it consists of the weekly working hours and the dated entries (not available, or available only at stated hours) that each faculty member enters in the faculty portal, less the defenses already booked. Where a faculty member has connected a Google Calendar, that member's busy periods are removed as well; only free/busy information is read and nothing is written to the calendar. A faculty member who has entered nothing is shown as not entered and is left out of the overlap, and a booking that includes such a person raises a warning; staff can ask the person to enter availability from the same screen. If a connected calendar cannot be read, no slot is proposed for the panel and the chosen time is refused. Slots are two hours long, between 08:00 and 18:00. Proposed dates begin only after the lead time, 14 days by default and held in the business-rules register: it is counted from the Form 1 endorsement for the title defense, and from the date the panel received the manuscript for the proposal and final defenses. A booking cannot be saved if the time is in the past, a panel member or the adviser is outside the entered hours or has an overlapping defense, the venue is taken, the student has an overlapping defense, or a panel member has declined the invitation. Two warnings can be overridden with a recorded reason: a date before the lead time, and a panel member who has not entered availability. A booked defense can be rescheduled or cancelled with a recorded reason and the name of who asked, and the earlier record is kept. A change of panel, which also needs a reason, puts the booking on hold until staff re-confirm it against the availability of the new panel.",
+   "note": "5.3.7 (rewritten after the calendar packet). defense_availability_context, GOOGLE_ASSUMED_HOURS only for a connected member with no hours, book_defense_schedule hard/soft conflicts, reschedule/cancel/reconfirm routes; tests/test_calendar_appointments.py.",
+   "expect": 1
+  },
+  {
+   "id": "5.3.8",
+   "mode": "paragraph",
+   "match": "Applies only to the programs that require practicum.",
+   "replace": "Applies only to the programs that require practicum (the Psychology programs and the Master of Science in Guidance and Counseling). Tracks memorandum of agreement submission, the practicum site and supervisor, the required hours (200 by default, set in the business rules), the completed hours entered by the student as a running total, and the certificates submitted as evidence. Every certificate submission is kept and counted automatically, so that further certificates from other establishments are added rather than replacing the earlier ones. A shortfall in hours leaves the case at Hours Incomplete, and the Academic Coordinator requests additional certificates or returns the case if the organization is not accepted. Once hours and documents are verified, the Academic Coordinator sends a status report to the Dean, who marks it reviewed. Student submission is locked until the eligibility conditions are met.",
+   "note": "5.3.8. practicum_eligibility, practicum_completion_attachments; hours are a student-entered running total, not summed over certificates.",
+   "expect": 1
+  },
+  {
+   "id": "5.3.9",
+   "mode": "paragraph",
+   "match": "Determines eligibility from coursework completion, comprehensive examination status",
+   "replace": "Determines eligibility from coursework completion, completion of each research stage (requirements, panel, confirmed schedule and a passing defense result), the post-defense completion documents, and practicum where applicable; the comprehensive examination is a condition for starting the research stages. Candidates are listed for a review window (a school year), and applications open only when the student is eligible. Candidates are processed in named batches in sequence: Graduate School staff compile the batch, the Academic Coordinator checks coursework, the Research Coordinator validates research and practicum, and staff prepare the endorsement list and send it to the Dean. A candidate found incomplete is listed as not eligible with the missing requirements and may resubmit. The Dean approves the list or returns it to staff for revision, and after approval the Dean exports the endorsed list as a file for manual transmission to the Registrar.",
+   "note": "5.3.9. graduation_eligibility, graduation_batch_actions, /api/graduation/endorsed.csv (Dean only).",
+   "expect": 1
+  },
+  {
+   "id": "5.3.10",
+   "mode": "paragraph",
+   "match": "Structured applications validated by explicit rules",
+   "replace": "Leave of absence and readmission run on a single case record. Structured applications are validated by explicit rules rather than by interpretation of an uploaded letter: the allowed reasons, the permitted duration (up to two semesters a request and four in total, with no limit on the number of leaves), and the filing date (no leave in the last two weeks of a semester); a leave can be extended once, right after it. Graduate School staff review the request and forward it to the Dean, who may approve it, return it for revision, or deny it. A student may withdraw a request before the Dean decides, and may cancel an approved leave that has not started. On approval the student's standing, enrollment tag and affected subject enrollments are updated when the leave begins, and the approved case joins a Registrar list that staff export as a CSV or Excel file; the list is handed over manually, and staff record when it was sent and acknowledged. Time on leave counts toward maximum residence, and the residency clock is never paused. Staff work the cases on a staged board with drag and drop, and staff and the Dean can apply a step to several cases at once. A readmission request follows the same path; its approval returns the student to active standing, closes the linked leave, and leaves enrollment planning to the Academic Coordinator.",
+   "note": "5.3.10. leave_workflow.py, leave_case/leave_case_event/leave_export_log tables, LeaveCasesBoard.jsx; tests/test_loa_readmission.py.",
+   "expect": 1
+  },
+  {
+   "id": "5.3.11",
+   "mode": "paragraph",
+   "match": "Monitors students who have stopped attending without filing a leave",
+   "replace": "Monitors students whose record shows absence without an approved leave, and applies the policy review for a return from AWOL. AWOL is created from explicit evidence (a recorded AWOL standing, a full-semester withdrawal with no approved leave, or a leave that ended without a return); in the last case AWOL is only proposed, and staff confirm it. Residency enrollment is recorded, and years in program are derived from the recorded entry year and never reduced by leave. A return from AWOL is decided by the Dean, and a student beyond the absolute maximum residence requires full re-enrollment rather than a simple return. A provisional Registrar sheet can be generated for a Dean-approved return and for an active residency record.",
+   "note": "5.3.11. automatic_awol_evidence, sync_leave_cases, years_in_program, residence_limits (app.py).",
+   "expect": 1
+  },
+  {
+   "id": "5.3.14",
+   "mode": "replace",
+   "find": "The assistant is distinct from the Red-Amber-Green risk indicator, which is a separate concept.",
+   "replace": "The policy library is maintained by Graduate School staff, who upload documents with a category and an effective date, keep earlier versions, and mark a document draft, active or archived; an answer that relies on a draft document says so. If Gemini is unavailable the assistant falls back to local retrieval from the same library. Staff and the administrator may ask record-based questions, a student is limited to the student's own record, and the Dean, the coordinators and faculty receive policy answers only. The assistant is distinct from the Red-Amber-Green risk indicator, which is a separate concept.",
+   "note": "5.3.14. /api/policy-documents*, generate_answer fallback chain, role scoping in the assistant route.",
+   "expect": 1
+  },
+  {
+   "id": "5.3.15",
+   "mode": "paragraph",
+   "match": "The student portal shows the student's own lifecycle status",
+   "replace": "The student portal shows the student's own progress, enrollment, research, research adviser, defense, practicum and graduation status, calendar, messages, documents and activity history, and is the point at which structured requests are filed: leave of absence, readmission, return from AWOL and subject withdrawal, together with the practicum, graduation, research gate, adviser and defense scheduling requests. The faculty portal provides advisees, including adviser requests and agreement to a change of adviser, signatures and endorsements, panel assignments and papers, panel invitations, the defense schedule, verdicts, assigned classes, a personal calendar, and availability entry with the optional Google Calendar connection. The Dean portal provides a dashboard, an approvals queue with a page for each process (course adjustments, leave, readmission and AWOL return, withdrawal, practicum reports, graduation endorsement, adviser appointments), batch decisions on leave cases, admission and coursework reports, a read-only defense calendar, reports and analytics, and a decision history. Every role has the in-app notification bell, and all three portals include the policy assistant and the business rules register. Files and messages are scoped so that a user sees only what belongs to that user's role and student.",
+   "note": "5.3.15. portalNav.jsx, StudentRoutes/DeanRoutes/FacultyRoutes.jsx. Section 5.10 lists the pages (Tables 23.1 to 23.3).",
+   "expect": 1
+  },
+  {
+   "id": "5.3-table21-status",
+   "mode": "replace",
+   "find": "Partially implemented",
+   "replace": "Implemented",
+   "note": "Table 21 modules 4, 5 and 6. The nine KPI measurements are now computed (access_control_kpi ... analytics_kpi_summary; Reports screen 'Module KPI measurements').",
+   "expect": 3
+  },
+  {
+   "id": "5.3-table21-m7",
+   "mode": "replace",
+   "find": "Reports module with ten report views and four export documents",
+   "replace": "Reports module with {{report_views}} report views ({{operational_reports}} operational, {{analytics_reports}} analytics), the module KPI measurements, and the Registrar and workbook exports",
+   "note": "Table 21 module 7. OPERATIONAL_REPORT_KEYS and ANALYTICS_REPORTS in app.py (generated count).",
+   "expect": 1
+  },
+  {
+   "id": "5.3-kpi-note",
+   "mode": "paragraph",
+   "match": "The modules marked partially implemented are functional",
+   "replace": "All seven modules are implemented. The nine key performance indicator measurements defined in Section 1.7.1.4 are computed from the running system and shown on the Reports screen under Module KPI measurements, each with its target and the basis of the figure. They measure the prototype's demonstration data, not institutional performance, and the dashboard and report counts remain operational counts derived from recorded transactions.",
+   "note": "Note after Table 21. tests/test_bpm_workflows.py test_all_nine_proposal_kpis_are_computed_in_order (now in tests/test_research_core.py run).",
+   "expect": 1
+  },
+  {
+   "id": "5.4.1",
+   "mode": "paragraph",
+   "match": "The system serves seven account types. Six of them can sign in",
+   "replace": "The system serves seven account types, and all seven can sign in: Graduate School Staff, Academic Coordinator, Research Coordinator, Dean, Faculty, Student and Administrator. The Registrar is represented only as the external counterparty and has no interactive account, which reflects the deliberate decision that the Registrar's work happens outside this system.",
+   "note": "5.4.1. ROLE_LABELS has seven roles, all sign in; the old text said six.",
+   "expect": 1
+  },
+  {
+   "id": "t22-staff",
+   "mode": "paragraph",
+   "match": "All lifecycle workflows, records, reports, work queue",
+   "replace": "Dashboard, all lifecycle workflows, standalone processes (leave of absence, readmission, AWOL, withdrawal), records, reports, defense calendar, adviser appointments, work queue, activity log, recommendations, policy assistant, policy documents, business rules, academic semesters",
+   "note": "Table 22 staff row from components/Layout.jsx NAV_GROUPS.",
+   "expect": 1
+  },
+  {
+   "id": "t22-ac",
+   "mode": "paragraph",
+   "match": "Monitoring sheet, enrollment, course adjustments, students, faculty, research gate",
+   "replace": "Monitoring sheet, students, faculty, enrollment, enrollment class list, course adjustments, research gate (including Form 1 endorsements), panel matching, practicum, graduation, AWOL and residency, defense calendar, adviser appointments, reports, work queue, policy assistant, business rules",
+   "note": "Table 22 Academic Coordinator row from Layout.jsx ROLE_PATHS and App.jsx.",
+   "expect": 1
+  },
+  {
+   "id": "t22-rc",
+   "mode": "paragraph",
+   "match": [
+    "Research gate, graduation, work queue",
+    "Research gate, panel matching, defense scheduling, graduation, monitoring sheet (view only), defense calendar, adviser appointments, work queue, policy assistant, business rules"
+   ],
+   "replace": "Research gate, panel matching, defense scheduling, graduation, monitoring sheet (view only), defense calendar, adviser appointments, work queue, policy assistant, business rules",
+   "note": "Table 22 Research Coordinator row from Layout.jsx ROLE_PATHS.",
+   "expect": 1,
+   "auto_lead": false
+  },
+  {
+   "id": "t22-dean",
+   "mode": "paragraph",
+   "match": "Approvals queue and decision screens",
+   "replace": "Dean portal: dashboard, approvals queue and a decision page per process (including adviser appointments), admission and coursework reports, defense calendar (view only), reports and analytics, decision history, policy assistant, business rules",
+   "note": "Table 22 Dean row from portalNav.jsx DEAN_NAV_GROUPS.",
+   "expect": 1
+  },
+  {
+   "id": "t22-faculty",
+   "mode": "paragraph",
+   "match": "Faculty portal: advisees, document approvals, defense verdicts, calendar",
+   "replace": "Faculty portal: advisees and adviser requests, signatures and endorsements, panel assignments and papers, panel invitations, defense schedule, verdicts, assigned classes, calendar, availability, policy assistant, business rules",
+   "note": "Table 22 Faculty row from portalNav.jsx FACULTY_NAV_GROUPS.",
+   "expect": 1
+  },
+  {
+   "id": "t22-student",
+   "mode": "paragraph",
+   "match": "Student portal: own status, requirements, requests, messages",
+   "replace": "Student portal: dashboard, progress, enrollment, research, research adviser, defense schedule, research calendar, practicum (where applicable), graduation, request center (leave, readmission, AWOL return, subject withdrawal), messages, documents, activity history, policy assistant, profile",
+   "note": "Table 22 Student row from portalNav.jsx STUDENT_NAV_GROUPS.",
+   "expect": 1
+  },
+  {
+   "id": "5.4.3",
+   "mode": "replace",
+   "find": "student identity and program context imported from the monitoring workbook;",
+   "replace": "student identity and program context imported from the monitoring workbook or entered in the monitoring sheet, with each value marked as imported, manual entry or system;",
+   "note": "5.4.3 data scope.",
+   "expect": 1
+  },
+  {
+   "id": "5.4.3b",
+   "mode": "replace",
+   "find": "uploaded attachments; and a transaction log of consequential actions.",
+   "replace": "uploaded attachments; the change history of monitoring-sheet entries; the business-rules register; the handoff status of documents prepared for the Registrar; and a transaction log of consequential actions.",
+   "note": "5.4.3 data scope (monitoring_edit, business_rule, leave_case registrar_* columns).",
+   "expect": 1
+  },
+  {
+   "id": "5.4.4",
+   "mode": "replace",
+   "find": "It does not transmit documents to the Registrar automatically, and does not claim that a document has been received or acknowledged.",
+   "replace": "It does not transmit documents to the Registrar; Graduate School staff send them through the official channel, and the system records that a list was sent or acknowledged only when a staff member enters that status, never by inference.",
+   "note": "5.4.4. leave_registrar_advance / POST /api/leave-cases/handoff record sent and acknowledged.",
+   "expect": 1
+  },
+  {
+   "id": "5.5-1",
+   "mode": "replace",
+   "find": "and import it periodically. No live interface is assumed.",
+   "replace": "and import it periodically, or enter records directly in the monitoring sheet. No live interface is assumed.",
+   "note": "5.5 assumption 1.",
+   "expect": 1
+  },
+  {
+   "id": "5.5-2",
+   "mode": "replace",
+   "find": "Values arriving by import are authoritative and are not edited locally; discrepancies are reported and corrected at source.",
+   "replace": "Values arriving by import are the official starting record. Authorized staff may correct or add a value in the monitoring sheet; every such entry is marked as a manual entry with the person, time and reason and is kept in a change history, and a later import that disagrees with a manual entry is held as a conflict for staff to resolve rather than overwriting it silently.",
+   "note": "5.5 assumption 2. Owner decision 2026-10-01 (AGENTS.md Rule 4).",
+   "expect": 1
+  },
+  {
+   "id": "5.5-5",
+   "mode": "replace",
+   "find": "and the Registrar's implementation is confirmed outside the system until such time as a confirmation mechanism is agreed.",
+   "replace": "and the Registrar's implementation is confirmed outside the system; staff may record in the system that a list was sent and that an acknowledgement was received, but the Registrar does not confirm through the system.",
+   "note": "5.5 assumption 5.",
+   "expect": 1
+  },
+  {
+   "id": "5.6.1-counts",
+   "mode": "replace",
+   "regex": "comprising \\d+ API routes and \\d+ database tables, together with an automated regression suite of \\d+ (workflow )?tests( in \\d+ test files)?",
+   "replace": "comprising {{routes}} API routes and {{tables}} database tables, together with an automated regression suite of {{tests}} tests in {{test_files}} test files",
+   "note": "5.6.1 generated counts (routes, tables, tests from the recorded run)."
+  },
+  {
+   "id": "t23-python",
+   "mode": "paragraph",
+   "match": [
+    "3.10 or higher",
+    "3.11 or higher"
+   ],
+   "replace": "3.11 or higher ({{python_minor}} in the current verified environment)",
+   "note": "Table 23. README states Python 3.11 or higher; the verified environment version is read from the interpreter that ran the collection.",
+   "expect": 1
+  },
+  {
+   "id": "t23-node",
+   "mode": "paragraph",
+   "match": [
+    "18 or higher (22.16",
+    "18 or higher ("
+   ],
+   "replace": "18 or higher ({{node_major_minor}} in the current verified environment)",
+   "note": "Table 23. Node version read with `node --version`.",
+   "expect": 1
+  },
+  {
+   "id": "t23-crypto",
+   "mode": "paragraph",
+   "match": [
+    "Credential and token protection",
+    "Listed dependency; not used"
+   ],
+   "replace": "Listed dependency; not used by the current code (calendar credentials are stored as plain columns, see Section 5.8.1)",
+   "note": "Table 23. No Python file imports cryptography (grep); faculty.google_calendar_*_token are plain text columns.",
+   "expect": 1
+  },
+  {
+   "id": "t23-mysql-version",
+   "mode": "paragraph",
+   "match": "8.0",
+   "replace": "8.0 (optional)",
+   "note": "Table 23 MySQL version cell. SQLite is the default database.",
+   "expect": 1
+  },
+  {
+   "id": "t23-mysql-purpose",
+   "mode": "paragraph",
+   "match": [
+    "Relational database for the deployed instance",
+    "Relational database for a deployed instance"
+   ],
+   "replace": "Relational database for a deployed instance; SQLite is used when no database URL is set",
+   "note": "Table 23 MySQL purpose cell.",
+   "expect": 1
+  },
+  {
+   "id": "5.7.2",
+   "mode": "paragraph",
+   "match": "Users require a current desktop or laptop browser",
+   "replace": "Users require a current desktop or laptop browser, specifically a recent version of Google Chrome or Microsoft Edge, and network access to the server on which the portal is deployed. The interface is designed primarily for a desktop working width; the layout adapts to narrower screens with a collapsible navigation menu, but the monitoring sheet in particular presents a wide table and is intended for a full-size display. No client software is installed. An internet connection beyond the university network is required only for the optional policy assistant, for Gemini similarity scoring in panel matching (which otherwise falls back to local keyword scoring), for the optional faculty calendar connection, and for web fonts, which fall back to system fonts when unavailable.",
+   "note": "5.7.2. frontend/index.html viewport, Layout.jsx drawer, app.py Gemini use in panel matching.",
+   "expect": 1
+  },
+  {
+   "id": "5.7.3",
+   "mode": "paragraph",
+   "match": "The application server requires a host capable of running Python 3",
+   "replace": "The application server requires a host capable of running Python 3 and serving the built front-end assets, a database (MySQL 8.0 for a deployed instance, or a local SQLite file when no database URL is configured), and file storage for uploaded attachments and imported workbooks. The listening port is set by the FLASK_PORT setting, which defaults to 5000; the demonstration deployment uses port 5050 and runs MySQL on the same host.",
+   "note": "5.7.3. app.py FLASK_PORT default 5000; 5050 comes from the launch configuration.",
+   "expect": 1
+  },
+  {
+   "id": "5.8.1a",
+   "mode": "replace",
+   "find": "Authentication is session-based, and passwords are stored only as salted hashes; no password is held in recoverable form.",
+   "replace": "Authentication is session-based, and passwords are stored only as salted hashes; no password is held in recoverable form. Five failed sign-ins within fifteen minutes lock an e-mail address for five minutes, the session cookie is not readable by page scripts, signing out invalidates the session on the server, and an account created with a generated password must choose its own (at least ten characters) at first sign-in. A presentation switch (DEMO_MODE), on by default for local demonstration, shows a demonstration-accounts panel on the sign-in page; it is switched off for any shared deployment.",
+   "note": "5.8.1. LoginThrottle, session cookie flags, must_change_password, demo_mode_enabled (app.py; tests/test_health.py).",
+   "expect": 1
+  },
+  {
+   "id": "5.8.1b",
+   "mode": "replace",
+   "find": "Integrity rests on three rules. Imported official values are read-only. Status changes are made only through the dedicated audited actions, each of which records the actor, the timestamp, and the previous value.",
+   "replace": "Integrity rests on three rules. Every value carries its origin (Imported, Manual entry or System), and a change to an imported value needs a recorded reason. Status changes are made only through the dedicated audited actions, each of which records the actor, the timestamp, and the previous value; changes made in the monitoring sheet are kept in an append-only change history.",
+   "note": "5.8.1. MonitoringEdit is never edited or deleted.",
+   "expect": 1
+  },
+  {
+   "id": "5.8.2",
+   "mode": "replace",
+   "regex": "the seeded (demonstration )?dataset of \\d+ students( \\([^)]*\\))?",
+   "replace": "the seeded demonstration dataset of {{seed_students}} students (imported from the program monitoring workbooks, plus the demonstration fixtures)",
+   "note": "5.8.2. Student count measured by seeding a temporary database as a first start does (collect stage). The old figure 371 came from a generated seed that no longer exists."
+  },
+  {
+   "id": "5.8.3a",
+   "mode": "replace",
+   "find": "Navigation is grouped into Overview, Records, Lifecycle Workflows, Standalone Processes, and Monitoring and support.",
+   "replace": "For Graduate School staff, navigation is grouped into Overview, Records, Lifecycle Workflows, Standalone Processes, and Monitoring and support; the student, Dean and faculty portals use their own groupings.",
+   "note": "5.8.3. Layout.jsx NAV_GROUPS and portalNav.jsx.",
+   "expect": 1
+  },
+  {
+   "id": "5.8.3b",
+   "mode": "replace",
+   "find": "Screens that display official values carry an explicit read-only notice naming the source.",
+   "replace": "Screens that show monitoring values show the origin of each value (Imported, Manual entry or System), with the person and time for manual entries, and screens that show source-owned information state that it is read-only.",
+   "note": "5.8.3. ProvenanceBadge.jsx, MonitoringGrid.jsx notices.",
+   "expect": 1
+  },
+  {
+   "id": "5.9.1",
+   "mode": "paragraph",
+   "match": "The full entity-relationship diagram of the platform database",
+   "replace": "The entity-relationship diagram presented as Figure 7 in Section 3.2.6.3, with the grouped views as Figures 7.1 to 7.8 and in Appendix Q, is the design as originally proposed. The implemented database comprises {{tables}} tables ({{columns}} columns), listed in Appendix Z by area: students, programs, curriculum and enrollment; accounts; monitoring sheet import and editing; research, panel and defense; faculty; practicum, graduation and standing changes; work, messages and audit; and business rules and policy documents.",
+   "note": "5.9.1. Generated counts; the eight groups of Appendix Q belong to the original design.",
+   "expect": 1
+  },
+  {
+   "id": "5.9.2",
+   "mode": "replace",
+   "regex": "The complete list of all \\d+ implemented tables",
+   "replace": "The complete list of all {{tables}} implemented tables",
+   "note": "5.9.2 generated count."
+  },
+  {
+   "id": "5.9.2b",
+   "mode": "replace",
+   "find": "Field names are those of the implemented schema.",
+   "replace": "Field names, data types and keys are read from the implemented schema, and every column of each table is listed.",
+   "note": "5.9.2. The field tables are regenerated from the data model by sync_proposal_inventories.py.",
+   "expect": 1
+  },
+  {
+   "id": "5.10-intro",
+   "mode": "replace",
+   "find": "Full-page captures of the same screens are collected in Appendix U.",
+   "replace": "Full-page captures of the same screens are collected in Appendix U. The captures show the prototype at the time they were taken; the descriptions below follow the current system, and the entries added since then (Policy Documents, Business Rules, Form 1 Endorsements) have no capture.",
+   "note": "5.10 intro. Screenshots are replaced separately.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.1",
+   "mode": "paragraph",
+   "match": "The login screen presents four account types",
+   "replace": "The login screen is a single form for an e-mail address and a password. The server assigns the role recorded against the account, so no account type is chosen or sent by the user. Repeated failed attempts lock the account for a short time, and an account created with a generated initial password must choose its own password at first sign-in. When the presentation switch DEMO_MODE is on, an expandable Demo accounts panel offers ready-made accounts for each role and resettable student cases; with it off the page is only the form.",
+   "note": "5.10.1. Login.jsx, auth_login, tests/test_health.py; old text described four account types and a responsibility selector.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.2",
+   "mode": "replace",
+   "find": "The dashboard is the landing screen for staff roles.",
+   "replace": "The dashboard is the landing screen for Graduate School staff and the administrator; the Academic Coordinator lands on the monitoring sheet and the Research Coordinator on the research gate.",
+   "note": "5.10.2. App.jsx homeFor(); /api/dashboard is staff and admin only.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.3",
+   "mode": "paragraph",
+   "match": "The monitoring sheet is the consolidated cohort view that the existing spreadsheet cannot provide.",
+   "replace": "The monitoring sheet is the consolidated cohort view that the existing spreadsheet cannot provide. Each row is a student and each column group is a curriculum category (Basic, Major, and Cognate) with one column per subject, followed by the comprehensive examination and the research milestones. Cell shading encodes the status vocabulary: completed, taken, enrolled, planned, incomplete, failed, dropped, withdrawn, and not taken, and a marker shows where a value was entered by hand. The screen carries a notice that entries typed in the portal are marked Manual entry with the user's name and the time and are kept in the change history, that a later upload that disagrees with a portal entry is held for review, and that grades are not entered here; for roles that cannot edit, it states that the sheet is view only. Graduate School staff and the Academic Coordinator add students and subject rows and edit statuses directly, and the record panel of a student shows each value's source and history. Students carrying a standing condition are labelled inline, and an integrity banner reports enrollment and profile inconsistencies found by comparing the enrollment ledger with the monitoring rows. The view is filtered by program, semester, progress, risk, and enrollment state, and exports to CSV or as an Excel workbook.",
+   "note": "5.10.3. MonitoringGrid.jsx, StudentRecordPanel.jsx, /api/monitoring/export.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.4",
+   "mode": "replace",
+   "find": "There is no manual student creation on this screen: students exist only because they appeared in an import, which preserves the rule that student identity originates outside the Graduate School.",
+   "replace": "There is no create form on this screen: a student can also be added on the monitoring sheet, which applies the same required fields and duplicate checks, so identity still originates outside the Graduate School and the system generates no student number. The screen also carries the onboarding report of each import batch and the Dean's decision on it, and it is open to Graduate School staff only.",
+   "note": "5.10.4. WorkflowPage.jsx student handoff; Layout.jsx ROLE_PATHS excludes it for coordinators.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.5",
+   "mode": "replace",
+   "find": "so that evidence of demand is not mistaken for a decision to open a class.",
+   "replace": "so that evidence of demand is not mistaken for a decision to open a class. The screen is the Course Adjustments tab of one page whose second tab is the offering setup: the Academic Coordinator saves a draft plan from the report, submits it to the Dean, and publishes the offerings once the plan is approved.",
+   "note": "5.10.5. CoursePlanning.jsx tabs.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.6",
+   "mode": "replace",
+   "find": "The Academic Coordinator and the administrator may manage offerings; other staff roles see the list read-only.",
+   "replace": "The Academic Coordinator and the administrator may manage offerings, and Graduate School staff see the list read-only. The screen is the Offering setup tab of the Course Adjustments page; it suggests a faculty member ranked by subject preference, availability and load, and an offering that has enrolled students cannot be removed.",
+   "note": "5.10.6. CoursePlanning.jsx, course_offerings_delete guard.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.7",
+   "mode": "replace",
+   "find": "In both cases the server validates that the subject is officially offered for the term before accepting the tag, and a subject that is not offered requires explicit resolution rather than being silently accepted.",
+   "replace": "The class list names the faculty member of each row, honours the Enrolled or Dropped status given in the file, and refuses rows for another semester and for students on leave, absent without leave or withdrawn; a row for a subject that is not offered is refused. For a single student the screen shows a preview, and a subject that is not offered is blocked unless the coordinator records a documented exception. The same screen carries the curriculum version tag and the study plan draft of the student.",
+   "note": "5.10.7. enrollment_class_list_import rules, ProcessGates.jsx.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.8",
+   "mode": "paragraph",
+   "match": "The enrollment class list presents the consolidated list of students against subjects",
+   "replace": "The enrollment class list presents, for each subject offered in the chosen semester, the roster of students enrolled in it, with the faculty member, schedule and section, each student's enrollment status, enrollment date and source. It can show one class or all classes, exports to CSV, is synchronized from enrollment and is read-only.",
+   "note": "5.10.8. EnrollmentClassList.jsx; old text described a students-by-subjects matrix.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.9",
+   "mode": "paragraph",
+   "match": "The research gate screen shows, for each student",
+   "replace": "The research gate screen shows, for the selected student, the four stages (title defense, proposal defense readiness, final defense, and completion) and the requirements of the stage in progress, with which are submitted, which await an adviser signature or staff action, and which are outstanding. The Academic Coordinator endorses Form 1 from a queue on the same screen, and the Research Coordinator records the ethics clearance once the proposal defense is passed. The defense result is shown read-only, because the panel chair submits it from the faculty portal.",
+   "note": "5.10.9. ResearchGateForm in WorkflowPage.jsx, Form1Endorsements.jsx.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.10",
+   "mode": "paragraph",
+   "match": "Panel matching produces a ranked shortlist of faculty for a student's defense panel",
+   "replace": "Panel matching produces a ranked shortlist of faculty for a student's defense panel by comparing the student's current paper with each faculty member's recorded expertise. Each candidate shows a score out of 100 built from expertise match, availability and workload, the topics and passage of the paper that matched, the expertise records used, and warning flags. A suggested panel is preselected by role, and a checklist shows whether it satisfies the composition rules of the Research Protocol. The student's adviser and co-adviser are listed as not eligible. The recommendation is advisory until the Research Coordinator or Graduate School staff finalize the panel.",
+   "note": "5.10.10. PanelMatchingForm in WorkflowPage.jsx; PANEL_NOMINATION_ROLES.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.11",
+   "mode": "paragraph",
+   "match": "Defense scheduling proposes slots at which the student and every panel member",
+   "replace": "Defense scheduling proposes slots in which the research adviser and every panel member who has entered availability are simultaneously free, drawing on each person's weekly hours and dated entries and on the busy periods of a connected Google Calendar. Proposals begin only after the required lead time. Members who have not entered availability are named, and staff can ask them to enter it from the same screen. When no overlap exists the screen shows no slot for that window. A chosen slot is checked live: conflicts that cannot be saved are listed in red (a panel, venue or student overlap, a person outside the entered hours, a declined invitation, or a time in the past), and warnings that need a recorded reason are listed in amber (before the lead time, or availability not entered). Bookings can be rescheduled or cancelled, each with a recorded reason and the name of who asked, and a booking held after a panel change can be re-confirmed; the history of earlier bookings is kept. The panel invitations of each booking are shown beside it.",
+   "note": "5.10.11 (rewritten after the calendar packet). defense_schedule_check (/api/defense-schedules/check), AvailabilityRequestPanel.jsx, panel invitation chips in WorkflowPage.jsx.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.12",
+   "mode": "paragraph",
+   "match": "The practicum screen is restricted to the programs that require a practicum.",
+   "replace": "The practicum screen is restricted to Psychology and MSGC students who meet the practicum eligibility checks. It shows the memorandum of agreement status, the practicum site and supervisor, the completed hours entered by the student against the required hours, and the certificate submissions, which are counted automatically and accumulate across submissions. A shortfall in hours appears as Hours Incomplete and prompts the Academic Coordinator to request additional certificates. The screen also carries the timeline through to the status report to the Dean.",
+   "note": "5.10.12. PracticumCaseDetails in WorkflowPage.jsx.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.13",
+   "mode": "paragraph",
+   "match": "The graduation screen lists candidates for a review window",
+   "replace": "The graduation screen lists eligible candidates, and candidates already placed in a batch, for a review window (a school year). Each candidate's check is resolved into coursework, research and practicum, and the missing items are named for candidates returned as not eligible. Candidates are processed in named batches on a staged board: the Academic Coordinator checks coursework, the Research Coordinator validates research and practicum, staff prepare the list, and the Dean approves it or returns it for revision. After approval the Dean exports the endorsed list as a file.",
+   "note": "5.10.13. StageBoard graduation (WorkflowPage.jsx), DeanGraduationPage.jsx.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.14",
+   "mode": "paragraph",
+   "match": "The leave of absence screen presents structured applications",
+   "replace": "The leave of absence screen presents each request as a card on a staged board, with a table view as an alternative. The columns are Submitted, In staff review, Returned to student, With the Dean, Leave scheduled, On leave, Return due, Ended, and Not approved. A card moves by drag and drop or by a Move to menu, and the server refuses any move the rules do not allow. The card shows the rule checks for the permitted reasons, the allowed duration (up to two semesters a request and four in total, with no limit on the number of leaves), and the filing date (no leave in the last two weeks of a semester). Staff review precedes the Dean's decision, which may be an approval, a return for revision or a denial, and a pending request may be withdrawn by the student. Selected cases can be forwarded or decided as a batch. A follow-up strip lists leaves that are ending or that ended with no return, where AWOL is proposed and staff confirm it. A Registrar list panel exports the Dean-approved cases as CSV or Excel and records when the list was sent and acknowledged; the portal sends nothing itself.",
+   "note": "5.10.14. LeaveCasesBoard.jsx, leave_workflow.py BOARD_COLUMNS, FollowUpStrip.jsx, RegistrarPanel.jsx.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.15",
+   "mode": "paragraph",
+   "match": "Readmission follows the same structured pattern as leave of absence.",
+   "replace": "Readmission uses the same board and case record as leave of absence, with the columns Submitted, In staff review, Returned to student, With the Dean, Approved (back in the program), and Not approved. Staff verify the return checklist item by item before forwarding, and every request is decided by the Dean rather than resolved automatically. On approval the student is active again, the linked leave is closed, enrollment planning passes to the Academic Coordinator as a separate step, and the approved case joins the Registrar list.",
+   "note": "5.10.15. leave_workflow.py readmission statuses.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.16",
+   "mode": "paragraph",
+   "match": "This screen combines the monitoring of students absent without leave",
+   "replace": "This screen combines the monitoring of students absent without leave with residency tracking. AWOL is created by the policy engine from explicit evidence and cannot be declared by hand; the engine raises an alert and a task for the Academic Coordinator, and for a leave that ended with no return AWOL is only proposed and staff confirm it. A return from AWOL is policy-reviewed and decided by the Dean, and a student beyond the absolute maximum residence requires re-enrollment rather than a simple return. Residency is derived from the recorded entry year rather than counted by hand.",
+   "note": "5.10.16. sync_automatic_awol_statuses, confirm_awol.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.17",
+   "mode": "replace",
+   "find": "Requests are presented on a board by stage—Submitted, Dean Review, Returned for Clarification, and Subject Tagging—and each card names",
+   "replace": "Requests are presented on a board of seven stages: Submitted, Dean Review, Returned for Clarification, Subject Tagging, Excel Export / Manual Email, Legacy Acknowledgement, and Rejected / Cancelled, and each card names",
+   "note": "5.10.17. WorkflowBoard columns in WorkflowPage.jsx (the withdrawal board does not support drag and drop).",
+   "expect": 1
+  },
+  {
+   "id": "5.10.21",
+   "mode": "replace",
+   "find": "access is scoped by role so that a student cannot obtain staff-only information through it.",
+   "replace": "access is scoped by role so that staff and the administrator may ask record-based questions, a student is limited to the student's own record, and the Dean, the coordinators and faculty receive policy answers only. The library of documents the assistant reads is maintained on the Policy Documents screen.",
+   "note": "5.10.21. assistant route scoping (app.py ~17126).",
+   "expect": 1
+  },
+  {
+   "id": "5.10.22",
+   "mode": "paragraph",
+   "match": "The reports screen presents the ten report views",
+   "replace": "The reports screen presents {{report_views}} report views: the {{operational_reports}} operational reports described in Section 5.11 and {{analytics_reports}} analytics views (queue aging and backlog, stage bottlenecks, workload and turnaround, residency watchlist, completion and attrition, scheduling cycle time, and follow-up closure), together with the module KPI measurements. The reports can be filtered by program, progress, risk, standing and workflow, and each paged report shows its record count before it is opened. Each table can be exported as CSV. The Dean has a separate Reports and Analytics page.",
+   "note": "5.10.22. Reports.jsx, ANALYTICS_REPORTS / OPERATIONAL_REPORT_KEYS (generated counts).",
+   "expect": 1
+  },
+  {
+   "id": "5.10.23",
+   "mode": "replace",
+   "find": "practicum where applicable, standing history, tasks, and the transaction history for that student.",
+   "replace": "practicum where applicable, recommended actions, the panel and defense schedule, open tasks, and the activity timeline for that student.",
+   "note": "5.10.23. StudentDetail.jsx has no standing-history panel.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.24",
+   "mode": "replace",
+   "find": "It is the source against which panel matching and offering assignment operate.",
+   "replace": "Each member also carries expertise records (research interests, publications, past advisee and panel titles, degrees) that staff and coordinators maintain and that panel matching reads. It is the source against which panel matching and offering assignment operate.",
+   "note": "5.10.24. Faculty.jsx ExpertiseEditor, /api/faculty/<id>/expertise.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.25",
+   "mode": "replace",
+   "find": "Removing a semester preserves the history that references it rather than deleting dependent records.",
+   "replace": "A semester that has dependent records, such as enrollments, leave cases or course adjustment plans, cannot be removed, so the history that references it is preserved.",
+   "note": "5.10.25. admin_terms_delete answers 409 when dependents exist.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.26",
+   "mode": "paragraph",
+   "match": "The Dean signs in to a dedicated portal",
+   "replace": "The Dean signs in to a dedicated portal whose approvals queue presents the decisions awaiting action across every process (course adjustments, leave of absence, readmission, return from AWOL, subject withdrawal, practicum reports, graduation endorsement, and adviser appointments), with a page for each process, batch decisions on leave cases, a read-only defense calendar, a decision history, and reports and analytics, rather than requiring the Dean to visit each workflow screen separately. Table 23.1 lists the pages.",
+   "note": "5.10 Dean portal. DeanRoutes.jsx, /api/approvals, workflow_approval_decide.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.27",
+   "mode": "replace",
+   "find": "with the eligibility rules checked at the point of submission so that an application that cannot succeed does not enter the queue.",
+   "replace": "with the eligibility rules checked at the point of submission so that an application that cannot succeed does not enter the queue. The student can also select offered subjects, nominate a research adviser and follow the appointment, see the next defense with a countdown and the next deadlines on the research calendar, upload documents, and withdraw a request or cancel an approved leave. Table 23.2 lists the pages.",
+   "note": "5.10 student portal. StudentRoutes.jsx.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.28",
+   "mode": "paragraph",
+   "match": "The faculty portal presents the assignments belonging to the signed-in faculty member",
+   "replace": "The faculty portal presents the assignments belonging to the signed-in faculty member: advisees and the adviser requests addressed to the member, research documents awaiting the adviser's signature, defense panels, invitations and verdicts, assigned classes, a personal calendar, and the member's availability, entered as weekly hours and dated entries, with the optional connection of that faculty member's own Google Calendar. The authorization flow permits a faculty member to connect only that faculty member's own account. Table 23.3 lists the pages.",
+   "note": "5.10 faculty portal. FacultyRoutes.jsx.",
+   "expect": 1
+  },
+  {
+   "id": "5.10.29",
+   "mode": "paragraph",
+   "match": "The same screens present different navigation depending on the signed-in role.",
+   "replace": "The same screens present different navigation depending on the signed-in role. The Academic Coordinator sees students, faculty, the monitoring sheet, enrollment and the enrollment class list, course adjustments, research gate, panel matching, practicum, graduation, AWOL and residency, the defense calendar, adviser appointments, reports, the work queue, the policy assistant and the business rules, but not the administrative screens. The Research Coordinator sees the research gate, panel matching, defense scheduling, graduation, the monitoring sheet (view only), the defense calendar, adviser appointments, the work queue, the policy assistant and the business rules. This restriction is applied by the server, not only by the navigation.",
+   "note": "5.10 role-scoped views. Layout.jsx ROLE_PATHS, ROLE_TRANSACTION_ACCESS.",
+   "expect": 1
+  },
+  {
+   "id": "5.11-intro",
+   "mode": "paragraph",
+   "match": [
+    "The system generates ten report views",
+    "The system generates {{report_views}} report views"
+   ],
+   "replace": "The system generates {{report_views}} report views ({{operational_reports}} operational reports and {{analytics_reports}} analytics views) and the export files listed in Table 25. The counts shown against each report in the following table are those observed after a first start on the seeded demonstration dataset of {{seed_students}} students (Section 6.2) and are given to indicate the shape of the output, not as institutional figures. Each report table can also be exported as CSV from the Reports screen.",
+   "note": "5.11. Generated counts; Reports.jsx; Table 24 is regenerated from a seeded temporary database.",
+   "expect": 1
+  },
+  {
+   "id": "5.11.1a",
+   "mode": "replace",
+   "find": "Four documents are generated for conveyance outside the system.",
+   "replace": "The following files are generated for conveyance outside the system.",
+   "note": "5.11.1. More than four exports exist now.",
+   "expect": 1
+  },
+  {
+   "id": "t25-wd-by",
+   "mode": "paragraph",
+   "match": "Withdrawal module on Dean approval",
+   "replace": "Withdrawal module, by Graduate School staff after the Dean approves and the subject is tagged",
+   "note": "Table 25. /api/withdrawal/approved.xlsx is staff-only and follows tagging.",
+   "expect": 1
+  },
+  {
+   "id": "t25-grad-by",
+   "mode": "paragraph",
+   "match": "Graduation module on Dean approval",
+   "replace": "Graduation module, by the Dean after approval",
+   "note": "Table 25. /api/graduation/endorsed.csv is Dean-only.",
+   "expect": 1
+  },
+  {
+   "id": "t25-standing-doc",
+   "mode": "paragraph",
+   "match": "Standing-change Registrar report",
+   "replace": "Leave of absence and readmission Registrar list (CSV or Excel), and single-student Registrar sheets",
+   "note": "Table 25. /api/leave-cases/registrar-export and /api/standing-changes/<slug>/<id>/registrar-report.",
+   "expect": 1
+  },
+  {
+   "id": "t25-standing-by",
+   "mode": "paragraph",
+   "match": "Leave of absence, readmission, AWOL, and residency modules on decision",
+   "replace": "Leave and readmission board, by Graduate School staff for Dean-approved cases; single-student sheets for leave, readmission, AWOL return and residency",
+   "note": "Table 25.",
+   "expect": 1
+  },
+  {
+   "id": "t25-standing-content",
+   "mode": "paragraph",
+   "match": "The document conveying the approved standing change",
+   "replace": "The approved cases for conveyance to the Registrar. Staff record when the list was sent and acknowledged; the system does not send it. The AWOL and residency sheets are provisional.",
+   "note": "Table 25. leave_registrar_advance, LeaveCase.registrar_* columns.",
+   "expect": 1
+  },
+  {
+   "id": "t25-monitoring",
+   "mode": "paragraph",
+   "match": "Monitoring sheet export (CSV)",
+   "replace": "Monitoring sheet export (Excel workbook per program, and CSV of the filtered view)",
+   "note": "Table 25. /api/monitoring/export returns a workbook; MonitoringGrid.jsx also offers a CSV of the filtered view.",
+   "expect": 1
+  },
+  {
+   "id": "5.11.1c",
+   "mode": "paragraph",
+   "match": "This boundary is deliberate and is the corrected position discussed in Section 4.2.5.8.",
+   "replace": "This boundary is deliberate and is the corrected position discussed in Section 4.2.5.8. The system does not claim that a document has been transmitted to or acknowledged by the Registrar unless a staff member records it. For leave of absence and readmission, staff mark a list as sent and as acknowledged, and the times are held against the case; for withdrawal and graduation, recording the Registrar's confirmation is carried as remaining work.",
+   "note": "5.11.1 closing paragraph. POST /api/leave-cases/handoff records Sent to Registrar and Acknowledged.",
+   "expect": 1
+  },
+  {
+   "id": "5.12-routes",
+   "mode": "replace",
+   "regex": "JSON API over \\d+ routes",
+   "replace": "JSON API over {{routes}} routes",
+   "note": "5.12 generated count."
+  },
+  {
+   "id": "5.12-tables",
+   "mode": "replace",
+   "regex": "a relational database of \\d+ tables accessed",
+   "replace": "a relational database of {{tables}} tables accessed",
+   "note": "5.12 generated count."
+  },
+  {
+   "id": "5.12-boundary",
+   "mode": "replace",
+   "find": "The application tier parses an imported workbook into read-only official values and records the import; there is no live connection, and no path exists by which a locally maintained value can be presented as an official one.",
+   "replace": "The application tier parses an imported workbook into the monitoring record and records the import; there is no live connection. A value entered locally is stored and shown as a manual entry with the person, time and reason, so it can never be presented as an imported one, and an import that disagrees with a manual entry is held as a conflict instead of replacing it.",
+   "note": "5.12. monitoring_record_source labels every value.",
+   "expect": 1
+  },
+  {
+   "id": "5.12-mysql",
+   "mode": "replace",
+   "find": "MySQL (SQLite for isolated tests)",
+   "replace": "MySQL for the deployed instance (a local SQLite file when no database URL is configured, and for isolated tests)",
+   "note": "5.12 relation-to-original paragraph. app.py database URL default.",
+   "expect": 1
+  },
+  {
+   "id": "5.13.3",
+   "mode": "paragraph",
+   "match": "The deployed instance runs MySQL 8.0 through PyMySQL.",
+   "replace": "A deployed instance is configured for MySQL 8.0 through PyMySQL; when no database URL is supplied the application uses a local SQLite file. The automated test suite runs each test file against a temporary SQLite database created for the run, so tests neither depend on nor modify the deployed data. The database connection is supplied by environment configuration (DATABASE_URL) rather than embedded in the source.",
+   "note": "5.13.3. app.py database URL handling.",
+   "expect": 1
+  },
+  {
+   "id": "5.13.4",
+   "mode": "replace",
+   "find": "The application listens on port 5050.",
+   "replace": "The application listens on the port given by FLASK_PORT (5000 by default; 5050 in the demonstration configuration).",
+   "note": "5.13.4. app.py FLASK_PORT default.",
+   "expect": 1
+  },
+  {
+   "id": "6.1-t26-r2",
+   "mode": "replace",
+   "find": "Executed; results in Section 6.4",
+   "replace": "Executed on the CAP-IT1 build; coverage by automated tests in Section 6.4",
+   "note": "Table 26. The manual walkthrough has not been repeated by hand on the current build.",
+   "expect": 1
+  },
+  {
+   "id": "6.1-t26-r3",
+   "mode": "replace",
+   "find": "Executed; results in Section 6.5",
+   "replace": "Checked against the current navigation and access-control tests; results in Section 6.5",
+   "note": "Table 26.",
+   "expect": 1
+  },
+  {
+   "id": "6.2-os",
+   "mode": "replace",
+   "regex": "^Windows [\\w. ]+, version [\\d.]+$",
+   "replace": "{{os}}",
+   "note": "Table 27 operating system of the machine that ran the suite (platform module)."
+  },
+  {
+   "id": "6.2-python",
+   "mode": "replace",
+   "regex": "^Python 3\\.\\d+(\\.\\d+)?$",
+   "replace": "Python {{python}}",
+   "note": "Table 27 interpreter version of the collection run."
+  },
+  {
+   "id": "6.2-node",
+   "mode": "replace",
+   "regex": "^Node\\.js [\\d.]+, Vite [\\d.]+, React [\\d.]+$",
+   "replace": "Node.js {{node}}, Vite {{vite}}, React {{react}}",
+   "note": "Table 27 versions read from node and the front-end package.json files."
+  },
+  {
+   "id": "6.2-browser",
+   "mode": "paragraph",
+   "match": "Microsoft Edge, driven both interactively and under automation",
+   "replace": "Not used by the automated suite; the manual walkthrough of Section 6.4 was performed in Microsoft Edge on the CAP-IT1 build",
+   "note": "Table 27. The automated suite needs no browser.",
+   "expect": 1
+  },
+  {
+   "id": "6.2-dataset",
+   "mode": "replace",
+   "regex": "(?s)^\\d+ students across \\d+ programs.*$",
+   "replace": "{{seed_students}} students across {{seed_programs}} programs, {{seed_subjects}} subjects, {{seed_faculty}} faculty records, and {{seed_demo_students}} seeded demonstration student accounts covering every process (the dataset a first start produces, measured on a temporary database)",
+   "note": "Table 27 dataset. Generated by seeding a temporary database (collect stage); the old figures came from a generated seed that no longer exists."
+  },
+  {
+   "id": "6.2-note",
+   "mode": "paragraph",
+   "match": "The automated suite creates its own temporary SQLite database",
+   "replace": "Each automated test file creates its own temporary SQLite database before the application is loaded and directs the application at it, and the test runs write uploaded files to a temporary folder. The suite therefore neither depends on nor modifies the deployed MySQL demonstration data, and repeated runs begin from an identical state.",
+   "note": "6.2. Each tests/test_*.py sets DATABASE_URL to a temp file before importing app.",
+   "expect": 1
+  },
+  {
+   "id": "6.3.1-count",
+   "mode": "replace",
+   "regex": "The suite comprises \\d+ test cases( in \\d+ test files)?",
+   "replace": "The suite comprises {{tests}} test cases in {{test_files}} test files",
+   "note": "6.3.1 generated count."
+  },
+  {
+   "id": "6.3.2-text",
+   "mode": "paragraph",
+   "match": "The suite was executed in full against the implemented system",
+   "replace": "The suite was executed in full against the implemented system on {{test_date}}. Of {{tests}} test cases, {{tests_passed}} passed and {{tests_failed}} failed, with {{tests_errors}} errors. The complete run took {{test_duration}}. The per-case results are given in Appendix V and the record of the run in Appendix W.",
+   "note": "6.3.2 generated from the recorded run (scripts/docs/proposal_inventory.json).",
+   "expect": 1
+  },
+  {
+   "id": "6.3.2-outcome",
+   "mode": "paragraph",
+   "match": "The suite reports an overall failure status",
+   "replace": "The suite reports an overall OK status: every one of the {{tests}} cases passed, covering enrollment and offering setup, monitoring integrity and portal entry, subject withdrawal, practicum, graduation, the standing changes, the research and defense pipeline, the policy assistant and policy documents, the business rules register, the portals, and access control.",
+   "note": "6.3.2. Only valid when the recorded run has no failure; the script stops otherwise.",
+   "expect": 1,
+   "requires_all_passed": true
+  },
+  {
+   "id": "6.3.3-heading",
+   "mode": "replace",
+   "find": "6.3.3 Defect Identified",
+   "replace": "6.3.3 Defects",
+   "note": "6.3.3 heading; the section is regenerated from the run.",
+   "expect": 1
+  },
+  {
+   "id": "6.4-intro",
+   "mode": "paragraph",
+   "match": "In addition to the automated suite, the lifecycle was exercised manually",
+   "replace": "In addition to the automated suite, the lifecycle was exercised manually through the demonstration scenarios, each carried out against the seeded dataset in the browser. The results below are those of that walkthrough of the CAP-IT1 build; it has not been repeated by hand on the current build, and the scenarios are covered there by the automated test cases of Section 6.3.4 (a manual walkthrough of the current build is part of the user acceptance testing planned for CAP-IT2).",
+   "note": "6.4. Manual results cannot be re-performed without a browser session; the text says so.",
+   "expect": 1
+  },
+  {
+   "id": "6.4-caption",
+   "mode": "replace",
+   "find": "Table 31. Scenario test results",
+   "replace": "Table 31. Scenario test results (manual walkthrough of the CAP-IT1 build)",
+   "note": "Table 31 caption.",
+   "expect": 1
+  },
+  {
+   "id": "6.4-r1",
+   "mode": "replace",
+   "find": "Students imported, upload recorded, validation issues surfaced, no manual creation path.",
+   "replace": "Students imported, upload recorded, validation issues surfaced; a student can also be added by hand on the monitoring sheet, marked as a manual entry.",
+   "note": "Table 31 scenario 1 expected outcome (updated to the current behaviour).",
+   "expect": 1
+  },
+  {
+   "id": "6.4-r8",
+   "mode": "replace",
+   "find": "Structured form validated by rule, staff review, Dean decision, Registrar document generated.",
+   "replace": "Structured form validated by rule, staff review, Dean decision, approved case on the Registrar list exported by staff.",
+   "note": "Table 31 scenario 8 expected outcome.",
+   "expect": 1
+  },
+  {
+   "id": "6.5-intro",
+   "mode": "replace",
+   "find": "Each account type was signed in and the presented navigation compared against the authorization the server enforces.",
+   "replace": "The navigation presented to each account type was compared against the authorization the server enforces, using the navigation definitions of the current front end and the access-control tests of Section 6.3.4; the sign-in walkthrough itself was last performed by hand on the CAP-IT1 build.",
+   "note": "6.5 intro.",
+   "expect": 1
+  },
+  {
+   "id": "t32-ac",
+   "mode": "paragraph",
+   "match": "Reports, records, monitoring sheet, enrollment class list, course adjustments",
+   "replace": "Reports, records, monitoring sheet, enrollment class list, course adjustments, enrollment, research gate, panel matching, practicum, graduation, AWOL, defense calendar, adviser appointments, work queue, policy assistant and business rules. Administrative screens absent.",
+   "note": "Table 32 Academic Coordinator row (Layout.jsx ROLE_PATHS).",
+   "expect": 1
+  },
+  {
+   "id": "t32-rc",
+   "mode": "paragraph",
+   "match": [
+    "Research gate, graduation, and work queue only.",
+    "Research gate, panel matching, defense scheduling, graduation, monitoring sheet (view only), defense calendar, adviser appointments, work queue, policy assistant and business rules. Administrative"
+   ],
+   "replace": "Research gate, panel matching, defense scheduling, graduation, monitoring sheet (view only), defense calendar, adviser appointments, work queue, policy assistant and business rules. Administrative screens absent.",
+   "note": "Table 32 Research Coordinator row.",
+   "expect": 1,
+   "auto_lead": false
+  },
+  {
+   "id": "t32-dean",
+   "mode": "paragraph",
+   "match": "Dean portal presenting the approvals queue.",
+   "replace": "Dean portal: dashboard, approvals queue with a page for each process (including adviser appointments), admission and coursework reports, defense calendar (view only), reports and analytics, decision history, policy assistant and business rules.",
+   "note": "Table 32 Dean row (portalNav.jsx).",
+   "expect": 1
+  },
+  {
+   "id": "t32-faculty",
+   "mode": "paragraph",
+   "match": "Faculty portal presenting assigned workflows only.",
+   "replace": "Faculty portal: advisees and adviser requests, signatures, panel papers, panel invitations, defense schedule, verdicts, assigned classes, calendar, availability, policy assistant and business rules; assigned students only.",
+   "note": "Table 32 Faculty row.",
+   "expect": 1
+  },
+  {
+   "id": "t32-student",
+   "mode": "paragraph",
+   "match": "Student portal presenting the student's own lifecycle status only.",
+   "replace": "Student portal: the student's own progress, enrollment, research, research adviser, defense schedule, research calendar, practicum, graduation, requests, messages, documents and profile only.",
+   "note": "Table 32 Student row.",
+   "expect": 1
+  },
+  {
+   "id": "6.6-1",
+   "mode": "replace",
+   "find": "Defect DEF-001, described in Section 6.3.3, affects the demonstration account reset baseline. It does not affect the subject withdrawal workflow.",
+   "replace": "Defect DEF-001, recorded at the CAP-IT1 milestone, concerned the reset test for the demonstration accounts. It was closed by correcting the expectation of the test, as Section 6.3.3 explains, and the test passes in the recorded run. It never affected the subject withdrawal workflow.",
+   "note": "6.6 item 1. tests/test_bpm_workflows.py now asserts the three Current subjects of the withdrawal demonstration student (MAED-COG1, MAED-MAJ1, MAED-MAJ3); the test passes in the recorded run. The seeding routine was not changed.",
+   "expect": 1,
+   "requires_all_passed": true
+  },
+  {
+   "id": "6.6-2",
+   "mode": "replace",
+   "regex": "(?s)The login screen.s prefilled faculty account does not match the seeded faculty accounts.*?a valid seeded account\\.",
+   "replace": "The sign-in page shows a panel of ready-made demonstration accounts only while the presentation switch DEMO_MODE is on; it must be switched off for any shared deployment, and with it off the page is only an e-mail and password form.",
+   "note": "6.6 item 2. The old prefilled-account defect belonged to the earlier login screen (Login.jsx now has no prefilled credentials; tests/test_health.py checks this)."
+  },
+  {
+   "id": "6.6-5",
+   "mode": "replace",
+   "regex": "(?s)The key performance indicator formulas defined in Section 1\\.7\\.1\\.4 are not yet computed by the system\\..*?remaining work\\.",
+   "replace": "The nine key performance indicator measurements defined in Section 1.7.1.4 are computed from the running system and shown on the Reports screen. They measure the prototype's demonstration data, not institutional performance, several of them do not reach their targets on that data, and they have not been validated by the Graduate School.",
+   "note": "6.6 item 5. analytics_kpi_summary etc.; the seeded measurement shows unmet targets (audit coverage, required monitoring fields, follow-up closure)."
+  },
+  {
+   "id": "6.8-a",
+   "mode": "paragraph",
+   "match": "The implemented system was exercised by",
+   "replace": "The implemented system was exercised by {{tests}} automated test cases, of which {{tests_passed}} passed and {{tests_failed}} failed, in the run of {{test_date}}; the eight manual lifecycle scenarios and the role-based access verification of Sections 6.4 and 6.5 were carried out on the CAP-IT1 build and are to be repeated by hand on the current build. The run ended without a failure or an error, and the defect DEF-001 of the CAP-IT1 milestone is closed.",
+   "note": "6.8 summary. Generated from the recorded run; the manual parts are labelled as CAP-IT1 results.",
+   "expect": 1,
+   "requires_all_passed": true
+  },
+  {
+   "id": "6.8-b",
+   "mode": "replace",
+   "find": "since user acceptance testing has not been administered, the defined KPI measurements are not yet computed, and the exchange with the Registrar remains a manual external step.",
+   "replace": "since user acceptance testing has not been administered, the KPI measurements have not been validated by the Graduate School, and the exchange with the Registrar remains a manual external step.",
+   "note": "6.8 second paragraph. The KPI measurements are computed now.",
+   "expect": 1
+  },
+  {
+   "id": "5.5-6",
+   "mode": "replace",
+   "find": "Faculty availability is either declared as recurring working hours or supplied by the faculty member's own connected calendar, with that connection made by the faculty member for the faculty member's own account only.",
+   "replace": "Faculty availability is whatever the faculty member enters in the faculty portal, as weekly working hours and dated entries, or the busy periods of a Google Calendar that the faculty member connects from the faculty member's own account only; the connection is read-only, and where nothing has been entered the system assumes no availability.",
+   "note": "5.5 assumption 6. Availability editor (FacultyAvailabilityEditor.jsx, /api/faculty-portal/availability*); tests: no_invented_busy_blocks_anywhere, creating_a_faculty_record_does_not_invent_working_hours.",
+   "expect": 1
+  },
+  {
+   "id": "5.3.5-adviser",
+   "mode": "insert_after",
+   "match": "Checks each student's required research submissions",
+   "replace": "Adviser appointment follows the protocol. The student nominates a faculty member on Form 3, which is allowed only while the student has no active adviser and no open application. The Academic Coordinator notes the application, the Research Coordinator or staff forward it to the Dean, and the Dean appoints the adviser (Form 3.1) or returns the application with a reason, after which the student may nominate again. A faculty member may hold at most five active advisees, and only the Dean, with a recorded exception and note, can exceed the limit. The nominated adviser then accepts or declines, a decline needing a reason. The student sends Forms 3.2 and 3.3 within five days of Form 3.1 (the forms travel by e-mail, so the student records that they were sent) and the Research Coordinator confirms receipt; an overdue contract is shown as a deadline. A student may change adviser once, before the proposal defense, with a reason on Form 3.1.1 that both the current and the new adviser must agree to, followed by the same Dean step; the earlier appointment then ends. An adviser appointed outside the portal can be recorded by staff or the Research Coordinator. Missing credentials, such as no recorded doctorate for a doctoral student, appear as warnings and do not block the appointment.",
+   "note": "New paragraph after 5.3.5. adviser_appointment table and routes (/api/adviser-appointments*, /api/student-portal/adviser*, /api/faculty-portal/adviser-requests*), rules faculty.max_advisees, research.adviser_contract_days, research.adviser_change_max; tests/test_calendar_appointments.py (AdviserAppointmentFlowTests, AdviserChangeTests).",
+   "key": "Adviser appointment follows the protocol."
+  },
+  {
+   "id": "5.3.7-calendars",
+   "mode": "insert_after",
+   "match": "Finds a defense slot at which the research adviser",
+   "replace": "Every role has a calendar fed by one interface: a student sees only the student's own defenses and deadlines, a faculty member sees the defenses sat on or advised, the advisees' deadlines and the member's own entered availability, and staff, the coordinators and the Dean see all defenses, the Dean's view being read-only. When a defense is booked, each panel member receives an invitation that can be accepted or declined, a decline needing a reason; a decline opens a replacement task for the Research Coordinator and blocks the booking until the seat is filled, and an adviser or panel member who cannot attend a booked defense tells the coordinators, who must reschedule. Notifications are in-app only, and no e-mail is sent: a bell in the top bar shows read and unread items with their links and due dates, for adviser steps, invitations, availability requests, and defenses booked, moved or cancelled, and reminders for a defense are created when the bell is opened, 14, 7, 2 and 1 days before it. Each person can create a private calendar link (an .ics feed whose secret address is the credential, replaceable and revocable at any time), and each booked defense can be downloaded as a single calendar event.",
+   "note": "New paragraph after 5.3.7. /api/calendar, /api/panel-invitations, /api/faculty-portal/panel-invitations*, /api/notifications*, /api/calendar-feed*, /api/defense-schedules/<id>/event.ics; tests: PanelInvitationTests, NotificationTests, PrivateFeedTests.",
+   "key": "Every role has a calendar fed by one interface"
+  },
+  {
+   "id": "6.6-3",
+   "mode": "replace",
+   "find": "but it means the Registrar's confirmation of an implemented standing change cannot presently be recorded through the interface, even though the data model provides the fields for it.",
+   "replace": "but it means that the Registrar cannot confirm through the system: staff can record in the portal that a leave or readmission list was sent and acknowledged, while for withdrawal and graduation export is still the last recorded step.",
+   "note": "6.6 item 3. POST /api/leave-cases/handoff records Sent to Registrar and Acknowledged for leave and readmission; withdrawal and graduation stop at export.",
+   "expect": 1
+  }
+ ]
+}

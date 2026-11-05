@@ -1,0 +1,54 @@
+# Claude Code — project notes
+
+**Read [`AGENTS.md`](AGENTS.md) first.** It holds the rules every agent
+follows (test first, targeted tests, stay inside the item, official-data
+read-only, leave the repo ready) and how work is split between Claude, Sonnet
+subagents, and the local model. Do not restate them here.
+
+- **The work queue** is first [`DEFENSE_REVISIONS.md`](DEFENSE_REVISIONS.md)
+  (panel revisions from the 2026-08-07 defense — highest priority), then
+  [`CHECKLIST_PHASE_PLAN.md`](CHECKLIST_PHASE_PLAN.md) (numbered, phase-gated
+  acceptance checklist, items 1–92) and
+  [`NEXT_SESSION_PLAN.md`](NEXT_SESSION_PLAN.md) (BPMN-compliance gaps). They
+  are the single source of truth for what the app must do — `.planning/` must
+  never drift from them.
+- **Improvement mode (v5.2, from 2026-10-17):** work lands on
+  the current branch `v6.2-migui` (earlier `v6.1-migui`, `v5.2-migui_again`) in the order of `.planning/ROADMAP.md`. The owner reads
+  `.planning/BOARD.md`; owner decisions are `.planning/DECISIONS.md`
+  (IM1–IM15); bugs and findings are rows in `.planning/ISSUES.md`; the
+  unattended loop is `.planning/IMPROVE.md`. Code map: `.planning/codebase/`.
+- **`Documents/Archive/CAPRIT2 OLD/` is archived pre-defense material** —
+  do not use it as a spec, do not edit it.
+- **Load `ui-ux-pro-max`** (`.claude/skills/ui-ux-pro-max/`) before planning
+  or reviewing anything under `frontend/src/**`.
+- **Load `intelligence-layer`** (`.claude/skills/intelligence-layer/`) for a
+  large multi-step job that benefits from architect/QA + cheaper-model
+  delegation, beyond the Claude/Sonnet-subagent/Ollama split AGENTS.md already defines.
+- **Stakeholder policy sources** in `Documents/Graduate_School/Policy_Sources/`
+  (Graduate School Handbook, Research Protocol) and the proposal
+  `Documents/Capstone/Proposal/Final Proposal Document - CAP-IT1.docx` are the
+  ground truth for what a workflow should do — read the relevant policy text
+  before changing or extending a workflow's behavior. The Word files have no
+  `pandoc` here; read them with a small stdlib `zipfile` + XML script.
+
+Commands: `/continue_CAPSTONE-USLS-MVP` (start any session with it).
+
+## Claude-specific conventions
+
+- `app.py` is one ~23,000-line Flask file holding every model, route, and
+  business rule. `Grep` for the symbol you need; don't read it end to end.
+- Tests are plain stdlib `unittest` in `tests/test_bpm_workflows.py`
+  (no `pytest` dependency, no `package.json` test script). They build their
+  own temp SQLite DB before importing `app`, so they never touch
+  `usls_gs_demo.sqlite3` or need `.env`.
+- Schema changes (owner decision IM4): edit the SQLAlchemy model and the
+  seed, then rebuild the demo database with `npm run seed`. Do not add
+  `ALTER TABLE` patches. See AGENTS.md Rule 4.
+- Official student/enrollment/grade data is read-only and sourced only from
+  an AIMS export import — never add a path that lets a user hand-edit it.
+  See AGENTS.md Rule 4.
+- Never read or quote `.env`, `.env.*`, or the contents of `uploads/` —
+  they hold local secrets and user-submitted files and are gitignored.
+- The `.venv` can go stale if the machine's Python version changed since it
+  was created (`.venv/pyvenv.cfg` pins an absolute interpreter path) — see
+  AGENTS.md Traps before assuming the gate will just run.

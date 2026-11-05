@@ -1,0 +1,114 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Enrollment Class List
+Grace Fernandez · Graduate School Staff
+1
+GF
+Enrollment Class List
+
+Read-only class rosters synchronized automatically with confirmed Enrollment records.
+
+DPSY — Doctor of Philosophy in Psychology
+MAPSY — Master of Arts in Psychology
+MASS — Master of Arts in Social Sciences
+DBA — Doctor of Business Administration
+MBA — Master of Business Administration
+EDD — Doctor of Education
+MAED — Master of Arts in Education
+MSGC — Master of Science in Guidance and Counseling
+MIT — Master in Information Technology
+MSCS — Master of Science in Computer Science
+MAN — Master of Arts in Nursing
+MSN — Master of Science in Nursing
+AY 2026-2027 2nd Semester (Next)
+AY 2026-2027 1st Semester (Current)
+AY 2025-2026 2nd Semester (Previous)
+All class lists
+MAED-COG1 — Teaching Strategies in Higher Education
+MAED-COG2 — Learning Analytics
+MAED-MAJ1 — Curriculum Development and Evaluation
+MAED-MAJ2 — Educational Leadership and Management
+MAED-MAJ3 — Assessment of Learning
+MAED-MAJ4 — Educational Technology and Instruction
+MAED-MAJ5 — Philosophy of Education
+Export CSV
+
+Read-only roster.
+
+Confirm or change enrollment in the Enrollment workspace; this list updates automatically.
+
+ENROLLMENT-SYNCHRONIZED CLASS LIST
+
+MAED-MAJ2 — Educational Leadership and Management
+
+Dr. Marlon Geronimo · Schedule not set · Section not set
+
+5 listed
+5 active
+Students enrolled in MAED-MAJ2
+STUDENT
+	IDNO
+	PROGRAM
+	ENROLLMENT STATUS
+	ENROLLED
+	SOURCE
+
+Bautista, Anton	GS-2026-HO-02	MAED	
+Enrolled	Aug 15, 2026	Requested MAED demo enrollment
+Castillo, Maureen	GS-2026-LOA-01	MAED	
+Enrolled	Oct 23, 2026	Requested MAED demo enrollment
+Dela Cruz, Clarissa	GS-2026-ENR-01	MAED	
+Enrolled	Nov 2, 2026	Class list import (MAED_Class_List_Walkthrough.csv)
+Gonzales, Martin	GS-2026-ENR-02	MAED	
+Enrolled	Nov 2, 2026	Class list import (MAED_Class_List_Walkthrough.csv)
+Lim, Joshua	GS-2026-WD-02	MAED	
+Enrolled	Sep 21, 2026	Withdrawal demo active enrollment

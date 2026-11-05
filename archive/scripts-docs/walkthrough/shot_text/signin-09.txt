@@ -1,0 +1,184 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+AWOL & Residency
+
+MONITORING & SUPPORT
+
+Work Queue
+Policy Assistant
+Business Rules
+
+Academic Coordinator
+
+Figures are computed live from recorded transactions.
+
+Academic Coordinator Portal
+Dashboard
+Dr. Ramon Alvarez · Academic Coordinator
+DR
+Welcome, Ramon
+
+Academic Coordinator · what needs you today
+
+Reports
+Needs your action
+
+Your office's open tasks, most urgent first
+
+Review automatic AWOL policy alert
+
+Paulo Garcia
+
+Pending
+Due Nov 4, 2026 (in 1d)
+
+Open AWOL & Residency
+
+Review automatic AWOL policy alert
+
+Clarisse Tan
+
+Pending
+Due Nov 9, 2026 (in 6d)
+
+Open AWOL & Residency
+
+Review automatic AWOL policy alert
+
+Maya Torres
+
+Pending
+Due Nov 14, 2026 (in 11d)
+
+Open AWOL & Residency
+
+Review automatic AWOL policy alert
+
+Noel Navarro
+
+Pending
+Due Nov 14, 2026 (in 11d)
+
+Open AWOL & Residency
+Waiting on others
+
+Another office or the student holds these. Nothing to do here until they act.
+
+View all
+
+Decide structured AWOL return declaration
+
+With the Dean. Noel Navarro
+
+Pending
+Due Nov 6, 2026 (in 3d)
+
+Open Work Queue
+
+Review graduation endorsement
+
+With the Dean. Hector Ong
+
+Pending
+Due Nov 7, 2026 (in 4d)
+
+Open Work Queue
+
+Review practicum status report
+
+With the Dean. Isabel Mendoza
+
+Pending
+Due Nov 7, 2026 (in 4d)
+
+Open Work Queue
+
+YOUR OPEN TASKS
+
+4
+
+0 overdue
+
+STUDENTS WITH OPEN WORK
+
+4
+
+Your tasks are about them
+
+AT RISK OR DELAYED
+
+4
+
+4 delayed
+
+DUE IN 7 DAYS
+
+2
+
+Your tasks, not yet overdue
+
+Recent activity
+
+Student automatically flagged AWOL
+
+Clarisse Tan · next: Academic Coordinator
+
+Sep 30, 2026
+
+AWOL return declaration submitted
+
+Clarisse Tan · next: Graduate School Staff
+
+Sep 30, 2026
+
+Student automatically flagged AWOL
+
+Noel Navarro · next: Academic Coordinator
+
+Sep 19, 2026
+
+AWOL return declaration forwarded to Dean
+
+Noel Navarro · next: Dean
+
+Sep 19, 2026
+
+Student automatically flagged AWOL
+
+Paulo Garcia · next: Academic Coordinator
+
+Sep 19, 2026
+
+Student declared AWOL
+
+Paulo Garcia · next: Student
+
+Sep 18, 2026

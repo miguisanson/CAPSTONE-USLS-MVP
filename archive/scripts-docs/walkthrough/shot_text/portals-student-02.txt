@@ -1,0 +1,165 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+My Progress
+
+ACADEMICS
+
+Enrollment
+Graduation Endorsement
+
+RESEARCH
+
+Research Progress
+Research Adviser
+Defense Schedule
+Research Calendar
+
+REQUESTS
+
+Request Center
+Leave of Absence
+Readmission
+Return from AWOL
+Subject Withdrawal
+
+SUPPORT
+
+Messages
+Documents
+Activity Log
+Policy Assistant
+My Profile
+
+Student
+
+Your record updates as staff act on your requests. Nothing here changes official grades or enrollment.
+
+Student Portal
+My Progress
+Sofia Reyes · MAED
+SR
+My Progress
+
+Your lifecycle stage, requirement status, and curriculum, read from the monitoring record.
+
+My Academic Status
+
+Your current stage, requirements, and next step
+
+1
+Current:
+Admission
+2
+Upcoming:
+Coursework
+3
+Upcoming:
+Comprehensive Exam
+4
+Upcoming:
+Proposal Development
+5
+Upcoming:
+Proposal Defense
+6
+Upcoming:
+Data Collection
+7
+Upcoming:
+Writing
+8
+Upcoming:
+Final Defense
+Coursework completion
+0%
+
+0 completed, 0 current, 18 missing.
+
+No research case opened yet
+
+Adviser: Dr. Patricia Salvador
+
+Research not started
+Workflow Status
+
+Administrative and completion requests currently visible to you
+
+Withdrawal
+Not submitted
+
+No withdrawal request is active.
+
+Graduation Endorsement
+Needs verification
+
+Resolve graduation missing coursework
+
+Curriculum progress
+
+Every subject in your program and where you stand on it
+
+Enroll in subjects
+Units completed
+0 / 54
+
+COMPLETED
+
+0
+
+CURRENT
+
+0
+
+MISSING
+
+18
+
+Basic
+3 subjects
+Basic subjects and their status
+SUBJECT
+	UNITS
+	SUGGESTED TERM
+	STATUS
+
+MAED-FED Foundations of Education	3	Year 1 - 2nd Semester	Not Started
+MAED-MOR Methods of Educational Research	3	Year 1 - 1st Semester	Not Started
+MAED-STAT Statistics in Education	3	Year 1 - 1st Semester	Not Started
+Cognate
+10 subjects
+Cognate subjects and their status
+SUBJECT
+	UNITS
+	SUGGESTED TERM
+	STATUS
+
+MAED-COG1 Teaching Strategies in Higher Education	3	Year 1 - 2nd Semester	Not Started
+MAED-COG10 Seminar on Contemporary Issues in Education	3	Year 2 - 2nd Semester	Not Started
+MAED-COG2 Learning Analytics	3	Year 1 - 2nd Semester	Not Started
+MAED-COG3 Inclusive Education	3	Year 2 - 1st Semester	Not Started
+MAED-COG4 Action Research in the Classroom	3	Year 2 - 1st Semester	Not Started
+MAED-COG5 School Administration and Supervision	3	Year 2 - 1st Semester	Not Started
+MAED-COG6 Educational Policy and Planning	3	Year 2 - 1st Semester	Not Started
+MAED-COG7 Guidance and Student Development	3	Year 2 - 2nd Semester	Not Started
+MAED-COG8 Instructional Design	3	Year 2 - 2nd Semester	Not Started
+MAED-COG9 Language and Literacy Education	3	Year 2 - 2nd Semester	Not Started
+Major
+5 subjects
+Major subjects and their status
+SUBJECT
+	UNITS
+	SUGGESTED TERM
+	STATUS
+
+MAED-MAJ1 Curriculum Development and Evaluation	3	Year 1 - 1st Semester	Not Started
+MAED-MAJ2 Educational Leadership and Management	3	Year 1 - 2nd Semester	Not Started
+MAED-MAJ3 Assessment of Learning	3	Year 2 - 1st Semester	Not Started
+MAED-MAJ4 Educational Technology and Instruction	3	Year 2 - 1st Semester	Not Started
+MAED-MAJ5 Philosophy of Education	3	Year 2 - 2nd Semester	Not Started

@@ -3,9 +3,33 @@
   "configurations": [
     {
       "name": "usls-gs",
-      "runtimeExecutable": "python",
+      "runtimeExecutable": ".venv/bin/python",
       "runtimeArgs": ["app.py"],
-      "port": 5000
+      "port": 5050,
+      "env": { "FLASK_PORT": "5050" }
+    },
+    {
+      "name": "usls-gs-win",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["app.py"],
+      "port": 5050,
+      "env": { "FLASK_PORT": "5050" }
+    },
+    {
+      "name": "usls-gs-check",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["app.py"],
+      "port": 5072,
+      "env": {
+        "FLASK_PORT": "5072",
+        "DATABASE_URL": "sqlite:///E:/Temp/claude/usls-check/check.sqlite3"
+      }
+    },
+    {
+      "name": "usls-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "port": 5173
     }
   ]
 }

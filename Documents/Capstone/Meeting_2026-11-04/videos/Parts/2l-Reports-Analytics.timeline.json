@@ -1,0 +1,188 @@
+[
+ {
+  "t": 1.2,
+  "kind": "card",
+  "label": "Signing in as Graduate School Staff",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 5.5,
+  "kind": "signin",
+  "label": "signed in as Graduate School Staff (staff@usls.edu.ph)",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 5.5,
+  "kind": "step",
+  "label": "open Reports & Analytics",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 8.4,
+  "kind": "hold",
+  "label": "reports-tour-01",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 19.7,
+  "kind": "step",
+  "label": "read the six numbers",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 19.8,
+  "kind": "hold",
+  "label": "reports-tour-02",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 26.5,
+  "kind": "hold",
+  "label": "reports-tour-03",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 33.4,
+  "kind": "step",
+  "label": "Needs attention: the causes, the students behind a bar, the list",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 33.9,
+  "kind": "hold",
+  "label": "reports-tour-04",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 41.9,
+  "kind": "hold",
+  "label": "reports-tour-05",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 47.7,
+  "kind": "hold",
+  "label": "reports-tour-06",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 57.6,
+  "kind": "step",
+  "label": "Where students get stuck",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 58.7,
+  "kind": "hold",
+  "label": "reports-tour-07",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 67.0,
+  "kind": "hold",
+  "label": "reports-tour-07b",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 73.5,
+  "kind": "step",
+  "label": "Office speed",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 74.7,
+  "kind": "hold",
+  "label": "reports-tour-08",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 83.1,
+  "kind": "step",
+  "label": "Records to fix",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 84.2,
+  "kind": "hold",
+  "label": "reports-tour-09",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 94.5,
+  "kind": "step",
+  "label": "report: By year started",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 95.6,
+  "kind": "hold",
+  "label": "reports-tour-10",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 100.0,
+  "kind": "step",
+  "label": "report: Graduation candidates",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 101.1,
+  "kind": "hold",
+  "label": "reports-tour-11",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 106.2,
+  "kind": "step",
+  "label": "report: Overdue and pending",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 107.3,
+  "kind": "hold",
+  "label": "reports-tour-12",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 110.9,
+  "kind": "step",
+  "label": "report: Defenses",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 112.1,
+  "kind": "hold",
+  "label": "reports-tour-13",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 118.6,
+  "kind": "step",
+  "label": "Registrar changes",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 119.8,
+  "kind": "hold",
+  "label": "reports-tour-14",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 125.2,
+  "kind": "step",
+  "label": "filter by program: every number follows",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 127.9,
+  "kind": "hold",
+  "label": "reports-tour-15",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 135.4,
+  "kind": "end",
+  "label": "end of part",
+  "role": "Graduate School Staff"
+ }
+]

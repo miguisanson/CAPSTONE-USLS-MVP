@@ -1,0 +1,236 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Policy Documents
+Grace Fernandez · Graduate School Staff
+1
+GF
+Policy Documents
+
+Manage the approved PDF and Word documents the Policy Assistant searches. Every answer names the document and page or section it came from. Drafts are searched but flagged as pending validation.
+
+Add document
+
+ALL SOURCES
+
+3
+
+STAFF UPLOADS
+
+1
+
+DRAFTS PENDING VALIDATION
+
+1
+
+READY FOR ASSISTANT
+
+3
+
+Test a question
+
+Type a question to see which passages the Policy Assistant would use, and from which document. Use it after an upload to confirm the new policy is found.
+
+Find passages
+What is the maximum residence period for a master's program?
+When may a student withdraw a subject?
+Who nominates the panel for a title defense?
+
+5 passages found by keyword search among 1449 indexed sections.
+
+ANSWER PREVIEW (EXTRACTED FROM THE PASSAGES, NO AI)
+
+Panel question: can a student drop a subject at any time, for example on Day 1? Day 1 is inside the first week, so a student may withdraw a subject on Day 1 with the Dean's approval, but it is not free: 10% of the total amount due for the term is charged in the first week and 20% in the second week. A student may also change a subject or add a subject only in the first week.
+Source: USLS Graduate School Operations Manual (draft for validation) (4.4 Withdrawal of subject)
+
+Draft — pending Graduate School validation: USLS Graduate School Operations Manual (draft for validation).
+
+1. USLS Graduate School Operations Manual (draft for validation)
+
+Draft
+section “4.4 Withdrawal of subject”
+
+Day 1 is inside the first week, so a student may withdraw a subject on Day 1 with the Dean's approval, but it is not free: 10% of the total amount due for the term is charged in the first week and 20% in the second week.
+
+Draft — pending Graduate School validation
+
+2. USLS Graduate School Operations Manual (draft for validation)
+
+Draft
+section “Timeline of consequences (Handbook 2022-2023, pp. 49-53)”
+
+(Consultation: withdrawal is possible before classes begin.) Not stated (OQ-02) Handbook silent; Consultation 29 July 2026 First week of classes, including Day 1 Withdraw a subject with the Dean's approval.
+
+Draft — pending Graduate School validation
+
+3. Graduate School Handbook 2022-2023
+
+Active
+p. 49, section “3.1 REGISTRATION > Withdrawal of Subject”
+
+Withdrawal of Subject The student may withdraw subjects until the second week from the start of classes regardless of whether or not classes have been attended. However, ten percent (10%) of the total amount due for the term if within the first week of classes, and twenty percent (20%) if within the second week will be charged.
+
+4. USLS Graduate School Operations Manual (draft for validation)
+
+Draft
+section “4.4.8 How the platform supports this process”
+
+The platform judges the window from the date of the request:
+
+Draft — pending Graduate School validation
+
+5. USLS Graduate School Operations Manual (draft for validation)
+
+Draft
+section “6.1 List of questions”
+
+Silent OQ-03 After the second week: may a student still withdraw from one subject, and what is it called and marked?
+
+Draft — pending Graduate School validation
+
+Documents
+
+Staff uploads can be edited, replaced, or removed. Built-in sources are view-only.
+
+Search documents
+All categories
+Handbook
+Research Protocol
+Operations Manual
+Memo
+Form
+Other
+All statuses
+Active
+Draft
+Archived
+USLS Graduate School Operations Manual (draft for validation)
+
+USLS_GS_Operations_Manual_-_DRAFT_for_Validation.docx
+
+Draft
+Operations Manual
+Version 1
+Draft — pending Graduate School validation. Assistant answers that use this document say so. Note: Prepared by the capstone group for Graduate School validation
+
+The capstone group's written description of how the Graduate School carries out each process, with the business rules register. A draft: every answer that uses it says it is pending validation.
+
+DOCX
+143 KB
+1074 searchable sections
+
+System Administrator · Nov 2, 2026, 8:46 PM
+
+Version history (1)
+
+Version 1
+Current, searched
+
+USLS_GS_Operations_Manual_-_DRAFT_for_Validation.docx · 143 KB
+
+System Administrator · Nov 2, 2026, 8:46 PM
+
+“Seeded from the project files”
+
+View
+Graduate School Research Protocol (AY 2024-2025)
+
+Complete-GS-Research-Protocol-Updated-for-AY2024-2025-without-publication-protocol-1.docx
+
+Active
+Research Protocol
+
+Built-in policy source managed with the application files.
+
+DOCX
+109 KB
+
+System library · Feb 17, 2026, 8:29 PM
+
+Graduate School Handbook 2022-2023
+
+GRADUATE-SCHOOL-HANDBOOK-22-23.pdf
+
+Active
+Handbook
+
+Built-in policy source managed with the application files.
+
+PDF
+890 KB
+
+System library · Jun 26, 2026, 3:31 PM
+
+Add policy document
+
+PDF or DOCX, up to 20 MB. Scanned PDFs are read with OCR when it is installed.
+
+Lounge_Reservation_Memo_20261102-2048.pdf · 2 KB
+
+PDF or DOCX, up to 20 MB
+
+Document title
+Category
+Handbook
+Research Protocol
+Operations Manual
+Memo
+Form
+Other
+Effective date
+Status
+Active
+Draft (pending validation)
+Archived (not searched)
+Description (optional)
+Version note (optional)
+Cancel
+Upload and index

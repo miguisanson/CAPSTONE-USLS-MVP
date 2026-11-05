@@ -1,0 +1,176 @@
+[
+ {
+  "t": 1.1,
+  "kind": "card",
+  "label": "Signing in as Graduate School Staff",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 6.9,
+  "kind": "signin",
+  "label": "signed in as Graduate School Staff (staff@usls.edu.ph)",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 6.9,
+  "kind": "step",
+  "label": "open Monitoring Sheet, choose MSN",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 9.3,
+  "kind": "hold",
+  "label": "monitoring-sheet-01",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 22.1,
+  "kind": "step",
+  "label": "open Add student",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 22.8,
+  "kind": "hold",
+  "label": "monitoring-sheet-02",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 34.2,
+  "kind": "step",
+  "label": "fill and submit the new student",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 36.1,
+  "kind": "hold",
+  "label": "monitoring-sheet-03",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 50.5,
+  "kind": "hold",
+  "label": "monitoring-sheet-04",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 55.6,
+  "kind": "step",
+  "label": "Add subjects now: the record panel",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 56.3,
+  "kind": "hold",
+  "label": "monitoring-sheet-05",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 64.3,
+  "kind": "step",
+  "label": "add subject row MSN-FED",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 65.9,
+  "kind": "hold",
+  "label": "monitoring-sheet-06",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 74.5,
+  "kind": "step",
+  "label": "add subject row MSN-MOR",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 77.0,
+  "kind": "step",
+  "label": "two manual rows with provenance",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 77.0,
+  "kind": "hold",
+  "label": "monitoring-sheet-07",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 85.8,
+  "kind": "step",
+  "label": "edit the remarks of MSN-FED",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 87.9,
+  "kind": "hold",
+  "label": "monitoring-sheet-08",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 92.5,
+  "kind": "step",
+  "label": "remove the MSN-MOR row with a reason",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 94.0,
+  "kind": "hold",
+  "label": "monitoring-sheet-09",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 103.9,
+  "kind": "hold",
+  "label": "monitoring-sheet-10",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 105.3,
+  "kind": "step",
+  "label": "Change history tab",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 107.0,
+  "kind": "hold",
+  "label": "monitoring-sheet-11",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 119.8,
+  "kind": "step",
+  "label": "new student appears in the grid, marked Manual",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 121.3,
+  "kind": "hold",
+  "label": "monitoring-sheet-12",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 128.9,
+  "kind": "step",
+  "label": "imported student: provenance and reason required to change an imported value",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 129.7,
+  "kind": "hold",
+  "label": "monitoring-sheet-13",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 138.5,
+  "kind": "hold",
+  "label": "monitoring-sheet-14",
+  "role": "Graduate School Staff"
+ },
+ {
+  "t": 149.6,
+  "kind": "end",
+  "label": "end of part",
+  "role": "Graduate School Staff"
+ }
+]

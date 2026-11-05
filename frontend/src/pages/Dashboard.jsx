@@ -1,285 +1,152 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-  CartesianGrid,
-} from "recharts";
-import {
-  Users,
-  UserCheck,
-  AlertTriangle,
-  ListTodo,
-  CalendarCheck,
-  CalendarOff,
-  CheckCircle2,
-  Clock,
-  ArrowRight,
-} from "lucide-react";
+import { FileText, LayoutDashboard, RefreshCw } from "lucide-react";
 import { api } from "../api";
+import { useAuth } from "../auth";
 import { useApi } from "../hooks";
-import { Card, SectionTitle, Spinner, StatusBadge, EmptyState } from "../components/ui";
-import { CHART_COLORS, RISK_COLORS, SCHEDULE_COLORS, formatDate, relativeDays } from "../lib/format";
+import { Button, InlineNotice, Spinner, StatusChip } from "../components/ui/index.js";
+import RoleHome from "../components/RoleHome.jsx";
+import { formatDate, relativeDays } from "../lib/format";
+import { canOpen, firstNameOf, officeActions, officeActivity, officeOf, officeStats, officeWaiting } from "../lib/staffHome.js";
 
-function Kpi({ icon: Icon, label, value, sub, tone = "brand" }) {
-  const tones = {
-    brand: "bg-brand-50 text-brand-700",
-    amber: "bg-amber-50 text-amber-700",
-    blue: "bg-blue-50 text-blue-700",
-    red: "bg-red-50 text-red-700",
-  };
-  return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between">
-        <span className={`grid h-11 w-11 place-items-center rounded-xl ${tones[tone]}`}>
-          <Icon className="h-6 w-6" strokeWidth={2} />
-        </span>
-      </div>
-      <p className="mt-4 font-display text-3xl font-semibold leading-none text-ink">{value}</p>
-      <p className="mt-2 text-sm font-semibold text-slate-700">{label}</p>
-      {sub && <p className="text-xs text-slate-500">{sub}</p>}
-    </Card>
-  );
-}
+// IM19 + AD7: the back-office home is action first - what waits on this office, what other offices hold, four key
+// numbers, recent activity. The charts and the filter bar that used to fill this page are on Reports > Analytics
+// (IM20). It serves the Graduate School office and the administrator (who also get the dashboard figures and the
+// activity feed, the analytics and the "Refresh data" button) and, since I-066, the two coordinators too: the same
+// layout with the figures of their own caseload (the dashboard API answers them with that), their own tasks and the
+// recent activity of their own students - and no link to a page their role cannot open (the drill-down, the activity
+// log and the analytics are the Graduate School's).
 
-function ChartCard({ title, subtitle, children, className = "" }) {
-  return (
-    <Card className={`p-5 ${className}`}>
-      <div className="mb-4">
-        <h3 className="font-display text-base font-semibold text-ink">{title}</h3>
-        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
-      </div>
-      {children}
-    </Card>
-  );
-}
-
-const tooltipStyle = {
-  borderRadius: 12,
-  border: "1px solid #e2e8f0",
-  boxShadow: "0 6px 24px rgba(15,23,42,0.10)",
-  fontSize: 13,
+const ROLE_NAMES = {
+  staff: "Graduate School Staff",
+  admin: "Administrator",
+  academic_coordinator: "Academic Coordinator",
+  research_coordinator: "Research Coordinator",
 };
+const GS_ROLES = new Set(["staff", "admin"]);
+const TASK_PAGE = 200; // the most the tasks API returns in one page
+
+function dueText(item) {
+  if (!item.dueAt) return undefined;
+  return `${item.overdue ? "Overdue, was due" : "Due"} ${formatDate(item.dueAt)} (${relativeDays(item.dueAt)})`;
+}
+
+function toRow(item) {
+  return {
+    key: item.key,
+    title: item.title,
+    detail: item.detail,
+    meta: dueText(item),
+    tone: item.tone,
+    chip: <StatusChip status={item.status} dot={false} size="sm" />,
+    to: item.target.to,
+    linkLabel: item.target.label,
+  };
+}
 
 export default function Dashboard() {
-  const { data, loading, error } = useApi(() => api.dashboard(), []);
-
-  if (loading) return <Spinner label="Loading dashboard…" />;
-  if (error) return <EmptyState icon={AlertTriangle} title="Could not load dashboard" hint={error} />;
-
-  const k = data.kpis;
-
-  return (
-    <div className="space-y-6 animate-fade-up">
-      <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">Graduate School Overview</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Every figure below is computed live from recorded transactions — student handoffs, audits, gates, panels, and schedules.
-        </p>
-      </div>
-
-      {/* Primary KPIs */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi icon={Users} label="Students monitored" value={k.total_students} sub={`${k.active_students} active`} tone="brand" />
-        <Kpi icon={AlertTriangle} label="Needing attention" value={k.at_risk} sub={`${k.high_risk} high risk`} tone="amber" />
-        <Kpi icon={ListTodo} label="Open tasks" value={k.pending_tasks} sub={`${k.overdue_tasks} overdue`} tone="red" />
-        <Kpi icon={CalendarCheck} label="Confirmed defenses" value={k.confirmed_schedules} sub={`${k.needs_availability} awaiting availability`} tone="blue" />
-      </div>
-
-      {/* Secondary strip */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <MiniStat icon={UserCheck} label="Active" value={k.active_students} />
-        <MiniStat icon={CalendarOff} label="On leave" value={k.on_leave} />
-        <MiniStat icon={CheckCircle2} label="Completed" value={k.completed} />
-        <MiniStat icon={Clock} label="Overdue tasks" value={k.overdue_tasks} />
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <ChartCard
-          title="Lifecycle stage distribution"
-          subtitle="Where students currently sit in the graduate lifecycle"
-          className="lg:col-span-2"
-        >
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={data.stage_distribution} layout="vertical" margin={{ left: 24, right: 16 }}>
-              <CartesianGrid horizontal={false} stroke="#eef2f6" />
-              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: "#64748b" }} />
-              <YAxis
-                type="category"
-                dataKey="stage"
-                width={130}
-                tick={{ fontSize: 12, fill: "#334155" }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f1f5f9" }} />
-              <Bar dataKey="count" radius={[0, 6, 6, 0]} fill="#0f7a44" barSize={18} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Risk level" subtitle="Computed from monitoring signals">
-          <ResponsiveContainer width="100%" height={320}>
-            <PieChart>
-              <Pie
-                data={data.risk_distribution}
-                dataKey="count"
-                nameKey="risk"
-                innerRadius={62}
-                outerRadius={96}
-                paddingAngle={2}
-              >
-                {data.risk_distribution.map((entry) => (
-                  <Cell key={entry.risk} fill={RISK_COLORS[entry.risk] || "#94a3b8"} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={tooltipStyle} />
-              <Legend iconType="circle" wrapperStyle={{ fontSize: 13 }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Students by college" subtitle="Program clusters under monitoring">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={data.college_distribution} margin={{ left: -16, right: 8 }}>
-              <CartesianGrid vertical={false} stroke="#eef2f6" />
-              <XAxis dataKey="college" tick={{ fontSize: 10, fill: "#64748b" }} interval={0} angle={-12} textAnchor="end" height={56} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#64748b" }} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f1f5f9" }} />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="#1c9a59" barSize={34} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Research gate position" subtitle="Active research cases by gate">
-          {data.gate_distribution.length ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={data.gate_distribution} dataKey="count" nameKey="gate" outerRadius={92} paddingAngle={2}>
-                  {data.gate_distribution.map((entry, i) => (
-                    <Cell key={entry.gate} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState title="No research cases yet" />
-          )}
-        </ChartCard>
-
-        <ChartCard title="Defense scheduling" subtitle="Outcome of scheduling requests">
-          {data.schedule_distribution.length ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={data.schedule_distribution} dataKey="count" nameKey="status" innerRadius={50} outerRadius={92} paddingAngle={2}>
-                  {data.schedule_distribution.map((entry) => (
-                    <Cell key={entry.status} fill={SCHEDULE_COLORS[entry.status] || "#94a3b8"} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState title="No schedule requests yet" />
-          )}
-        </ChartCard>
-      </div>
-
-      {/* Open work queue by owner */}
-      <ChartCard title="Open work queue by owner" subtitle="Who currently owns the next action">
-        {data.tasks_by_owner.length ? (
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={data.tasks_by_owner} margin={{ left: -16, right: 8 }}>
-              <CartesianGrid vertical={false} stroke="#eef2f6" />
-              <XAxis dataKey="owner" tick={{ fontSize: 11, fill: "#64748b" }} interval={0} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#64748b" }} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f1f5f9" }} />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="#0f7a44" barSize={48} />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <EmptyState title="No open tasks" />
-        )}
-      </ChartCard>
-
-      {/* Activity + tasks */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="p-5">
-          <SectionTitle title="Recent activity" subtitle="Latest recorded transactions" icon={Clock} />
-          {data.recent_logs.length ? (
-            <ul className="space-y-3">
-              {data.recent_logs.map((log) => (
-                <li key={log.id} className="flex gap-3 rounded-xl border border-slate-100 p-3">
-                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-ink">{log.result}</p>
-                    <p className="truncate text-xs text-slate-500">
-                      {log.student_name || "—"} · next: {log.next_owner || "—"} · {formatDate(log.created_at)}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState title="No activity yet" hint="Complete a workflow to populate this feed." />
-          )}
-          <Link to="/activity" className="btn-ghost mt-4 w-full">
-            View full activity log <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Card>
-
-        <Card className="p-5">
-          <SectionTitle title="Open work queue" subtitle="Highest-priority pending tasks" icon={ListTodo} />
-          {data.open_tasks.length ? (
-            <ul className="divide-y divide-slate-100">
-              {data.open_tasks.map((task) => (
-                <li key={task.id} className="flex items-center gap-3 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-ink">{task.title}</p>
-                    <p className="text-xs text-slate-500">
-                      {task.owner_role} · {task.student_name || "—"}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <StatusBadge value={task.overdue ? "Overdue" : "Pending"} />
-                    <p className="mt-1 text-xs text-slate-400">{relativeDays(task.due_at)}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState title="No pending tasks" />
-          )}
-          <Link to="/work-queue" className="btn-ghost mt-4 w-full">
-            Open the work queue <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Card>
-      </div>
-    </div>
+  const { user } = useAuth();
+  const role = user?.role;
+  const office = officeOf(role);
+  const isGraduateSchool = GS_ROLES.has(role);
+  const [refreshing, setRefreshing] = useState(false);
+  const [notice, setNotice] = useState(null); // { tone, text } after "Refresh data"
+  const { data, loading, error, refetch } = useApi(
+    () =>
+      Promise.all([
+        api.tasks({ owner: office, page_size: TASK_PAGE }),
+        api.tasks({ page_size: TASK_PAGE }),
+        api.dashboard({}), // a coordinator is answered with their own caseload (viewer.owner)
+      ]).then(([own, all, dashboard]) => ({ own, all, dashboard })),
+    [role]
   );
-}
 
-function MiniStat({ icon: Icon, label, value }) {
+  // I-071: the date-driven sweeps no longer run when a page is viewed. This runs them on request, then reads the home again.
+  async function refreshData() {
+    setRefreshing(true);
+    setNotice(null);
+    try {
+      const result = await api.maintenanceRefresh();
+      setNotice({ tone: "success", text: result.message || "Data refreshed." });
+      refetch();
+    } catch (err) {
+      setNotice({ tone: "danger", text: err.message || "Could not refresh the data." });
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  if (loading && !data) return <Spinner label="Loading your home…" />;
+  if (error) {
+    return (
+      <InlineNotice tone="danger" title="Could not load your home">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span>{error}</span>
+          <Button variant="secondary" size="sm" onClick={refetch}>Try again</Button>
+        </div>
+      </InlineNotice>
+    );
+  }
+
+  const actions = officeActions(data.own.items, role);
+  const waiting = officeWaiting(data.all.items, role);
+  // the tasks API counts every open task; the page of 200 may hold fewer than the total
+  const heldByOthers = Math.max((data.all.total ?? 0) - (data.own.total ?? 0), waiting.total);
+  const stats = officeStats({ role, own: { ...actions, total: data.own.total ?? actions.total }, waiting: { total: heldByOthers }, kpis: data.dashboard?.kpis || null });
+  const queue = `/work-queue?owner=${encodeURIComponent(office)}`;
+  const activity = data.dashboard
+    ? officeActivity(data.dashboard.recent_logs, undefined, role).map((entry) => ({
+        key: entry.key,
+        title: entry.title,
+        detail: entry.detail,
+        time: formatDate(entry.at),
+        to: entry.to,
+      }))
+    : null;
+  const firstName = firstNameOf(user?.full_name) || ROLE_NAMES[role];
+
   return (
-    <Card className="flex items-center gap-3 p-4">
-      <span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-500">
-        <Icon className="h-5 w-5" />
-      </span>
-      <div>
-        <p className="font-display text-xl font-semibold leading-none text-ink">{value}</p>
-        <p className="text-xs text-slate-500">{label}</p>
-      </div>
-    </Card>
+    <RoleHome
+      header={{
+        title: `Welcome, ${firstName}`,
+        description: `${ROLE_NAMES[role] || office} · what needs you today`,
+        icon: LayoutDashboard,
+        actions: (
+          <>
+            {isGraduateSchool && (
+              <Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={refreshData}>
+                Refresh data
+              </Button>
+            )}
+            {canOpen("/reports", role) && (
+              <Button as={Link} to="/reports" variant="secondary" icon={FileText}>
+                Reports
+              </Button>
+            )}
+          </>
+        ),
+      }}
+      actions={actions.items.map(toRow)}
+      actionsSubtitle="Your office's open tasks, most urgent first"
+      actionsEmpty={{ title: "Nothing is waiting on you", hint: `New tasks for the ${office} will appear here.` }}
+      actionsAll={actions.total > actions.items.length ? { to: queue, label: `View all ${actions.total}` } : undefined}
+      waiting={{
+        title: "Waiting on others",
+        subtitle: "Another office or the student holds these. Nothing to do here until they act.",
+        items: waiting.items.map(toRow),
+        all: { to: "/work-queue", label: "View all" },
+      }}
+      stats={stats}
+      activity={activity}
+      activityAll={activity && isGraduateSchool ? { to: "/activity", label: "View all" } : undefined}
+      activityEmpty={{ title: "No activity yet", hint: "Complete a workflow to populate this feed." }}
+      notice={
+        notice && (
+          <InlineNotice tone={notice.tone} onDismiss={() => setNotice(null)}>
+            {notice.text}
+          </InlineNotice>
+        )
+      }
+    />
   );
 }

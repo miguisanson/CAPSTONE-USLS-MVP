@@ -1,0 +1,227 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Business Rules
+Grace Fernandez · Graduate School Staff
+1
+GF
+Business Rules
+
+The rules the workflows follow, each with the handbook or protocol page it comes from. The Graduate School Handbook 2022-2023 is in force; where the system and the handbook disagree, the handbook wins. Rules set by the Handbook or the Research Protocol are locked: they change only when the Graduate School issues a new policy (upload it under Policy Documents). Prototype rules awaiting Graduate School validation can be adjusted; every change is recorded with your reason.
+
+RULES IN THE REGISTER
+
+65
+
+ENFORCED BY THE SYSTEM
+
+47
+
+DOCUMENTED ONLY
+
+18
+
+NEED REVIEW
+
+12
+
+All rules
+Enforced by the system
+Documented only
+Needs review
+Official (locked)
+Pending validation
+Search rules
+Subject withdrawal
+
+Subject withdrawal window
+
+A student may withdraw subjects until the end of the second week from the start of classes (14 calendar days), whether or not classes were attended. The request needs the Dean's approval. It is not free: the fee consequence below applies. After the window a single subject can no longer be withdrawn; the student may still withdraw from all subjects (paying the full fees for the semester) or file a Leave of Absence.
+
+Source: Graduate School Handbook 2022-2023, p. 49 · Registration - Withdrawal of Subject
+
+Enforced by the system
+Official — Handbook p. 49
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 49. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+withdrawal.window_days
+
+14 days
+Change history
+0
+
+First week of classes (fee tier boundary)
+
+Withdrawals filed within the first 7 calendar days of classes fall in the first-week fee tier; days 8 to 14 fall in the second-week tier.
+
+Source: Graduate School Handbook 2022-2023, pp. 50-51 · Fees and Expenses - Refund of Fees
+
+Enforced by the system
+Official — Handbook pp. 50-51
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 50-51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+withdrawal.first_week_days
+
+7 days
+Change history
+0
+
+Fee charged for a first-week withdrawal
+
+10% of the total amount due for the term is charged when the subject is withdrawn within the first week of classes, regardless of whether classes were attended.
+
+Source: Graduate School Handbook 2022-2023, pp. 49, 51 · Registration - Withdrawal of Subject; Fees - Refund of Fees
+
+Documented only
+Official — Handbook pp. 49, 51
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 49, 51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+withdrawal.fee_percent_first_week
+
+10 percent
+Change history
+0
+
+Fee charged for a second-week withdrawal
+
+20% of the total amount due for the term is charged when the subject is withdrawn within the second week of classes.
+
+Source: Graduate School Handbook 2022-2023, pp. 49, 51 · Registration - Withdrawal of Subject; Fees - Refund of Fees
+
+Documented only
+Official — Handbook pp. 49, 51
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 49, 51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+withdrawal.fee_percent_second_week
+
+20 percent
+Change history
+0
+
+Fee charged after the second week
+
+After the second week the student may still withdraw all subjects at any time of the semester but pays the full enrollment fees for the semester (a justifiable reason limits the charge to the last month of attendance).
+
+Source: Graduate School Handbook 2022-2023, p. 51 · Fees and Expenses - Refund of Fees
+
+Documented only
+Official — Handbook p. 51
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+withdrawal.fee_percent_after_window
+
+100 percent
+Change history
+0
+Dropping a subject and retention
+
+A subject is dropped only when unexcused absences exceed 20%
+
+A student is expected to attend regularly; the maximum absences allowed is 20% of the class hours for the semester. When unexcused absences in one subject go beyond 20%, the professor automatically drops the student from that subject (grade DRP, 5.0). The Academic Coordinator can only record a Dropped status when the unexcused-absence percentage entered is above this limit; a student who wants to leave a subject earlier files a Subject Withdrawal instead (see the withdrawal window).
+
+Source: Graduate School Handbook 2022-2023, p. 52 · Attendance - Limits on Absences
+
+Enforced by the system
+Official — Handbook p. 52
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 52. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+dropping.absence_limit_percent
+
+20 percent
+Change history
+0
+Leave of absence
+
+A leave filed in the second half of a semester marks the courses W
+
+For a leave filed by the student himself or herself during the second half of the semester, the class standing of the enrolled courses becomes W (withdrawn) and no refund of tuition and fees is given. The portal shows this on the request.
+
+Source: Graduate School Handbook 2022-2023, p. 53 · Attendance - Leave of Absence, guideline 2
+
+Enforced by the system
+Official — Handbook p. 53
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 53. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+loa.second_half_marks_w
+
+Yes
+Change history
+0
+
+Leaving without a formal leave is AWOL
+
+A student who withdraws from the college without a formal leave of absence is considered absent without leave (AWOL) and has registration privileges curtailed or withdrawn.
+
+Source: Graduate School Handbook 2022-2023, p. 53 · Attendance - Leave of Absence
+
+Enforced by the system
+Official — Handbook p. 53
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 53. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+loa.awol_if_no_leave
+
+Yes
+Change history
+0

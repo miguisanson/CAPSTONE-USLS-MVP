@@ -1,0 +1,190 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Subject Withdrawal
+Grace Fernandez · Graduate School Staff
+2
+GF
+Subject Withdrawal
+
+Withdraw a student from one subject until the end of the second week of classes, without changing program standing.
+
+How this works
+View recent activity
+Rules applied on this screen
+5 rules from the Graduate School policies
+
+1 Submitted, 1 With the Dean, 1 Exported - email the Registrar, 1 Not approved
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Search requests by name, student number or program
+All programs
+MAED
+MAN
+MSN
+All statuses
+Exported - email to the Registrar
+With the Dean
+Denied
+Submitted
+Showing 4 of 4 requests
+Board
+Table
+1 approved subject withdrawal exported as approved-subject-withdrawals-2026-11-02.xlsx.
+
+← 3 stages to the left
+
+Submitted
+1
+
+Waiting for Graduate School staff to record and forward.
+
+Adrian Lim
+
+2360006 · MAED
+
+MAED-COG10 - Seminar on Contemporary Issues in Education
+
+AY 2026-2027 1st Semester · Before classes begin
+
+Next: Graduate School Staff
+
+View details
+Move to…
+Select all in this column
+Returned to student
+0
+
+Waiting for the student to correct and resend.
+
+No requests here
+
+With the Dean
+1
+
+Waiting for the Dean's decision.
+
+Hazel Flores
+
+2360087 · MAN
+
+MAN-COG10 - Critical Care Nursing
+
+AY 2026-2027 1st Semester · Before classes begin
+
+Next: Dean
+
+View details
+
+Waiting for: Dean
+
+Subject tagging
+0
+
+Approved. Staff tag the subject as Withdrawn.
+
+No requests here
+
+Excel export
+0
+
+Tagged. Staff export the approved-withdrawals Excel list.
+
+No requests here
+
+Exported - email the Registrar
+1
+
+Exported lists (and older acknowledged records). Staff email the file to the Registrar.
+
+Elena Navarro
+
+GS-2026-WD-01 · MAED
+
+MAED-MAJ1 - Curriculum Development and Evaluation
+
+AY 2026-2027 1st Semester · First week of classes
+
+Next: Graduate School Staff
+
+Fee 10% of the term
+Registrar: Exported - Ready to Send
+View details
+
+Waiting for: Graduate School Staff
+
+Not approved
+1
+
+Denied by the Dean, or cancelled.
+
+Gian Lacson
+
+2460068 · MSN
+
+MSN-COG10 - Critical Care Nursing
+
+AY 2026-2027 1st Semester · Before classes begin
+
+No further step
+
+View details
+
+Finished - nothing more to do
+
+Registrar list
+
+Dean-approved withdrawals whose subject is tagged go to the Registrar. The portal does not send any email: download the Excel list, email it through the official channel, and wait for the Registrar to acknowledge.
+
+Prepare Excel export
+
+0 tagged withdrawals waiting for the Excel list, 1 withdrawal already exported.

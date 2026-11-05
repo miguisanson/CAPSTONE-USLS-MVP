@@ -1,0 +1,80 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+
+APPROVALS
+
+Approvals Queue
+7
+Course Adjustments
+1
+Leave of Absence
+1
+Readmission
+1
+AWOL & Residency
+1
+Subject Withdrawal
+1
+Practicum Reports
+1
+Graduation Endorsement
+1
+Admission & Coursework Reports
+
+MONITORING & SUPPORT
+
+Reports & Analytics
+Activity Log
+Policy Assistant
+Business Rules
+
+Dean
+
+Every decision is recorded against your account with the date and time.
+
+Dean Portal
+Policy Assistant
+Dr. Manuel Villaruz · Dean
+3
+DM
+Policy Assistant
+
+Answers come only from the uploaded policy documents and your own records, with the sources shown. For guidance only: final decisions stay with authorized personnel.
+
+Assistant
+
+Policy documents and your own queue
+
+Hi! I'm the Policy Assistant. I answer from the Graduate School policy documents and show the document, page and section behind every answer. Ask what is waiting on you, or any question about policy, forms, procedures or deadlines.
+What is the maximum residence for a master's program?
+Candidacy to the degree must be attained within three (3) academic years from the date of admission and all requirements must be completed within five (5) academic years. If a student cannot comply with the MRR (extends beyond 5 years), he/she is allowed a maximum of two (2)-year extension but is required to enroll in a graded 6-unit refresher courses related to the area of specialization. A master's program must be finished within a maximum of seven (7) academic years including Leave of Absence (LOA). A student who cannot finish within seven (7) years is required to re-enroll all the courses taken and comply with requirements to earn new credits.
+Source: Graduate School Handbook 2022-2023 (p. 54, 3.6 MAXIMUM RESIDENCE - Master's Program)
+Offline answer
+Found by keyword search; Gemini was not used
+
+The assistant is answering from the policy documents without AI right now.
+
+SOURCES (1)
+
+Graduate School Handbook 2022-2023
+Page 54 · 3.6 MAXIMUM RESIDENCE › Master's Program
+What is waiting on me?
+Explain the LOA and residency rule.
+What is the maximum residence period for a master's program?
+How is a defense panel composed?
+
+Enter to send · Shift+Enter for a new line
+
+How this works
+Policy questions are answered only from the retrieved passages of the policy documents.
+Every answer lists its sources. Open one to see the document, page, section and exact passage.
+If the documents do not cover a question, it says so instead of guessing.
+Questions like “what is my next step?” use only your own record or queue.
+An “Offline answer” label means Gemini was not used and the answer is a keyword match.

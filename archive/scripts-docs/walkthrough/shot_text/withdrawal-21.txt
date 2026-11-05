@@ -1,0 +1,331 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Subject Withdrawal
+Grace Fernandez · Graduate School Staff
+2
+GF
+Subject Withdrawal
+
+Withdraw a student from one subject until the end of the second week of classes, without changing program standing.
+
+How this works
+View recent activity
+Rules applied on this screen
+5 rules from the Graduate School policies
+
+1 Submitted, 1 With the Dean, 1 Subject tagging, 1 Not approved
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Search requests by name, student number or program
+All programs
+MAED
+MAN
+MSN
+All statuses
+Approved - tag the subject
+With the Dean
+Denied
+Submitted
+Showing 4 of 4 requests
+Board
+Table
+
+3 more stages to the right →
+
+Submitted
+1
+
+Waiting for Graduate School staff to record and forward.
+
+Adrian Lim
+
+2360006 · MAED
+
+MAED-COG10 - Seminar on Contemporary Issues in Education
+
+AY 2026-2027 1st Semester · Before classes begin
+
+Next: Graduate School Staff
+
+View details
+Move to…
+Select all in this column
+Returned to student
+0
+
+Waiting for the student to correct and resend.
+
+No requests here
+
+With the Dean
+1
+
+Waiting for the Dean's decision.
+
+Hazel Flores
+
+2360087 · MAN
+
+MAN-COG10 - Critical Care Nursing
+
+AY 2026-2027 1st Semester · Before classes begin
+
+Next: Dean
+
+View details
+
+Waiting for: Dean
+
+Subject tagging
+1
+
+Approved. Staff tag the subject as Withdrawn.
+
+Elena Navarro
+
+GS-2026-WD-01 · MAED
+
+MAED-MAJ1 - Curriculum Development and Evaluation
+
+AY 2026-2027 1st Semester · First week of classes
+
+Next: Graduate School Staff
+
+Fee 10% of the term
+View details
+Move to…
+Select all in this column
+Excel export
+0
+
+Tagged. Staff export the approved-withdrawals Excel list.
+
+No requests here
+
+Exported - email the Registrar
+0
+
+Exported lists (and older acknowledged records). Staff email the file to the Registrar.
+
+No requests here
+
+Not approved
+1
+
+Denied by the Dean, or cancelled.
+
+Gian Lacson
+
+2460068 · MSN
+
+MSN-COG10 - Critical Care Nursing
+
+AY 2026-2027 1st Semester · Before classes begin
+
+No further step
+
+View details
+
+Finished - nothing more to do
+
+Registrar list
+
+Dean-approved withdrawals whose subject is tagged go to the Registrar. The portal does not send any email: download the Excel list, email it through the official channel, and wait for the Registrar to acknowledge.
+
+Nothing to send to the Registrar yet. Tagged withdrawals appear here.
+
+Elena Navarro
+Approved - tag the subject
+
+Subject withdrawal · GS-2026-WD-01 · MAED
+
+WHERE THIS REQUEST IS
+
+Complete:
+Request submitted
+Complete:
+Staff forwards it
+Complete:
+Dean decision
+4
+Current:
+Subject tagged Withdrawn
+5
+Upcoming:
+Excel list exported
+6
+Upcoming:
+Emailed to the Registrar
+THE REQUEST
+STUDENT
+Elena Navarro
+GS-2026-WD-01 · Master of Arts in Education
+TYPE
+Subject withdrawal
+SUBJECT
+MAED-MAJ1 - Curriculum Development and Evaluation
+SEMESTER
+AY 2026-2027 1st Semester
+REASON
+I need to revise my first-semester study load.
+WITHDRAWAL WINDOW
+First week of classes
+WINDOW DEADLINE
+2026-11-12
+FEE CONSEQUENCE (INFORMATION ONLY)
+A charge of 10% of the term's total due applies (Graduate School Handbook 2022-2023, pp. 49, 51). Shown for information only: the portal does not compute or collect payments; the Business Office settles the fees.
+ACADEMIC RECORD EFFECT
+Recorded as Withdrawn in the enrollment ledger. Any grade mark (W) is applied by the Registrar; grades are outside this portal.
+DEAN DECISION
+Approved
+REGISTRAR LIST
+Pending Subject Tag
+FILED
+Nov 2, 2026
+DEAN DECIDED
+Nov 2, 2026
+STAFF NOTES
+None
+POLICY CHECK
+
+Advice for staff - the Dean decides.
+
+Needs Human Review
+Suggested for the Dean: Check before deciding
+
+Subject withdrawal is allowed until the end of the second week of classes (14 calendar days from the start of classes), whether or not classes were attended (Graduate School Handbook 2022-2023, p. 49). It is not free: 10% of the term's total due is charged in the first week and 20% in the second. After the window a single subject cannot be withdrawn; the student may still withdraw from all subjects (paying the full fees for the semester) or file a Leave of Absence.
+
+Withdrawal window
+
+First week of classes. Deadline: 2026-11-12.
+
+Pass
+
+Subject is still active
+
+The selected subject is Enrolled.
+
+Pass
+
+Signed request form
+
+No request form was uploaded.
+
+Needs Review
+EARLIER REQUESTS BY THIS STUDENT
+
+No earlier requests in this process.
+
+MESSAGES
+
+Notes and returns about this request, newest at the bottom.
+
+G
+
+Grace Fernandez (Graduate School Staff) → Student
+
+Student visible
+Sent
+
+Status changed from Submitted to GS Staff to Dean Review. Next owner: Dean.
+
+Nov 2, 2026, 8:45 PM
+D
+
+Dr. Manuel Villaruz (Dean) → Student
+
+Student visible
+Sent
+
+Status changed from Dean Review to Approved - Awaiting Subject Tag. Next owner: Graduate School Staff.
+
+Nov 2, 2026, 8:46 PM
+Write a note
+Who is it for?
+The student (they can read it)
+The Dean (staff only)
+Graduate School staff (internal note)
+Note
+Save note
+FILES
+
+No files were uploaded for this request.
+
+REGISTRAR FOLLOW-UP
+
+Tagged withdrawals go out on the approved-withdrawals Excel list. The portal does not send any email: export the list, email it through the official channel and wait for the Registrar's acknowledgement.
+
+Registrar list: Pending Subject Tag
+
+Nothing to send yet. The link appears after the Dean approves.
+
+HISTORY
+Who did what
+3
+Activity log
+3
+Close details
+Tag the subject as Withdrawn
+Tag the subject as Withdrawn
+
+Elena Navarro - Subject withdrawal
+
+Approved - tag the subject
+Tagged - ready for Excel export
+
+The selected subject shows Withdrawn in Official Offered Subjects. Any grade mark is applied by the Registrar.
+
+Note (optional)
+Kept with this step in the history.
+Tag the subject as Withdrawn
+Cancel

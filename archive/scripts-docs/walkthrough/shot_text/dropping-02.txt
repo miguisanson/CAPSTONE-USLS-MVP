@@ -1,0 +1,84 @@
+Record dropped subject
+
+Joshua Lim · MAED-MAJ2 · AY 2026-2027 1st Semester
+
+Educational Leadership and Management
+
+Current status
+
+Enrolled
+New status *
+Choose status
+Dropped
+Effective date *
+When a subject can be dropped
+5 rules from the Graduate School policies
+
+A subject is dropped only when unexcused absences exceed 20%
+
+20 percent
+
+A student is expected to attend regularly; the maximum absences allowed is 20% of the class hours for the semester. When unexcused absences in one subject go beyond 20%, the professor automatically drops the student from that subject (grade DRP, 5.0). The Academic Coordinator can only record a Dropped status when the unexcused-absence percentage entered is above this limit; a student who wants to leave a subject earlier files a Subject Withdrawal instead (see the withdrawal window).
+
+Source: Graduate School Handbook 2022-2023, p. 52 (Attendance - Limits on Absences)
+
+Enforced by the system
+
+Grade given to a subject dropped for absences
+
+DRP (5.0)
+
+A subject dropped for absences carries the grade DRP with a value of 5.0.
+
+Source: Graduate School Handbook 2022-2023, p. 52 (Attendance - Limits on Absences)
+
+Documented only
+
+Grades are outside the system's scope (stakeholder decision).
+
+Retention: master's weighted average
+
+2 grade
+
+To remain in good standing a master's student keeps a weighted average of 2.0 or better at the end of each academic year.
+
+Source: Graduate School Handbook 2022-2023, p. 54 (Academic Performance - Retention Policy)
+
+Documented only
+
+Grades are outside the system's scope (stakeholder decision).
+
+Retention: doctorate weighted average
+
+1.75 grade
+
+To remain in good standing a doctorate student keeps a weighted average of 1.75 or better at the end of each academic year.
+
+Source: Graduate School Handbook 2022-2023, p. 54 (Academic Performance - Retention Policy)
+
+Documented only
+
+Grades are outside the system's scope (stakeholder decision).
+
+A grade of 5.0 drops the student from the program
+
+Yes
+
+A student who gets a 5.0 is automatically dropped from the program, and failure in any subject means no re-admission to the program.
+
+Source: Graduate School Handbook 2022-2023, p. 54 (Academic Performance - Retention Policy)
+
+Documented only
+
+Grades are outside the system's scope (stakeholder decision).
+
+See every business rule and its history
+
+Unexcused absences (% of class hours) *
+A subject is dropped by the professor only when unexcused absences are more than the limit shown above. To leave a subject earlier, the student files a Subject Withdrawal.
+Coordinator note *
+
+Dropping is recorded here by the Academic Coordinator. A withdrawal, allowed until the end of the second week of classes, must be initiated by the student in the Withdrawal workflow.
+
+Cancel
+Save status

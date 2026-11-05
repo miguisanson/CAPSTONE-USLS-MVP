@@ -1,0 +1,173 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Academic Semesters
+Grace Fernandez · Graduate School Staff
+1
+GF
+Academic Semesters
+
+Maintain the list of academic semesters and mark the current planning term. Enrollment, course adjustments, and reporting use these semesters.
+
+Add semester
+Add next semester
+Updated AY 2031-2032 1st Semester.
+Academic semesters, newest first, with their dates and actions
+SEMESTER
+	SEMESTER DATES	ACTIONS
+
+AY 2031-2032 1st Semester
+	2031-08-01 — 2031-11-30	
+Set as current
+AY 2031-2032 1st Semester
+Edit dates
+AY 2031-2032 1st Semester
+Remove
+AY 2031-2032 1st Semester
+
+
+AY 2028-2029 2nd Semester
+	2029-01-10 — 2029-05-10	
+Set as current
+AY 2028-2029 2nd Semester
+Edit dates
+AY 2028-2029 2nd Semester
+Remove
+AY 2028-2029 2nd Semester
+
+
+AY 2028-2029 1st Semester
+	2028-08-01 — 2028-11-29	
+Set as current
+AY 2028-2029 1st Semester
+Edit dates
+AY 2028-2029 1st Semester
+Remove
+AY 2028-2029 1st Semester
+
+
+AY 2027-2028 2nd Semester
+	2028-01-10 — 2028-05-09	
+Set as current
+AY 2027-2028 2nd Semester
+Edit dates
+AY 2027-2028 2nd Semester
+Remove
+AY 2027-2028 2nd Semester
+
+
+AY 2027-2028 1st Semester
+	2027-08-01 — 2027-11-29	
+Set as current
+AY 2027-2028 1st Semester
+Edit dates
+AY 2027-2028 1st Semester
+Remove
+AY 2027-2028 1st Semester
+
+
+AY 2026-2027 2nd Semester
+	2027-01-10 — 2027-05-10	
+Set as current
+AY 2026-2027 2nd Semester
+Edit dates
+AY 2026-2027 2nd Semester
+Remove
+AY 2026-2027 2nd Semester
+
+
+AY 2026-2027 1st Semester
+Current
+	2026-10-30 — 2026-11-29	
+Edit dates
+AY 2026-2027 1st Semester
+Remove
+AY 2026-2027 1st Semester
+
+
+AY 2025-2026 2nd Semester
+	2026-01-10 — 2026-05-10	
+Set as current
+AY 2025-2026 2nd Semester
+Edit dates
+AY 2025-2026 2nd Semester
+Remove
+AY 2025-2026 2nd Semester
+
+
+AY 2025-2026 1st Semester
+	2025-08-01 — 2025-11-29	
+Set as current
+AY 2025-2026 1st Semester
+Edit dates
+AY 2025-2026 1st Semester
+Remove
+AY 2025-2026 1st Semester
+
+
+AY 2024-2025 2nd Semester
+	2025-01-10 — 2025-05-10	
+Set as current
+AY 2024-2025 2nd Semester
+Edit dates
+AY 2024-2025 2nd Semester
+Remove
+AY 2024-2025 2nd Semester
+
+
+AY 2024-2025 1st Semester
+	2024-08-01 — 2024-11-29	
+Set as current
+AY 2024-2025 1st Semester
+Edit dates
+AY 2024-2025 1st Semester
+Remove
+AY 2024-2025 1st Semester

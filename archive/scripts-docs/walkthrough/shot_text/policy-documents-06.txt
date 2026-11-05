@@ -1,0 +1,173 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Policy Documents
+Grace Fernandez · Graduate School Staff
+1
+GF
+Policy Documents
+
+Manage the approved PDF and Word documents the Policy Assistant searches. Every answer names the document and page or section it came from. Drafts are searched but flagged as pending validation.
+
+Add document
+
+ALL SOURCES
+
+4
+
+STAFF UPLOADS
+
+2
+
+DRAFTS PENDING VALIDATION
+
+1
+
+READY FOR ASSISTANT
+
+4
+
+Walkthrough Memo - Lounge Reservation 20261102-2048 was added to the Policy Assistant library.
+Test a question
+
+Type a question to see which passages the Policy Assistant would use, and from which document. Use it after an upload to confirm the new policy is found.
+
+Find passages
+What is the maximum residence period for a master's program?
+When may a student withdraw a subject?
+Who nominates the panel for a title defense?
+
+5 passages found by keyword search among 1449 indexed sections.
+
+ANSWER PREVIEW (EXTRACTED FROM THE PASSAGES, NO AI)
+
+Panel question: can a student drop a subject at any time, for example on Day 1? Day 1 is inside the first week, so a student may withdraw a subject on Day 1 with the Dean's approval, but it is not free: 10% of the total amount due for the term is charged in the first week and 20% in the second week. A student may also change a subject or add a subject only in the first week.
+Source: USLS Graduate School Operations Manual (draft for validation) (4.4 Withdrawal of subject)
+
+Draft — pending Graduate School validation: USLS Graduate School Operations Manual (draft for validation).
+
+1. USLS Graduate School Operations Manual (draft for validation)
+
+Draft
+section “4.4 Withdrawal of subject”
+
+Day 1 is inside the first week, so a student may withdraw a subject on Day 1 with the Dean's approval, but it is not free: 10% of the total amount due for the term is charged in the first week and 20% in the second week.
+
+Draft — pending Graduate School validation
+
+2. USLS Graduate School Operations Manual (draft for validation)
+
+Draft
+section “Timeline of consequences (Handbook 2022-2023, pp. 49-53)”
+
+(Consultation: withdrawal is possible before classes begin.) Not stated (OQ-02) Handbook silent; Consultation 29 July 2026 First week of classes, including Day 1 Withdraw a subject with the Dean's approval.
+
+Draft — pending Graduate School validation
+
+3. Graduate School Handbook 2022-2023
+
+Active
+p. 49, section “3.1 REGISTRATION > Withdrawal of Subject”
+
+Withdrawal of Subject The student may withdraw subjects until the second week from the start of classes regardless of whether or not classes have been attended. However, ten percent (10%) of the total amount due for the term if within the first week of classes, and twenty percent (20%) if within the second week will be charged.
+
+4. USLS Graduate School Operations Manual (draft for validation)
+
+Draft
+section “4.4.8 How the platform supports this process”
+
+The platform judges the window from the date of the request:
+
+Draft — pending Graduate School validation
+
+5. USLS Graduate School Operations Manual (draft for validation)
+
+Draft
+section “6.1 List of questions”
+
+Silent OQ-03 After the second week: may a student still withdraw from one subject, and what is it called and marked?
+
+Draft — pending Graduate School validation
+
+Documents
+
+Staff uploads can be edited, replaced, or removed. Built-in sources are view-only.
+
+Search documents
+All categories
+Handbook
+Research Protocol
+Operations Manual
+Memo
+Form
+Other
+All statuses
+Active
+Draft
+Archived
+Walkthrough Memo - Lounge Reservation 20261102-2048
+
+Lounge_Reservation_Memo_20261102-2048.pdf
+
+Active
+Memo
+Version 1
+
+Made-up lounge reservation rule, uploaded during the walkthrough to show that a new policy is searchable at once.
+
+PDF
+2 KB
+1 page
+1 searchable section
+
+Grace Fernandez · Nov 2, 2026, 8:48 PM
+
+Version history (1)

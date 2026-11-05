@@ -1,0 +1,223 @@
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { api } from "../../api";
+import { useApi } from "../../hooks";
+import { Card, EmptyState, InlineNotice, Spinner } from "../../components/ui/index.js";
+import { PortalNavProvider } from "../../components/portalNav";
+import { DEAN_PROCESSES, processOfType } from "../../lib/deanHome.js";
+
+// Approval "processes" as the Dean sees them: the table lives in lib/deanHome.js (the Dean home's unit test imports it).
+export { DEAN_PROCESSES, processOfType };
+
+const DeanContext = createContext(null);
+
+export function DeanProvider({ children }) {
+  const { data, loading, error, refetch: refetchApprovals } = useApi(() => api.approvals(), []);
+  // Adviser appointments waiting for the Dean's decision; a failed call counts as none.
+  const { data: adviserData, refetch: refetchAdviser } = useApi(
+    () => api.adviserAppointments({ scope: "open" }).catch(() => ({ appointments: [] })),
+    [],
+  );
+  const refetch = () => {
+    refetchAdviser();
+    return refetchApprovals();
+  };
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [busy, setBusy] = useState(0);
+  const [note, setNote] = useState({});
+  const [template, setTemplate] = useState({});
+  const [recipient, setRecipient] = useState({});
+  const [visibility, setVisibility] = useState({});
+  const [msg, setMsg] = useState("");
+  const [actErr, setActErr] = useState("");
+  const keepFeedbackOnce = useRef(false);
+
+  // Banners belong to the page where the action happened; clear them when the
+  // Dean moves elsewhere (except right after a decision sends them back to a list).
+  useEffect(() => {
+    if (keepFeedbackOnce.current) {
+      keepFeedbackOnce.current = false;
+      return;
+    }
+    setMsg("");
+    setActErr("");
+  }, [location.pathname]);
+
+  // New reports arrive while the Dean is signed in (I-009): reload the approvals and the adviser queue
+  // (sidebar numbers, boards) whenever the Dean moves to another page.
+  const adviserFirstRun = useRef(true);
+  useEffect(() => {
+    if (adviserFirstRun.current) {
+      adviserFirstRun.current = false;
+      return;
+    }
+    refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  // Graduation rows only count while the student is eligible (same rule as before).
+  const graduationEligibleItem = (item) => item.type !== "graduation" || item.eligibility?.eligible === true;
+  const workflowPending = useMemo(() => (data?.workflow_pending || []).filter(graduationEligibleItem), [data]);
+  const workflowRecent = useMemo(() => (data?.workflow_recent || []).filter(graduationEligibleItem), [data]);
+  const workflowOverview = useMemo(() => (data?.workflow_overview || []).filter(graduationEligibleItem), [data]);
+  const pendingPlans = useMemo(() => data?.pending || [], [data]);
+  const recentPlans = useMemo(() => data?.recent || [], [data]);
+
+  const pendingAdviser = useMemo(
+    () => (adviserData?.appointments || []).filter((row) => (row.actions || []).includes("appoint")).length,
+    [adviserData],
+  );
+
+  const counts = useMemo(() => {
+    const byProcess = (key) => workflowPending.filter((item) => DEAN_PROCESSES[key].types.includes(item.type)).length;
+    return {
+      pendingPlans: pendingPlans.length,
+      pendingLeaveOfAbsence: byProcess("leave-of-absence"),
+      pendingReadmission: byProcess("readmission"),
+      pendingAwol: byProcess("awol"),
+      pendingWithdrawal: byProcess("withdrawal"),
+      pendingPracticum: byProcess("practicum"),
+      pendingGraduation: byProcess("graduation"),
+      pendingAdviser,
+      pendingTotal: pendingPlans.length + workflowPending.length + pendingAdviser,
+    };
+  }, [workflowPending, pendingPlans, pendingAdviser]);
+
+  function findCase(type, id) {
+    const key = String(id);
+    return [...workflowPending, ...workflowOverview, ...workflowRecent].find((item) => item.type === type && String(item.id) === key) || null;
+  }
+
+  // Called by the plan card's DecisionPanel once the Dean has typed the note (a return needs one) and confirmed.
+  async function decidePlan(plan, decision, comment = note[plan.id] || "") {
+    setBusy(plan.id);
+    setMsg("");
+    setActErr("");
+    try {
+      const res = await api.decideApproval(plan.id, { decision, note: comment });
+      setMsg(res.message);
+      setNote((current) => ({ ...current, [plan.id]: "" }));
+      refetch();
+    } catch (e) {
+      setActErr(e.message);
+    } finally {
+      setBusy(0);
+    }
+  }
+
+  // Called by the case page's DecisionPanel once the Dean has typed the comment (return and deny need one) and
+  // confirmed in the window titled after the button. `comment` is the trimmed text of the comment box.
+  async function requestWorkflowDecision(item, decision, comment = "") {
+    const key = `${item.type}-${item.id}`;
+    const selectedTemplate = template[key] || "";
+    const combinedNote = [selectedTemplate !== "Other / Custom comment" ? selectedTemplate : "", comment].filter(Boolean).join(" · ");
+    if (["return", "deny"].includes(decision) && !combinedNote.trim()) {
+      setActErr("Choose a reason or enter a comment before returning or denying the request.");
+      return;
+    }
+    setBusy(key);
+    setMsg("");
+    setActErr("");
+    try {
+      const res = await api.decideWorkflowApproval(item.type, item.id, { decision, note: combinedNote });
+      setMsg(res.message);
+      await refetch();
+      // After deciding from a case page, go back to that process's list.
+      if (location.pathname.startsWith("/dean/case/")) {
+        keepFeedbackOnce.current = true;
+        navigate(`/dean/approvals/${processOfType(item.type) || ""}`.replace(/\/$/, ""));
+      }
+    } catch (e) {
+      setActErr(e.message);
+    } finally {
+      setBusy(0);
+    }
+  }
+
+  async function messageWorkflow(item) {
+    const key = `${item.type}-${item.id}`;
+    const selectedTemplate = template[key] || "";
+    const customNote = (note[key] || "").trim();
+    const messageTemplate = selectedTemplate || (customNote ? "Other / Custom comment" : "");
+    if (!messageTemplate || (messageTemplate === "Other / Custom comment" && !customNote)) {
+      setActErr("Choose a message template or enter a custom comment.");
+      return;
+    }
+    setBusy(`message-${key}`);
+    setMsg("");
+    setActErr("");
+    try {
+      const res = await api.sendWorkflowMessage(item.type, {
+        student_id: item.student.id,
+        action_type: "note",
+        recipient_role: recipient[key] || "Graduate School Staff",
+        visibility: (recipient[key] || "Graduate School Staff") === "Student" ? "student_visible" : (visibility[key] || "internal"),
+        template: messageTemplate,
+        comment: customNote,
+      });
+      setMsg(res.message);
+      await refetch();
+    } catch (error) {
+      setActErr(error.message || "Could not save the workflow comment.");
+    } finally {
+      setBusy(0);
+    }
+  }
+
+  const value = {
+    data, loading, error, refetch,
+    workflowPending, workflowRecent, workflowOverview, pendingPlans, recentPlans,
+    counts, findCase,
+    busy, setBusy, msg, setMsg, actErr, setActErr,
+    note, setNote, template, setTemplate, recipient, setRecipient, visibility, setVisibility,
+    decidePlan, requestWorkflowDecision, messageWorkflow,
+  };
+
+  return (
+    <PortalNavProvider counts={counts} flags={null}>
+      <DeanContext.Provider value={value}>
+        {children}
+      </DeanContext.Provider>
+    </PortalNavProvider>
+  );
+}
+
+export function useDean() {
+  const value = useContext(DeanContext);
+  if (!value) throw new Error("useDean must be used inside DeanProvider.");
+  return value;
+}
+
+// Shared loading / error gate for Dean pages that need the approvals data.
+export function DeanGate({ children }) {
+  const { data, loading, error } = useDean();
+  if (loading && !data) {
+    return (
+      <Card pad="lg">
+        <Spinner label="Loading approvals…" />
+      </Card>
+    );
+  }
+  if (error && !data) {
+    return (
+      <Card pad="lg">
+        <EmptyState icon={AlertTriangle} title="Could not load approvals" hint={error} />
+      </Card>
+    );
+  }
+  if (!data) return null;
+  return children;
+}
+
+// Result / error banners shared by every Dean page.
+export function DeanFeedback() {
+  const { msg, actErr } = useDean();
+  return (
+    <>
+      {msg && <InlineNotice tone="success" icon={CheckCircle2}>{msg}</InlineNotice>}
+      {actErr && <InlineNotice tone="danger">{actErr}</InlineNotice>}
+    </>
+  );
+}

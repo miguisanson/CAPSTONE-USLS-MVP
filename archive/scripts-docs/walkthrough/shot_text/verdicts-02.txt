@@ -1,0 +1,602 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Defense Scheduling
+Grace Fernandez · Graduate School Staff
+2
+GF
+Defense Scheduling
+
+Match available dates across student, adviser, and panel, then book, reschedule, or cancel the defense with a recorded reason.
+
+How this works
+View recent activity
+Rules applied on this screen
+11 rules from the Graduate School policies · 2 need review
+Scheduling
+Calendar
+Choose a student
+
+Pick the record this action applies to
+
+BN
+
+Selected student
+
+GS-2026-UD-01 - Barrientos, Nico - MBA
+
+Coordinate the defense schedule
+
+Review readiness and the matched panel, compare overlap, then make the final staff decision
+
+STUDENT READINESS
+
+Proposal Defense
+
+Reorder Point Policies and Service Levels for a Regional Hardware Distributor
+
+Adviser: Dr. Paolo Navarro
+
+Missing Requirements
+
+Proposal manuscript
+
+Pending adviser signature
+
+Panel assignment
+
+Completed
+
+Proposal defense endorsement
+
+Upload required
+
+Statistical consultation form or qualitative exemption
+
+Upload required
+
+Proposal manuscript endorsement
+
+Upload required
+
+Confirmed proposal defense schedule
+
+Completed
+
+Proposal defense result
+
+Awaiting defense result
+
+Form 5.1 Technical Review Certificate
+
+Covered by the cleared ethics review
+
+Research Protocol Form 5.2 ethics clearance
+
+Cleared (demo seed)
+
+Ethics clearance status and date
+
+Cleared (demo seed)
+
+Staff override: I reviewed the pending Research Gate requirements and still want to schedule this defense.
+Panel members
+
+Matched panel is the default — you can reassign from the full faculty list
+
+4 selected
+Change panel
+
+Dr. Marco Villanueva
+
+Panel Chair
+
+Entered
+
+Business
+
+Operations management, supply chain analytics, quality systems, and process improvement
+
+Entered - updated Nov 2, 2026
+
+Accepted
+
+Dr. Benjamin Reyes
+
+Content Specialist
+
+Entered
+
+Business
+
+Finance, business analytics, accounting, and financial technology
+
+Entered - updated Nov 2, 2026
+
+Accepted
+
+Dr. Teodoro Ramos
+
+Method Specialist
+
+Entered
+
+Education
+
+Learning analytics, online learning assessment, and educational data science
+
+Entered - updated Nov 2, 2026
+
+Accepted
+
+Dr. Angela Cruz
+
+External Panel
+
+Entered
+
+Business
+
+Strategic management, entrepreneurship, organizational innovation, and family business
+
+Entered - updated Nov 2, 2026
+
+Invited
+Availability comes only from what each person entered (weekly hours and dates) or their connected Google Calendar. Nobody is assumed free. All times are Philippine time.
+Open the defense calendar
+View faculty profiles
+
+Availability of the panel
+
+Nobody is assumed to be free. People who have not entered availability are not checked.
+
+Dr. Paolo Navarro · Research Adviser
+
+Entered - updated Nov 2, 2026
+
+Dr. Marco Villanueva · Panel Chair
+
+Entered - updated Nov 2, 2026
+
+Dr. Benjamin Reyes · Content Specialist
+
+Entered - updated Nov 2, 2026
+
+Dr. Teodoro Ramos · Method Specialist
+
+Entered - updated Nov 2, 2026
+
+Dr. Angela Cruz · External Panel
+
+Entered - updated Nov 2, 2026
+
+ASK THE ADVISER AND THE PANEL FOR THEIR AVAILABLE DATES
+
+Dates needed from
+Until
+Message (optional)
+Ask for availability
+
+Preferred date window
+
+The system searches for a 120-minute overlap.
+
+14-day lead time applied. Suggestions begin Mon, Nov 16, 2026.
+
+From
+To
+Availability overlap
+
+Darker green means more participants are free. Amber full-overlap cells are already booked and cannot be selected.
+
+0/5
+5/5
+Availability overlap by day and half hour
+TIME	MON, NOV 16, 2026	TUE, NOV 17, 2026	WED, NOV 18, 2026	THU, NOV 19, 2026	FRI, NOV 20, 2026	MON, NOV 23, 2026	TUE, NOV 24, 2026	WED, NOV 25, 2026	THU, NOV 26, 2026	FRI, NOV 27, 2026	MON, NOV 30, 2026	TUE, DEC 1, 2026	WED, DEC 2, 2026	THU, DEC 3, 2026
+8:00 AM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+8:30 AM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+9:00 AM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+9:30 AM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+10:00 AM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+10:30 AM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+11:00 AM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+11:30 AM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+12:00 PM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+12:30 PM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+1:00 PM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+1:30 PM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+2:00 PM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+2:30 PM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+3:00 PM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+3:30 PM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+4:00 PM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+4:30 PM	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5	5/5
+5:00 PM	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5
+5:30 PM	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5	0/5
+Panel availability
+
+Detailed source availability for each adviser and panelist.
+
+5 participants
+Availability of each participant by day
+DATE	
+
+Dr. Paolo Navarro
+
+Research Adviser · Business
+
+Entered - updated Nov 2, 2026
+	
+
+Dr. Marco Villanueva
+
+Panel Chair · Business
+
+Entered - updated Nov 2, 2026
+	
+
+Dr. Benjamin Reyes
+
+Content Specialist · Business
+
+Entered - updated Nov 2, 2026
+	
+
+Dr. Teodoro Ramos
+
+Method Specialist · Education
+
+Entered - updated Nov 2, 2026
+	
+
+Dr. Angela Cruz
+
+External Panel · Business
+
+Entered - updated Nov 2, 2026
+
+
+
+Mon, Nov 16, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Tue, Nov 17, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Wed, Nov 18, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Thu, Nov 19, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Fri, Nov 20, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Mon, Nov 23, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Tue, Nov 24, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Wed, Nov 25, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Thu, Nov 26, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Fri, Nov 27, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Mon, Nov 30, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Tue, Dec 1, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Wed, Dec 2, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+
+
+
+Thu, Dec 3, 2026
+
+Overlap found
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+	
+8:00 AM-5:00 PM
+Best shared options
+
+Select one to prepare the proposed schedule.
+
+671 conflict-free found
+Earliest option - Mon, Nov 16, 2026
+10:00 AM-12:00 PM - all 5 who entered availability are free
+Mon, Nov 16, 2026
+10:30 AM-12:30 PM - all 5 who entered availability are free
+Mon, Nov 16, 2026
+11:00 AM-1:00 PM - all 5 who entered availability are free
+Mon, Nov 16, 2026
+11:30 AM-1:30 PM - all 5 who entered availability are free
+Mon, Nov 16, 2026
+12:00 PM-2:00 PM - all 5 who entered availability are free
+Mon, Nov 16, 2026
+12:30 PM-2:30 PM - all 5 who entered availability are free
+Mon, Nov 16, 2026
+1:00 PM-3:00 PM - all 5 who entered availability are free
+Mon, Nov 16, 2026
+1:30 PM-3:30 PM - all 5 who entered availability are free
+
+SELECTED PROPOSED SCHEDULE
+
+Mon, Nov 2, 2026
+9:17 PM-9:21 PM
+Checked against the availability people entered
+Final schedule
+
+Only staff can finalize this stage schedule.
+
+Selected date *
+Start time *
+End time *
+Defense type *
+Proposal Defense
+Date the panel received the manuscript
+Mode *
+On-site
+Online
+Hybrid
+Venue / meeting link
+Scheduling constraints
+
+Needs a reason
+
+Proposal Defense needs at least 14 days after today (no manuscript receipt date recorded); the earliest date is 2026-11-16
+
+To book anyway, tick the override box below and write why.
+
+Earliest allowed date: Nov 16, 2026 (14-day lead time). Times are Philippine time.
+
+Warning override: finalize despite the warnings (before the lead time, or a panelist who has not entered availability) and record why. Double-booked panelists or rooms, people outside their entered hours, a declined invitation, and slots in the past cannot be overridden.
+Reason for the staff override (required, recorded with the schedule) *
+
+Lead time (14 days) is counted from today (no manuscript receipt date recorded): Mon, Nov 2, 2026.
+
+This stage is already booked for Mon, Nov 2, 2026. Saving will reschedule it: the old record is kept and linked.
+
+Reason for rescheduling *
+Requested by *
+Student
+Research adviser
+Panel chair
+Panel member
+GS Office
+Research Coordinator
+Other
+Cancel this booking instead
+Source reference
+Reschedule defense
+Defense rescheduled. The previous booking is kept in the history.
+View schedule history
+3

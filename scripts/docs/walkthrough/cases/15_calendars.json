@@ -1,0 +1,191 @@
+{
+ "slug": "calendars",
+ "title": "Research - Calendars for every role, Google Calendar, private link and bell",
+ "kind": "live",
+ "part": "2i",
+ "presenter": "Nat",
+ "owner": "GS Staff, Faculty, Student",
+ "duration": "6 min",
+ "story": [
+  "Part of the research demo slot, after {case:defense-scheduling} and before {case:verdicts}. Once a defense is booked everybody involved sees the same booking in their own calendar. Staff see every defense on the **Calendar** tab of **7 · Defense Scheduling** and can open a defense in the Scheduling tab; a faculty member sees only the defenses he or she sits on or advises on **My Calendar**, together with his or her own availability and, once connected, Google busy times; a student sees only his or her own defense, the deadlines that lead to it and a link for the phone calendar.",
+  "This case walks through the three calendars with the defenses booked in the previous case, the private calendar link (a subscribe link that works in Google Calendar, Outlook or Apple Calendar without signing in), the **Google Calendar** card on the faculty **My Calendar** page, the faculty availability page and the notification bell. The server of the demo has no Google keys, so the Connect Google Calendar button opens a preview of the permission step; no Google account is connected in this walk-through."
+ ],
+ "accounts": [
+  [
+   "GS Staff",
+   "staff@usls.edu.ph",
+   "Calendar tab of 7 · Defense Scheduling: filters, a defense, the private calendar link"
+  ],
+  [
+   "Faculty - External Panel",
+   "angela.cruz@usls.edu.ph",
+   "Dr. Angela Cruz: My Calendar, the Google Calendar card, My Availability, bell"
+  ],
+  [
+   "Student",
+   "student@usls.edu.ph",
+   "Miguel Yu: Research Calendar and bell"
+  ]
+ ],
+ "data": [
+  [
+   "Defenses shown in every role",
+   "The Proposal Defenses of the demonstration students Gab Tolentino, Bea Salonga and Nico Barrientos, booked or moved in {case:defense-scheduling}"
+  ],
+  [
+   "Calendar filters",
+   "Status: Everything; view: Agenda"
+  ],
+  [
+   "Private link",
+   "Created on the staff calendar with Create my private link"
+  ],
+  [
+   "Google Calendar",
+   "Not connected (the demo server has no Google keys); the preview dialog is opened and closed with Not now"
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Staff: the defense calendar",
+   "steps": [
+    {
+     "text": "Sign in as GS Staff (**staff@usls.edu.ph**). Open **7 · Defense Scheduling** and select the tab **Calendar** (it can also be reached from the link \"Open the defense calendar\" on the Scheduling tab). Confirm the filters **Program**, **Stage**, **Status** (**Booked and held**), **Panelist or adviser**, **Venue** and **Student**, the tick box **Deadlines**, the legend (Title Defense, Proposal Defense, Final Defense, Deadline, Needs attention, Verdict overdue), the buttons **Print**, **Today**, **Month**, **Week** and **Agenda**, and the month view with each defense as a coloured chip (time and stage) and the protocol deadlines as flags.",
+     "shots": [
+      {
+       "id": "calendars-01",
+       "caption": "The Calendar tab of Defense Scheduling: filters, legend and the month view."
+      }
+     ]
+    },
+    {
+     "text": "Select the chip of Gab Tolentino's defense. The card on the right shows the stage and student, the chip **Scheduled**, **Date**, **Time**, **Venue**, **Mode**, **Program**, **Adviser**, the **Panel** with each role, **Add to my calendar (.ics)** and **Open in Defense Scheduling**.",
+     "shots": [
+      {
+       "id": "calendars-02",
+       "caption": "A defense selected: all the facts of the booking and the way back to the Scheduling tab."
+      }
+     ]
+    },
+    {
+     "text": "Set **Status** to **Everything** and select **Agenda**. Confirm that the cancelled booking now appears (struck through, chip **Cancelled**) next to the booked ones, and that deadlines such as \"Manuscript and Form 4 with the panel (14-Day Rule)\" are listed on their dates.",
+     "shots": [
+      {
+       "id": "calendars-03",
+       "caption": "Agenda view with Status Everything: booked, cancelled and the deadlines."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - Staff: the private calendar link",
+   "steps": [
+    {
+     "text": "Select **Month** again and scroll to **Subscribe to this calendar** (\"Defenses and deadlines in your own calendar app\"). Select **Create my private link**. Confirm **Your private link** (an address ending in .ics, with a copy button), the instruction \"In Google Calendar choose \"Other calendars\" then \"From URL\" and paste the link. Anyone with the link can see your calendar, so do not share it.\" and the buttons **New link** and **Turn off**. Open the link in a new tab: it returns a calendar file (in this run it held 10 entries: the defenses and their deadlines). The student's Research Calendar carries the same card.",
+     "shots": [
+      {
+       "id": "calendars-04",
+       "caption": "The private link created: copy it into Google Calendar, Outlook or Apple Calendar."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - Faculty: My Calendar, Google Calendar and availability",
+   "steps": [
+    {
+     "text": "Sign in as Dr. Angela Cruz (**angela.cruz@usls.edu.ph**). In the faculty sidebar open **My Calendar**. Confirm the tick boxes **Deadlines**, **My availability** and **Google busy times**, the legend with **Available**, **Not available** and **Busy (Google)**, the week view with her working hours shaded green, and on the right the card **Google Calendar** with the chip **Not connected**, the text \"Connect once to check busy times and add new defense schedules automatically.\" and the button **Connect Google Calendar**.",
+     "shots": [
+      {
+       "id": "calendars-05",
+       "caption": "My Calendar (week view) with the Google Calendar card: Not connected."
+      }
+     ]
+    },
+    {
+     "text": "Select **Month**. Confirm that only defenses where she is on the panel or advises appear, plus her advisees' deadlines.",
+     "shots": [
+      {
+       "id": "calendars-06",
+       "caption": "My Calendar, month view: only her own defenses."
+      }
+     ]
+    },
+    {
+     "text": "Select a defense chip. The card adds **Your role** (External Panel) and the button **I cannot attend this defense**, which sends a reason to the Research Coordinator.",
+     "shots": [
+      {
+       "id": "calendars-07",
+       "caption": "A defense on My Calendar: Your role and I cannot attend this defense."
+      }
+     ]
+    },
+    {
+     "text": "Select **Connect Google Calendar**. Because the demo server has no Google OAuth keys, a preview dialog opens: **Allow USLS Graduate School to use your calendar availability?** with the badge **Integration preview**, three lines under \"How your calendar will be used\" (check unrelated items only as free and busy time; create, update and remove only the defense events scheduled through this system; do not read titles, descriptions or guests of unrelated events) and the note **Demo-safe preview**: \"Opening Google Calendar does not mark this account as connected.\" Select **Not now**. Nothing is connected and nothing is changed.",
+     "shots": [
+      {
+       "id": "calendars-08",
+       "caption": "The permission preview: what the connection would be used for."
+      }
+     ]
+    },
+    "What the connected state does (read from the screen's own text, not run here): with a real Google OAuth key the same button goes to Google's permission screen. Afterwards the card shows the chip **Connected**, the Google address and \"Last checked\", with the buttons **Reconnect calendar**, **Check calendar now** and **Disconnect calendar**. Busy times from the main Google calendar then show as grey **Busy (Google)** blocks on My Calendar and prevent scheduling conflicts; new defense schedules are added to that Google calendar automatically. If Google stops accepting the permission the chip changes to **Reconnect your Google Calendar**. **Disconnect calendar** asks \"Disconnect Google Calendar?\", removes the defense events the system added (unrelated events are never touched) and keeps the working hours and dates she entered.",
+    {
+     "text": "In the sidebar open **My Availability**. Read **Weekly hours** (Monday to Friday with From and To times, Saturday and Sunday not available), **Specific dates** (I am NOT available / I am available ONLY these hours) and **Requests from the Graduate School**. Staff use exactly these entries when they search for a shared date ({case:defense-scheduling}).",
+     "shots": [
+      {
+       "id": "calendars-09",
+       "caption": "My Availability: weekly hours, specific dates and requests."
+      }
+     ]
+    },
+    {
+     "text": "Open **Dashboard**. Below the card **Needs your action** the line \"Google Calendar not connected.\" has the link **Calendar connection**, which leads back to the card on My Calendar. Open the notification bell: it lists the booking, the cancellation and the 14-day reminder of Gab Tolentino's defense.",
+     "shots": [
+      {
+       "id": "calendars-10",
+       "caption": "Faculty dashboard: the Google Calendar line with the link Calendar connection."
+      },
+      {
+       "id": "calendars-11",
+       "caption": "The faculty notification bell."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part D - Student: Research Calendar",
+   "steps": [
+    {
+     "text": "Sign in as the student (**student@usls.edu.ph**, Miguel Yu) and open **Research Calendar** in the sidebar. Confirm \"Your next defense\" (here \"No defense is booked yet\" with the button **Request a defense schedule**, because his own defenses are booked later in {case:proposal_final}), **Next deadlines**, the note \"If your defense is moved, a notice with the old and the new time arrives in the bell at the top of the page.\" and the **Calendar** with the same legend. Once a defense is booked, its date, time and panel appear here and the deadlines (for example sending the manuscript to the panel) are listed.",
+     "shots": [
+      {
+       "id": "calendars-12",
+       "caption": "The student's Research Calendar before a defense is booked."
+      }
+     ]
+    },
+    {
+     "text": "Open the notification bell: \"You have no notifications.\" A moved defense would show the old and the new time here.",
+     "shots": [
+      {
+       "id": "calendars-13",
+       "caption": "The student's bell."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "All times are Philippine time (Asia/Manila). The calendars read one shared feed, so a change made in Defense Scheduling appears in every role at once.",
+  "The Dean has no calendar page in this version: the former Dean calendar address leads back to the Approvals Queue.",
+  "The private link is a secret address: anyone who has it can read the owner's calendar, so it can be replaced (**New link**) or switched off (**Turn off**) at any time. Faculty do not use this link; they use the Google Calendar card.",
+  "The Google Calendar connection could not be run in this walk-through (no Google keys on the demo server). Everything said about the connected state comes from the text and buttons of the faculty screens.",
+  "The demonstration students 2691201 to 03 that carry the scheduling and verdict cases do not have a student login, so their own notices cannot be shown from the student side. The adviser appointment screens are shown in {case:research_title}.",
+  "Faculty bell items and deadline flags are computed when the bell or the calendar is opened; there is no email."
+ ]
+}

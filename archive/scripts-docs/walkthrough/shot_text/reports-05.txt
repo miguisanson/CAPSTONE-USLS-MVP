@@ -1,0 +1,212 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Reports & Analytics
+Grace Fernandez · Graduate School Staff
+1
+GF
+Reports & Analytics
+
+Who is late, where each cohort stands, what is waiting, defenses and graduation. Filter, sort, and download Excel or PDF.
+
+Back to dashboard
+Students at risk
+Cohorts by stage
+Overdue and pending
+Defenses
+Graduation candidates
+Registrar changes
+Analytics
+Program
+Any program
+DBA
+DPSY
+EDD
+MAED
+MAN
+MAPSY
+MASS
+MBA
+MIT
+MSCS
+MSGC
+MSN
+Stage
+Any stage
+Admission
+Coursework
+Comprehensive Exam
+Proposal Development
+Proposal Defense
+Data Collection
+Writing
+Final Defense
+LOA
+AWOL
+Withdrawal In Progress
+Withdrawn
+Completed
+Term
+Any term
+AY 2024-2025 1st Semester
+AY 2024-2025 2nd Semester
+AY 2025-2026 1st Semester
+AY 2025-2026 2nd Semester
+AY 2026-2027 1st Semester
+AY 2026-2027 2nd Semester
+AY 2027-2028 1st Semester
+AY 2027-2028 2nd Semester
+AY 2028-2029 1st Semester
+AY 2028-2029 2nd Semester
+Office
+Any office
+Academic Coordinator
+Dean
+Graduate School Staff
+Student
+Type
+Any type
+Overdue task
+Pending request
+Overdue milestones and pending requests by office
+
+Overdue tasks and requests still waiting for an answer, by office, longest wait first.
+
+Download Excel
+Download PDF
+
+15 rows
+
+Overdue milestones and pending requests by office
+STUDENT
+	PROGRAM
+	TYPE
+	WHAT IS WAITING
+	OFFICE
+	SINCE
+	DAYS WAITING
+
+Benjamin Santos
+
+2460003
+
+	MAED	Pending request	
+Leave of Absence: LOA application submitted
+	Graduate School Staff	Aug 12, 2026	82
+Adrian Lim
+
+2360006
+
+	MAED	Pending request	
+Withdrawal: Withdrawal request submitted
+	Graduate School Staff	Aug 20, 2026	74
+Elena Mendoza
+
+2260011
+
+	MAED	Pending request	
+AWOL & Residency: Residency enrollment recorded
+	Student	Aug 29, 2026	65
+Lorenzo Reyes
+
+2360074
+
+	MSN	Pending request	
+Leave of Absence: LOA request forwarded to Dean
+	Dean	Sep 7, 2026	56
+Hazel Flores
+
+2360087
+
+	MAN	Pending request	
+Withdrawal: Withdrawal request recorded and forwarded to the Dean
+	Dean	Sep 8, 2026	55
+Maria Dela Cruz
+
+2460009
+
+	MAED	Pending request	
+Readmission: Readmission request submitted
+	Graduate School Staff	Sep 10, 2026	53
+Maya Torres
+
+GS-2026-AWOL-01
+
+	MAED	Pending request	
+AWOL & Residency: Student automatically flagged AWOL
+	Academic Coordinator	Sep 14, 2026	49
+Paulo Garcia
+
+2360010
+
+	MAED	Pending request	
+AWOL & Residency: Student automatically flagged AWOL
+	Academic Coordinator	Sep 19, 2026	44
+Noel Navarro
+
+2560085
+
+	MAN	Pending request	
+AWOL & Residency: Student automatically flagged AWOL
+	Academic Coordinator	Sep 19, 2026	43
+Isabel Flores
+
+2260007
+
+	MAED	Pending request	
+Graduation: Included in graduation candidate list
+	Graduate School Staff	Sep 27, 2026	36
+
+Showing 1–10 of 15
+
+Previous
+Page 1 of 2
+Next

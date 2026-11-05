@@ -1,0 +1,283 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Enrollment
+Grace Fernandez · Graduate School Staff
+1
+GF
+Enrollment
+
+Assign official semester offerings to an individual student. Confirming runs all checks and synchronizes the class list, monitoring sheet, student profile, and portal in one action.
+A class list row marked Dropped is accepted only with an "Unexcused Absence Percent" column above the handbook limit (20%), or a "Drop Exception Reason" that explains the approved exception.
+
+Upload class list
+Offering list
+Enrollment and academic load: rules applied
+5 rules from the Graduate School policies
+
+Normal part-time load: lower bound
+
+6 units
+
+The normal load of a part-time graduate student starts at 6 units per semester. The portal shows the load on the enrollment preview; a lighter load is allowed for residency, thesis or final-term students, so it is information rather than a block.
+
+Source: Graduate School Handbook 2022-2023, p. 48 (Registration - Academic Load)
+
+Documented only
+
+The handbook calls this the normal load, not a hard limit; the portal shows it as information only.
+
+Normal part-time load: upper bound
+
+9 units
+
+The normal load of a part-time graduate student is at most 9 units per semester. Above 9 units the student is carrying a full-time load.
+
+Source: Graduate School Handbook 2022-2023, p. 48 (Registration - Academic Load)
+
+Documented only
+
+The handbook calls this the normal load, not a hard limit; the portal shows it as information only.
+
+Full-time load
+
+12 units
+
+The normal load of a full-time graduate student is 12 units per semester. Enrolling more than this in one semester is flagged on the enrollment preview and needs a documented exception before it can be saved.
+
+Source: Graduate School Handbook 2022-2023, p. 48 (Registration - Academic Load)
+
+Enforced by the system
+
+Residency enrollment is only for research, practicum, comprehensive exam or publication
+
+Yes
+
+A student with no subjects to take may enroll for residence only to work on the thesis/dissertation, the practicum/internship, to complete an INC, to take the comprehensive exam or to wait for a publication. A student who simply will not enroll for a semester but still has units to take files a Leave of Absence instead.
+
+Source: Graduate School Handbook 2022-2023, p. 48 (Registration - Residency Enrollment)
+
+Enforced by the system
+
+Removal of an INC grade
+
+1 years
+
+An incomplete grade must be removed within one academic year, otherwise it becomes 3.0 (master's) or 2.0 (doctorate) and the subject must be taken again. A student with an INC in every subject is dropped from the rolls.
+
+Source: Graduate School Handbook 2022-2023, p. 54 (Academic Performance - Incomplete Grades)
+
+Documented only
+
+Grades are outside the system's scope (stakeholder decision).
+
+See every business rule and its history
+
+Adding or changing a subject: rules applied
+3 rules from the Graduate School policies
+Program
+DBA — Doctor of Business Administration
+DPSY — Doctor of Philosophy in Psychology
+EDD — Doctor of Education
+MAED — Master of Arts in Education
+MAN — Master of Arts in Nursing
+MAPSY — Master of Arts in Psychology
+MASS — Master of Arts in Social Sciences
+MBA — Master of Business Administration
+MIT — Master in Information Technology
+MSCS — Master of Science in Computer Science
+MSGC — Master of Science in Guidance and Counseling
+MSN — Master of Science in Nursing
+Academic semester
+AY 2028-2029 2nd Semester (+5)
+AY 2028-2029 1st Semester (+4)
+AY 2027-2028 2nd Semester (+3)
+AY 2027-2028 1st Semester (+2)
+AY 2026-2027 2nd Semester (Next)
+AY 2026-2027 1st Semester (Current)
+AY 2025-2026 2nd Semester (Previous)
+AY 2025-2026 1st Semester (-2)
+AY 2024-2025 2nd Semester (-3)
+AY 2024-2025 1st Semester (-4)
+Student
+Bernardo, Camille — 2360054
+Bernardo, Daniel — 2460055
+Castillo, Irene — 2360051
+Dizon, Rafael — 2560057
+Flores, Lara — 2460058
+Marquez, Liza — GS-2026-PM-06
+Mendoza, Bianca — 2560052
+Reyes, Carla — 2460056
+Reyes, Gian — 2360053
+Salonga, Bea — GS-2026-UD-02
+CB
+Camille Bernardo
+
+2360054 · DBA · AY 2026-2027 1st Semester
+
+Enrolled
+Active
+0 selected
+
+COMPLETED
+
+11
+
+Already finished; cannot be added again.
+
+ENROLLED
+
+0
+
+Already active in the selected semester.
+
+NOT TAKEN
+
+7
+
+Can be added when offered.
+
+NEEDS REVIEW
+
+0
+
+Active in another term or has an unresolved monitoring status.
+
+Official offered subjects
+
+Status comes from the monitoring sheet. Completed and already-enrolled subjects are shown but locked; only Not taken subjects can be added.
+
+3 offered
+Official offered subjects for this semester
+SUBJECT	STUDENT STATUS	DEMAND	ENROLLMENT
+
+
+DBA-MAJ3
+
+Financial Management
+
+Major · 3 units
+
+	
+Completed
+
+Already completed in the monitoring sheet; it cannot be enrolled again.
+
+	1 student	
+Completed
+
+
+DBA-MAJ4
+
+Marketing Management
+
+Major · 3 units
+
+	
+Completed
+
+Already completed in the monitoring sheet; it cannot be enrolled again.
+
+	1 student	
+Completed
+
+
+DBA-MAJ5
+
+Operations Management
+
+Major · 3 units
+
+	
+Completed
+
+Already completed in the monitoring sheet; it cannot be enrolled again.
+
+	1 student	
+Completed
+Enrollment draft
+
+0 subjects · 0 units
+
+No subjects selected yet
+
+Choose Add on a subject in the list to start this semester's draft.
+
+Source / reference
+Confirm enrollment
+
+The draft already matches the saved enrollment. Add or remove a subject to change it.
+
+Conflict checks run automatically. Safe warnings follow the authoritative record; blocking conflicts are reported without changing enrollment.
+
+Enrollment history
+
+Durable semester records for this student.
+
+No semester enrollment has been saved yet.
+
+Confirm an enrollment draft and its subjects will be listed here.
+
+Curriculum version & study plan draft
+
+Tag the curriculum version the student is tracked against, then generate the study plan from the curriculum audit and send it to the Academic Coordinator. The plan is derived, never typed.
+
+Study plan for Camille Bernardo · the student chosen at the top of the page
+
+Curriculum version
+Select a version…
+2026-2027
+Tag curriculum version
+Generate study plan draft
+
+RECENT STUDY PLAN DRAFTS
+
+No study plan drafts yet

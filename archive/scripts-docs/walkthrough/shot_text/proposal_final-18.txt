@@ -1,0 +1,242 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Research Gate
+Grace Fernandez · Graduate School Staff
+2
+GF
+Research Gate
+
+Check Form 1, Form 4, or completion evidence and set readiness or revision state. The Academic Coordinator endorses Form 1; the panel chair records each defense verdict.
+
+How this works
+View recent activity
+Rules applied on this screen
+8 rules from the Graduate School policies · 1 needs review
+Research Gate
+Adviser designation
+Choose a student
+
+Pick the record this action applies to
+
+YM
+
+Selected student
+
+2260004 - Yu, Miguel - MAED
+
+Research Gate record
+
+The stage and checklist are calculated from uploads, endorsements, and workflow results
+
+STUDENT
+
+Miguel Yu
+
+STUDENT ID
+
+2260004
+
+PROGRAM
+
+Master of Arts in Education
+
+ADVISER
+
+Dr. Celeste Tan
+
+RESEARCH TITLE
+
+Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses
+
+CURRENT STAGE
+
+Proposal Defense
+
+AUTOMATIC RESEARCH PROGRESS
+
+Complete:
+Title Defense
+Complete
+2
+Current:
+Proposal Defense
+Awaiting Review
+3
+Upcoming:
+Final Defense
+Locked
+4
+Upcoming:
+Completion
+Locked
+
+COMPLETED REQUIREMENTS
+
+0
+
+PENDING REQUIREMENTS
+
+10
+
+Proposal Defense requirements
+
+Uploaded and pending documents appear together. Open any file to preview it.
+
+Awaiting Review
+
+Proposal manuscript
+
+Upload the proposal manuscript. The assigned adviser reviews and signs the exact uploaded file in-system.
+
+STUDENT UPLOAD · 1/1 FILES
+
+Submitted for review
+Yu_Miguel_Proposal_Manuscript.pdf · PDF · Nov 2, 2026
+
+Panel assignment
+
+Generated after the Research Coordinator completes Panel Matching.
+
+STAFF / SYSTEM MANAGED
+
+Pending panel matching
+
+Proposal defense endorsement
+
+Upload the proposal defense endorsement. The assigned adviser reviews and signs the exact uploaded file in-system.
+
+STUDENT UPLOAD · 1/1 FILES
+
+Submitted for review
+Yu_Miguel_Form4_Endorsement_for_Proposal_Defense.pdf · PDF · Nov 2, 2026
+
+Statistical consultation form or qualitative exemption
+
+Upload Form 4.1 or the approved qualitative-research exemption.
+
+STUDENT UPLOAD · 1/1 FILES
+
+Submitted for review
+Yu_Miguel_Form4-1_Qualitative_Exemption.pdf · PDF · Nov 2, 2026
+
+Proposal manuscript endorsement
+
+Upload the proposal manuscript endorsement. The assigned adviser reviews and signs the exact uploaded file in-system.
+
+STUDENT UPLOAD · 1/1 FILES
+
+Submitted for review
+Yu_Miguel_Proposal_Manuscript_Endorsement.pdf · PDF · Nov 2, 2026
+
+Confirmed proposal defense schedule
+
+Added automatically after staff confirms a shared panel schedule.
+
+STAFF / SYSTEM MANAGED
+
+Pending confirmed schedule
+
+Proposal defense result
+
+Recorded by the panel chair after the scheduled proposal defense; revisions, if any, are confirmed before the stage completes.
+
+STAFF / SYSTEM MANAGED
+
+Pending confirmed schedule
+
+Form 5.1 Technical Review Certificate
+
+Released by the panel chair after the panel approves the revised proposal manuscript. Upload it after the proposal defense.
+
+STUDENT UPLOAD · 0/1 FILES
+
+Opens after the proposal defense is passed
+
+Research Protocol Form 5.2 ethics clearance
+
+Upload the ethics clearance form signed by the Ethics Office.
+
+STUDENT UPLOAD · 0/1 FILES
+
+Opens after the proposal defense is passed
+
+Ethics clearance status and date
+
+Recorded by the Research Coordinator after previewing the signed ethics clearance (Form 5.2).
+
+STAFF / SYSTEM MANAGED
+
+Pending Research Coordinator record
+
+Research Protocol Form 5.2 ethics clearance
+
+Opens after the proposal defense is passed. Preview Form 5.1 and the signed Ethics Office form (Form 5.2, due within one month of the defense), then record the clearance status and date. Ethics clearance is needed before the Final Defense.
+
+Pending Research Coordinator record
+
+Panel Matching
+
+System-generated from the active paper body after required clearances.
+
+Recommended panel available
+Open matching
+Verify submitted requirements
+
+DEFENSE RESULT GATE
+
+Proposal defense result
+
+Confirm the defense schedule first. The student cannot move to the next Research Gate stage until a passing result is recorded.
+
+Pending confirmed schedule
+
+Read-only for GS staff. The assigned panel chair or panel lead submits the verdict from the Faculty Portal.

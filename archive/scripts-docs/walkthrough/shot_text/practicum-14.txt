@@ -1,0 +1,244 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+My Progress
+
+ACADEMICS
+
+Enrollment
+Practicum
+Graduation Endorsement
+
+RESEARCH
+
+Research Progress
+Research Adviser
+Defense Schedule
+Research Calendar
+
+REQUESTS
+
+Request Center
+Leave of Absence
+Readmission
+Return from AWOL
+Subject Withdrawal
+
+SUPPORT
+
+Messages
+2
+Documents
+Activity Log
+Policy Assistant
+My Profile
+
+Student
+
+Your record updates as staff act on your requests. Nothing here changes official grades or enrollment.
+
+Student Portal
+Practicum
+Paolo Ramirez · MSGC
+2
+PR
+Practicum
+Practicum In Progress
+
+Submit your MOA and completion evidence for the practicum requirement (Psychology and MSGC programs).
+
+All requests
+You cannot cancel this request yourself. To change or cancel it, contact the Graduate School office. Open your Messages
+
+Request discussion
+
+Messages and replies are shown chronologically. The newest post is highlighted in green.
+
+P
+
+Paolo Ramirez (Student) (Student) → Graduate School Staff
+
+Student visible
+Sent
+
+Signed MOA with the partner center.
+
+Nov 2, 2026, 8:25 PM
+G
+
+Grace Fernandez (Graduate School Staff) → Student
+
+Student visible
+Sent
+
+Status changed from MOA Submitted to MOA Under Review. Next owner: Academic Coordinator.
+
+Nov 2, 2026, 8:25 PM
+D
+
+Dr. Ramon Alvarez (Academic Coordinator) → Student
+
+Latest
+Student visible
+Sent
+
+Status changed from MOA Under Review to Practicum In Progress. Next owner: Student.
+
+Nov 2, 2026, 8:25 PM
+Reply to Dr. Ramon Alvarez
+Send reply
+Rules applied on this screen
+5 rules from the Graduate School policies · 5 need review
+
+Psychology and MSGC students only
+
+Practicum is restricted to students enrolled in a Psychology program or the Master of Science in Guidance and Counseling (MSGC). Your program, MSGC — Master of Science in Guidance and Counseling, is within this scope.
+
+Current practicum stage
+
+Only the requirements due now can be edited. Completed submissions stay available below.
+
+Practicum In Progress
+1
+Eligibility Check / Pre-Practicum Requirements
+
+The eligibility gate was completed for this request. The values below continue to reflect the latest monitoring and research records.
+
+Completed
+
+Eligibility recommendation
+
+Based on the encoded course audit and research milestone records.
+
+Verified
+
+Practicum program scope
+
+Source: student.program
+
+MSGC - Master of Science in Guidance and Counseling / Psychology program or MSGC
+
+Verified
+
+Basic units completed
+
+Source: course_audit.by_category.Basic
+
+9 / 6
+
+Verified
+
+Major units completed
+
+Source: course_audit.by_category.Major
+
+15 / 9
+
+Verified
+
+Cognate units completed
+
+Source: course_audit.by_category.Cognate
+
+30 / 6
+
+Verified
+
+Total units completed
+
+Source: course_audit.completed_units
+
+54 / 21
+
+Verified
+
+Title stage
+
+Source: student.current_stage / research_case.current_gate
+
+Completed / Completed
+
+Verified
+
+Proposal stage
+
+Source: student.current_stage / research_case.current_gate
+
+Completed / Completed
+
+Verified
+
+Ethics clearance
+
+Source: student.current_stage / research_case.current_gate
+
+Completed / Completed
+
+Verified
+
+Final stage
+
+Source: student.current_stage / research_case.current_gate
+
+Completed / Completed
+
+Verified
+2
+MOA Submission
+
+Completed MOA information is read-only while you continue to the next stage.
+
+Completed
+
+PRACTICUM SITE
+
+Guidance and Counseling Partner Center
+
+SUPERVISOR
+
+Ms. Angela Cruz
+
+ALREADY SUBMITTED
+
+Paolo_Ramirez_Signed_MOA.pdf
+
+Uploaded by Paolo Ramirez (Student) · Nov 2, 2026 · MOA Submission
+
+View file
+3
+Practicum Document Submission
+
+What you need to submit now: completed hours and one PDF containing the required completion documents.
+
+Current stage
+Required hours
+Completed hours *
+
+Certificates are counted automatically
+
+The system currently detects 0 submitted certificate files. Uploading an additional file updates this count.
+
+Completion certificates / forms / hours proof PDF
+Choose PDF file
+Browse
+PDF only, up to 25 MB. The file is stored with your request.
+Remarks for the reviewer
+Submit completion stage
+4
+Review / Approval
+
+Available after Step 3 is submitted.
+
+Locked
+5
+Completion / Final Verification
+
+Available after the completion review is approved.
+
+Locked

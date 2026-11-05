@@ -1,0 +1,384 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Leave of Absence
+Grace Fernandez · Graduate School Staff
+3
+GF
+Leave of Absence
+
+Record an LOA application and route the Dean decision. Time on leave still counts toward the maximum residence.
+
+How this works
+View recent activity
+Rules applied on this screen
+9 rules from the Graduate School policies · 3 need review
+
+1 In staff review, 2 With the Dean, 1 Leave scheduled, 2 On leave, 1 Ended
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Refresh leave dates
+Search requests by name, student number or program
+All programs
+MAED
+MIT
+MSCS
+MSN
+All statuses
+In staff review
+Closed
+Leave scheduled
+With the Dean
+On leave
+All reasons
+Employment / professional obligation
+Family emergency
+Medical / health
+Showing 1 of 7 requests
+Clear 1 filter
+Board
+Table
+
+5 more stages to the right →
+
+Submitted
+0
+
+Waiting for Graduate School staff to start.
+
+No requests here
+
+In staff review
+1
+
+Staff are checking the request against the handbook rules.
+
+Daniel Fernandez
+
+GS-2026-LOA-02 · MAED
+
+AY 2026-2027 2nd Semester to AY 2027-2028 1st Semester (2 semesters)
+
+Reason: Employment / professional obligation
+
+Next: Graduate School Staff
+
+Awaiting your review
+View details
+Move to…
+Select all in this column
+Returned to student
+0
+
+Waiting for the student to correct and resend.
+
+No requests here
+
+With the Dean
+0 of 2
+
+Waiting for the Dean's decision.
+
+No requests here
+
+Leave scheduled
+0 of 1
+
+Approved; the leave has not started yet.
+
+No requests here
+
+On leave
+0 of 2
+
+The student is away. Enrollment is closed.
+
+No requests here
+
+Return due
+0
+
+The leave is ending or has ended. Follow up with the student.
+
+No requests here
+
+Ended
+0 of 1
+
+Finished leaves, approved extensions and leaves that ended with no return.
+
+No requests here
+
+Not approved
+0
+
+Denied, taken back by the student, or cancelled.
+
+No requests here
+
+Registrar list
+
+Dean-approved requests that go to the Registrar. The portal does not send any email: download the list, email it yourself, then mark it as sent. Mark it as acknowledged when the Registrar confirms.
+
+Download list (Excel)
+Download list (CSV)
+Mark as sent
+Mark as acknowledged
+
+Nothing ticked: a download includes every request still waiting to go out.
+
+Dean-approved requests for the Registrar
+	STUDENT	LEAVE PERIOD	DEAN DECISION	HANDOFF
+	
+
+Therese Lacson
+
+GS-2026-READ-01 · MAED
+
+	AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester (2 semesters)	Sep 8, 2026	Acknowledged
+	
+
+Olivia Cabrera
+
+2460017 · MSCS
+
+	AY 2026-2027 2nd Semester (1 semester)	Oct 13, 2026	Exported - Ready to Send
+	
+
+Hazel Castillo
+
+2360031 · MIT
+
+	AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester (2 semesters)	Sep 8, 2026	Acknowledged
+	
+
+Gabriel Domingo
+
+GS-2026-READ-02 · MAED
+
+	AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester (2 semesters)	Sep 8, 2026	Acknowledged
+Export history
+Daniel Fernandez
+In staff review
+
+Leave of Absence · GS-2026-LOA-02 · MAED
+
+WHERE THIS REQUEST IS
+
+Complete:
+Request submitted
+2
+Current:
+Staff review
+3
+Upcoming:
+Dean decision
+4
+Upcoming:
+Leave begins
+5
+Upcoming:
+Return
+6
+Upcoming:
+Back in the program
+THE REQUEST
+STUDENT
+Daniel Fernandez
+GS-2026-LOA-02 · Master of Arts in Education
+TYPE
+Leave of Absence
+LEAVE PERIOD
+AY 2026-2027 2nd Semester to AY 2027-2028 1st Semester (2 semesters)
+Jan 10, 2027 to Nov 29, 2027
+REASON
+Employment / professional obligation
+WHAT THE STUDENT WROTE
+I have accepted a work assignment in another city and cannot carry a study load for the next two semesters.
+STAGE AND TAG BEFORE LEAVING
+-
+ELIGIBILITY RESULT
+Not set yet
+FILED
+Nov 2, 2026
+SENT TO THE DEAN
+—
+DEAN DECIDED
+—
+STAFF NOTES
+None
+DEAN REMARKS
+None
+POLICY CHECK
+
+Advice for staff - the Dean decides.
+
+Needs Review
+Suggested for the Dean: Return for Revision
+
+The LOA request needs staff review because required details are missing or uncertain.
+
+Structured application source
+
+Student portal Leave of Absence application
+
+Present
+
+Allowed reason category
+
+Employment / professional obligation
+
+Pass
+
+Reason for leave
+
+I have accepted a work assignment in another city and cannot carry a study load for the next two semesters.
+
+Present
+
+Effective period
+
+AY 2026-2027 2nd Semester to AY 2027-2028 1st Semester (2 semester(s)); a leave may be approved for up to 2 semester(s) at a time (Graduate School Handbook 2022-2023, p. 52).
+
+Pass
+
+Total leave
+
+0 semester(s) of leave already approved + 2 requested = 2. A leave may be renewed for at most another year, so all leave together cannot pass 4 semesters (Graduate School Handbook 2022-2023, p. 52).
+
+Pass
+
+Filing date
+
+The selected semester begins 2027-01-10.
+
+Pass
+
+Minimum residency
+
+Estimated completed residency: 0 semester(s) from entry year 2026; at least 1 expected (Prototype rule — pending Graduate School validation).
+
+Needs Review
+THE STUDENT SO FAR
+
+1 year in the program
+
+Normal length 5 years. The most allowed is 7 years.
+
+0 of 4 leave semesters already approved
+
+Earlier leaves count toward the total limit.
+
+EARLIER REQUESTS BY THIS STUDENT
+
+No earlier requests in this process.
+
+MESSAGES
+
+Notes and returns about this request, newest at the bottom.
+
+D
+
+Daniel Fernandez (Student) (Student) → Student
+
+Student visible
+Sent
+
+Graduate School staff will check it and send it to the Dean. You will get a notice at every step.
+
+Nov 2, 2026, 8:34 PM
+Write a note
+Who is it for?
+The student (they can read it)
+The Dean (staff only)
+Graduate School staff (internal note)
+Note
+Save note
+FILES
+
+No files were uploaded for this request.
+
+REGISTRAR FOLLOW-UP
+
+Dean-approved requests go on the Registrar list below the board. The portal does not send any email: download the list, email it through the official channel and wait for the Registrar's acknowledgement.
+
+Nothing to send yet. The link appears after the Dean approves.
+
+HISTORY
+Who did what
+2
+Activity log
+2
+Close details
+Forward to Dean
+Return to student
+Forward to Dean
+
+Daniel Fernandez - Leave of Absence
+
+In staff review
+With the Dean
+
+The request goes to the Dean, who decides. Nothing is decided yet.
+
+Eligibility result
+Use the policy check result (Needs Review)
+Eligible
+Eligible to Return
+Needs Review
+Not Eligible
+Pending Requirements
+Advice from the policy check: Needs Review. The Dean decides.
+Note for the Dean
+Optional. Staff and the Dean can see it.
+Forward to Dean
+Cancel

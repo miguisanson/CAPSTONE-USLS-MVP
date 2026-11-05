@@ -1,0 +1,308 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+AWOL & Residency
+
+MONITORING & SUPPORT
+
+Work Queue
+Policy Assistant
+Business Rules
+
+Academic Coordinator
+
+Figures are computed live from recorded transactions.
+
+Academic Coordinator Portal
+Enrollment
+Dr. Ramon Alvarez · Academic Coordinator
+DR
+Enrollment
+
+Assign official semester offerings to an individual student. Confirming runs all checks and synchronizes the class list, monitoring sheet, student profile, and portal in one action.
+A class list row marked Dropped is accepted only with an "Unexcused Absence Percent" column above the handbook limit (20%), or a "Drop Exception Reason" that explains the approved exception.
+
+Upload class list
+Offering list
+Enrollment and academic load: rules applied
+5 rules from the Graduate School policies
+Adding or changing a subject: rules applied
+3 rules from the Graduate School policies
+Program
+DBA — Doctor of Business Administration
+DPSY — Doctor of Philosophy in Psychology
+EDD — Doctor of Education
+MAED — Master of Arts in Education
+MAN — Master of Arts in Nursing
+MAPSY — Master of Arts in Psychology
+MASS — Master of Arts in Social Sciences
+MBA — Master of Business Administration
+MIT — Master in Information Technology
+MSCS — Master of Science in Computer Science
+MSGC — Master of Science in Guidance and Counseling
+MSN — Master of Science in Nursing
+Academic semester
+AY 2028-2029 2nd Semester (+5)
+AY 2028-2029 1st Semester (+4)
+AY 2027-2028 2nd Semester (+3)
+AY 2027-2028 1st Semester (+2)
+AY 2026-2027 2nd Semester (Next)
+AY 2026-2027 1st Semester (Current)
+AY 2025-2026 2nd Semester (Previous)
+AY 2025-2026 1st Semester (-2)
+AY 2024-2025 2nd Semester (-3)
+AY 2024-2025 1st Semester (-4)
+Student
+Aquino, Roberto — GS-2026-CA-02
+Bautista, Anton — GS-2026-HO-02
+Castillo, Maureen — GS-2026-LOA-01
+Cruz, Daniel — 2560001
+Dela Cruz, Clarissa — GS-2026-ENR-01
+Dela Cruz, Maria — 2460009
+Domingo, Gabriel — GS-2026-READ-02
+Fernandez, Daniel — GS-2026-LOA-02
+Flores, Isabel — 2260007
+Garcia, Paulo — 2360010
+Gonzales, Martin — GS-2026-ENR-02
+Lacson, Therese — GS-2026-READ-01
+Lim, Adrian — 2360006
+Lim, Joshua — GS-2026-WD-02
+Mendoza, Carlo — GS-2026-GRAD-02
+Mendoza, Elena — 2260011
+Mercado, Lianne — GS-2026-CA-01
+Navarro, Elena — GS-2026-WD-01
+Ong, Hector — 2360008
+Reyes, Grace — 2560002
+Reyes, Sofia — GS-2026-HO-01
+Santos, Benjamin — 2460003
+Santos, Bianca — GS-2026-GRAD-01
+Tan, Clarisse — 2460005
+Torres, Maya — GS-2026-AWOL-01
+Valdez, Nicolas — GS-2026-RES-01
+Yu, Miguel — 2260004
+Filter students
+JL
+Joshua Lim
+
+GS-2026-WD-02 · MAED · AY 2026-2027 1st Semester
+
+Enrolled
+Active
+3 selected
+
+COMPLETED
+
+0
+
+Already finished; cannot be added again.
+
+ENROLLED
+
+3
+
+Already active in the selected semester.
+
+NOT TAKEN
+
+15
+
+Can be added when offered.
+
+NEEDS REVIEW
+
+0
+
+Active in another term or has an unresolved monitoring status.
+
+Official offered subjects
+
+Status comes from the monitoring sheet. Completed and already-enrolled subjects are shown but locked; only Not taken subjects can be added.
+
+7 offered
+Official offered subjects for this semester
+SUBJECT	STUDENT STATUS	DEMAND	ENROLLMENT
+
+
+MAED-COG1
+
+Teaching Strategies in Higher Education
+
+Cognate · 3 units
+
+	
+Not taken
+
+Not yet taken in the monitoring sheet; it may be added when offered.
+
+	2 students	
+Add
+
+
+MAED-COG2
+
+Learning Analytics
+
+Cognate · 3 units
+
+	
+Enrolled
+Change
+
+Already enrolled for AY 2026-2027 1st Semester.
+
+	3 students	
+Enrolled
+
+
+MAED-MAJ1
+
+Curriculum Development and Evaluation
+
+Major · 3 units
+
+	
+Not taken
+
+Not yet taken in the monitoring sheet; it may be added when offered.
+
+	11 students	
+Add
+
+
+MAED-MAJ2
+
+Educational Leadership and Management
+
+Major · 3 units
+
+	
+Enrolled
+Change
+
+Already enrolled for AY 2026-2027 1st Semester.
+
+	3 students	
+Enrolled
+
+
+MAED-MAJ3
+
+Assessment of Learning
+
+Major · 3 units
+
+	
+Not taken
+
+Not yet taken in the monitoring sheet; it may be added when offered.
+
+	4 students	
+Add
+
+
+MAED-MAJ4
+
+Educational Technology and Instruction
+
+Major · 3 units
+
+	
+Enrolled
+Change
+
+Already enrolled for AY 2026-2027 1st Semester.
+
+	2 students	
+Enrolled
+
+
+MAED-MAJ5
+
+Philosophy of Education
+
+Major · 3 units
+
+	
+Not taken
+
+Not yet taken in the monitoring sheet; it may be added when offered.
+
+	1 student	
+Add
+Enrollment draft
+
+3 subjects · 9 units
+
+MAED-COG2
+
+Learning Analytics
+
+Already enrolled · monitoring sheet
+
+MAED-MAJ2
+
+Educational Leadership and Management
+
+Already enrolled · monitoring sheet
+
+MAED-MAJ4
+
+Educational Technology and Instruction
+
+Already enrolled · monitoring sheet
+
+Source / reference
+Confirm enrollment
+
+The draft already matches the saved enrollment. Add or remove a subject to change it.
+
+Conflict checks run automatically. Safe warnings follow the authoritative record; blocking conflicts are reported without changing enrollment.
+
+Enrollment history
+
+Durable semester records for this student.
+
+View enrollment history
+3
+Curriculum version & study plan draft
+
+Tag the curriculum version the student is tracked against, then generate the study plan from the curriculum audit and send it to the Academic Coordinator. The plan is derived, never typed.
+
+Study plan for Joshua Lim · the student chosen at the top of the page
+
+Curriculum version
+Select a version…
+2026-2027
+Tag curriculum version
+Generate study plan draft
+
+RECENT STUDY PLAN DRAFTS
+
+No study plan drafts yet

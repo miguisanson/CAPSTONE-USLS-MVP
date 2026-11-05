@@ -1,0 +1,277 @@
+"""Seed quality: the demo data must not contradict the app's own rules.
+
+Senior review 2026-10-22 (.planning/research/FULL-REVIEW-2026-10-22.md) F-06, F-07, F-08, F-16, F-40,
+F-41 = issues I-060, I-061, I-062, I-070, I-094, I-095. One seeded temporary database is built for the
+whole module (the way tests/test_v53_backend.py builds its own); every test only reads it.
+"""
+import os
+import re
+import tempfile
+import unittest
+from collections import Counter
+from datetime import date, datetime, timedelta
+
+_DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
+_DB_FILE.close()
+os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
+os.environ["GOOGLE_API_KEY"] = ""
+os.environ["GOOGLE_AI_STUDIO_API_KEY"] = ""
+os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="policy-uploads-"))
+os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
+os.environ.setdefault("USLS_UPLOAD_DIR", tempfile.mkdtemp(prefix="uploads-"))
+
+from app import (  # noqa: E402
+    AcademicTerm,
+    AdviserAppointment,
+    AdviserAssignment,
+    Course,
+    DefenseVerdict,
+    Faculty,
+    PanelAssignment,
+    Program,
+    SEEDED_HISTORY_SOURCE,
+    STUDENT_NUMBER_RE,
+    Student,
+    SubjectEnrollment,
+    DEMO_STUDENT_NUMBERS,
+    Task,
+    TransactionLog,
+    UserAccount,
+    WithdrawalApplication,
+    align_seed_calendar,
+    enrollment_window,
+    get_active_term,
+    generate_semester_calendar,
+    seed_semester_years,
+    subject_withdrawal_window,
+    adviser_max_advisees,
+    app,
+    compute_course_audit,
+    comprehensive_exam_eligibility,
+    db,
+    build_demo_database,
+    student_adviser_faculty,
+)
+
+DEAN_QUEUE_TYPES = ("leave-of-absence", "readmission", "awol-return", "withdrawal", "practicum", "graduation")
+RESEARCH_STAGES = ("Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense", "Completed")
+
+
+class SeedQualityTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        app.config.update(TESTING=True)
+        with app.app_context():
+            build_demo_database()
+            cls.dean_id = UserAccount.query.filter_by(role="dean").first().id
+            cls.today = date.today()
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            with app.app_context():
+                db.session.remove()
+                db.engine.dispose()
+            os.unlink(_DB_FILE.name)
+        except (FileNotFoundError, PermissionError):
+            pass
+
+    def _client(self, account_id, role):
+        client = app.test_client()
+        with client.session_transaction() as session:
+            session["account_id"] = account_id
+            session["role"] = role
+        return client
+
+    # ------------------------------------------------------------------ I-060 (F-06)
+    def test_no_faculty_advises_more_students_than_the_limit(self):
+        with app.app_context():
+            limit = adviser_max_advisees()
+            over = []
+            for faculty in Faculty.query.all():
+                accepted = AdviserAppointment.query.filter(
+                    AdviserAppointment.faculty_id == faculty.id,
+                    AdviserAppointment.status == "Accepted",
+                    AdviserAppointment.ended_at.is_(None),
+                ).count()
+                legacy = AdviserAssignment.query.filter_by(faculty_id=faculty.id, status="Active").count()
+                if max(accepted, legacy) > limit:
+                    over.append(f"{faculty.name}: {accepted} appointments / {legacy} assignments (limit {limit})")
+            self.assertEqual([], over)
+
+    def test_an_adviser_never_sits_on_the_advisees_panel(self):
+        with app.app_context():
+            clashes = []
+            for student in Student.query.all():
+                adviser_ids = {faculty.id for faculty in student_adviser_faculty(student)}
+                panel_ids = {row.faculty_id for row in PanelAssignment.query.filter_by(student_id=student.id).all()}
+                for faculty_id in adviser_ids & panel_ids:
+                    clashes.append(f"{student.name} ({student.student_number}): {db.session.get(Faculty, faculty_id).name}")
+            self.assertEqual([], clashes)
+
+    # ------------------------------------------------------------------ I-062 (F-08)
+    def test_the_dean_has_a_case_waiting_in_every_queue_and_some_decided_ones(self):
+        dean = self._client(self.dean_id, "dean")
+        payload = dean.get("/api/approvals").get_json()
+        waiting = Counter(item["type"] for item in payload["workflow_pending"])
+        missing = [queue for queue in DEAN_QUEUE_TYPES if not waiting[queue]]
+        self.assertEqual([], missing, f"no case waiting for the Dean in: {missing}")
+        self.assertGreaterEqual(len(payload["pending"]), 1, "no course offering plan waits for the Dean")
+        decided = len(payload["workflow_recent"]) + len(payload["recent"])
+        self.assertGreaterEqual(decided, 3, "the Dean should also have a few decided cases in the past weeks")
+
+    # ------------------------------------------------------------------ I-061 (F-07)
+    def test_a_student_in_research_has_finished_coursework_and_passed_the_comprehensive(self):
+        with app.app_context():
+            bad = []
+            for student in Student.query.filter(Student.current_stage.in_(RESEARCH_STAGES)).all():
+                audit = compute_course_audit(student)
+                if audit["completed_units"] <= 0 or audit["completed_units"] < audit["total_units"]:
+                    bad.append(f"{student.name} {student.student_number} {student.current_stage}: "
+                               f"{audit['completed_units']}/{audit['total_units']} units")
+                if (student.comprehensive_exam_status or "").lower() != "passed":
+                    bad.append(f"{student.name} {student.student_number}: compre {student.comprehensive_exam_status}")
+            self.assertEqual([], bad)
+
+    def test_no_category_shows_more_units_than_the_requirement(self):
+        with app.app_context():
+            bad = []
+            for student in Student.query.all():
+                for row in comprehensive_exam_eligibility(student)["categories"]:
+                    if row["completed"] > row["required"]:
+                        bad.append(f"{student.name} {row['category']}: {row['completed']} of {row['required']} units")
+            self.assertEqual([], bad[:10])
+
+    def test_subjects_have_real_titles_and_terms_and_programs_real_colleges(self):
+        with app.app_context():
+            same_as_code = [c.code for c in Course.query.all() if (c.title or "").strip().upper() == c.code.upper()]
+            self.assertEqual([], same_as_code[:10], "subject titles that only repeat the code")
+            other_prefix = [c.code for c in Course.query.all() if (c.title or "").upper().startswith("MAGC")]
+            self.assertEqual([], other_prefix)
+            for program in Program.query.all():
+                terms = {c.recommended_term for c in Course.query.filter_by(program_id=program.id).all()}
+                self.assertGreater(len(terms), 1, f"{program.code}: every subject has the same suggested term {terms}")
+            self.assertEqual([], [p.code for p in Program.query.all() if p.college in (None, "", "Imported")])
+
+    # ------------------------------------------------------------------ I-070 (F-16)
+    def test_seeded_events_are_spread_over_the_previous_weeks(self):
+        with app.app_context():
+            def weeks(values):
+                return {value.isocalendar()[:2] for value in values if value}
+
+            logged = [row.created_at for row in TransactionLog.query.all()]
+            appointments = [row.applied_at for row in AdviserAppointment.query.all()]
+            verdicts = [row.submitted_at for row in DefenseVerdict.query.all()]
+            due = [row.due_at.date() if isinstance(row.due_at, datetime) else row.due_at for row in Task.query.all()]
+            self.assertGreaterEqual(len(weeks(logged)), 4, "activity log happens in fewer than 4 weeks")
+            self.assertGreaterEqual(len(weeks(appointments)), 4, "adviser appointments happen in fewer than 4 weeks")
+            self.assertGreaterEqual(len({d for d in due}), 3, "tasks are all due on the same day")
+            self.assertGreater(len({v.strftime("%H:%M:%S") for v in verdicts if v}), 1, "all verdicts at the same clock time")
+            oldest = self.today - timedelta(weeks=12, days=1)
+            # I-197: activity rows tagged as deliberate history (seed_report_history) may be older, so the
+            # "compared with last term" reports have something to compare. Everything else stays in the window.
+            current_activity = [row.created_at for row in TransactionLog.query.all() if row.source_reference != SEEDED_HISTORY_SOURCE]
+            for label, values in (("activity", current_activity), ("appointments", appointments)):
+                self.assertTrue(all(oldest <= value.date() <= self.today for value in values if value), label)
+            self.assertTrue(all(value.date() <= self.today for value in logged if value), "history is in the past")
+
+    # ------------------------------------------------------------------ I-094 (F-40)
+    def test_default_student_has_nothing_to_withdraw_and_the_withdrawal_demo_students_have_subjects(self):
+        """Miguel Yu (student@usls.edu.ph) is at Final Defense with all coursework completed, so policy
+        leaves him no current subject to withdraw (and the withdrawal window is the first two weeks of
+        a semester: the registrar calendar, not demo data). The withdrawal demo belongs to the dedicated
+        accounts, which must keep subjects enrolled in the active term."""
+        with app.app_context():
+            default = UserAccount.query.filter_by(email="student@usls.edu.ph").one().student
+            self.assertEqual("Final Defense", default.current_stage)
+            self.assertEqual(0, SubjectEnrollment.query.filter(
+                SubjectEnrollment.student_id == default.id,
+                SubjectEnrollment.status.in_(("Enrolled", "Current")),
+            ).count())
+            for number in ("2690401", "2690402"):
+                student = Student.query.filter_by(student_number=number).one()
+                self.assertGreaterEqual(SubjectEnrollment.query.filter(
+                    SubjectEnrollment.student_id == student.id,
+                    SubjectEnrollment.status == "Enrolled",
+                ).count(), 1, number)
+
+    # ------------------------------------------------------------------ I-162 / I-164 (audit I-143)
+    def test_every_seeded_withdrawal_names_a_subject(self):
+        with app.app_context():
+            rows = WithdrawalApplication.query.all()
+            self.assertTrue(rows)
+            self.assertEqual([], [row.id for row in rows if not row.subject_enrollment_id])
+
+    def test_the_withdrawal_demo_students_are_inside_an_open_window_on_any_seed_day(self):
+        """The 14-day window must not depend on the calendar date the demo is seeded on (I-162)."""
+        with app.app_context():
+            account = UserAccount.query.filter_by(email="withdrawal.elena@usls.edu.ph").one()
+            subject = SubjectEnrollment.query.filter_by(student_id=account.student_id, status="Enrolled").first()
+            window = subject_withdrawal_window(subject)
+            self.assertTrue(window["eligible"], window)
+            self.assertEqual(10, window["fee_percent"], window)
+            # Still open for the next week of a demo or UAT.
+            self.assertTrue(subject_withdrawal_window(subject, self.today + timedelta(days=7))["eligible"])
+            joshua = Student.query.filter_by(student_number="2690402").one()
+            joshua_subject = SubjectEnrollment.query.filter_by(student_id=joshua.id, status="Enrolled").first()
+            self.assertTrue(subject_withdrawal_window(joshua_subject)["eligible"])
+            subject_id, account_id = subject.id, account.id
+        client = self._client(account_id, "student")
+        response = client.post("/api/student-portal/requests/withdrawal", json={
+            "reason": "Work schedule clash.", "subject_enrollment_id": subject_id})
+        self.assertIn(response.status_code, (200, 201), response.get_json())
+
+    # ------------------------------------------------------------------ I-095 (F-41)
+    def test_the_seed_calendar_has_a_running_semester_on_any_seed_day(self):
+        """records-02: between semesters or near a semester's end the seed still dates a running semester."""
+        for today in (date(2026, 12, 5), date(2026, 11, 27), date(2027, 6, 15), date(2026, 8, 3), date(2026, 10, 1)):
+            terms = [AcademicTerm(label=label, start_date=start, end_date=start + timedelta(days=120))
+                     for label, start in generate_semester_calendar(*seed_semester_years(today))]
+            align_seed_calendar(terms, today)
+            running = [t for t in terms if t.start_date <= today <= t.end_date]
+            self.assertEqual(len(running), 1, today)
+            self.assertLessEqual((today - running[0].start_date).days, 3, today)
+            self.assertGreater((running[0].end_date - today).days, 100, today)
+            ordered = sorted(terms, key=lambda t: t.start_date)
+            for earlier, later in zip(ordered, ordered[1:]):
+                self.assertLess(earlier.end_date, later.start_date, (today, earlier.label, later.label))
+
+    def test_the_active_semester_has_an_enrollment_period_that_is_open_on_the_seed_day(self):
+        """The enrollment banner and the server's refusals read the planning window; the seed gives the active term a real one."""
+        with app.app_context():
+            term = get_active_term()
+            self.assertIsNotNone(term.planning_window_open)
+            self.assertIsNotNone(term.planning_window_close)
+            self.assertTrue(enrollment_window(term)["is_open"])
+            self.assertGreaterEqual((term.planning_window_close - self.today).days, 14)
+            self.assertEqual(AcademicTerm.query.filter(AcademicTerm.planning_window_close.isnot(None)).count(), 1)
+
+    def test_terms_cover_only_the_current_year_plus_or_minus_two(self):
+        with app.app_context():
+            current_start = self.today.year if self.today.month >= 8 else self.today.year - 1
+            years = sorted({int(term.label.split()[1].split("-")[0]) for term in AcademicTerm.query.all()})
+            self.assertEqual(list(range(current_start - 2, current_start + 3)), years)
+            self.assertEqual(10, AcademicTerm.query.count())
+
+    # ------------------------------------------------------------------ I-353: one student-ID format
+    def test_every_seeded_student_has_a_seven_digit_id_and_a_yy_yy_school_year(self):
+        with app.app_context():
+            students = Student.query.all()
+            self.assertTrue(students)
+            bad_ids = [s.student_number for s in students if not STUDENT_NUMBER_RE.fullmatch(s.student_number or "")]
+            self.assertEqual([], bad_ids)
+            self.assertEqual(len(students), len({s.student_number for s in students}))
+            bad_ay = [s.academic_year_entry for s in students if not re.fullmatch(r"\d{2}-\d{2}", s.academic_year_entry or "")]
+            self.assertEqual([], bad_ay)
+
+    def test_the_demo_personas_come_from_one_mapping_table(self):
+        with app.app_context():
+            numbers = set(DEMO_STUDENT_NUMBERS.values())
+            self.assertEqual(len(numbers), len(DEMO_STUDENT_NUMBERS))
+            self.assertTrue(all(STUDENT_NUMBER_RE.fullmatch(n) for n in numbers))
+            seeded = {s.student_number for s in Student.query.all()}
+            self.assertEqual(set(), numbers - seeded)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,173 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Policy Documents
+Grace Fernandez · Graduate School Staff
+1
+GF
+Policy Documents
+
+Manage the approved PDF and Word documents the Policy Assistant searches. Every answer names the document and page or section it came from. Drafts are searched but flagged as pending validation.
+
+Add document
+
+ALL SOURCES
+
+3
+
+STAFF UPLOADS
+
+1
+
+DRAFTS PENDING VALIDATION
+
+1
+
+READY FOR ASSISTANT
+
+3
+
+Walkthrough Memo - Lounge Reservation 20261102-2048 was removed from the Policy Assistant library.
+Test a question
+
+Type a question to see which passages the Policy Assistant would use, and from which document. Use it after an upload to confirm the new policy is found.
+
+Find passages
+What is the maximum residence period for a master's program?
+When may a student withdraw a subject?
+Who nominates the panel for a title defense?
+
+1 passage found by keyword search among 1450 indexed sections.
+
+ANSWER PREVIEW (EXTRACTED FROM THE PASSAGES, NO AI)
+
+Walkthrough Memo - Lounge Reservation 20261102-2048 Graduate School Lounge Reservation Rule (walkthrough memo, made-up for demonstration only). Section 1. A student organisation may reserve the Graduate School lounge at most six (6) times per semest Section 2. A reservation must be filed with the Graduate School office at least three working days ahead.
+Source: Walkthrough Memo - Lounge Reservation 20261102-2048 (p. 1)
+
+1. Walkthrough Memo - Lounge Reservation 20261102-2048
+
+Active
+p. 1
+
+A student organisation may reserve the Graduate School lounge at most six (6) times per semest Section 2.
+
+Documents
+
+Staff uploads can be edited, replaced, or removed. Built-in sources are view-only.
+
+Search documents
+All categories
+Handbook
+Research Protocol
+Operations Manual
+Memo
+Form
+Other
+All statuses
+Active
+Draft
+Archived
+USLS Graduate School Operations Manual (draft for validation)
+
+USLS_GS_Operations_Manual_-_DRAFT_for_Validation.docx
+
+Draft
+Operations Manual
+Version 1
+Draft — pending Graduate School validation. Assistant answers that use this document say so. Note: Prepared by the capstone group for Graduate School validation
+
+The capstone group's written description of how the Graduate School carries out each process, with the business rules register. A draft: every answer that uses it says it is pending validation.
+
+DOCX
+143 KB
+1074 searchable sections
+
+System Administrator · Nov 2, 2026, 8:46 PM
+
+Version history (1)
+
+Version 1
+Current, searched
+
+USLS_GS_Operations_Manual_-_DRAFT_for_Validation.docx · 143 KB
+
+System Administrator · Nov 2, 2026, 8:46 PM
+
+“Seeded from the project files”
+
+View
+Graduate School Research Protocol (AY 2024-2025)
+
+Complete-GS-Research-Protocol-Updated-for-AY2024-2025-without-publication-protocol-1.docx
+
+Active
+Research Protocol
+
+Built-in policy source managed with the application files.
+
+DOCX
+109 KB
+
+System library · Feb 17, 2026, 8:29 PM
+
+Graduate School Handbook 2022-2023
+
+GRADUATE-SCHOOL-HANDBOOK-22-23.pdf
+
+Active
+Handbook
+
+Built-in policy source managed with the application files.
+
+PDF
+890 KB
+
+System library · Jun 26, 2026, 3:31 PM

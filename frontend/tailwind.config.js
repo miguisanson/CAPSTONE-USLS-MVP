@@ -19,10 +19,36 @@ export default {
         },
         canvas: "#f4f7f9",
         ink: "#0f172a",
+        // Muted text must reach 4.5:1 on white, the page background (canvas #f4f7f9) and slate-100 (WCAG 1.4.3; I-092).
+        // Tailwind's slate-500 (#64748b) is 4.42:1 on canvas and slate-400 (#94a3b8) is 2.4:1, and both are used as
+        // muted text all over the app, so the two steps are darkened here once instead of editing every page:
+        // 400 = 5.7:1 on white / 5.3 on canvas / 5.2 on slate-100 / 4.6 on slate-200; 500 = 6.6:1 on white. Backgrounds that use
+        // bg-slate-400 (status dots) get the same darker grey.
+        slate: {
+          400: "#586880",
+          500: "#4e5e74",
+        },
       },
       fontFamily: {
         sans: ["'Open Sans'", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["Poppins", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
+      // Phase 5 design contract (.planning/phases/05-design-system/05-UI-SPEC.md sections 1-2).
+      // 2xs = the 11px "micro" step that replaces text-[9px] / [10px] / [11px].
+      fontSize: {
+        "2xs": ["0.6875rem", { lineHeight: "1rem" }],
+      },
+      // Page content never stretches past 1440px on wide screens: max-w-page.
+      maxWidth: {
+        page: "90rem",
+      },
+      // One z-index scale instead of z-40 / 50 / [70] / [80] / [90] / [100] / [110].
+      zIndex: {
+        header: "30",
+        drawer: "40",
+        modal: "100",
+        confirm: "110",
+        toast: "120",
       },
       boxShadow: {
         card: "0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.06)",
@@ -37,9 +63,32 @@ export default {
           "0%": { opacity: "0", transform: "translateY(6px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        // Motion tokens (I-148/I-156). The global prefers-reduced-motion rule in index.css cuts every one of them.
+        "backdrop-in": { "0%": { opacity: "0" }, "100%": { opacity: "1" } },
+        "dialog-panel-in": {
+          "0%": { opacity: "0", transform: "scale(0.98)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        "drawer-in-right": { "0%": { transform: "translateX(100%)" }, "100%": { transform: "translateX(0)" } },
+        "drawer-in-left": { "0%": { transform: "translateX(-100%)" }, "100%": { transform: "translateX(0)" } },
+        "notice-in": {
+          "0%": { opacity: "0", transform: "translateY(-4px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        // A card that has just arrived in its column: a green ring that fades out.
+        "card-settle": {
+          "0%": { boxShadow: "0 0 0 3px rgba(63, 182, 115, 0.85)" },
+          "100%": { boxShadow: "0 0 0 3px rgba(63, 182, 115, 0)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.25s ease-out",
+        "backdrop-in": "backdrop-in 150ms ease-out",
+        "dialog-panel": "dialog-panel-in 180ms ease-out",
+        "drawer-right": "drawer-in-right 200ms ease-out",
+        "drawer-left": "drawer-in-left 200ms ease-out",
+        "notice-in": "notice-in 150ms ease-out",
+        "card-settle": "card-settle 1s ease-out",
       },
     },
   },

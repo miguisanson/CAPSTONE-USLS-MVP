@@ -1,0 +1,137 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Policy Assistant
+Grace Fernandez · Graduate School Staff
+1
+GF
+Policy Assistant
+
+Answers come only from the uploaded policy documents and your own records, with the sources shown. For guidance only: final decisions stay with authorized personnel.
+
+Assistant
+
+General · policy documents and all students
+
+Hi! I'm the Policy Assistant. Ask about a student's status, what is waiting on you, or Graduate School policy. I answer from live records and the policy documents, and I say so when the documents do not cover a question.
+Can a student withdraw a subject on Day 1, and how much is the fee?
+Day 1 is inside the first week, so a student may withdraw a subject on Day 1 with the Dean's approval, but it is not free: 10% of the total amount due for the term is charged in the first week and 20% in the second week. A student may also change a subject or add a subject only in the first week. After the second week the student may still withdraw but pays the full fees (or fees up to the last month of attendance if the reason is justifiable).
+Source: USLS Graduate School Operations Manual (draft for validation) (4.4 Withdrawal of subject)
+
+Draft — pending Graduate School validation: USLS Graduate School Operations Manual (draft for validation).
+Offline answer
+Found by keyword search; Gemini was not used
+
+The assistant is answering from the policy documents without AI right now.
+
+SOURCES (1)
+
+USLS Graduate School Operations Manual (draft for validation)
+4.4 Withdrawal of subject
+Draft — pending Graduate School validation
+Day 1 is inside the first week, so a student may withdraw a subject on Day 1 with the Dean's approval, but it is not free: 10% of the total amount due for the term is charged in the first week and 20% in the second week. A student may also change a subject or add a subject only in the first week. After the second week the student may still withdraw but pays the full fees (or fees up to the last month of attendance if the reason is justifiable).
+Is time on leave of absence included in the maximum years to finish a master's degree?
+A master's program must be finished within a maximum of seven (7) academic years including Leave of Absence (LOA). A student who cannot finish within seven (7) years is required to re-enroll all the courses taken and comply with requirements to earn new credits.
+Source: Graduate School Handbook 2022-2023 (p. 54, 3.6 MAXIMUM RESIDENCE - Master's Program)
+Offline answer
+Found by keyword search; Gemini was not used
+
+The assistant is answering from the policy documents without AI right now.
+
+SOURCES (1)
+
+Graduate School Handbook 2022-2023
+Page 54 · 3.6 MAXIMUM RESIDENCE › Master's Program
+What is waiting on me?
+Which students need attention right now?
+What does a student need for proposal defense readiness?
+Explain the LOA and residency rule.
+
+Enter to send · Shift+Enter for a new line
+
+Focus on a student
+
+Optional: ground answers in one record
+
+Filter
+All programs
+DPSY — Doctor of Philosophy in Psychology
+MAPSY — Master of Arts in Psychology
+MASS — Master of Arts in Social Sciences
+DBA — Doctor of Business Administration
+MBA — Master of Business Administration
+EDD — Doctor of Education
+MAED — Master of Arts in Education
+MSGC — Master of Science in Guidance and Counseling
+MIT — Master in Information Technology
+MSCS — Master of Science in Computer Science
+MAN — Master of Arts in Nursing
+MSN — Master of Science in Nursing
+All stages
+Admission
+Coursework
+Comprehensive Exam
+Proposal Development
+Proposal Defense
+Data Collection
+Writing
+Final Defense
+LOA
+AWOL
+Withdrawal In Progress
+Withdrawn
+Completed
+How this works
+Policy questions are answered only from the retrieved passages of the policy documents.
+Every answer lists its sources. Open one to see the document, page, section and exact passage.
+If the documents do not cover a question, it says so instead of guessing.
+Questions like “what is my next step?” use only your own record or queue.
+An “Offline answer” label means Gemini was not used and the answer is a keyword match.

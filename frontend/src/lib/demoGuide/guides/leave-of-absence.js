@@ -1,0 +1,111 @@
+import { STAFF, DEAN, from, LEAVE_ORDER, RESEND, DENIED } from "./_shared.js";
+
+export default {
+  id: "leave-of-absence",
+  process: "leave-of-absence",
+  title: "Leave of Absence",
+  summary: "A student asks for a leave, staff check it, the Dean approves, staff start the leave.",
+  studentNumber: "2690802",
+  walkthrough: "09_leave_of_absence",
+  accounts: {
+    student: { who: "the student", label: "Daniel Fernandez", email: "loa.daniel@usls.edu.ph" },
+    staff: STAFF,
+    dean: DEAN,
+  },
+  steps: [
+    {
+      id: "loa-file", title: "The student asks for a leave", role: "student", route: "/student/requests/leave-of-absence", page: "Leave of Absence",
+      say: "leave-of-absence-03",
+      do: "Pick when the leave starts and ends (two semesters at most), a reason and a short explanation, then send the request.",
+      target: 'main form button[type="submit"]',
+      actions: [
+        { select: "#loa-start", label: "AY 2026-2027 2nd Semester" },
+        { select: "#loa-end", label: "AY 2027-2028 1st Semester" },
+        { select: "#loa-reason", label: "Employment / professional obligation" },
+        { type: "#loa-remarks", text: "I have accepted a work assignment in another city and cannot carry a study load for the next two semesters." },
+        { click: "submit" },
+        { click: { role: "button", name: "Send request", in: "dialog" } },
+      ],
+      doneWhen: { status: from(LEAVE_ORDER, "Submitted") },
+      rule: "A leave covers at most two semesters at a time (Graduate School Handbook); leave counts toward the maximum residence.",
+      ifAsked: [
+        { q: "How long can a leave be?", a: "Two semesters at a time. Leave counts toward the maximum residence; the request window shows how many of the 4 leave semesters are already approved." },
+        { q: "Why does the policy check say Needs review?", a: "The Minimum residency rule is a prototype value this demo student does not meet. Rules marked Needs review are prototype values waiting for Graduate School validation. The Dean still decides." },
+      ],
+    },
+    {
+      id: "loa-review", title: "Staff start the review", role: "staff", route: "/workflow/leave-of-absence", page: "Leave of Absence",
+      say: "leave-of-absence-07",
+      do: "Find the card in Submitted and move it to In staff review (drag it, or use Move to... on the card). Open View details and read the policy check.",
+      target: '[aria-label="Leave of absence board"]',
+      actions: [
+        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Daniel Fernandez" } } },
+        { click: { role: "menuitem", name: "In staff review" } },
+        { pause: 900 },
+      ],
+      doneWhen: { status: from(LEAVE_ORDER, "Staff Review") },
+      rule: "The server checks every move. A card that is waiting for the student or the Dean cannot be moved by staff.",
+      ifAsked: [
+        { q: "Does the policy check approve the request?", a: "No. It is advice for staff with Pass or Needs review. Only the Dean decides." },
+        { q: "Can staff just drag the card anywhere?", a: "No. Dragging is the same guarded step as the buttons. The server refuses a move the rules do not allow." },
+      ],
+    },
+    {
+      id: "loa-forward", title: "Staff forward it to the Dean", role: "staff", route: "/workflow/leave-of-absence", page: "Leave of Absence",
+      say: "leave-of-absence-11",
+      do: "Click Forward to Dean, keep the eligibility result on the policy check, write a note for the Dean and forward it.",
+      actions: [
+        { click: { role: "button", name: "View details for Daniel Fernandez" } },
+        { click: { role: "button", name: "Forward to Dean", in: "dialog" } },
+        { type: { css: "textarea", in: "dialog" }, text: "Two semesters is within the handbook limit and no earlier leave is on record. The minimum-residency check is a prototype rule, so the Dean should confirm." },
+        { click: { role: "button", name: "Forward to Dean", exact: true, in: "dialog" } },
+        { click: { role: "button", name: "Close details" }, optional: true },
+      ],
+      doneWhen: { status: from(LEAVE_ORDER, "Dean Review") },
+      ifAsked: [{ q: "Why does staff add a note?", a: "The note tells the Dean what staff checked, for example that two semesters is within the Handbook limit and no earlier leave is on record." }],
+    },
+    {
+      id: "loa-decide", title: "The Dean decides", role: "dean", route: ["/dean/approvals/leave-of-absence", "/dean/case/leave-of-absence"], page: "Leave of Absence (Dean)",
+      say: "leave-of-absence-14",
+      do: "Open the request in the Dean's queue and approve it with a note. Return for revision and Deny are the other choices.",
+      actions: [
+        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Daniel Fernandez" } } },
+        { click: { role: "menuitem", name: "Leave scheduled" } },
+        { type: { css: "textarea", in: "dialog" }, text: "Approved for two semesters. The student is to file a readmission request before the leave ends." },
+        { click: { role: "button", name: "Approve", exact: true, in: "dialog" } },
+      ],
+      doneWhen: { status: from(LEAVE_ORDER, "Leave Scheduled") },
+      branches: [
+        { status: ["Returned"], goto: "loa-resend", note: "The request was returned with a comment. The student corrects it and sends it again." },
+        { status: ["Denied"], goto: "loa-denied", note: "The Dean denied the request." },
+      ],
+      rule: "Only the Dean approves, returns or denies a leave.",
+      ifAsked: [
+        { q: "Is an email sent to the Registrar?", a: "No. The portal sends no email. Staff download the Registrar list, email it, then mark it sent and acknowledged." },
+        { q: "What if the Dean does not approve?", a: "The Dean can return it for revision (the student corrects and sends again) or deny it (the student is told why)." },
+      ],
+    },
+    {
+      id: "loa-start", title: "Staff start the leave", role: "staff", route: "/workflow/leave-of-absence", page: "Leave of Absence", dateWait: true,
+      say: "leave-of-absence-17",
+      do: "For the demo, move the card from Leave scheduled to On leave with Start the leave now. Enrollment closes for the student.",
+      actions: [
+        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Daniel Fernandez" } } },
+        { click: { role: "menuitem", name: "On leave" } },
+        { click: { role: "button", name: "Start the leave now", exact: true, in: "dialog" } },
+      ],
+      doneWhen: { status: from(LEAVE_ORDER, "On Leave") },
+      ifAsked: [{ q: "Does a leave start by itself?", a: "Yes, on the first day of the leave semester. Starting it by hand is only for the demo, so nobody waits for a real date." }],
+    },
+    {
+      id: "loa-result", title: "The student sees On leave", role: "student", route: "/student/requests/leave-of-absence", page: "Leave of Absence",
+      say: "leave-of-absence-22",
+      do: "Sign in as the student: the badge reads On leave and the discussion shows every message from the steps. Enrollment is closed.",
+      actions: [{ pause: 1500, caption: "Showing the student's page" }],
+      doneWhen: "manual",
+      ifAsked: [{ q: "How does the student come back?", a: "By filing a Readmission request before the leave ends. Open the Readmission guide for that." }],
+    },
+    RESEND("loa-resend", "/student/requests/leave-of-absence", "Leave of Absence", "leave-of-absence-03", { doneWhen: { status: from(LEAVE_ORDER, "Submitted") } }),
+    DENIED("loa-denied", "/student/requests/leave-of-absence", "Leave of Absence", "leave-of-absence-15"),
+  ],
+};

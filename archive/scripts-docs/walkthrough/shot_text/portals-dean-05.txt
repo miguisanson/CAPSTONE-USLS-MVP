@@ -1,0 +1,1250 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+
+APPROVALS
+
+Approvals Queue
+7
+Course Adjustments
+1
+Leave of Absence
+1
+Readmission
+1
+AWOL & Residency
+1
+Subject Withdrawal
+1
+Practicum Reports
+1
+Graduation Endorsement
+1
+Admission & Coursework Reports
+
+MONITORING & SUPPORT
+
+Reports & Analytics
+Activity Log
+Policy Assistant
+Business Rules
+
+Dean
+
+Every decision is recorded against your account with the date and time.
+
+Dean Portal
+Business Rules
+Dr. Manuel Villaruz · Dean
+3
+DM
+Business Rules
+
+The rules the workflows follow, each with the handbook or protocol page it comes from. The Graduate School Handbook 2022-2023 is in force; where the system and the handbook disagree, the handbook wins. Rules set by the Handbook or the Research Protocol are locked: they change only when the Graduate School issues a new policy (upload it under Policy Documents). Only Graduate School staff and the administrator can adjust the prototype rules.
+
+RULES IN THE REGISTER
+
+65
+
+ENFORCED BY THE SYSTEM
+
+47
+
+DOCUMENTED ONLY
+
+18
+
+NEED REVIEW
+
+12
+
+All rules
+Enforced by the system
+Documented only
+Needs review
+Official (locked)
+Pending validation
+Search rules
+Enrollment and academic load
+
+Normal part-time load: lower bound
+
+The normal load of a part-time graduate student starts at 6 units per semester. The portal shows the load on the enrollment preview; a lighter load is allowed for residency, thesis or final-term students, so it is information rather than a block.
+
+Source: Graduate School Handbook 2022-2023, p. 48 · Registration - Academic Load
+
+Documented only
+Official — Handbook p. 48
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 48. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The handbook calls this the normal load, not a hard limit; the portal shows it as information only.
+
+enrollment.part_time_min_units
+
+6 units
+Change history
+0
+
+Normal part-time load: upper bound
+
+The normal load of a part-time graduate student is at most 9 units per semester. Above 9 units the student is carrying a full-time load.
+
+Source: Graduate School Handbook 2022-2023, p. 48 · Registration - Academic Load
+
+Documented only
+Official — Handbook p. 48
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 48. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The handbook calls this the normal load, not a hard limit; the portal shows it as information only.
+
+enrollment.part_time_max_units
+
+9 units
+Change history
+0
+
+Full-time load
+
+The normal load of a full-time graduate student is 12 units per semester. Enrolling more than this in one semester is flagged on the enrollment preview and needs a documented exception before it can be saved.
+
+Source: Graduate School Handbook 2022-2023, p. 48 · Registration - Academic Load
+
+Enforced by the system
+Official — Handbook p. 48
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 48. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+enrollment.full_time_units
+
+12 units
+Change history
+0
+
+Residency enrollment is only for research, practicum, comprehensive exam or publication
+
+A student with no subjects to take may enroll for residence only to work on the thesis/dissertation, the practicum/internship, to complete an INC, to take the comprehensive exam or to wait for a publication. A student who simply will not enroll for a semester but still has units to take files a Leave of Absence instead.
+
+Source: Graduate School Handbook 2022-2023, p. 48 · Registration - Residency Enrollment
+
+Enforced by the system
+Official — Handbook p. 48
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 48. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+enrollment.residency_only_after_coursework
+
+Yes
+Change history
+0
+
+Removal of an INC grade
+
+An incomplete grade must be removed within one academic year, otherwise it becomes 3.0 (master's) or 2.0 (doctorate) and the subject must be taken again. A student with an INC in every subject is dropped from the rolls.
+
+Source: Graduate School Handbook 2022-2023, p. 54 · Academic Performance - Incomplete Grades
+
+Documented only
+Official — Handbook p. 54
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 54. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: Grades are outside the system's scope (stakeholder decision).
+
+enrollment.inc_completion_years
+
+1 years
+Change history
+0
+Course adjustments (add or change a subject)
+
+Adding a subject: first week of classes only
+
+Adding subjects is allowed during the first week of classes (7 calendar days from the start of classes) with the written approval of the Associate Dean. After that, an addition is flagged on the enrollment preview and can only be saved with a documented exception (the Associate Dean's written approval).
+
+Source: Graduate School Handbook 2022-2023, p. 49 · Registration - Adding of Subject/s
+
+Enforced by the system
+Official — Handbook p. 49
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 49. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+course_adjustment.add_subject_window_days
+
+7 days
+Change history
+0
+
+Changing one subject for another: first week of classes only
+
+Changing one subject for another is allowed during the first week of classes (7 calendar days from the start of classes) only if the original subject was dissolved, the student has a schedule conflict, or the student failed the prerequisite subject.
+
+Source: Graduate School Handbook 2022-2023, pp. 48-49 · Registration - Change of Subject
+
+Enforced by the system
+Official — Handbook pp. 48-49
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 48-49. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+course_adjustment.change_subject_window_days
+
+7 days
+Change history
+0
+
+Conditions for a change of subject
+
+The reason for a change must be one of: the original subject is dissolved, a conflict in schedules, or failure in the prerequisite subject. Staff confirm the reason; the system records the exception but cannot see the schedule or the grade.
+
+Source: Graduate School Handbook 2022-2023, p. 49 · Registration - Change of Subject
+
+Documented only
+Official — Handbook p. 49
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 49. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The reason is confirmed by staff and the Associate Dean; schedules and grades are outside the portal.
+
+course_adjustment.change_conditions
+
+Subject dissolved; schedule conflict; failed prerequisite
+Change history
+0
+Subject withdrawal
+
+Subject withdrawal window
+
+A student may withdraw subjects until the end of the second week from the start of classes (14 calendar days), whether or not classes were attended. The request needs the Dean's approval. It is not free: the fee consequence below applies. After the window a single subject can no longer be withdrawn; the student may still withdraw from all subjects (paying the full fees for the semester) or file a Leave of Absence.
+
+Source: Graduate School Handbook 2022-2023, p. 49 · Registration - Withdrawal of Subject
+
+Enforced by the system
+Official — Handbook p. 49
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 49. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+withdrawal.window_days
+
+14 days
+Change history
+0
+
+First week of classes (fee tier boundary)
+
+Withdrawals filed within the first 7 calendar days of classes fall in the first-week fee tier; days 8 to 14 fall in the second-week tier.
+
+Source: Graduate School Handbook 2022-2023, pp. 50-51 · Fees and Expenses - Refund of Fees
+
+Enforced by the system
+Official — Handbook pp. 50-51
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 50-51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+withdrawal.first_week_days
+
+7 days
+Change history
+0
+
+Fee charged for a first-week withdrawal
+
+10% of the total amount due for the term is charged when the subject is withdrawn within the first week of classes, regardless of whether classes were attended.
+
+Source: Graduate School Handbook 2022-2023, pp. 49, 51 · Registration - Withdrawal of Subject; Fees - Refund of Fees
+
+Documented only
+Official — Handbook pp. 49, 51
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 49, 51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+withdrawal.fee_percent_first_week
+
+10 percent
+Change history
+0
+
+Fee charged for a second-week withdrawal
+
+20% of the total amount due for the term is charged when the subject is withdrawn within the second week of classes.
+
+Source: Graduate School Handbook 2022-2023, pp. 49, 51 · Registration - Withdrawal of Subject; Fees - Refund of Fees
+
+Documented only
+Official — Handbook pp. 49, 51
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 49, 51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+withdrawal.fee_percent_second_week
+
+20 percent
+Change history
+0
+
+Fee charged after the second week
+
+After the second week the student may still withdraw all subjects at any time of the semester but pays the full enrollment fees for the semester (a justifiable reason limits the charge to the last month of attendance).
+
+Source: Graduate School Handbook 2022-2023, p. 51 · Fees and Expenses - Refund of Fees
+
+Documented only
+Official — Handbook p. 51
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 51. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+withdrawal.fee_percent_after_window
+
+100 percent
+Change history
+0
+Dropping a subject and retention
+
+A subject is dropped only when unexcused absences exceed 20%
+
+A student is expected to attend regularly; the maximum absences allowed is 20% of the class hours for the semester. When unexcused absences in one subject go beyond 20%, the professor automatically drops the student from that subject (grade DRP, 5.0). The Academic Coordinator can only record a Dropped status when the unexcused-absence percentage entered is above this limit; a student who wants to leave a subject earlier files a Subject Withdrawal instead (see the withdrawal window).
+
+Source: Graduate School Handbook 2022-2023, p. 52 · Attendance - Limits on Absences
+
+Enforced by the system
+Official — Handbook p. 52
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 52. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+dropping.absence_limit_percent
+
+20 percent
+Change history
+0
+
+Grade given to a subject dropped for absences
+
+A subject dropped for absences carries the grade DRP with a value of 5.0.
+
+Source: Graduate School Handbook 2022-2023, p. 52 · Attendance - Limits on Absences
+
+Documented only
+Official — Handbook p. 52
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 52. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: Grades are outside the system's scope (stakeholder decision).
+
+dropping.drp_grade
+
+DRP (5.0)
+Change history
+0
+
+Retention: master's weighted average
+
+To remain in good standing a master's student keeps a weighted average of 2.0 or better at the end of each academic year.
+
+Source: Graduate School Handbook 2022-2023, p. 54 · Academic Performance - Retention Policy
+
+Documented only
+Official — Handbook p. 54
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 54. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: Grades are outside the system's scope (stakeholder decision).
+
+dropping.retention_master_average
+
+2 grade
+Change history
+0
+
+Retention: doctorate weighted average
+
+To remain in good standing a doctorate student keeps a weighted average of 1.75 or better at the end of each academic year.
+
+Source: Graduate School Handbook 2022-2023, p. 54 · Academic Performance - Retention Policy
+
+Documented only
+Official — Handbook p. 54
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 54. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: Grades are outside the system's scope (stakeholder decision).
+
+dropping.retention_doctorate_average
+
+1.75 grade
+Change history
+0
+
+A grade of 5.0 drops the student from the program
+
+A student who gets a 5.0 is automatically dropped from the program, and failure in any subject means no re-admission to the program.
+
+Source: Graduate School Handbook 2022-2023, p. 54 · Academic Performance - Retention Policy
+
+Documented only
+Official — Handbook p. 54
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 54. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: Grades are outside the system's scope (stakeholder decision).
+
+dropping.failing_grade_dropped_from_program
+
+Yes
+Change history
+0
+Leave of absence
+
+Written request with reason and period
+
+A request for a leave of absence is made in writing to the Dean. It states the reason for the leave and specifies the period.
+
+Source: Graduate School Handbook 2022-2023, p. 52 · Attendance - Leave of Absence
+
+Enforced by the system
+Official — Handbook p. 52
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 52. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+loa.written_request_required
+
+Yes
+Change history
+0
+
+A leave is approved for up to one year
+
+A leave of absence may be approved for a period of one year (two semesters).
+
+Source: Graduate School Handbook 2022-2023, p. 52 · Attendance - Leave of Absence
+
+Enforced by the system
+Official — Handbook p. 52
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 52. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+loa.max_period_semesters
+
+2 semesters
+Change history
+0
+
+A leave may be renewed for at most another year
+
+The leave may be renewed for at most another year, so all approved leave together cannot pass two years (four semesters).
+
+Source: Graduate School Handbook 2022-2023, p. 52 · Attendance - Leave of Absence
+
+Enforced by the system
+Official — Handbook p. 52
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 52. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+loa.max_total_semesters
+
+4 semesters
+Change history
+0
+
+No leave within two weeks before the last day of classes
+
+No leave of absence is granted during a semester within two weeks (14 days) before the last day of classes.
+
+Source: Graduate School Handbook 2022-2023, p. 53 · Attendance - Leave of Absence, guideline 3
+
+Enforced by the system
+Official — Handbook p. 53
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 53. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+loa.no_filing_days_before_term_end
+
+14 days
+Change history
+0
+
+A leave filed in the second half of a semester marks the courses W
+
+For a leave filed by the student himself or herself during the second half of the semester, the class standing of the enrolled courses becomes W (withdrawn) and no refund of tuition and fees is given. The portal shows this on the request.
+
+Source: Graduate School Handbook 2022-2023, p. 53 · Attendance - Leave of Absence, guideline 2
+
+Enforced by the system
+Official — Handbook p. 53
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 53. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+loa.second_half_marks_w
+
+Yes
+Change history
+0
+
+Minimum semesters completed before a leave
+
+The student must have completed at least one semester before filing a leave.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+loa.min_completed_semesters
+
+1 semesters
+Change history
+0
+
+A leave is marked Return Due this many days before it ends
+
+Graduate School staff see the leave as Return Due, and the student is reminded to file a readmission request or ask for an extension, this many days before the leave ends.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+leave.return_due_days
+
+30 days
+Change history
+0
+
+Days after a leave ends before AWOL is proposed
+
+If a leave has ended and no readmission was filed after this many days, the system proposes AWOL. A Graduate School staff member confirms it; nothing changes automatically.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+leave.return_grace_days
+
+14 days
+Change history
+0
+
+Leaving without a formal leave is AWOL
+
+A student who withdraws from the college without a formal leave of absence is considered absent without leave (AWOL) and has registration privileges curtailed or withdrawn.
+
+Source: Graduate School Handbook 2022-2023, p. 53 · Attendance - Leave of Absence
+
+Enforced by the system
+Official — Handbook p. 53
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 53. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+loa.awol_if_no_leave
+
+Yes
+Change history
+0
+Readmission
+
+A returning student writes an intent to enroll
+
+A student returning from a leave of absence or AWOL declares the intention to enroll by writing to the University Registrar through the Graduate School Dean, who endorses it to the Registrar.
+
+Source: Graduate School Handbook 2022-2023, p. 53 · Attendance - Leave of Absence (return)
+
+Enforced by the system
+Official — Handbook p. 53
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 53. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+readmission.written_intent_required
+
+Yes
+Change history
+0
+AWOL, residency and maximum residence
+
+Master's: all requirements within 5 academic years
+
+A master's student completes all requirements within five academic years from the date of admission. Beyond that the student needs the extension below.
+
+Source: Graduate School Handbook 2022-2023, p. 54 · Maximum Residence - Master's Program
+
+Enforced by the system
+Official — Handbook p. 54
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 54. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+residency.master_normal_years
+
+5 years
+Change history
+0
+
+Master's: absolute maximum of 7 academic years, including leave of absence
+
+A master's program must be finished within seven academic years including leave of absence. A student who cannot finish within seven years re-enrolls all courses taken. The residence clock is not paused during a leave.
+
+Source: Graduate School Handbook 2022-2023, p. 55 · Maximum Residence - Master's Program
+
+Enforced by the system
+Official — Handbook p. 55
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 55. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+residency.master_absolute_years
+
+7 years
+Change history
+0
+
+Doctorate: all requirements within 7 academic years
+
+A doctorate student completes all requirements, including the dissertation, within seven academic years from the date of admission.
+
+Source: Graduate School Handbook 2022-2023, p. 55 · Maximum Residence - Doctorate Program
+
+Enforced by the system
+Official — Handbook p. 55
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 55. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+residency.doctorate_normal_years
+
+7 years
+Change history
+0
+
+Doctorate: absolute maximum of 9 academic years, including leave of absence
+
+A doctoral program must be finished within nine academic years including leave of absence. A student who cannot finish within nine years re-enrolls all courses taken. The residence clock is not paused during a leave.
+
+Source: Graduate School Handbook 2022-2023, p. 55 · Maximum Residence - Doctorate Program
+
+Enforced by the system
+Official — Handbook p. 55
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 55. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+residency.doctorate_absolute_years
+
+9 years
+Change history
+0
+
+Extension beyond the normal limit
+
+A student who cannot comply with the normal maximum residence is allowed a maximum two-year extension.
+
+Source: Graduate School Handbook 2022-2023, pp. 54-55 · Maximum Residence
+
+Enforced by the system
+Official — Handbook pp. 54-55
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 54-55. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+residency.extension_years
+
+2 years
+Change history
+0
+
+Graded refresher course during the extension
+
+During the two-year extension the student enrolls in a graded 6-unit refresher course related to the area of specialization.
+
+Source: Graduate School Handbook 2022-2023, pp. 54-55 · Maximum Residence
+
+Enforced by the system
+Official — Handbook pp. 54-55
+
+This rule is set by the Graduate School Handbook 2022-2023, pp. 54-55. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+residency.refresher_units
+
+6 units
+Change history
+0
+
+Time on leave of absence counts toward maximum residence
+
+The maximum-residence limits include leave of absence. The residency clock keeps running while a student is on leave; it is never paused.
+
+Source: Graduate School Handbook 2022-2023, p. 55 · Maximum Residence
+
+Enforced by the system
+Official — Handbook p. 55
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 55. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+residency.includes_loa
+
+Yes
+Change history
+0
+
+Master's: candidacy within 3 academic years
+
+Candidacy to the degree must be attained within three academic years from the date of admission.
+
+Source: Graduate School Handbook 2022-2023, p. 54 · Maximum Residence - Master's Program
+
+Documented only
+Official — Handbook p. 54
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 54. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: Candidacy status is decided by the Graduate School and is not tracked as a date in the system.
+
+residency.master_candidacy_years
+
+3 years
+Change history
+0
+
+Doctorate: candidacy within 5 academic years
+
+Candidacy to the degree must be attained within five academic years from the date of admission.
+
+Source: Graduate School Handbook 2022-2023, p. 55 · Maximum Residence - Doctorate Program
+
+Documented only
+Official — Handbook p. 55
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 55. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: Candidacy status is decided by the Graduate School and is not tracked as a date in the system.
+
+residency.doctorate_candidacy_years
+
+5 years
+Change history
+0
+Research requirements
+
+Comprehensive exam must be passed before the title defense
+
+A student who passes the comprehensive examination confers with the Dean for an adviser and is advanced to candidacy. Research stages (Form 1 title defense onward) stay locked until the comprehensive exam is marked Passed.
+
+Source: Graduate School Handbook 2022-2023, p. 57 · Comprehensive Examinations - Advancement to Candidacy
+
+Enforced by the system
+Official — Handbook p. 57
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 57. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+research.comprehensive_exam_before_research
+
+Yes
+Change history
+0
+
+Thesis / project paper writing period
+
+Thesis or project paper writing must be finished within two years from the title defense (or proposal defense). The proposal must be submitted and defended within one year of the title defense.
+
+Source: Graduate School Handbook 2022-2023, p. 58 · Project Paper, Thesis & Dissertation - Standards
+
+Documented only
+Official — Handbook p. 58
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 58. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The deadline is tracked by staff; the system shows time in stage but does not block on it.
+
+research.thesis_writing_years
+
+2 years
+Change history
+0
+
+Dissertation writing period
+
+Dissertation writing must be finished within three years from the title defense. The proposal must be submitted and defended within one year of the title defense.
+
+Source: Graduate School Handbook 2022-2023, p. 58 · Project Paper, Thesis & Dissertation - Standards
+
+Documented only
+Official — Handbook p. 58
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 58. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The deadline is tracked by staff; the system shows time in stage but does not block on it.
+
+research.dissertation_writing_years
+
+3 years
+Change history
+0
+
+Similarity index of at most 15%
+
+The final draft undergoes Turnitin scanning and a similarity index rating of not more than 15% is required before the paper goes to the editor.
+
+Source: Graduate School Research Protocol AY 2024-2025 · Closed-door Final Defense - After the defense (Turnitin scanning)
+
+Documented only
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Closed-door Final Defense - After the defense (Turnitin scanning)). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: Staff check the uploaded Turnitin certificate; the percentage is not read from the file automatically.
+
+research.turnitin_max_percent
+
+15 percent
+Change history
+0
+
+One change of title only
+
+A student may request only one change of the title of the study, before applying for the proposal defense.
+
+Source: Graduate School Research Protocol AY 2024-2025 · Change of Title of the Study
+
+Documented only
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Change of Title of the Study). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: Not tracked by the system yet; the panel and the Research Coordinator enforce it.
+
+research.title_change_max
+
+1 requests
+Change history
+0
+
+One change of research adviser only
+
+A student may request only one change of research adviser, before the proposal defense.
+
+Source: Graduate School Research Protocol AY 2024-2025 · Request for Change of Research Adviser
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Request for Change of Research Adviser). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+research.adviser_change_max
+
+1 requests
+Change history
+0
+
+Advising contract forms within 5 days of Form 3.1
+
+Once the research adviser is appointed, the student emails Form 3.2 (Research Timetable) and Form 3.3 (Thesis/Dissertation Advising Contract) to the GS Research Coordinator within 5 days of receiving Form 3.1. The adviser tracker shows the due date and flags it when it is overdue.
+
+Source: Graduate School Research Protocol AY 2024-2025 · Designation of the Research Adviser - II. Advising Contract
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Designation of the Research Adviser - II. Advising Contract). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+research.adviser_contract_days
+
+5 days
+Change history
+0
+
+Adviser signature waiting: remind after 3 days
+
+An adviser is reminded when an advisee's manuscript or endorsement has waited for their signature this many days.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+research.signature_reminder_days
+
+3 days
+Change history
+0
+Defense scheduling and panels
+
+Title defense: apply at least 2 weeks before
+
+Form 1 with the three concept papers must reach the Academic Coordinator, and be endorsed to the Research Coordinator, at least two weeks (14 days) before the scheduled title defense. A title defense cannot be scheduled sooner than this.
+
+Source: Graduate School Research Protocol AY 2024-2025 · Title Defense - I. Application for Title Defense
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Title Defense - I. Application for Title Defense). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.title_lead_days
+
+14 days
+Change history
+0
+
+Proposal defense: endorse at least 2 weeks before
+
+Form 4 is endorsed at least two weeks (14 days) before the proposal defense; the panel members receive the manuscript two weeks before to review it (the 14-Day Rule).
+
+Source: Graduate School Research Protocol AY 2024-2025 · Proposal Defense - I. Application for Proposal Defense
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Proposal Defense - I. Application for Proposal Defense). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.proposal_lead_days
+
+14 days
+Change history
+0
+
+Closed-door final defense: endorse at least 2 weeks before
+
+Form 4 and the manuscript are endorsed at least two weeks (14 days) before the closed-door final defense, following the 14-Day Rule (14 days, weekends included, from the day the panel receives the manuscript).
+
+Source: Graduate School Research Protocol AY 2024-2025 · Closed-door Final Defense - I. Application
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Closed-door Final Defense - I. Application). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.final_lead_days
+
+14 days
+Change history
+0
+
+Public final defense: apply 5 days before
+
+The application for the public final defense (Form 4.3) is made 5 days before the preferred schedule so that the Graduate School can post the announcement.
+
+Source: Graduate School Research Protocol AY 2024-2025 · Public Defense - I. Application for the Public Defense
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Public Defense - I. Application for the Public Defense). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.public_final_lead_days
+
+5 days
+Change history
+0
+
+Project paper panel: chair and 2 members
+
+A project paper panel has 1 Panel Chair and 2 members (1 Content Specialist, 1 Method Specialist), 3 in all.
+
+Source: Graduate School Handbook 2022-2023, p. 60 · Guidelines for Thesis/Dissertation - Application for Title Defense
+
+Enforced by the system
+Official — Handbook p. 60
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 60. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.panel_size_project_paper
+
+3 members
+Change history
+0
+
+Thesis panel: chair and 3 members
+
+A thesis panel has 1 Panel Chair and 3 members (1 Content Specialist, 1 Method Specialist, 1 External Panel), 4 in all. The external member joins from the proposal defense onward.
+
+Source: Graduate School Handbook 2022-2023, p. 60 · Guidelines for Thesis/Dissertation - Application for Title Defense
+
+Enforced by the system
+Official — Handbook p. 60
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 60. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.panel_size_thesis
+
+4 members
+Change history
+0
+
+Dissertation panel: chair and 4 members
+
+A dissertation panel has 1 Panel Chair and 4 members (2 Content Specialists, 1 Method Specialist, 1 External Panel), 5 in all. The external member joins from the proposal defense onward.
+
+Source: Graduate School Handbook 2022-2023, p. 60 · Guidelines for Thesis/Dissertation - Application for Title Defense
+
+Enforced by the system
+Official — Handbook p. 60
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 60. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.panel_size_dissertation
+
+5 members
+Change history
+0
+
+Thesis final defense: below 85 is a provisional pass with major revisions
+
+For a thesis a score below 85 on Form 7 is a provisional pass with major revisions (subject for re-defense). For a dissertation the line is 90. The panel chair enters the Form 7 score in the verdict form, which refuses a plain pass below this value.
+
+Source: Graduate School Research Protocol AY 2024-2025 · Closed-door Final Defense - II. During the defense
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Closed-door Final Defense - II. During the defense). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.thesis_major_revision_score
+
+85 score
+Change history
+0
+
+Dissertation final defense: below 90 is a provisional pass with major revisions
+
+For a dissertation a score below 90 on Form 7 is a provisional pass with major revisions (subject for re-defense). The verdict form refuses a plain pass below this value.
+
+Source: Graduate School Research Protocol AY 2024-2025 · Closed-door Final Defense - II. During the defense
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Closed-door Final Defense - II. During the defense). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+defense.dissertation_major_revision_score
+
+90 score
+Change history
+0
+
+Defense reminders: 14, 7, 2 and 1 day before
+
+The student, the adviser and the panel get an in-app reminder this many days before a confirmed defense (the first is also the 14-Day Rule check that the panel has the manuscript).
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+defense.reminder_days
+
+14,7,2,1
+Change history
+0
+
+Panelist with no availability: remind within 3 days of the request
+
+A panelist whose availability is still not entered this many days after staff asked for it is reminded again.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+defense.availability_reminder_days
+
+3 days
+Change history
+0
+Practicum
+
+Practicum hours required
+
+The number of practicum hours a student must complete before the practicum is marked complete.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+practicum.required_hours
+
+200 hours
+Change history
+0
+
+Practicum eligibility: Basic units
+
+Basic-course units a student must have completed before starting the practicum.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+practicum.required_units_basic
+
+6 units
+Change history
+0
+
+Practicum eligibility: Major units
+
+Major-course units a student must have completed before starting the practicum.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+practicum.required_units_major
+
+9 units
+Change history
+0
+
+Practicum eligibility: Cognate units
+
+Cognate-course units a student must have completed before starting the practicum.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+practicum.required_units_cognate
+
+6 units
+Change history
+0
+
+Practicum eligibility: total units
+
+Total course units a student must have completed before starting the practicum.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+practicum.required_units_total
+
+21 units
+Change history
+0
+Graduation
+
+Present the thesis or dissertation at a research conference
+
+A student who enrolled in August 2020 or later presents the thesis or dissertation at a research conference (the Graduate School Research Conference or an external one) and submits the certificate of presentation. Only graduating students join the ceremony.
+
+Source: Graduate School Research Protocol AY 2024-2025 · Public Defense - After the Public Defense (note)
+
+Documented only
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Public Defense - After the Public Defense (note)). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+Not enforced: The certificate of presentation is submitted to the Graduate School Office and checked by staff.
+
+graduation.research_conference_presentation
+
+Yes
+Change history
+0
+
+Documents needed before hard-bound copies
+
+Before the hard-bound copies: soft copy of the final manuscript, panel approval emails, ethics clearance, Turnitin certificate and the editor's certification (Form 9); then the approval sheet (Form 10).
+
+Source: Graduate School Research Protocol AY 2024-2025 · Closed-door Final Defense - After the defense
+
+Enforced by the system
+Official — Research Protocol
+
+This rule is set by the Graduate School Research Protocol AY 2024-2025 (Closed-door Final Defense - After the defense). It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+graduation.completion_documents
+
+Final manuscript; panel approval; ethics clearance; Turnitin certificate; editor certification (Form 9); approval sheet (Form 10)
+Change history
+0
+Faculty
+
+Faculty teaching load limit
+
+The most teaching units a faculty member can be assigned in one semester when course offerings are matched to faculty.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+Pending validation — can be adjusted until the Graduate School confirms
+
+Check this value against the policy, then confirm or adjust it to clear the flag.
+
+faculty.teaching_load_limit_units
+
+24 units
+Change history
+0
+
+Faculty: at most five advisees per semester
+
+A faculty member can be assigned at most five active advisees per semester; more only with the approval of the Dean. The Research Protocol (Designation of the Research Adviser) says the same. The adviser appointment blocks a sixth advisee unless the Dean records an exception with a note.
+
+Source: Graduate School Handbook 2022-2023, p. 59 · Project Paper, Thesis & Dissertation - Adviser
+
+Enforced by the system
+Official — Handbook p. 59
+
+This rule is set by the Graduate School Handbook 2022-2023, p. 59. It changes only when the Graduate School issues a new policy; upload the new policy under Policy Documents.
+
+faculty.max_advisees
+
+5 advisees
+Change history
+0

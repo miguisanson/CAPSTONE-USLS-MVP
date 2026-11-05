@@ -1,0 +1,551 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+AWOL & Residency
+
+MONITORING & SUPPORT
+
+Work Queue
+Policy Assistant
+Business Rules
+
+Academic Coordinator
+
+Figures are computed live from recorded transactions.
+
+Academic Coordinator Portal
+Course Adjustments
+Dr. Ramon Alvarez · Academic Coordinator
+DR
+Course Adjustments
+
+Review subject demand, decide what to offer, then complete the semester schedule and faculty assignments in one workspace.
+
+Demand & adjustments
+Offering setup
+Adding or changing a subject: rules applied
+3 rules from the Graduate School policies
+Adjustments and subject demand
+
+Demand is recalculated automatically from the current student records. The coordinator remains responsible for every offering and faculty decision.
+
+Program
+DBA - Doctor of Business Administration
+DPSY - Doctor of Philosophy in Psychology
+EDD - Doctor of Education
+MAED - Master of Arts in Education
+MAN - Master of Arts in Nursing
+MAPSY - Master of Arts in Psychology
+MASS - Master of Arts in Social Sciences
+MBA - Master of Business Administration
+MIT - Master in Information Technology
+MSCS - Master of Science in Computer Science
+MSGC - Master of Science in Guidance and Counseling
+MSN - Master of Science in Nursing
+Academic year and semester
+AY 2028-2029 2nd Semester (+5)
+AY 2028-2029 1st Semester (+4)
+AY 2027-2028 2nd Semester (+3)
+AY 2027-2028 1st Semester (+2)
+AY 2026-2027 2nd Semester (Next)
+AY 2026-2027 1st Semester (Current)
+AY 2025-2026 2nd Semester (Previous)
+AY 2025-2026 1st Semester (-2)
+AY 2024-2025 2nd Semester (-3)
+AY 2024-2025 1st Semester (-4)
+
+Subject needs are calculated automatically
+
+Counts below update with the selected program and semester. They support the decision; they do not publish an offering or assign a faculty member by themselves.
+
+OFFERING PLAN PROGRESS
+
+1
+Upcoming:
+Draft
+2
+Upcoming:
+Submitted
+3
+Upcoming:
+Approved
+4
+Upcoming:
+Published
+
+Draft saved. Review the demand list and submit when ready.
+
+Demand numbers are guidance. Every curriculum subject remains available for a manual offering decision.
+
+Save draft (7 offered)
+Submit for approval
+Publish
+
+CURRICULUM SUBJECTS
+
+18
+
+AFFECTED STUDENTS
+
+13
+
+DELAYED IF WITHHELD
+
+13
+
+SELECTED TO OFFER
+
+7
+
+Course offering decisions
+
+MAED · Master of Arts in Education · planning for AY 2026-2027 2nd Semester · generated 11/2/2026, 8:57:59 PM
+
+Download CSV
+
+17 students reviewed · 7 subjects needed next term · 27 student seats needed · 18 subjects with a backlog
+
+Needing next term: the subject is in the student's next semester group, or the student must retake it. This is the number to plan an offering from. Not taken yet: everyone who still has to take it at some point; never smaller than the first number. One affected student is enough to offer a subject; open Details on a row to see the students, who would be delayed if it is withheld, and who could teach it.
+
+Dr. Liwayway Bautista is the same suggested faculty member for every subject (from preferences, availability, specialization and teaching load), so it is not repeated on each row. Choose the faculty member for each subject below.
+
+Search subjects or students
+All subjects (18)
+Needed next term (7)
+Later in the curriculum (11)
+Course offering decisions: one row per curriculum subject with students needing it, decision, sections and faculty
+SUBJECT
+	NEEDING NEXT TERM
+	NOT TAKEN YET
+	DECISION	SECTIONS	FACULTY	
+DETAILS
+
+
+
+MAED-MAJ1
+
+Curriculum Development and Evaluation
+
+	
+8
+	8	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-STAT
+
+Statistics in Education
+
+	
+8
+	8	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-MOR
+
+Methods of Educational Research
+
+	
+6
+	6	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG2
+
+Learning Analytics
+
+	
+2
+	11	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG5
+
+School Administration and Supervision
+
+	
+1
+	13	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG6
+
+Educational Policy and Planning
+
+	
+1
+	13	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG1
+
+Teaching Strategies in Higher Education
+
+	
+1
+	10	
+Suggested
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG7
+
+Guidance and Student Development
+
+	
+0
+	13	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG8
+
+Instructional Design
+
+	
+0
+	13	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG9
+
+Language and Literacy Education
+
+	
+0
+	13	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG10
+
+Seminar on Contemporary Issues in Education
+
+	
+0
+	12	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG3
+
+Inclusive Education
+
+	
+0
+	12	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-COG4
+
+Action Research in the Classroom
+
+	
+0
+	12	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-MAJ5
+
+Philosophy of Education
+
+	
+0
+	11	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-MAJ4
+
+Educational Technology and Instruction
+
+	
+0
+	10	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-MAJ2
+
+Educational Leadership and Management
+
+	
+0
+	8	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-MAJ3
+
+Assessment of Learning
+
+	
+0
+	8	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+
+
+MAED-FED
+
+Foundations of Education
+
+	
+0
+	6	
+No decision
+	
+	
+Unassigned
+Dr. Liwayway Bautista · 9/24u
+Dr. Marlon Geronimo · 9/24u
+Dr. Patricia Salvador · 9/24u
+Dr. Teodoro Ramos · 9/24u
+	Details
+Coursework status report to the Dean
+Generate report
+
+Completion issues and missing subjects for the active term, compiled for the Dean's review.
+
+No coursework reports yet
+
+Generate one to send to the Dean.
+
+MAED-MAJ1
+
+Curriculum Development and Evaluation
+
+Suggested
+Demand
+8 students need it next term8 not taken yet
+
+8 delayed if withheld
+
+Needing next term (8)
+All who have not taken it (8)
+
+Daniel Cruz (2560001)
+
+Year 2 · delayed if not offered
+
+Due next term
+
+Clarissa Dela Cruz (GS-2026-ENR-01)
+
+Year 1 · delayed if not offered
+
+Due next term
+
+Daniel Fernandez (GS-2026-LOA-02)
+
+Year 1 · delayed if not offered
+
+Due next term
+
+Martin Gonzales (GS-2026-ENR-02)
+
+Year 1 · delayed if not offered
+
+Due next term
+
+Joshua Lim (GS-2026-WD-02)
+
+Year 1 · delayed if not offered
+
+Due next term
+
+Lianne Mercado (GS-2026-CA-01)
+
+Year 1 · delayed if not offered
+
+Due next term
+
+Grace Reyes (2560002)
+
+Year 2 · delayed if not offered
+
+Due next term
+
+Sofia Reyes (GS-2026-HO-01)
+
+Year 1 · delayed if not offered
+
+Due next term
+Who could teach it
+Dr. Liwayway Bautista
+9/24u
+Dr. Marlon Geronimo
+9/24u
+Dr. Patricia Salvador
+9/24u
+
+Recommended from preferences, availability, specialization and teaching load. The coordinator can choose anyone.

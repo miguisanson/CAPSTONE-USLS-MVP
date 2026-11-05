@@ -1,0 +1,147 @@
+{
+ "slug": "dropping",
+ "title": "Dropping a Subject - the 20% absence rule, recorded by the Academic Coordinator",
+ "kind": "live",
+ "part": "2f",
+ "presenter": "Myrine",
+ "owner": "Academic Coordinator",
+ "duration": "5 min",
+ "story": [
+  "Dropping and withdrawing are two different things. Under the handbook a student does not choose to drop: the professor drops a student from a subject when the student's unexcused absences go beyond 20% of the class hours (grade DRP, 5.0). A student who wants to leave a subject earlier files a Subject Withdrawal instead, which is allowed only until the end of the second week of classes and carries a fee. The Graduate School therefore does not approve or refuse a drop; it records that it happened, because a dropped subject changes what that student still needs and what has to be offered next term.",
+  "This case answers the panel's question, can a student drop on Day 1? The answer on screen is no. The only way the platform records a drop is through the Academic Coordinator, and it accepts the record only when the unexcused-absence percentage entered is above 20%, which cannot be true on the first day of classes. Anyone who wants out of a subject early has the Withdrawal route, shown in the previous case.",
+  "The demonstration uses Joshua Lim, a seeded MAED student enrolled in three subjects (MAED-COG2, MAED-MAJ2, MAED-MAJ4), reset first. Elena Navarro and the other demo students are not touched."
+ ],
+ "accounts": [
+  [
+   "Academic Coordinator",
+   "academic@usls.edu.ph",
+   "Records the drop on 3 · Enrollment. The action is refused for other roles."
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   ""
+  ]
+ ],
+ "data": [
+  [
+   "Program / semester",
+   "MAED, AY 2026-2027 1st Semester (Current)"
+  ],
+  [
+   "Student",
+   "Joshua Lim, 2690402 (demo key withdrawal-joshua, reset first)"
+  ],
+  [
+   "Subject",
+   "MAED-MAJ2"
+  ],
+  [
+   "Effective date",
+   "the day of the walkthrough (the default)"
+  ],
+  [
+   "First attempt",
+   "10% unexcused absences, refused"
+  ],
+  [
+   "Second attempt",
+   "25% unexcused absences, accepted"
+  ],
+  [
+   "Coordinator note",
+   "Registrar advice received: unexcused absences above the handbook limit."
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Record the drop",
+   "steps": [
+    {
+     "text": "Sign in as the Academic Coordinator and open **3 · Enrollment** under **Lifecycle workflows** in the sidebar. The page has the buttons **Upload class list** and **Offering list**, two rule panels (**Enrollment and academic load: rules applied** and **Adding or changing a subject: rules applied**) and three pickers: **Program**, **Academic semester** and **Student**. Choose **MAED**, **AY 2026-2027 1st Semester (Current)** and **Lim, Joshua**. In **Official offered subjects** his three subjects MAED-COG2, MAED-MAJ2 and MAED-MAJ4 show an **Enrolled** badge with a **Change** button beside it and a locked **Enrolled** button on the right; the other subjects show Not taken.",
+     "shots": [
+      {
+       "id": "dropping-01",
+       "caption": "Joshua Lim's enrolled subjects in Official offered subjects, each with a Change button."
+      }
+     ]
+    },
+    {
+     "text": "Select **Change** next to the **Enrolled** badge of **MAED-MAJ2**. The dialog **Record dropped subject** opens with the student, subject and semester in its subtitle, the subject's **Current status** (Enrolled), **New status** and **Effective date** (today by default). In **New status** the only choice besides **Choose status** is **Dropped**; withdrawal is deliberately not offered here because it must be started by the student. The panel **When a subject can be dropped** (5 rules from the Graduate School policies) is open and its first rule reads A subject is dropped only when unexcused absences exceed 20% (**20 percent**, Graduate School Handbook 2022-2023, p. 52, **Enforced by the system**). It says the Academic Coordinator can only record Dropped when the percentage entered is above that limit. The other rules record the DRP (5.0) grade and the retention rules as **Documented only** because grades are out of scope.",
+     "shots": [
+      {
+       "id": "dropping-02",
+       "caption": "Record dropped subject: Dropped is the only status, with the drop rule and its handbook page. (The dialog is taller than a screen; the picture shows its top part.)"
+      }
+     ]
+    },
+    {
+     "text": "Fold the rules panel, choose **Dropped** in **New status**, leave the **Effective date** as the default, type **10** in **Unexcused absences (% of class hours)** and the **Coordinator note** shown above, and select **Save Dropped**. The button reads Save status until a status is chosen. If something is missing, the dialog lists what to fix when you press it.",
+     "shots": [
+      {
+       "id": "dropping-03",
+       "caption": "10% entered with a note."
+      }
+     ]
+    },
+    {
+     "text": "The system refuses and shows the rule in red: A subject can only be dropped when unexcused absences are more than 20% of the class hours (Graduate School Handbook 2022-2023, p. 52); 10% was entered. A student who wants to leave the subject earlier files a Subject Withdrawal instead, which is allowed until the end of the second week of classes (14 calendar days from the start of classes) (p. 49). Nothing is saved.",
+     "shots": [
+      {
+       "id": "dropping-04",
+       "caption": "Refusal that cites the 20% rule and points to the Withdrawal route."
+      }
+     ]
+    },
+    {
+     "text": "Select **Change** on MAED-MAJ2 again, fold the rules panel, choose **Dropped**, enter **25** as the unexcused-absence percentage with the same note, and select **Save Dropped**.",
+     "shots": [
+      {
+       "id": "dropping-05",
+       "caption": "25% entered: above the 20% limit."
+      }
+     ]
+    },
+    {
+     "text": "The page confirms **MAED-MAJ2 is now marked Dropped.** with two links, **Monitoring sheet** and **Student profile**. The student header still reads **Enrolled** and **Active**, with 2 selected subjects.",
+     "shots": [
+      {
+       "id": "dropping-06",
+       "caption": "Drop recorded."
+      }
+     ]
+    },
+    {
+     "text": "In **Official offered subjects** the MAED-MAJ2 row now reads **Dropped** (Marked dropped for AY 2026-2027 1st Semester; it cannot be silently reactivated in the same semester) and its right-hand button reads **Dropped**. MAED-COG2 and MAED-MAJ4 are unchanged; the **Enrollment draft** on the right lists these two.",
+     "shots": [
+      {
+       "id": "dropping-07",
+       "caption": "Enrollment: MAED-MAJ2 is Dropped, the other subjects unchanged."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - The same record in the Monitoring Sheet",
+   "steps": [
+    {
+     "text": "Open **Monitoring Sheet** (under Records), choose **MAED** in **Program** and the current semester in **Semester**, and find the row of Joshua Lim (2690402). The MAED-MAJ2 cell now shows **D** (Dropped, in the legend) while MAED-MAJ4 and MAED-COG2 still show **R** (Enrolled). A yellow bar above the legend may report enrollment/profile inconsistency items for MAED: that is the sheet's own consistency check on other seeded students, not caused by this drop.",
+     "shots": [
+      {
+       "id": "dropping-08",
+       "caption": "Monitoring Sheet: MAED-MAJ2 shown as Dropped."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "Answer to the panel: a student cannot drop on Day 1. The rule is a threshold on unexcused absences (20% of class hours) that the professor applies; the platform only records the outcome and refuses to record one that does not meet the threshold. The portal does not measure attendance, so the percentage is entered and cited by the coordinator; attendance records are outside the platform.",
+  "A drop that follows a documented exception (for example a Registrar-approved case) can be recorded through a class-list import row that carries a Drop Exception Reason; the Enrollment screen states this above the filters.",
+  "The drop is an academic-record entry, not a grade. The DRP (5.0) grade is the Registrar's; grades are out of scope.",
+  "No automatic Registrar feed exists. The drop reaches the Graduate School outside the system and is recorded here; no feed is claimed.",
+  "Only the Academic Coordinator can record a drop. Graduate School Staff and other roles are refused by the system."
+ ]
+}

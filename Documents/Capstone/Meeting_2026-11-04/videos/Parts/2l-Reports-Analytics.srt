@@ -1,0 +1,67 @@
+1
+00:00:01,199 --> 00:00:05,299
+Next, we have Reports and Analytics. Graduate School staff signs in.
+
+2
+00:00:08,400 --> 00:00:19,500
+Here we have Reports and Analytics, under Overview. At the top are the filters: program, year started, and period. Below them are the six numbers the office asks about most.
+
+3
+00:00:19,800 --> 00:00:26,300
+First, Behind schedule. It's the share of active students who are running late, compared to a target.
+
+4
+00:00:26,500 --> 00:00:33,199
+Then Median days to decide, compared to the twelve months before. Every number here comes from recorded events.
+
+5
+00:00:33,899 --> 00:00:41,699
+Next, we have Needs attention. It shows one bar per cause. The longest bar affects the most students.
+
+6
+00:00:41,899 --> 00:00:47,500
+Clicking a cause narrows the list to just the students it affects.
+
+7
+00:00:47,700 --> 00:00:57,399
+Show all causes brings the full list back, most delayed first, with the office that can move each student forward. It downloads as Excel or PDF.
+
+8
+00:00:58,700 --> 00:01:06,799
+Next, we have Where students get stuck. It counts the students at each stage, as on time, slow, or stuck.
+
+9
+00:01:07,000 --> 00:01:13,299
+Every count is a button. Click it to see the actual students behind the number.
+
+10
+00:01:14,700 --> 00:01:22,899
+Then Office speed. It shows which offices take longest to close requests. The longest red bar is the office to ask first.
+
+11
+00:01:24,200 --> 00:01:34,299
+Next, we have Records to fix. It lists research students with missing details, such as no adviser. Once a record is fixed, it drops off the list.
+
+12
+00:01:35,599 --> 00:01:39,799
+This next tab shows students by year started and by stage.
+
+13
+00:01:41,099 --> 00:01:46,000
+Then Graduation candidates. It shows who can graduate, and what is still missing.
+
+14
+00:01:47,299 --> 00:01:50,700
+Overdue and pending lists every waiting task, longest first.
+
+15
+00:01:52,099 --> 00:01:58,399
+Defenses shows the ones already held and the ones coming up, with the panel and the verdict.
+
+16
+00:01:59,799 --> 00:02:05,000
+And Registrar changes is the daily list the Registrar needs to apply in AIMS.
+
+17
+00:02:07,900 --> 00:02:15,200
+One last thing. Every filter applies to the whole page. Pick one program, and all the numbers follow.

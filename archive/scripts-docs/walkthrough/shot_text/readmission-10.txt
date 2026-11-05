@@ -1,0 +1,311 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Readmission
+Grace Fernandez · Graduate School Staff
+4
+GF
+Readmission
+
+Record a return request after LOA, route the Dean decision, and reactivate approved students.
+
+How this works
+View recent activity
+Rules applied on this screen
+1 rule from the Graduate School policies
+
+1 In staff review, 2 With the Dean
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Refresh leave dates
+Search requests by name, student number or program
+All programs
+MAED
+MIT
+All statuses
+In staff review
+With the Dean
+Showing 1 of 3 requests
+Clear 1 filter
+Board
+Table
+
+2 more stages to the right →
+
+Submitted
+0
+
+Waiting for Graduate School staff to start.
+
+No requests here
+
+In staff review
+1
+
+Staff are checking the return checklist.
+
+Therese Lacson
+
+GS-2026-READ-01 · MAED
+
+Returning: AY 2026-2027 2nd Semester
+
+Next: Graduate School Staff
+
+Awaiting your review
+View details
+Move to…
+Select all in this column
+Returned to student
+0
+
+Waiting for the student to correct and resend.
+
+No requests here
+
+With the Dean
+0 of 2
+
+Waiting for the Dean's decision.
+
+No requests here
+
+Approved - back in the program
+0
+
+The student is active again. The Academic Coordinator plans the enrollment.
+
+No requests here
+
+Not approved
+0
+
+Denied or taken back by the student.
+
+No requests here
+
+Registrar list
+
+Dean-approved requests that go to the Registrar. The portal does not send any email: download the list, email it yourself, then mark it as sent. Mark it as acknowledged when the Registrar confirms.
+
+Nothing to send to the Registrar yet
+
+Approved requests appear here after the Dean decides.
+
+Export history
+Therese Lacson
+In staff review
+
+Readmission · GS-2026-READ-01 · MAED
+
+WHERE THIS REQUEST IS
+
+Complete:
+Request submitted
+2
+Current:
+Staff review
+3
+Upcoming:
+Dean decision
+4
+Upcoming:
+Back in the program
+THE REQUEST
+STUDENT
+Therese Lacson
+GS-2026-READ-01 · Master of Arts in Education
+TYPE
+Readmission
+RETURNING IN
+AY 2026-2027 2nd Semester
+REASON
+-
+INTENTION AFTER THE LEAVE
+My leave is ending and I am ready to resume thesis work with my adviser. My study plan is updated and I have no pending accountability.
+LINKED LEAVE
+Leave of Absence: AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester (On leave)
+STAGE AND TAG BEFORE LEAVING
+-
+ELIGIBILITY RESULT
+Not set yet
+FILED
+Nov 2, 2026
+SENT TO THE DEAN
+—
+DEAN DECIDED
+—
+STAFF NOTES
+None
+DEAN REMARKS
+None
+POLICY CHECK
+
+Advice for staff - the Dean decides.
+
+Needs Review
+Suggested for the Dean: Return for Revision
+
+The readmission request meets the defined return checks and is ready to be forwarded for a Dean decision.
+
+Readmission application/reference
+
+Student portal readmission request
+
+Present
+
+Previous LOA period
+
+AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester
+
+Present
+
+Target return semester
+
+AY 2026-2027 2nd Semester
+
+Present
+
+Required return documents
+
+All checklist items are selected.
+
+Pass
+
+Current LOA/leave status
+
+Student is currently recorded as on leave.
+
+Pass
+
+Linked leave of absence
+
+AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester · On leave.
+
+Pass
+
+Return semester after the leave
+
+Early return: the leave was approved until 2027-05-10 but the student asks to come back in AY 2026-2027 2nd Semester. The Dean decides whether the leave ends early.
+
+Needs Review
+RETURN CHECKLIST
+
+Structured return intention completed
+
+The student ticked this. Not verified by staff yet.
+
+Updated study plan confirmed
+
+The student ticked this. Not verified by staff yet.
+
+Program or adviser consultation completed
+
+The student ticked this. Not verified by staff yet.
+
+No pending accountability confirmed
+
+The student ticked this. Not verified by staff yet.
+
+THE STUDENT SO FAR
+
+1 year in the program
+
+Normal length 5 years. The most allowed is 7 years.
+
+2 of 4 leave semesters already approved
+
+Earlier leaves count toward the total limit.
+
+EARLIER REQUESTS BY THIS STUDENT
+Leave of Absence · AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester
+On leave
+decided Sep 8, 2026
+MESSAGES
+
+Notes and returns about this request, newest at the bottom.
+
+T
+
+Therese Lacson (Student) (Student) → Student
+
+Student visible
+Sent
+
+Graduate School staff will check it and send it to the Dean. You will get a notice at every step.
+
+Nov 2, 2026, 8:37 PM
+Write a note
+Who is it for?
+The student (they can read it)
+The Dean (staff only)
+Graduate School staff (internal note)
+Note
+Save note
+FILES
+
+No files were uploaded for this request.
+
+REGISTRAR FOLLOW-UP
+
+Dean-approved requests go on the Registrar list below the board. The portal does not send any email: download the list, email it through the official channel and wait for the Registrar's acknowledgement.
+
+Nothing to send yet. The link appears after the Dean approves.
+
+HISTORY
+Who did what
+2
+Activity log
+2
+Close details
+Forward to Dean
+Return to student

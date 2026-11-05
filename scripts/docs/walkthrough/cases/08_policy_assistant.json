@@ -1,0 +1,106 @@
+{
+ "slug": "policy-assistant",
+ "title": "Policy Assistant - live questions with a cited source",
+ "kind": "live",
+ "part": "2g",
+ "presenter": "Myrine",
+ "owner": "GS Staff, Student, Dean, Faculty",
+ "duration": "8 min",
+ "story": [
+  "Each role has a **Policy Assistant** page. It answers from the policy document library (Handbook, Research Protocol and the Draft Operations Manual; see {case:policy-documents}) and always shows the document and the page or section it used, so an answer can be checked instead of trusted. Staff can also focus the assistant on one student; the Dean and Faculty pages answer policy questions and questions about their own queue; the Student page answers policy questions and questions about that student's own record only.",
+  "In this case the questions are typed live, the way the panel would ask them. The server used for this walkthrough has no AI key (no Gemini key is set), so every answer is local retrieval: the assistant looks the question up in the policy documents by keyword and quotes the passage it finds. Each answer therefore carries the label **Offline answer** with the line Found by keyword search; Gemini was not used. It quotes the right passage with its document, page and section but does not rephrase it, and a question worded differently can find different passages. With a key set the same screen shows Answered by Gemini and reworded answers; this walkthrough did not run that mode."
+ ],
+ "accounts": [
+  ["Graduate School Staff", "staff@usls.edu.ph", "Policy Assistant, can focus on a student"],
+  ["Student (Miguel Yu)", "student@usls.edu.ph", "Student Policy Assistant (policy documents and own record)"],
+  ["Dean (Dr. Manuel Villaruz)", "dean@usls.edu.ph", "Dean's Policy Assistant (policy documents and own queue)"],
+  ["Faculty (Dr. Liwayway Bautista)", "liwayway.bautista@usls.edu.ph", "Faculty Policy Assistant (policy documents and own queue)"],
+  ["Password", "DemoPass123!", "same for every demo account"]
+ ],
+ "data": [
+  ["Staff question 1", "Can a student withdraw a subject on Day 1, and how much is the fee?"],
+  ["Staff question 2", "Is time on leave of absence included in the maximum years to finish a master's degree?"],
+  ["Staff question 3", "Adding a subject is allowed until when?"],
+  ["Staff question 4 (not in the library)", "What is the cafeteria menu today?"],
+  ["Staff suggested question", "Which students need attention right now?"],
+  ["Student question", "Can I file a leave of absence during the last two weeks of the semester?"],
+  ["Student suggested question", "What is my next step?"],
+  ["Dean question", "What is the maximum residence for a master's program?"],
+  ["Faculty question", "How many advisees can a faculty member handle in a semester?"],
+  ["AI mode", "None (no Gemini key): every answer is labelled Offline answer"]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Staff: Policy Assistant",
+   "steps": [
+    {
+     "text": "Sign in as **staff@usls.edu.ph** and open **Policy Assistant** under Monitoring & support. The page has a chat called **Assistant** whose line under the title reads **General · policy documents and all students**. It opens with a greeting that says answers come from live records and the policy documents, and that the assistant says so when the documents do not cover a question. Under the chat are four suggested questions and the question box (Enter to send, Shift+Enter for a new line). On the right, **Focus on a student** (optional) lets staff ground answers in one record, and **How this works** says that every answer lists its sources, that opening one shows the document, page, section and exact passage, and that an Offline answer label means Gemini was not used.",
+     "shots": [{"id": "policy-assistant-01", "caption": "Staff Policy Assistant: the chat, suggested questions, the optional student focus and How this works."}]
+    },
+    {
+     "text": "Click the question box, type **Can a student withdraw a subject on Day 1, and how much is the fee?** and press Enter. The answer says that Day 1 is inside the first week, so the student may withdraw a subject with the Dean's approval, but it is not free: 10% of the total amount due for the term is charged in the first week and 20% in the second, and after the second week the full fees are paid. Under the answer are the source line Operations Manual (draft for validation), 4.4 Withdrawal of subject, a line marking it as a Draft pending Graduate School validation, the label **Offline answer** with Found by keyword search; Gemini was not used, and a collapsed **SOURCES (1)** panel.",
+     "shots": [{"id": "policy-assistant-02", "caption": "The Day 1 question: the answer, the Draft warning, the Offline answer label and the cited source (Operations Manual, 4.4)."}]
+    },
+    {
+     "text": "Select the entry under **SOURCES (1)**. It opens to show a yellow Draft tag (pending Graduate School validation), the document and section (4.4 Withdrawal of subject) and the exact passage the answer was taken from, set off with a green rule.",
+     "shots": [{"id": "policy-assistant-09", "caption": "The opened source: document, section and the exact passage, flagged as a Draft."}]
+    },
+    {
+     "text": "Ask **Is time on leave of absence included in the maximum years to finish a master's degree?** The answer is the Handbook: a master's program must be finished within a maximum of seven (7) academic years including Leave of Absence (LOA), and a student who cannot finish within seven years must re-enroll all courses taken. The source line reads Graduate School Handbook 2022-2023 (p. 54, 3.6 MAXIMUM RESIDENCE - Master's Program), and the sources panel lists the Handbook, Page 54.",
+     "shots": [{"id": "policy-assistant-03", "caption": "Leave and maximum residence: the Handbook passage, cited to page 54."}]
+    },
+    {
+     "text": "Ask **Adding a subject is allowed until when?** The answer is the Handbook sentence that adding subjects is allowed during the first week of classes upon the written approval of the Associate Dean. The source line reads Graduate School Handbook 2022-2023 (p. 49, 3.1 REGISTRATION - Adding of Subject/s).",
+     "shots": [{"id": "policy-assistant-04", "caption": "Adding a subject: first week only, cited to Handbook page 49."}]
+    },
+    {
+     "text": "Ask a question the library does not cover: **What is the cafeteria menu today?** The assistant does not guess. It shows a calm card titled **Not covered by the policy documents** that says the USLS policy documents in the library do not cover this and to ask the Graduate School office, with a hint to rephrase using the name of a rule, stage or form. No sources are listed because none answers the question.",
+     "shots": [{"id": "policy-assistant-10", "caption": "A question outside the library: Not covered by the policy documents."}]
+    },
+    {
+     "text": "Select the suggested question **Which students need attention right now?** This is not a policy question: for staff the assistant answers from the live records. The reply is a card titled **Students needing attention** with the number of students and follow-up items, the highest priority students first, and for each one the Issue, the Next action and the Owner. It is labelled Live record · Verified rules, not Offline answer, because it is calculated from the database and fixed workflow rules rather than found in a document. The student names are links to the student record.",
+     "shots": [{"id": "policy-assistant-11", "caption": "Staff only: Students needing attention, answered from live records."}]
+    }
+   ]
+  },
+  {
+   "title": "Part B - Student, Dean and Faculty",
+   "steps": [
+    {
+     "text": "In a separate session sign in as **student@usls.edu.ph** and open **Policy Assistant** under Support. The chat line reads **Policy documents and your own record only** and there is no student focus box. **How this works** adds that the assistant is private and read-only: it uses the record connected to the signed-in account, cannot see other students and cannot change grades, enrollment, requests or official records. The suggested questions are What is my next step?, What am I missing?, What do I need before a research defense? and Explain the leave, AWOL, and residency rules for students.",
+     "shots": [{"id": "policy-assistant-05", "caption": "Student Policy Assistant: policy documents and own record only."}]
+    },
+    {
+     "text": "Type **Can I file a leave of absence during the last two weeks of the semester?** and press Enter. The answer quotes the Handbook: no leave of absence shall be granted during the semester within two (2) weeks before the last day of classes, and a student returning from leave declares the intention to enroll in writing. The source line reads Graduate School Handbook 2022-2023 (p. 52, 3.4 ATTENDANCE - Leave of Absence), followed by the Offline answer label and a **SOURCES (1)** panel naming the Handbook, Page 52.",
+     "shots": [{"id": "policy-assistant-06", "caption": "Student question: the Handbook answer with its source (page 52)."}]
+    },
+    {
+     "text": "Select the suggested question **What is my next step?** The answer comes from the student's own record, not from a document: you are at the Final Defense stage (MAED), standing Active, progress status On Track, with no open tasks. Its labels read **Offline answer**, **From your own record** and Built from your record without Gemini. There are no sources because no policy passage was used.",
+     "shots": [{"id": "policy-assistant-12", "caption": "Personal question: answered from the student's own record, labelled From your own record."}]
+    },
+    {
+     "text": "In a separate session sign in as **dean@usls.edu.ph** and open **Policy Assistant** under Monitoring & support. The chat line reads **Policy documents and your own queue**; the suggested questions include What is waiting on me? Type **What is the maximum residence for a master's program?** The answer quotes the Handbook: candidacy within three academic years and all requirements within five, a two-year extension with a graded 6-unit refresher, and a master's program finished within seven academic years including Leave of Absence. The source is Graduate School Handbook 2022-2023 (p. 54, 3.6 MAXIMUM RESIDENCE - Master's Program).",
+     "shots": [{"id": "policy-assistant-07", "caption": "Dean: the same assistant with the Handbook page cited."}]
+    },
+    {
+     "text": "In a separate session sign in as **liwayway.bautista@usls.edu.ph** and open **Policy Assistant** under Support. Type **How many advisees can a faculty member handle in a semester?** The answer is the Handbook: the Dean, Associate Dean and Research Coordinator decide on the adviser using, among other things, the number of advisees (maximum of five (5) per semester); in some cases, with fewer faculty in the program, a faculty member can be assigned more than five. The source line reads Graduate School Handbook 2022-2023 (p. 59, 3.10 PROJECT PAPER, THESIS & DISSERTATION - Project Paper/Thesis/Dissertation Adviser).",
+     "shots": [{"id": "policy-assistant-08", "caption": "Faculty: the maximum of five advisees per semester, cited to Handbook page 59."}]
+    }
+   ]
+  },
+  {
+   "title": "Part C - What the panel should know about the answers",
+   "steps": [
+    "The assistant retrieves passages by keyword and quotes them; it does not interpret them. Wording matters. In the same run, the question Is time on leave of absence included in the maximum years... found the exact Handbook sentence, while the shorter Does time on leave of absence count toward the maximum residence? returned only the open-question line OQ-10 from the Draft Operations Manual. If an answer looks off, rephrase using the words of the policy (leave of absence, maximum, first week, written approval).",
+    "Page numbers in the source lines are the printed page numbers of the Handbook, the same pages that the Business Rules register cites (for example, the adding-a-subject rule is on p. 49 in both; see {case:business-rules}).",
+    "A Draft source is labelled every time it is used. Answers that rest on the Operations Manual say so in the answer text and in the opened source, and the Graduate School is asked to validate that document before it is treated as policy."
+   ]
+  }
+ ],
+ "notes": [
+  "Guidance only: the assistant does not approve anything. Final decisions stay with authorized personnel.",
+  "Keyless run: no Gemini key was set on the walkthrough server, so every answer is local retrieval (keyword search) and is labelled Offline answer. No answer here was written by an AI model. With a key configured the label reads Answered by Gemini and the answers are reworded from the same passages; this walkthrough did not run that mode.",
+  "Not every question finds the right passage. In this run Who pays for the printing of hard-bound copies? returned two loosely related passages about hard-bound reproduction instead of Not covered by the policy documents, while How many members must a thesis defense panel have? found the Research Protocol Title Defense passage (chair and 2, 3 or 4 members by paper type).",
+  "The staff question Which students need attention right now? depends on the records at the moment of asking, so the names and counts shown will differ from run to run."
+ ]
+}

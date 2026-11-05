@@ -1,0 +1,707 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Monitoring Sheet
+Grace Fernandez · Graduate School Staff
+1
+GF
+Monitoring Sheet
+
+Curriculum progress for each student. Add students and edit subject rows here, or upload a workbook under Student Handoff.
+
+Export workbook
+Add student
+Dana Monitor204453 was added to the MSN monitoring sheet.
+DPSY — Doctor of Philosophy in Psychology
+MAPSY — Master of Arts in Psychology
+MASS — Master of Arts in Social Sciences
+DBA — Doctor of Business Administration
+MBA — Master of Business Administration
+EDD — Doctor of Education
+MAED — Master of Arts in Education
+MSGC — Master of Science in Guidance and Counseling
+MIT — Master in Information Technology
+MSCS — Master of Science in Computer Science
+MAN — Master of Arts in Nursing
+MSN — Master of Science in Nursing
+AY 2026-2027 2nd Semester (Next)
+AY 2026-2027 1st Semester (Current)
+AY 2025-2026 2nd Semester (Previous)
+All progress
+Not started
+In progress
+All subjects complete
+Eligible for compre
+All risk
+On Track
+At Risk of Delay
+Delayed
+Not Yet Assessed
+At Risk of Delay/Delayed
+All enrollment
+LOA
+AWOL
+LOA or AWOL
+Enrolled
+Withdrawn
+Sort: Last name
+Sort: AY Entry newest
+Sort: AY Entry oldest
+Sort: Completed subjects most
+Sort: Completed subjects least
+Sort: Completed units most
+Sort: Highest risk
+Export CSV
+
+Select a subject cell or the pencil beside a name to add or edit a row.
+
+Everything you type is marked Manual entry with your name and the time, and is kept in the change history. Imported values are never overwritten silently: a later upload that disagrees with a portal entry is held for review. Grades are not entered here.
+1 enrollment/profile inconsistency item(s) found
+Officially completed
+Taken
+Enrolled
+Failed
+Dropped
+Planned
+INC
+Withdrawn
+Not taken
+Manual entry
+Curriculum progress of each student, one column per subject
+STUDENT	AY ENTRY	YR	BASIC	MAJOR	COGNATE	COMPRE EXAM	RESEARCH
+MSN-FED	MSN-MOR	MSN-STAT	MSN-MAJ1	MSN-MAJ2	MSN-MAJ3	MSN-MAJ4	MSN-MAJ5	MSN-COG1	MSN-COG10	MSN-COG2	MSN-COG3	MSN-COG4	MSN-COG5	MSN-COG6	MSN-COG7	MSN-COG8	MSN-COG9	Title	Proposal	Ethics	Final
+
+Cabrera, Katrina
+IDNO 2260073
+On Track
+	22-23	5	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Passed
+	
+	
+	-	-
+
+Chua, Ana
+IDNO 2560079
+On Track
+	25-26	2	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Chua, Olivia
+IDNO 2260072
+On Track
+	22-23	5	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Passed
+	
+	
+	
+	-
+
+Dizon, Camille
+IDNO GS-2026-PM-01
+On Track
+	24-25	3	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Passed
+	
+	-	-	-
+
+Francisco, Carla
+IDNO 2260076
+On Track
+	22-23	5	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Francisco, Diane
+IDNO 2560078
+On Track
+	25-26	2	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Hernandez, Elise
+IDNO 2360071
+On Track
+	23-24	4	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Jacinto, Martin
+IDNO 2360081
+On Track
+	23-24	4	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Eligible
+	-	-	-	-
+
+Lacson, Gian
+IDNO 2460068
+On Track
+	24-25	3	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+R
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Lim, Noel
+IDNO 2560070
+Not Yet Assessed
+	25-26	2	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Monitor204453, Dana
+IDNO 9204453
+Manual
+Not Yet Assessed
+	26-27	1	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Reyes, Lorenzo
+IDNO 2360074
+On Track
+	23-24	4	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Reyes, Olivia
+IDNO 2360077
+On Track
+	23-24	4	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Eligible
+	-	-	-	-
+
+Santos, Jon
+IDNO 2560069
+Not Yet Assessed
+	25-26	2	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+
+Tan, Adrian
+IDNO 2360075
+On Track
+	23-24	4	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+Eligible
+	-	-	-	-
+
+Villanueva, Camille
+IDNO 2560080
+On Track
+	25-26	2	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+C
+	
+	
+C
+	
+C
+	
+	
+	
+	
+	
+	
+	
+Not eligible
+	-	-	-	-
+Add student
+
+Recorded as a manual entry with your name and the time. A student login is created, like the sheet import does.
+
+Dana Monitor204453 was added to the MSN monitoring sheet.
+
+Student portal login: dana.monitor204453@student.usls.edu.ph.
+
+The first-login password is the shared demo password, the same one the sheet import gives new students.
+
+Done
+Add subjects now

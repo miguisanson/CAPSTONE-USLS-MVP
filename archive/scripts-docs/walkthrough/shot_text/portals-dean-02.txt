@@ -1,0 +1,259 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+
+APPROVALS
+
+Approvals Queue
+7
+Course Adjustments
+1
+Leave of Absence
+1
+Readmission
+1
+AWOL & Residency
+1
+Subject Withdrawal
+1
+Practicum Reports
+1
+Graduation Endorsement
+1
+Admission & Coursework Reports
+
+MONITORING & SUPPORT
+
+Reports & Analytics
+Activity Log
+Policy Assistant
+Business Rules
+
+Dean
+
+Every decision is recorded against your account with the date and time.
+
+Dean Portal
+Approvals Queue
+Dr. Manuel Villaruz · Dean
+3
+DM
+Approvals Queue
+7 waiting
+
+Everything waiting on the Dean, grouped by process. Open a case to review the files, history and messages before you decide.
+
+Search Dean review lists
+All programs
+MAED
+MAN
+MAPSY
+MIT
+MSN
+All stages / statuses
+Dean Review
+Pending
+Ready for Dean Review
+Report Sent to Dean
+Submitted
+UPDATED FROM
+UPDATED THROUGH
+SORT
+Newest updated
+Oldest updated
+Student name
+Course Adjustments 1
+Open Course Adjustments
+
+Course offerings · MIT
+
+AY 2026-2027 2nd Semester · 4 subject(s) proposed · submitted Sep 27, 2026
+
+36 days ago
+Review
+Leave of Absence 1
+Open Leave of Absence
+Workflow cases waiting for the Dean
+STUDENT
+	REQUEST
+	STATUS
+	WAITING
+	
+ACTIONS
+
+
+Lorenzo Reyes
+2360074 · MSN	
+
+Leave of Absence request · Lorenzo Reyes
+
+MSN · AY 2026-2027 2nd Semester
+
+	Dean Review	
+
+Sep 7, 2026
+
+56 days ago
+	
+Review
+
+Showing 1–1 of 1
+
+Readmission 1
+Open Readmission
+Workflow cases waiting for the Dean
+STUDENT
+	REQUEST
+	STATUS
+	WAITING
+	
+ACTIONS
+
+
+Hazel Castillo
+2360031 · MIT	
+
+Readmission request · Hazel Castillo
+
+MIT · AY 2026-2027 2nd Semester
+
+	Dean Review	
+
+Oct 22, 2026
+
+11 days ago
+	
+Review
+
+Showing 1–1 of 1
+
+AWOL & Residency 1
+Open AWOL & Residency
+Workflow cases waiting for the Dean
+STUDENT
+	REQUEST
+	STATUS
+	WAITING
+	
+ACTIONS
+
+
+Noel Navarro
+2560085 · MAN	
+
+Return from AWOL · Noel Navarro
+
+MAN · Within Maximum Residence
+
+	Dean Review	
+
+Sep 19, 2026
+
+43 days ago
+	
+Review
+
+Showing 1–1 of 1
+
+Subject Withdrawal 1
+Open Subject Withdrawal
+Workflow cases waiting for the Dean
+STUDENT
+	REQUEST
+	STATUS
+	WAITING
+	
+ACTIONS
+
+
+Hazel Flores
+2360087 · MAN	
+
+Subject withdrawal · Hazel Flores
+
+MAN · MAN-COG10 · AY 2026-2027 1st Semester
+
+	Dean Review	
+
+Sep 8, 2026
+
+55 days ago
+	
+Review
+
+Showing 1–1 of 1
+
+Practicum Reports 1
+Open Practicum Reports
+Workflow cases waiting for the Dean
+STUDENT
+	REQUEST
+	STATUS
+	WAITING
+	
+ACTIONS
+
+
+Isabel Mendoza
+2360101 · MAPSY	
+
+Practicum status report · Isabel Mendoza
+
+MAPSY · 200/200 hours · Report Sent to Dean
+
+	Report Sent to Dean	
+
+Oct 20, 2026
+
+13 days ago
+	
+Review
+
+Showing 1–1 of 1
+
+Graduation Endorsement 1
+Open Graduation Endorsement
+Workflow cases waiting for the Dean
+STUDENT
+	REQUEST
+	STATUS
+	WAITING
+	
+ACTIONS
+
+
+Hector Ong
+2360008 · MAED	
+
+Graduation endorsement · Hector Ong
+
+MAED · Batch 2 October 2026 · Current review window
+
+	Ready for Dean Review	
+
+Oct 8, 2026
+
+25 days ago
+	
+Review
+
+Showing 1–1 of 1
+
+Adviser Designation 0
+
+Form 3 → Academic Coordinator notes → Research Coordinator sends to the Dean → Dean, Associate Dean or Research Coordinator approves (Form 3.1) → adviser accepts → student sends Forms 3.2 and 3.3 within 5 days.
+
+Needs my action
+In progress
+Accepted - contract
+All
+
+Nothing is waiting on you
+
+Applications that need your note, forwarding, decision or receipt show up here.

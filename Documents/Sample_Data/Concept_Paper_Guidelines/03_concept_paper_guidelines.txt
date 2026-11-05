@@ -1,0 +1,310 @@
+UNIVERSITY OF ST. LA SALLE
+GRADUATE SCHOOL
+CONCEPT PAPER GUIDELINES AND TEMPLATE
+For Demo and Testing Purposes Only
+
+====================================================================
+PART A — GUIDELINES FOR WRITING A CONCEPT PAPER
+====================================================================
+
+A.1 PURPOSE OF THE CONCEPT PAPER
+
+A concept paper is a brief but structured document that presents
+a proposed research idea to the panel for evaluation during the
+Title Defense (Gate 1 / Form 1). Each student must submit three
+concept papers representing three distinct research topics or angles.
+The panel selects or recommends one title from the three papers
+for the student to develop as their thesis, dissertation, or
+project paper.
+
+The concept paper is not a full research proposal. It is a focused
+summary that demonstrates the student's ability to identify a
+researchable problem, situate it in existing literature, and propose
+a feasible methodology.
+
+A.2 LENGTH AND FORMAT
+
+  Minimum length:   1,500 words (excluding references)
+  Maximum length:   3,000 words (excluding references)
+  Font:             Times New Roman, 12pt
+  Line spacing:     Double
+  Margins:          1 inch on all sides
+  File format:      PDF (must be a text-readable PDF, not scanned image)
+
+A.3 REQUIRED SECTIONS
+
+Every concept paper must contain ALL of the following sections.
+A paper missing any required section will be returned to the student
+for revision before the Academic Coordinator can endorse Form 1.
+
+  1. Title
+  2. Background of the Study
+  3. Statement of the Problem
+  4. Significance of the Study
+  5. Scope and Delimitation
+  6. Theoretical or Conceptual Framework
+  7. Proposed Methodology
+  8. References
+
+Each section is described in detail below.
+
+A.4 SECTION DESCRIPTIONS AND REQUIREMENTS
+
+SECTION 1 — TITLE
+The title must be clear, specific, and reflective of the research
+content. It should indicate the variables, population, and context
+where applicable. Avoid vague or overly broad titles.
+
+Good example:
+  "Digital Wallet Adoption Among Micro-Enterprise Owners in Bacolod City:
+   A Technology Acceptance Model Perspective"
+
+Poor example:
+  "A Study on Technology and Business"
+
+SECTION 2 — BACKGROUND OF THE STUDY
+The background presents the context and rationale for the research.
+It should:
+  - Describe the situation or phenomenon being studied.
+  - Present relevant statistics, trends, or prior research that
+    establish the need for this study.
+  - Establish the gap in existing knowledge that this research fills.
+  - Be grounded in current and credible sources (within the last
+    ten years, unless citing seminal works).
+
+Minimum length: 300 words.
+
+SECTION 3 — STATEMENT OF THE PROBLEM
+This section states the central research problem and breaks it down
+into specific, answerable research questions or objectives.
+
+Requirements:
+  - One (1) overarching research problem or central question.
+  - Minimum of three (3) specific research questions or objectives
+    derived from the central problem.
+  - Questions must be specific, measurable, and researchable.
+  - Avoid yes/no questions; use "what," "how," "to what extent,"
+    or "what is the relationship between."
+
+Example format:
+  Central problem: This study investigates the relationship between
+  financial literacy and savings behavior among public school teachers
+  in Negros Occidental.
+
+  Specific questions:
+  1. What is the level of financial literacy of the respondents in terms
+     of budgeting, investing, and debt management?
+  2. What is the savings behavior of the respondents as measured by
+     frequency of saving, amount saved, and savings instruments used?
+  3. Is there a significant relationship between financial literacy and
+     savings behavior of the respondents?
+
+SECTION 4 — SIGNIFICANCE OF THE STUDY
+This section explains the value and contribution of the research.
+It should identify who will benefit from the findings and how.
+
+Typical beneficiaries to address:
+  - The institution or organization being studied
+  - The profession or industry
+  - Policy makers or administrators
+  - Future researchers
+  - The community or society
+
+Each beneficiary group must be mentioned with a specific explanation
+of how the research findings will benefit them.
+
+SECTION 5 — SCOPE AND DELIMITATION
+This section clearly defines what the study will and will not cover.
+
+  Scope:       The specific variables, population, time period,
+               and geographic coverage of the study.
+  Delimitation: The conscious boundaries set by the researcher
+               and the justification for those boundaries.
+
+Example: "This study is limited to full-time faculty members of the
+College of Business at USLS during the academic year 2025-2026.
+Part-time faculty and administrative staff are excluded from the study."
+
+SECTION 6 — THEORETICAL OR CONCEPTUAL FRAMEWORK
+This section presents the theory or model that underpins the research.
+
+  - Identify and explain the theory or model.
+  - Cite the original source of the theory or model.
+  - Explain how the theory applies to the current study.
+  - Include a conceptual framework diagram if applicable (optional
+    for the concept paper stage, required at proposal stage).
+
+SECTION 7 — PROPOSED METHODOLOGY
+This section outlines the research design and approach. It must
+include all of the following:
+
+  (a) Research design — Describe whether the study is quantitative,
+      qualitative, or mixed methods. Identify the specific design
+      (e.g., descriptive-correlational, phenomenological, case study,
+      experimental, action research).
+
+  (b) Participants or respondents — Who will be the subjects of the
+      study? State the population and the sampling method.
+
+  (c) Sampling procedure — How will participants be selected?
+      (e.g., purposive sampling, stratified random sampling, total
+      enumeration)
+
+  (d) Data collection instruments — What tools will be used to gather
+      data? (e.g., survey questionnaire, interview guide, observation
+      checklist, document review)
+
+  (e) Data analysis — How will the data be analyzed?
+      Quantitative: state the statistical tools (e.g., mean, Pearson r,
+      regression, chi-square).
+      Qualitative: state the analysis approach (e.g., thematic analysis,
+      content analysis, grounded theory coding).
+
+SECTION 8 — REFERENCES
+  - Minimum of ten (10) references.
+  - At least seven (7) must be from peer-reviewed journals or
+    academic sources.
+  - At least five (5) must have been published within the last
+    ten (10) years.
+  - Use APA 7th edition format for all references.
+  - References must match in-text citations.
+
+====================================================================
+PART B — CHECKLIST FOR CONCEPT PAPER COMPLIANCE
+====================================================================
+
+Use this checklist to verify that a concept paper meets minimum
+requirements before Academic Coordinator endorsement.
+
+ITEM                                                   REQUIRED   PRESENT
+Title (clear, specific, reflects variables/context)       Yes     [ ]
+Background of the Study (min. 300 words)                  Yes     [ ]
+Background cites current sources (last 10 years)          Yes     [ ]
+Background identifies research gap                        Yes     [ ]
+Statement of the Problem (1 central + 3 specific)         Yes     [ ]
+Research questions are specific and measurable            Yes     [ ]
+Significance of the Study (identifies beneficiaries)      Yes     [ ]
+Scope and Delimitation clearly stated                     Yes     [ ]
+Theoretical or Conceptual Framework identified            Yes     [ ]
+Theory or model cited with original source                Yes     [ ]
+Proposed Methodology — research design stated             Yes     [ ]
+Proposed Methodology — participants described             Yes     [ ]
+Proposed Methodology — sampling procedure described       Yes     [ ]
+Proposed Methodology — data instruments described         Yes     [ ]
+Proposed Methodology — analysis approach described        Yes     [ ]
+References — minimum 10 sources                           Yes     [ ]
+References — minimum 7 peer-reviewed                      Yes     [ ]
+References — minimum 5 within last 10 years               Yes     [ ]
+References in APA 7th edition format                      Yes     [ ]
+File submitted as text-readable PDF (not scanned)         Yes     [ ]
+Length between 1,500 and 3,000 words (excl. references)  Yes     [ ]
+
+RESULT OPTIONS:
+  Compliant              — All required items present. Proceed to endorsement.
+  Needs Revision         — One to three items missing or incomplete.
+                           Return to student with specific feedback.
+  Missing Requirements   — Four or more items missing or incomplete.
+                           Return to student; endorsement cannot proceed.
+
+====================================================================
+PART C — CONCEPT PAPER TEMPLATE
+====================================================================
+
+[UNIVERSITY OF ST. LA SALLE LETTERHEAD]
+Graduate School
+Concept Paper for Title Defense
+
+Title:
+[Write the full title of the proposed research here.]
+
+Author:
+[Student full name, Program, Academic Year of Entry]
+
+Submitted to:
+[Research Coordinator / Academic Coordinator name]
+
+Date Submitted:
+[Date]
+
+---
+
+1. BACKGROUND OF THE STUDY
+
+[Write the background here. Minimum 300 words. Discuss the context,
+current situation, existing literature, and the gap this research
+will address. Cite all sources used.]
+
+---
+
+2. STATEMENT OF THE PROBLEM
+
+This study aims to [state the central problem or research objective].
+
+Specifically, it seeks to answer the following questions:
+
+1. [Specific research question 1]
+2. [Specific research question 2]
+3. [Specific research question 3]
+[Add more as needed.]
+
+---
+
+3. SIGNIFICANCE OF THE STUDY
+
+The findings of this study will be beneficial to the following:
+
+[Name of beneficiary 1]. [Explanation of benefit.]
+[Name of beneficiary 2]. [Explanation of benefit.]
+[Continue as applicable.]
+
+---
+
+4. SCOPE AND DELIMITATION
+
+This study will focus on [describe the variables, population, and
+setting]. The study will be conducted during [time period].
+
+The study is delimited to [describe boundaries and exclusions].
+
+---
+
+5. THEORETICAL OR CONCEPTUAL FRAMEWORK
+
+This study is anchored on [name of theory or model] proposed by
+[author, year]. [Brief explanation of the theory.] This theory is
+relevant to the study because [explain the connection].
+
+---
+
+6. PROPOSED METHODOLOGY
+
+Research Design:
+[Describe the research design and justification.]
+
+Participants or Respondents:
+[Describe the population and who will participate.]
+
+Sampling Procedure:
+[Describe how participants will be selected.]
+
+Data Collection Instruments:
+[Describe the tools to be used to collect data.]
+
+Data Analysis:
+[Describe how data will be analyzed.]
+
+---
+
+7. REFERENCES
+
+[List all references in APA 7th edition format.]
+
+Example:
+Dela Cruz, M. (2022). Financial literacy and savings behavior in
+  emerging economies. Journal of Applied Economics, 18(3), 45-62.
+  https://doi.org/10.xxxx/xxxxx
+
+====================================================================
+END OF DOCUMENT
+USLS Concept Paper Guidelines and Template — Demo Version
+====================================================================

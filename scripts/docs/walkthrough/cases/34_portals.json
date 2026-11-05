@@ -1,0 +1,226 @@
+{
+ "slug": "portals",
+ "title": "The Dean, Faculty and Student portals",
+ "kind": "reference",
+ "part": "Ref",
+ "presenter": "-",
+ "owner": "Dean, Faculty, Student",
+ "duration": "6 min",
+ "story": [
+  "Every role signs in through the same page and lands in the same kind of workspace: a sidebar of separate pages, a breadcrumb (for example Dean Portal > Approvals Queue), the notification bell, the Sign out icon and the account chip. What differs is which pages the role is given. The Dean sees only what is waiting for a decision. A faculty member sees only their own advisees, panels and calendar. A student sees only their own record. A page that several roles use carries one name for all of them (for example Leave of Absence is the name of the staff page, the Dean page and the student page).",
+  "This case is a short, read-only tour. It shows that the portals are not one long scrolling page and that each role's sidebar is limited to its own transactions. Nothing is changed in the records. The sidebar of every role is listed in {case:signin}."
+ ],
+ "accounts": [
+  [
+   "Dean",
+   "dean@usls.edu.ph",
+   "Approvals, activity log, reports, rules"
+  ],
+  [
+   "Faculty",
+   "liwayway.bautista@usls.edu.ph",
+   "Advisees, panel invitations, availability, calendar, defense schedule"
+  ],
+  [
+   "Student",
+   "handoff.sofia@usls.edu.ph",
+   "Sofia Reyes, a new MAED student (demo key student-handoff-sofia)"
+  ]
+ ],
+ "data": [
+  [
+   "Changes made",
+   "None. This is a read-only tour."
+  ],
+  [
+   "Student",
+   "Sofia Reyes, 2690601, reset before the tour (Demo accounts panel, group 1 · Student Handoff)"
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - The Dean portal",
+   "intro": null,
+   "steps": [
+    {
+     "text": "Sign in as **dean@usls.edu.ph** by typing the email and password. The **Dean Portal** opens on the **Dashboard**: **Welcome, Manuel**, the line Dean - the decisions waiting on you, and the button **Open approvals queue**. **Needs your action** lists the waiting cases, oldest first, each with a **Review** button. The figures beside it are **Decisions waiting**, **Oldest wait**, **Waiting on you over 7 days** and **Decided this week**, and **Recent decisions** (with **View all**) lists what the Dean decided before.",
+     "shots": [
+      {
+       "id": "portals-dean-01",
+       "caption": "Dean Dashboard: decisions waiting, how long they have waited, and recent decisions."
+      }
+     ]
+    },
+    {
+     "text": "Open **Approvals Queue** in the sidebar (the chip beside the title says how many are waiting). Every process that needs the Dean is grouped on this page, each group with a link such as **Open Leave of Absence**, and the filters **Search Dean review lists**, **All programs**, **All stages / statuses**, **Updated from**, **Updated through** and **Sort**. The sidebar also has one page per process (Course Adjustments, Leave of Absence, Readmission, AWOL & Residency, Subject Withdrawal, Practicum Reports, Graduation Endorsement and Admission & Coursework Reports), each with a badge showing how many items wait.",
+     "shots": [
+      {
+       "id": "portals-dean-02",
+       "caption": "Approvals Queue, grouped by process."
+      }
+     ]
+    },
+    {
+     "text": "Open **Activity Log** (it was called Decision History in an earlier version). Each decision taken by the Dean account is listed with its date and status, newest first; the filter **Process** narrows the list, and every entry keeps its full stage history on the case page.",
+     "shots": [
+      {
+       "id": "portals-dean-03",
+       "caption": "Activity Log: what the Dean has decided, newest first."
+      }
+     ]
+    },
+    {
+     "text": "Open **Reports & Analytics** in the Dean portal. The page uses the same frame as the staff page: the filters **Program**, **Year started** and **Period**, the same strip of six numbers (for example **Requests waiting more than 7 days (all offices)**, **Median days to decide** and **Endorsements sent to the Dean**), and five tabs. **Waiting for my decision** asks which decisions have waited the longest, grouped by how many days they have waited, with a chart and a table. **How fast decisions are made** asks how fast decisions are made, with the median and the slowest 10 percent for each process; a dashed line marks the decision target. **Outcomes** asks what was decided, and many returns for one process show as a warning. **Graduation pipeline** shows four steps: ready to graduate and not yet sent to the Dean, sent to the Dean in this period, waiting for the Dean's decision now, and decided in this period. **Students by stage** counts the active students at each stage. Each count opens the cases or students behind it.",
+     "shots": [
+      {
+       "id": "portals-dean-04",
+       "caption": "Dean Reports & Analytics: the five tabs, starting with Waiting for my decision."
+      }
+     ]
+    },
+    {
+     "text": "Open **Business Rules**. The Dean can read the same register of rules as the staff (see {case:business-rules}), with the source page of each rule. Rules set by the Handbook or the Research Protocol are shown as **Official (locked)**; the header states that they change only when the Graduate School issues a new policy, and that only Graduate School staff and the administrator can adjust the prototype rules.",
+     "shots": [
+      {
+       "id": "portals-dean-05",
+       "caption": "Business Rules as the Dean sees them (read only)."
+      }
+     ]
+    },
+    {
+     "text": "Open **Leave of Absence** under **Approvals** as an example of a per-process page. It uses the same **Board** / **Table** layout as the staff page of the same name, with the Dean's wording in the header (Leave of absence requests that Graduate School staff forwarded for your decision) and the panel **Rules applied on this screen**. The case waiting for the Dean sits in the column **With the Dean**.",
+     "shots": [
+      {
+       "id": "portals-dean-06",
+       "caption": "Dean Leave of Absence page: the shared board, with the case waiting for the Dean."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - The Faculty portal",
+   "intro": null,
+   "steps": [
+    {
+     "text": "Sign out and sign in as **liwayway.bautista@usls.edu.ph**. The **Faculty Portal** opens on the **Dashboard** (Welcome, Liwayway). **Needs your action** shows what waits for the faculty member (here one panel invitation, with the button **Answer invitations**), a card says **Google Calendar not connected** with a link to the calendar connection, and the figures are **Your open items**, **Advisees**, **Panel committees** and **Upcoming defenses**.",
+     "shots": [
+      {
+       "id": "portals-faculty-01",
+       "caption": "Faculty Dashboard."
+      }
+     ]
+    },
+    {
+     "text": "Open **My Advisees**. The page says **You can advise at most 5 students.** and shows how many places are used (5 of 5 in this run), then a table of the advisees with their program, stage, adviser contract, documents and what needs a signature. A note explains that Forms 3.2 and 3.3 (the adviser contract) are due 5 days after Form 3.1.",
+     "shots": [
+      {
+       "id": "portals-faculty-02",
+       "caption": "My Advisees with the five-advisee limit."
+      }
+     ]
+    },
+    {
+     "text": "Open **Panel Invitations**. Each invitation names the student, the defense stage, the status **Invited**, the faculty member's role on the panel and the other panel members, with **Accept** and **Decline** buttons. The page does not answer for the faculty member; this walkthrough does not press either button.",
+     "shots": [
+      {
+       "id": "portals-faculty-03",
+       "caption": "Panel Invitations waiting for an answer."
+      }
+     ]
+    },
+    {
+     "text": "Open **My Availability**. **Weekly hours** are set per day (**Save weekly hours**, **Copy Monday to weekdays**), **Specific dates** mark one-off or vacation dates as not available or available only at certain hours (**Add date**), and **Requests from the Graduate School** are answered here. The button **See your calendar** leads to My Calendar. All times are Philippine time.",
+     "shots": [
+      {
+       "id": "portals-faculty-04",
+       "caption": "My Availability: weekly hours, specific dates and requests from the Graduate School."
+      }
+     ]
+    },
+    {
+     "text": "Open **My Calendar**. Defenses, deadlines, availability and (when connected) Google busy times appear in the **Month**, **Week** and **Agenda** views, with a **Print** button and tick boxes to show or hide **Deadlines**, **My availability** and **Google busy times**. The **Google Calendar** card says **Not connected** and offers **Connect Google Calendar**; connecting needs a Google account, so this walkthrough does not connect it. Once connected, the busy times of the main calendar count as unavailable and new defense schedules are added to it.",
+     "shots": [
+      {
+       "id": "portals-faculty-05",
+       "caption": "My Calendar in the Faculty portal, with the Google Calendar connection card."
+      }
+     ]
+    },
+    {
+     "text": "Open **Defense Schedule**. A table lists the defenses of the panels the faculty member sits on: student, defense, date and time, mode and venue, role, status and **Add to calendar**. The buttons **Open my calendar** and **My availability** are at the top.",
+     "shots": [
+      {
+       "id": "portals-faculty-06",
+       "caption": "Defense Schedule: the defenses of the panels this faculty member sits on."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - The Student portal",
+   "intro": null,
+   "steps": [
+    {
+     "text": "Sign out and sign in as **handoff.sofia@usls.edu.ph** (Sofia Reyes). The **Student Portal** opens on the **Dashboard** (Welcome, Sofia) with her program, student number and year, **Needs your action**, **Your lifecycle** (eight steps from Admission to Final Defense, the current one marked), **Elsewhere in your portal** (one line each for Defense Schedule, Research Adviser, Request Center and Leave of Absence), and the figures for coursework, research, open tasks and unread messages.",
+     "shots": [
+      {
+       "id": "portals-student-01",
+       "caption": "Student Dashboard for a new student."
+      }
+     ]
+    },
+    {
+     "text": "Open **My Progress**. **My Academic Status** shows the lifecycle strip and the coursework completion, **Workflow Status** shows the requests that are visible to the student, and **Curriculum progress** lists every subject of the program (Basic, Cognate and Major) with units, suggested term and status, read from the monitoring record. The button **Enroll in subjects** leads to Enrollment.",
+     "shots": [
+      {
+       "id": "portals-student-02",
+       "caption": "My Progress: stage strip and curriculum."
+      }
+     ]
+    },
+    {
+     "text": "Open **Enrollment**. Published subjects are marked **Offered** or **Not offered** for the current semester; subjects already on the record stay locked. The button **View my progress** goes back to My Progress.",
+     "shots": [
+      {
+       "id": "portals-student-03",
+       "caption": "Student Enrollment: offered and not-offered subjects."
+      }
+     ]
+    },
+    {
+     "text": "Open **Request Center**. Every request a student can file is here with its status, in three groups: **Research & Defense** (Research Progress, Defense Schedule), **Requests** (Leave of Absence, Readmission, Return from AWOL, Subject Withdrawal) and **Completion** (Practicum, Graduation Endorsement). Requests that do not apply to the student are shown as locked with the reason, for example Research Progress is locked until the comprehensive exam is passed.",
+     "shots": [
+      {
+       "id": "portals-student-04",
+       "caption": "Request Center with locked requests explained."
+      }
+     ]
+    },
+    {
+     "text": "Open **Messages**. Clarification requests and staff replies for the student's requests are kept here and can be filtered by workflow (**Filter messages**: All workflows, Leave of Absence, Readmission, Course Audit, AWOL / Residency, Practicum, Withdrawal, Graduation).",
+     "shots": [
+      {
+       "id": "portals-student-05",
+       "caption": "Messages: clarifications and staff replies."
+      }
+     ]
+    },
+    {
+     "text": "Open **Leave of Absence** under **Requests** as an example of a request page. It shows the chip **Not submitted**, the button **All requests**, the panel **Rules applied on this screen**, and the form **Ask for a leave of absence** (**Leave starts**, **Leave ends**, **Reason**, **Tell us what is happening**, **Submit leave request**). This walkthrough does not submit it.",
+     "shots": [
+      {
+       "id": "portals-student-06",
+       "caption": "A student request page: Leave of Absence, not submitted."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "Each portal footer states the scope of the role: the Dean's decisions are recorded against the Dean account with the date and time; a faculty member sees only assigned advisees and panels; a student's record updates as staff act on requests and nothing on these pages changes official grades or enrollment.",
+  "The faculty Google Calendar connection needs Google credentials and a Google account; it is shown as Not connected in this demonstration."
+ ]
+}

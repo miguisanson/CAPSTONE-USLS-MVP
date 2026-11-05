@@ -1,0 +1,230 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Subject Withdrawal
+Grace Fernandez · Graduate School Staff
+1
+GF
+Subject Withdrawal
+
+Withdraw a student from one subject until the end of the second week of classes, without changing program standing.
+
+How this works
+View recent activity
+Rules applied on this screen
+5 rules from the Graduate School policies
+
+Subject withdrawal window
+
+14 days
+
+A student may withdraw subjects until the end of the second week from the start of classes (14 calendar days), whether or not classes were attended. The request needs the Dean's approval. It is not free: the fee consequence below applies. After the window a single subject can no longer be withdrawn; the student may still withdraw from all subjects (paying the full fees for the semester) or file a Leave of Absence.
+
+Source: Graduate School Handbook 2022-2023, p. 49 (Registration - Withdrawal of Subject)
+
+Enforced by the system
+
+First week of classes (fee tier boundary)
+
+7 days
+
+Withdrawals filed within the first 7 calendar days of classes fall in the first-week fee tier; days 8 to 14 fall in the second-week tier.
+
+Source: Graduate School Handbook 2022-2023, pp. 50-51 (Fees and Expenses - Refund of Fees)
+
+Enforced by the system
+
+Fee charged for a first-week withdrawal
+
+10 percent
+
+10% of the total amount due for the term is charged when the subject is withdrawn within the first week of classes, regardless of whether classes were attended.
+
+Source: Graduate School Handbook 2022-2023, pp. 49, 51 (Registration - Withdrawal of Subject; Fees - Refund of Fees)
+
+Documented only
+
+The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+Fee charged for a second-week withdrawal
+
+20 percent
+
+20% of the total amount due for the term is charged when the subject is withdrawn within the second week of classes.
+
+Source: Graduate School Handbook 2022-2023, pp. 49, 51 (Registration - Withdrawal of Subject; Fees - Refund of Fees)
+
+Documented only
+
+The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+Fee charged after the second week
+
+100 percent
+
+After the second week the student may still withdraw all subjects at any time of the semester but pays the full enrollment fees for the semester (a justifiable reason limits the charge to the last month of attendance).
+
+Source: Graduate School Handbook 2022-2023, p. 51 (Fees and Expenses - Refund of Fees)
+
+Documented only
+
+The portal shows the fee consequence as information; it does not compute or collect payments (Business Office).
+
+See every business rule and its history
+
+1 Submitted, 1 With the Dean, 1 Not approved
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Search requests by name, student number or program
+All programs
+MAED
+MAN
+MSN
+All statuses
+With the Dean
+Denied
+Submitted
+Showing 3 of 3 requests
+Board
+Table
+
+3 more stages to the right →
+
+Submitted
+1
+
+Waiting for Graduate School staff to record and forward.
+
+Adrian Lim
+
+2360006 · MAED
+
+MAED-COG10 - Seminar on Contemporary Issues in Education
+
+AY 2026-2027 1st Semester · Before classes begin
+
+Next: Graduate School Staff
+
+View details
+Move to…
+Select all in this column
+Returned to student
+0
+
+Waiting for the student to correct and resend.
+
+No requests here
+
+With the Dean
+1
+
+Waiting for the Dean's decision.
+
+Hazel Flores
+
+2360087 · MAN
+
+MAN-COG10 - Critical Care Nursing
+
+AY 2026-2027 1st Semester · Before classes begin
+
+Next: Dean
+
+View details
+
+Waiting for: Dean
+
+Subject tagging
+0
+
+Approved. Staff tag the subject as Withdrawn.
+
+No requests here
+
+Excel export
+0
+
+Tagged. Staff export the approved-withdrawals Excel list.
+
+No requests here
+
+Exported - email the Registrar
+0
+
+Exported lists (and older acknowledged records). Staff email the file to the Registrar.
+
+No requests here
+
+Not approved
+1
+
+Denied by the Dean, or cancelled.
+
+Gian Lacson
+
+2460068 · MSN
+
+MSN-COG10 - Critical Care Nursing
+
+AY 2026-2027 1st Semester · Before classes begin
+
+No further step
+
+View details
+
+Finished - nothing more to do
+
+Registrar list
+
+Dean-approved withdrawals whose subject is tagged go to the Registrar. The portal does not send any email: download the Excel list, email it through the official channel, and wait for the Registrar to acknowledge.
+
+Nothing to send to the Registrar yet. Tagged withdrawals appear here.

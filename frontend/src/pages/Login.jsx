@@ -1,0 +1,667 @@
+import { useEffect, useRef, useState } from "react";
+import { Navigate } from "react-router-dom";
+import { BookPlus, BriefcaseBusiness, CalendarOff, CheckCircle2, ChevronDown, ChevronRight, Compass, Eye, EyeOff, GitBranch, GraduationCap, LockKeyhole, LogOut, PlayCircle, RotateCcw, SlidersHorizontal, UserCog, UserRound, UserX } from "lucide-react";
+import { api } from "../api";
+import { useAuth } from "../auth";
+import { homePath } from "../lib/homePaths.js";
+import { GUIDES } from "../lib/demoGuide/guides/index.js";
+import { firstStop, startDemoSession } from "../lib/demoGuide/session.js";
+import { guideEnabled, setGuideEnabled } from "../lib/demoGuide/prefs.js";
+import { Button, InlineNotice, Input, PageHeader } from "../components/ui/index.js";
+
+
+const STUDENT_LIFECYCLE_DEMOS = [
+  {
+    workflow: "student-handoff",
+    title: "1 · Student Handoff",
+    description: "New-student profiles after admissions handoff.",
+    icon: UserCog,
+  },
+  {
+    workflow: "course-adjustments",
+    title: "2 · Course Adjustments",
+    description: "Missing-subject demand scenarios for official course offerings.",
+    icon: SlidersHorizontal,
+  },
+  {
+    workflow: "enrollment",
+    title: "3 · Enrollment",
+    description: "Ready for single-student offered-subject enrollment.",
+    icon: BookPlus,
+  },
+  {
+    workflow: "research",
+    title: "5–7 · Research, Panel & Defense",
+    description: "Courses and comprehensive exam complete; ready for Title Defense requirements.",
+    icon: GitBranch,
+  },
+  {
+    workflow: "practicum",
+    title: "8 · Practicum",
+    description: "Psychology and MSGC students only; prerequisites complete.",
+    icon: BriefcaseBusiness,
+  },
+  {
+    workflow: "graduation",
+    title: "9 · Graduation",
+    description: "All prior requirements complete; ready for Graduation.",
+    icon: GraduationCap,
+  },
+];
+
+const STANDALONE_STUDENT_DEMOS = [
+  {
+    workflow: "leave-of-absence",
+    title: "Leave of Absence",
+    description: "Leave requests checked against the handbook rules.",
+    icon: CalendarOff,
+  },
+  {
+    workflow: "readmission",
+    title: "Readmission",
+    description: "Approved-LOA personas ready to file return requests.",
+    icon: UserRound,
+  },
+  {
+    workflow: "awol",
+    title: "AWOL & Residency",
+    description: "One automatically flagged AWOL return and one residency-ready persona.",
+    icon: UserX,
+  },
+  {
+    workflow: "withdrawal",
+    title: "Withdrawal",
+    description: "Active subject enrollment; can withdraw a subject until the end of the second week of classes.",
+    icon: LogOut,
+  },
+];
+
+// Where "Start a guided demo" sends the signed-in presenter. Kept outside the component: refresh() shows the app's loading screen,
+// which unmounts this page, so a state value would be lost before the redirect.
+let pendingLanding = "";
+
+export default function Login() {
+  const { user, refresh } = useAuth();
+  const expired = new URLSearchParams(window.location.search).get("expired") === "1"; // sent by api.js on a 401 (I-211)
+  // The form always starts empty: nothing is pre-filled, so a real typed login can be shown.
+  // The one exception: the Demo Guide's "Sign in as ..." opens this page with ?as=<email>, so that account is ready to sign in.
+  const asEmail = new URLSearchParams(window.location.search).get("as") || "";
+  // The Demo Guide's "Switch to ..." button adds go=1 (sign in by itself with the demo password) and to=<page of the step>.
+  const autoGo = new URLSearchParams(window.location.search).get("go") === "1";
+  const wantedPage = new URLSearchParams(window.location.search).get("to") || "";
+  const [form, setForm] = useState({ email: asEmail, password: "" });
+  const [showPassword, setShowPassword] = useState(false);
+  // The sign-in is made here (not through the auth context's login(), which sets the app-wide loading flag and so
+  // unmounts this page): a wrong password keeps what was typed, the open demo panel and the scroll position.
+  const [signInError, setSignInError] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
+  // Global demo switch (null until the server answers, or with demo mode off): steps never wait for a calendar date.
+  const [skipDateWaits, setSkipDateWaits] = useState(null);
+  const [skipNote, setSkipNote] = useState("");
+  const [demoOpen, setDemoOpen] = useState(Boolean(asEmail));
+  const [guideOn, setGuideOn] = useState(guideEnabled); // per browser; off unless the presenter turns it on
+  const [starting, setStarting] = useState(""); // the guide being started (its button shows "Signing in...")
+  const [startError, setStartError] = useState("");
+  // Where to go once signed in; empty = the role's home. Only a page of this app is accepted.
+  const [landing, setLanding] = useState(pendingLanding || (autoGo && /^\/(?![/\\])/.test(wantedPage) ? wantedPage : ""));
+  const autoTried = useRef(false);
+  const [demoAccounts, setDemoAccounts] = useState([]);
+  const [demoStudents, setDemoStudents] = useState([]);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoLoaded, setDemoLoaded] = useState(false);
+  const [demoError, setDemoError] = useState("");
+  const [demoNotice, setDemoNotice] = useState("");
+  const [quickLoginBusy, setQuickLoginBusy] = useState("");
+  const [resetBusy, setResetBusy] = useState("");
+  const [openDemoGroup, setOpenDemoGroup] = useState("");
+
+  // Ask the server whether to list the demo logins. With it off (demo mode off, or DEMO_SHOW_ACCOUNTS=0
+  // on a public site), this page is only the form.
+  useEffect(() => {
+    let active = true;
+    api.authConfig()
+      .then((result) => {
+        if (!active) return;
+        setDemoMode(Boolean(result.show_accounts));
+        setSkipDateWaits(result.demo_mode ? Boolean(result.skip_date_waits) : null);
+      })
+      .catch(() => {
+        if (active) setDemoMode(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Demo credentials are fetched only when the presenter expands the panel.
+  useEffect(() => {
+    if (!demoMode || !demoOpen || demoLoaded) return undefined;
+    let active = true;
+    setDemoLoading(true);
+    Promise.all([api.demoAccounts(), api.demoStudents()])
+      .then(([accounts, students]) => {
+        if (!active) return;
+        setDemoAccounts(accounts.items || []);
+        setDemoStudents(students.items || []);
+        setDemoLoaded(true);
+      })
+      .catch((requestError) => {
+        if (active) setDemoError(requestError.message || "Demo accounts could not be loaded.");
+      })
+      .finally(() => {
+        if (active) setDemoLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [demoMode, demoOpen, demoLoaded]);
+
+  const sharedPassword = demoAccounts[0]?.password || demoStudents[0]?.password || "";
+
+  // With ?as=<email>, once the demo accounts are known, the shared demo password goes in as well.
+  useEffect(() => {
+    const match = asEmail && demoAccounts.find((account) => account.email === asEmail);
+    if (match) setForm((current) => (current.password ? current : { email: match.email, password: match.password || "" }));
+  }, [asEmail, demoAccounts]);
+
+  // "Switch to ...": the page was opened with go=1, so once the demo password is known the account signs in by itself.
+  useEffect(() => {
+    const password = demoAccounts.concat(demoStudents).find((account) => account.email === asEmail)?.password || sharedPassword;
+    if (!autoGo || !asEmail || !password || autoTried.current) return;
+    autoTried.current = true;
+    setSigningIn(true);
+    signIn({ email: asEmail, password }).catch((requestError) => {
+      setSignInError(requestError.message || "Could not sign in.");
+      setSigningIn(false);
+    });
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (user?.role) pendingLanding = "";
+  }, [user]);
+
+  if (user?.role) return <Navigate to={landing || homePath(user.role)} replace />;
+
+  async function signIn(credentials) {
+    // The role is decided by the server from the account; the form never sends one.
+    await api.login({ email: credentials.email.trim(), password: credentials.password });
+    // The session now exists: load it. The page then redirects to the role's home (see the Navigate above).
+    await refresh();
+  }
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    setSignInError("");
+    setSigningIn(true);
+    try {
+      await signIn(form);
+    } catch (requestError) {
+      setSignInError(requestError.message || "Could not sign in.");
+      setSigningIn(false);
+    }
+  }
+
+  function fillForm(account) {
+    setDemoError("");
+    setSignInError("");
+    setForm({ email: account.email, password: account.password });
+    setShowPassword(true);
+  }
+
+  async function quickLogin(account, busyKey) {
+    setDemoError("");
+    setDemoNotice("");
+    setQuickLoginBusy(busyKey);
+    try {
+      await signIn(account);
+    } catch (requestError) {
+      setDemoError(requestError.message || `Could not sign in as ${account.name || account.label}.`);
+    } finally {
+      setQuickLoginBusy("");
+    }
+  }
+
+  // "Start a guided demo": one click signs in as the person of the demo's first step, turns the guide on and lands on that step's page.
+  async function startDemo(guide) {
+    const { account } = firstStop(guide);
+    setStartError("");
+    setStarting(guide.id);
+    try {
+      let password = sharedPassword;
+      if (!password) {
+        const [accounts, students] = await Promise.all([api.demoAccounts(), api.demoStudents()]);
+        setDemoAccounts(accounts.items || []);
+        setDemoStudents(students.items || []);
+        setDemoLoaded(true);
+        password = accounts.items?.[0]?.password || students.items?.[0]?.password || "";
+      }
+      if (!password) throw new Error("The demo accounts could not be loaded. Use Demo accounts below.");
+      pendingLanding = await startDemoSession(guide, password); // a failed sign-in leaves the guide as it was
+      setLanding(pendingLanding);
+      await refresh();
+    } catch (requestError) {
+      setStartError(requestError.message || `Could not sign in as ${account.label}.`);
+      setStarting("");
+    }
+  }
+
+  async function resetDemoStudent(student) {
+    const confirmed = window.confirm(
+      `Reset ${student.name}'s ${student.workflow_title || student.workflow} demo? This clears this workflow's submissions, messages, tasks, and staff actions for the student.`,
+    );
+    if (!confirmed) return;
+    setDemoError("");
+    setDemoNotice("");
+    setResetBusy(student.key);
+    try {
+      // The server only resets for Graduate School staff, so sign in as a demo staff account first,
+      // reset, then sign out again.
+      const signInOptions = demoAccounts
+        .filter((account) => account.role === "staff")
+        .map(({ email, password }) => ({ email, password }));
+      let signedIn = false;
+      for (const credentials of signInOptions) {
+        if (!credentials.email || !credentials.password) continue;
+        try {
+          await api.login(credentials);
+          signedIn = true;
+          break;
+        } catch {
+          /* try the next demo account */
+        }
+      }
+      if (!signedIn) throw new Error(`Could not sign in to reset ${student.name}. Sign in as Graduate School Staff and reset from there.`);
+      let result;
+      try {
+        result = await api.resetDemoStudent(student.key);
+      } finally {
+        await api.logout().catch(() => {});
+      }
+      if (result.item) {
+        setDemoStudents((items) => items.map((item) => (item.key === student.key ? result.item : item)));
+      }
+      setDemoNotice(result.message || `${student.name}'s demo data was reset.`);
+    } catch (requestError) {
+      setDemoError(requestError.message || `Could not reset ${student.name}.`);
+    } finally {
+      setResetBusy("");
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-canvas">
+      <main className="mx-auto grid min-h-screen w-full max-w-page grid-cols-1 items-start gap-8 px-4 py-8 lg:grid-cols-2 lg:px-8 lg:py-16">
+        <section className="space-y-5">
+          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-600 text-white shadow-card">
+            <GraduationCap className="h-8 w-8" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="eyebrow !text-brand-700">University of St. La Salle</p>
+            {/* The one large title in the app (UI-SPEC AD1): text-3xl is allowed in this file only */}
+            <PageHeader
+              className="mt-2"
+              title="Graduate School Lifecycle Portal"
+              titleProps={{ className: "!text-3xl leading-tight" }}
+              description="Sign in with your Graduate School account. The screens you see depend on the role your account holds."
+            />
+          </div>
+
+          {demoMode && guideOn && (
+            <section aria-labelledby="start-demo-title" className="rounded-2xl border border-amber-300 bg-amber-50">
+              <div className="space-y-1 px-4 pb-2 pt-4">
+                <h2 id="start-demo-title" className="card-title flex items-center gap-2 !text-amber-900">
+                  <Compass className="h-4 w-4" aria-hidden="true" /> Start a guided demo
+                </h2>
+                <p className="text-sm text-amber-900">Pick a demo. The app signs you in as the first person and a guide panel tells you what to click and what to say.</p>
+              </div>
+              <ul className="divide-y divide-amber-200 border-t border-amber-200">
+                {GUIDES.map((guide) => (
+                  <li key={guide.id}>
+                    <button
+                      type="button"
+                      disabled={Boolean(starting)}
+                      onClick={() => startDemo(guide)}
+                      className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-ink">{guide.title}</span>
+                        <span className="meta block">{starting === guide.id ? "Signing in…" : guide.summary}</span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-amber-800" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {startError && (
+                <div className="border-t border-amber-200 p-3">
+                  <InlineNotice tone="danger">{startError}</InlineNotice>
+                </div>
+              )}
+            </section>
+          )}
+
+          {(demoMode || skipDateWaits !== null) && (
+            <section aria-labelledby="presenter-settings-title" className="rounded-2xl border border-amber-200 bg-amber-50/60">
+              <h2 id="presenter-settings-title" className="eyebrow px-4 pt-3 !text-amber-900">Presenter settings</h2>
+              <div className="divide-y divide-amber-200">
+                {skipDateWaits !== null && (
+                  <PresenterSwitch
+                    icon={CalendarOff}
+                    title="Skip date waits"
+                    hint="On: steps go ahead without waiting for a real date (a panel verdict before the defense day, AWOL before the leave ends). Applies to every account. Off: the real date rules."
+                    checked={skipDateWaits}
+                    stateId="skip-date-waits-state"
+                    onChange={(wanted) => {
+                      setSkipDateWaits(wanted);
+                      setSkipNote("");
+                      api.setDemoSettings({ skip_date_waits: wanted })
+                        .then((result) => setSkipDateWaits(Boolean(result.skip_date_waits)))
+                        .catch((error) => {
+                          setSkipDateWaits(!wanted);
+                          setSkipNote(error?.message || "Could not change this. Try again.");
+                        });
+                    }}
+                  />
+                )}
+                {skipNote && <p role="status" className="px-4 pb-3 text-xs font-semibold text-amber-900">{skipNote}</p>}
+                <PresenterSwitch
+                  icon={Compass}
+                  title="Demo guide panel"
+                  hint="On: the guided demo list shows here, and after signing in the guide panel and its button show in the top bar. Off: the list is hidden and the app looks as usual. This browser only."
+                  checked={guideOn}
+                  stateId="demo-guide-panel-state"
+                  onChange={(wanted) => {
+                    setGuideEnabled(wanted);
+                    setGuideOn(wanted);
+                  }}
+                />
+              </div>
+            </section>
+          )}
+
+          {demoMode && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/60">
+              <button
+                type="button"
+                onClick={() => setDemoOpen((value) => !value)}
+                aria-expanded={demoOpen}
+                aria-controls="demo-accounts-panel"
+                className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-900">
+                    <PlayCircle className="h-4 w-4" aria-hidden="true" /> Demo accounts
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900">Demo mode</span>
+                  </span>
+                  <span className="mt-0.5 block text-xs text-amber-800">
+                    For presentations only. Expand to see ready-made accounts; nothing is filled in until you choose.
+                  </span>
+                </span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-amber-800 transition-transform ${demoOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+              </button>
+
+              {demoOpen && (
+                <div id="demo-accounts-panel" className="space-y-4 border-t border-amber-200 px-4 pb-4 pt-3">
+                  {demoLoading && <p role="status" className="text-sm text-slate-500">Loading demo accounts…</p>}
+
+                  {demoAccounts.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="field-label">Staff, Dean, Faculty and Student</p>
+                      {sharedPassword && (
+                        <p className="text-xs text-slate-600">
+                          Demo password for every account below:{" "}
+                          <code className="rounded-md bg-white px-1.5 py-0.5 font-mono text-xs text-ink ring-1 ring-slate-200">{sharedPassword}</code>
+                        </p>
+                      )}
+                      <ul className="divide-y divide-amber-100 overflow-hidden rounded-xl border border-amber-100 bg-white">
+                        {demoAccounts.map((account) => (
+                          <li key={account.email} className="flex items-center gap-2 p-2">
+                            <span className="min-w-0 flex-1 px-1">
+                              <span className="block truncate text-sm font-semibold text-ink">{account.label}</span>
+                              <span className="meta block truncate">{account.email} · {account.detail}</span>
+                            </span>
+                            <Button variant="secondary" size="sm" className="shrink-0" onClick={() => fillForm(account)}>
+                              Fill form
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="shrink-0"
+                              onClick={() => quickLogin(account, account.email)}
+                              disabled={Boolean(quickLoginBusy || resetBusy)}
+                              aria-label={`Sign in as ${account.label} (demo)`}
+                            >
+                              {quickLoginBusy === account.email ? "Signing in…" : "Sign in"}
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {demoStudents.length > 0 && (
+                    <div className="space-y-3">
+                      <div>
+                        <p className="field-label">Student workflow demos</p>
+                        <p className="meta mt-1 leading-relaxed">
+                          Arranged in the Graduate School lifecycle sequence. Select a student to sign in, or reset one case for a clean walkthrough.
+                        </p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                        {STUDENT_LIFECYCLE_DEMOS.map((group) => (
+                          <DemoStudentGroup
+                            key={group.workflow}
+                            open={openDemoGroup === group.workflow}
+                            onToggle={() => setOpenDemoGroup((current) => (current === group.workflow ? "" : group.workflow))}
+                            title={group.title}
+                            description={group.description}
+                            icon={group.icon}
+                            students={demoStudents.filter((student) => student.workflow === group.workflow)}
+                            quickLoginBusy={quickLoginBusy}
+                            resetBusy={resetBusy}
+                            onLogin={(student) => quickLogin(student, student.key)}
+                            onReset={resetDemoStudent}
+                          />
+                        ))}
+                      </div>
+                      <div>
+                        <p className="field-label">Standalone processes</p>
+                        <p className="meta mt-1 leading-relaxed">
+                          Leave, return, AWOL or residency, and early subject-withdrawal scenarios that branch from the main student lifecycle.
+                        </p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                        {STANDALONE_STUDENT_DEMOS.map((group) => (
+                          <DemoStudentGroup
+                            key={group.workflow}
+                            open={openDemoGroup === group.workflow}
+                            onToggle={() => setOpenDemoGroup((current) => (current === group.workflow ? "" : group.workflow))}
+                            title={group.title}
+                            description={group.description}
+                            icon={group.icon}
+                            students={demoStudents.filter((student) => student.workflow === group.workflow)}
+                            quickLoginBusy={quickLoginBusy}
+                            resetBusy={resetBusy}
+                            onLogin={(student) => quickLogin(student, student.key)}
+                            onReset={resetDemoStudent}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div aria-live="polite" className="min-h-5">
+                    {demoNotice && (
+                      <p className="flex items-start gap-1.5 text-xs font-semibold leading-relaxed text-brand-700">
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {demoNotice}
+                      </p>
+                    )}
+                    {demoError && <InlineNotice tone="danger">{demoError}</InlineNotice>}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        <section className="card p-5 sm:p-6 lg:sticky lg:top-8" aria-labelledby="sign-in-title">
+          <div className="mb-5">
+            <h2 id="sign-in-title" className="section-title">Sign in</h2>
+            <p className="meta mt-1">Accounts are created by the Graduate School office.</p>
+          </div>
+
+          <form onSubmit={onSubmit} className="space-y-4" autoComplete="on" noValidate>
+            <div>
+              <label htmlFor="login-email" className="field-label">Email</label>
+              <Input
+                id="login-email"
+                type="email"
+                name="email"
+                autoComplete="username"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                aria-invalid={signInError ? true : undefined}
+                aria-describedby={signInError ? "sign-in-error" : undefined}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="login-password" className="field-label">Password</label>
+              <div className="relative">
+                <Input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="current-password"
+                  value={form.password}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  className="pr-12"
+                  aria-invalid={signInError ? true : undefined}
+                  aria-describedby={signInError ? "sign-in-error" : undefined}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((value) => !value)}
+                  className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 cursor-pointer place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 max-sm:h-10 max-sm:w-10"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                </button>
+              </div>
+            </div>
+
+            <Button type="submit" loading={signingIn} icon={signingIn ? undefined : LockKeyhole} className="w-full">
+              {signingIn ? "Signing in…" : "Sign in"}
+            </Button>
+            {/* Under the button, so the message appears without moving anything that was already on screen */}
+            {expired && !signInError && (
+              <InlineNotice tone="warning" id="session-ended">
+                Your session ended — please sign in again.
+              </InlineNotice>
+            )}
+            {signInError && (
+              <InlineNotice tone="danger" id="sign-in-error">
+                {signInError}
+              </InlineNotice>
+            )}
+          </form>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+// One row of the Presenter settings: a title, one line of help, and an On / Off switch (a checkbox with role="switch": keyboard and screen readers work).
+function PresenterSwitch({ icon: Icon, title, hint, checked, onChange, stateId }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 px-4 py-3">
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+          <Icon className="h-4 w-4" aria-hidden="true" /> {title}
+        </span>
+        <span className="mt-0.5 block text-xs text-amber-800">{hint}</span>
+      </span>
+      <span className="flex shrink-0 items-center gap-2">
+        <span data-testid={stateId} className="w-7 text-right text-xs font-semibold text-amber-900">{checked ? "On" : "Off"}</span>
+        <span className="relative h-6 w-11 shrink-0">
+          <input type="checkbox" role="switch" aria-label={title} className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none relative block h-6 w-11 rounded-full bg-slate-400 transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-transform after:content-[''] peer-checked:bg-brand-600 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-amber-500 peer-focus-visible:ring-offset-2"
+          />
+        </span>
+      </span>
+    </label>
+  );
+}
+
+function DemoStudentGroup({ className = "", open, onToggle, title, description, icon: Icon, students, quickLoginBusy, resetBusy, onLogin, onReset }) {
+  const contentId = `demo-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-students`;
+  return (
+    <section className={`overflow-hidden rounded-2xl border border-slate-200 bg-white ${className}`} aria-label={`${title} demo students`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={contentId}
+        className={`flex w-full cursor-pointer items-center justify-between gap-3 bg-slate-50 px-3.5 py-3 text-left transition-colors hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-500 focus-visible:ring-0 focus-visible:ring-offset-0 ${open ? "border-b border-slate-100" : ""}`}
+      >
+        <span className="min-w-0">
+          <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <Icon className="h-4 w-4 text-brand-700" aria-hidden="true" /> {title}
+          </span>
+          <span className="meta mt-1 block leading-relaxed">{description}</span>
+        </span>
+        <span className="inline-flex shrink-0 items-center gap-2">
+          <span className="rounded-full bg-white px-2 py-0.5 text-2xs font-semibold text-slate-500 ring-1 ring-slate-200">
+            {students.length}
+          </span>
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+        </span>
+      </button>
+      {open && (
+      <div id={contentId} className="divide-y divide-slate-100">
+        {students.map((student) => {
+          const isLoggingIn = quickLoginBusy === student.key;
+          const isResetting = resetBusy === student.key;
+          const anyBusy = Boolean(quickLoginBusy || resetBusy);
+          return (
+            <div key={student.key} className="flex items-stretch gap-1.5 p-2">
+              <button
+                type="button"
+                onClick={() => onLogin(student)}
+                disabled={anyBusy}
+                className="min-w-0 flex-1 cursor-pointer rounded-xl px-2 py-2 text-left transition-colors hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-wait disabled:opacity-60"
+                aria-label={`Sign in as ${student.name}, ${title} demo student`}
+              >
+                <span className="block truncate text-sm font-semibold text-ink">
+                  {isLoggingIn ? "Signing in…" : student.name}
+                </span>
+                <span className="meta mt-0.5 block truncate">
+                  {student.student_number} · {student.program_code}
+                </span>
+                <span className="mt-1 flex items-start gap-1 text-2xs font-semibold leading-snug text-brand-700">
+                  <CheckCircle2 className="mt-px h-3 w-3 shrink-0" aria-hidden="true" /> {student.ready_label}
+                </span>
+              </button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => onReset(student)}
+                disabled={anyBusy}
+                className="my-1 shrink-0 self-center"
+                aria-label={`Reset ${student.name}'s ${title} demo data`}
+                title={`Reset ${student.name}'s demo data`}
+              >
+                <RotateCcw className={`h-3.5 w-3.5 ${isResetting ? "animate-spin" : ""}`} aria-hidden="true" />
+                {isResetting ? "Resetting" : "Reset"}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+      )}
+    </section>
+  );
+}

@@ -1,0 +1,423 @@
+1
+00:00:01,100 --> 00:00:06,700
+In this demo, we'll start with the Monitoring Sheet. First, Graduate School staff signs in.
+
+2
+00:00:09,300 --> 00:00:21,900
+Here we have the Monitoring Sheet, under Records. Each row is a student, and each column is a subject. The colours show what is completed, what is enrolled, and what is not taken yet.
+
+3
+00:00:22,800 --> 00:00:34,000
+Let's start by adding a student who is missing from the imported sheet. The window warns that this is a manual entry, and it records who made it and when.
+
+4
+00:00:36,100 --> 00:00:50,299
+The form asks for the student ID and the name. The school year the student started comes already filled in. The same checks as an import still apply, so the same student can't be added twice.
+
+5
+00:00:50,500 --> 00:00:55,399
+And just like that, the student is added, with a Student Portal login.
+
+6
+00:00:56,299 --> 00:01:04,099
+Next, we have the record panel. It lists all eighteen subjects. None are taken yet, and the units are counted automatically.
+
+7
+00:01:05,900 --> 00:01:14,299
+Now Graduate School staff adds a subject, marks it Completed, picks the term from the list, and adds a remark.
+
+8
+00:01:17,000 --> 00:01:25,599
+Notice that both new rows say Manual entry in the Source column. That way, hand-typed data is never mixed up with imported data.
+
+9
+00:01:27,900 --> 00:01:32,299
+If a remark needs fixing, it's a simple edit.
+
+10
+00:01:34,000 --> 00:01:43,700
+What about removing a row? That needs a reason. The subject goes back to not taken, and the removal stays in the history.
+
+11
+00:01:47,000 --> 00:01:59,599
+Speaking of history, here we have the Change history tab. It shows every add, change, and removal: the old value, the new value, who did it, when, and why. That is the audit trail.
+
+12
+00:02:01,299 --> 00:02:08,700
+Back on the grid, the new student now has a Manual tag, and each hand-entered cell shows an orange dot.
+
+13
+00:02:09,699 --> 00:02:18,300
+Now let's compare that with an imported student. Every row here says Imported, because the values come from the official workbook.
+
+14
+00:02:18,500 --> 00:02:29,400
+Changing an imported value needs a reason, and the staff member's name is saved with it. And grades are never typed in here. AIMS stays the official source.
+
+15
+00:02:31,659 --> 00:02:37,659
+Next, we have the Leave of Absence. Meet Daniel, a Master of Arts in Education student.
+
+16
+00:02:38,560 --> 00:02:45,659
+Under Requests, Daniel opens Leave of Absence. Right away, the form shows the limit: two semesters at a time.
+
+17
+00:02:46,659 --> 00:02:54,459
+Here we have a panel that lists every rule the screen follows, each with its page in the Handbook.
+
+18
+00:02:57,959 --> 00:03:02,060
+Now Daniel picks the dates, chooses a reason, and adds a short explanation.
+
+19
+00:03:03,159 --> 00:03:07,359
+Before sending, Daniel gets a summary to check.
+
+20
+00:03:07,560 --> 00:03:12,060
+The request is sent, and now it waits for Graduate School staff.
+
+21
+00:03:12,259 --> 00:03:15,659
+So let's switch over. Graduate School staff signs in.
+
+22
+00:03:17,959 --> 00:03:25,060
+Here we have the Leave of Absence board. Each column is a stage, and each card is a request.
+
+23
+00:03:26,959 --> 00:03:33,759
+Graduate School staff drags the card to In staff review. The server checks every move before it counts.
+
+24
+00:03:40,060 --> 00:03:48,259
+Next is the policy check. It gives advice, either Pass or Needs review. But it never makes the decision. The Dean does.
+
+25
+00:03:52,560 --> 00:03:57,959
+So Graduate School staff forwards the request to the Dean.
+
+26
+00:03:58,159 --> 00:04:03,959
+The card moves to With the Dean, and staff can no longer change it.
+
+27
+00:04:04,159 --> 00:04:07,560
+Now it's the Dean's turn. The Dean signs in.
+
+28
+00:04:15,560 --> 00:04:20,360
+The Dean drags the card to Leave scheduled.
+
+29
+00:04:20,560 --> 00:04:26,959
+And the leave is approved and flagged for the Registrar. The Dean could also have denied it.
+
+30
+00:04:27,659 --> 00:04:35,659
+Back to the office side. Graduate School staff signs in again.
+
+31
+00:04:39,360 --> 00:04:45,060
+For this demo, Graduate School staff starts the leave by hand.
+
+32
+00:04:45,259 --> 00:04:48,659
+Daniel is now on leave, and enrollment is closed.
+
+33
+00:04:49,459 --> 00:04:56,560
+Next, we have the Registrar list. The portal doesn't send e-mail. Graduate School staff sends it the official way.
+
+34
+00:05:02,060 --> 00:05:06,560
+Then Graduate School staff marks the list as sent to the Registrar.
+
+35
+00:05:07,360 --> 00:05:13,860
+Let's check back on Daniel. Daniel signs in one more time.
+
+36
+00:05:14,060 --> 00:05:17,460
+And Daniel's page now shows the status On leave.
+
+37
+00:05:19,959 --> 00:05:28,859
+Now let's look at Readmission, for students coming back from a leave. Therese has been on approved leave, and signs in.
+
+38
+00:05:29,859 --> 00:05:38,459
+Here we have the Readmission page. Enrollment stays closed until the readmission is approved. The leave that is ending is already filled in.
+
+39
+00:05:39,359 --> 00:05:46,559
+The rule says a returning student must write an intent to enroll. That's on page fifty-three of the Handbook.
+
+40
+00:05:49,459 --> 00:06:00,159
+So Therese picks the return semester and gives a reason. There's nothing to tick. The system shows what it already checked in the records, and what staff still need to confirm.
+
+41
+00:06:03,959 --> 00:06:10,159
+The request is sent. It goes to Graduate School staff first, and then to the Dean.
+
+42
+00:06:10,359 --> 00:06:14,159
+Let's switch to the office. Graduate School staff signs in.
+
+43
+00:06:16,459 --> 00:06:23,859
+Here we have the Readmission board. It works the same way, with its own columns. Therese's card is in Submitted.
+
+44
+00:06:28,159 --> 00:06:34,659
+Opening it, the request shows the return semester, the intention, and the leave it's linked to.
+
+45
+00:06:34,859 --> 00:06:48,759
+Next, we have the return checklist. It follows page forty-five of the Handbook. The system already checked the written intention and the subjects left. The Business Office clearance and the interview are for staff to confirm.
+
+46
+00:06:48,959 --> 00:06:56,059
+The policy check also flags an early return. Only the Dean can allow that, so it shows Needs review.
+
+47
+00:06:59,459 --> 00:07:08,159
+When forwarding, Graduate School staff ticks the two office checks. Anything left unticked reaches the Dean as Needs review.
+
+48
+00:07:10,259 --> 00:07:14,459
+Now it's the Dean's turn. The Dean signs in to decide.
+
+49
+00:07:22,559 --> 00:07:27,759
+The Dean approves the return and adds a note.
+
+50
+00:07:27,959 --> 00:07:36,159
+And Therese is active again. Readmission restores the student's standing, but it doesn't enroll any subjects. The Academic Coordinator does that next.
+
+51
+00:07:36,859 --> 00:07:44,559
+Back to the office side. Graduate School staff signs in again.
+
+52
+00:07:44,759 --> 00:07:52,860
+On the staff board, the Academic Coordinator is now the next owner, and the case is flagged for the Registrar.
+
+53
+00:07:53,059 --> 00:08:00,860
+Here we have the same Registrar list as before. Download it, send it, mark it sent, and then mark it acknowledged.
+
+54
+00:08:01,559 --> 00:08:06,159
+Then Therese signs back in.
+
+55
+00:08:06,359 --> 00:08:11,259
+Therese can see the approval, along with the messages from staff and the Dean.
+
+56
+00:08:13,319 --> 00:08:21,219
+Next, we have AWOL, and the return from AWOL. This one starts on the office side. Graduate School staff signs in.
+
+57
+00:08:22,120 --> 00:08:32,419
+Here we have the AWOL and Residency board. It flags cases straight from the imported enrollment records. Nobody marks a student AWOL by hand.
+
+58
+00:08:32,620 --> 00:08:41,919
+The card for Maya Torres is in the AWOL column, waiting on the student. Staff can't move it. Only the student can start a return.
+
+59
+00:08:42,819 --> 00:08:54,519
+Residence limits also apply. A master's student has five years normally, and seven at most. A doctoral student has seven, and nine at most. Time on leave counts too.
+
+60
+00:08:55,620 --> 00:09:03,419
+The card shows the AWOL date, where the flag came from, and the last semester the student enrolled.
+
+61
+00:09:03,620 --> 00:09:07,019
+Now let's see the student's side. Maya signs in.
+
+62
+00:09:08,019 --> 00:09:15,220
+Here we have the Return from AWOL page. It shows the flag. Registration stays restricted until the return is reviewed.
+
+63
+00:09:18,620 --> 00:09:28,120
+The next open semester is already picked, and the last enrolled semester comes from the records. So Maya only writes the intention and the reason.
+
+64
+00:09:30,919 --> 00:09:36,019
+The request is sent. The system checks that Maya is still within the maximum residence.
+
+65
+00:09:36,720 --> 00:09:44,319
+Back to the office side. Graduate School staff signs in again.
+
+66
+00:09:44,519 --> 00:09:50,620
+On the staff board, the card has moved to Return review on its own.
+
+67
+00:09:50,819 --> 00:09:55,620
+Opening it, the request shows the intention and the residence limits.
+
+68
+00:09:59,419 --> 00:10:05,220
+Graduate School staff forwards it to the Dean, with a note.
+
+69
+00:10:07,319 --> 00:10:10,720
+Now it's the Dean's turn. The Dean signs in.
+
+70
+00:10:18,620 --> 00:10:26,419
+The Dean drags the card to Back in the program. The approval restores the student's standing.
+
+71
+00:10:26,620 --> 00:10:28,519
+And Maya is active again.
+
+72
+00:10:29,220 --> 00:10:35,720
+Graduate School staff signs in one last time.
+
+73
+00:10:35,919 --> 00:10:42,019
+Next, the Academic Coordinator is the owner, because enrolling subjects is a separate step.
+
+74
+00:10:44,819 --> 00:10:53,019
+And here we have the Registrar list. It has one report for each approved return. Staff download it and send it officially.
+
+75
+00:10:53,919 --> 00:10:58,220
+Then Maya signs in again.
+
+76
+00:10:58,419 --> 00:11:07,120
+Maya can see the approval. So leave, readmission, and AWOL returns all use the same board, the same request window, and the same Registrar list.
+
+77
+00:11:09,420 --> 00:11:13,519
+Next, we have Reports and Analytics. Graduate School staff signs in.
+
+78
+00:11:16,620 --> 00:11:27,720
+Here we have Reports and Analytics, under Overview. At the top are the filters: program, year started, and period. Below them are the six numbers the office asks about most.
+
+79
+00:11:28,019 --> 00:11:34,519
+First, Behind schedule. It's the share of active students who are running late, compared to a target.
+
+80
+00:11:34,720 --> 00:11:41,420
+Then Median days to decide, compared to the twelve months before. Every number here comes from recorded events.
+
+81
+00:11:42,120 --> 00:11:49,920
+Next, we have Needs attention. It shows one bar per cause. The longest bar affects the most students.
+
+82
+00:11:50,120 --> 00:11:55,720
+Clicking a cause narrows the list to just the students it affects.
+
+83
+00:11:55,920 --> 00:12:05,620
+Show all causes brings the full list back, most delayed first, with the office that can move each student forward. It downloads as Excel or PDF.
+
+84
+00:12:06,920 --> 00:12:15,019
+Next, we have Where students get stuck. It counts the students at each stage, as on time, slow, or stuck.
+
+85
+00:12:15,220 --> 00:12:21,519
+Every count is a button. Click it to see the actual students behind the number.
+
+86
+00:12:22,920 --> 00:12:31,120
+Then Office speed. It shows which offices take longest to close requests. The longest red bar is the office to ask first.
+
+87
+00:12:32,420 --> 00:12:42,519
+Next, we have Records to fix. It lists research students with missing details, such as no adviser. Once a record is fixed, it drops off the list.
+
+88
+00:12:43,820 --> 00:12:48,019
+This next tab shows students by year started and by stage.
+
+89
+00:12:49,320 --> 00:12:54,220
+Then Graduation candidates. It shows who can graduate, and what is still missing.
+
+90
+00:12:55,519 --> 00:12:58,920
+Overdue and pending lists every waiting task, longest first.
+
+91
+00:13:00,320 --> 00:13:06,620
+Defenses shows the ones already held and the ones coming up, with the panel and the verdict.
+
+92
+00:13:08,019 --> 00:13:13,220
+And Registrar changes is the daily list the Registrar needs to apply in AIMS.
+
+93
+00:13:16,120 --> 00:13:23,420
+One last thing. Every filter applies to the whole page. Pick one program, and all the numbers follow.
+
+94
+00:13:25,480 --> 00:13:31,480
+Finally, let's go through the five best features of the portal. Graduate School staff signs in.
+
+95
+00:13:33,080 --> 00:13:49,580
+First, we have rules with a source. Every rule the workflows follow is kept in one register. Each rule shows its page in the Handbook or the Research Protocol, and a label: enforced by the system, documented only, or needs review.
+
+96
+00:13:49,779 --> 00:13:55,080
+Search for a topic, and the matching rules come up, each with its page.
+
+97
+00:14:00,279 --> 00:14:09,779
+Second, we have the Policy Assistant. It answers only from the Graduate School's own documents. Ask a question, and the answer names its source.
+
+98
+00:14:09,980 --> 00:14:17,480
+This site runs without the Gemini key, so this is the offline answer. Clicking the source opens the exact passage.
+
+99
+00:14:22,679 --> 00:14:30,279
+Third, we have panel matching that explains itself. Each faculty member gets a score out of one hundred.
+
+100
+00:14:30,480 --> 00:14:38,679
+The breakdown is right on screen: expertise, availability, and workload, with the passage that matched. A person still makes the final choice.
+
+101
+00:14:44,580 --> 00:14:56,679
+Fourth, we have scheduling that checks before it books. It reads everyone's availability and suggests the best shared times.
+
+102
+00:14:56,879 --> 00:15:05,779
+Hard stops, like a panelist or a room booked twice, can't be overridden. Warnings, like a short lead time, need a reason on record.
+
+103
+00:15:08,379 --> 00:15:17,679
+Fifth, we have shared boards. Leave, readmission, AWOL, withdrawal, practicum, and graduation all run on the same kind of board, and every move is recorded.
+
+104
+00:15:21,580 --> 00:15:27,679
+And Reports and Analytics are built from those records. Nothing is typed in by hand.
+
+105
+00:15:27,879 --> 00:15:40,180
+To sum up, each feature takes data the Graduate School already has, adds the policy behind it, and turns it into a decision, a warning, or a number to track.
+
+106
+00:15:40,379 --> 00:15:52,279
+To be honest about the limits: the portal doesn't send e-mail, Google Calendar is optional, official data comes only from AIMS, and rules marked Needs review still wait for validation. Thank you.

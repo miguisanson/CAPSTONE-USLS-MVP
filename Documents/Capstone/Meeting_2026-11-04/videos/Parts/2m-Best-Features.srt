@@ -1,0 +1,51 @@
+1
+00:00:01,100 --> 00:00:07,099
+Finally, let's go through the five best features of the portal. Graduate School staff signs in.
+
+2
+00:00:08,699 --> 00:00:25,199
+First, we have rules with a source. Every rule the workflows follow is kept in one register. Each rule shows its page in the Handbook or the Research Protocol, and a label: enforced by the system, documented only, or needs review.
+
+3
+00:00:25,399 --> 00:00:30,699
+Search for a topic, and the matching rules come up, each with its page.
+
+4
+00:00:35,899 --> 00:00:45,399
+Second, we have the Policy Assistant. It answers only from the Graduate School's own documents. Ask a question, and the answer names its source.
+
+5
+00:00:45,600 --> 00:00:53,099
+This site runs without the Gemini key, so this is the offline answer. Clicking the source opens the exact passage.
+
+6
+00:00:58,299 --> 00:01:05,899
+Third, we have panel matching that explains itself. Each faculty member gets a score out of one hundred.
+
+7
+00:01:06,099 --> 00:01:14,299
+The breakdown is right on screen: expertise, availability, and workload, with the passage that matched. A person still makes the final choice.
+
+8
+00:01:20,200 --> 00:01:32,299
+Fourth, we have scheduling that checks before it books. It reads everyone's availability and suggests the best shared times.
+
+9
+00:01:32,500 --> 00:01:41,399
+Hard stops, like a panelist or a room booked twice, can't be overridden. Warnings, like a short lead time, need a reason on record.
+
+10
+00:01:44,000 --> 00:01:53,299
+Fifth, we have shared boards. Leave, readmission, AWOL, withdrawal, practicum, and graduation all run on the same kind of board, and every move is recorded.
+
+11
+00:01:57,200 --> 00:02:03,299
+And Reports and Analytics are built from those records. Nothing is typed in by hand.
+
+12
+00:02:03,500 --> 00:02:15,800
+To sum up, each feature takes data the Graduate School already has, adds the policy behind it, and turns it into a decision, a warning, or a number to track.
+
+13
+00:02:16,000 --> 00:02:27,900
+To be honest about the limits: the portal doesn't send e-mail, Google Calendar is optional, official data comes only from AIMS, and rules marked Needs review still wait for validation. Thank you.

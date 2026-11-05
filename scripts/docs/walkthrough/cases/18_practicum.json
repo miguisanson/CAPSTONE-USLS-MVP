@@ -1,0 +1,399 @@
+{
+ "slug": "practicum",
+ "title": "Practicum - MOA, hours incomplete, additional certificates, Dean review",
+ "kind": "live",
+ "part": "2j",
+ "presenter": "Khloe",
+ "owner": "Student, GS Staff, Academic Coordinator, Dean",
+ "duration": "12 min",
+ "story": [
+  "Paolo Ramirez is a Master of Science in Guidance and Counseling (MSGC) student. Practicum applies only to Psychology programs and MSGC; students of other programs never appear on the practicum screens. Paolo already passed the automatic eligibility check (courses and research done), so he starts at his MOA. He sends his signed MOA, the practicum is marked in progress, and then he documents only 120 of the 200 required hours.",
+  "The platform records the case as Hours Incomplete and does not let the practicum be completed. GS Staff forward the documents, the Academic Coordinator asks for additional certificates, Paolo resubmits with 200 hours and a new certificate, the Coordinator verifies completion and sends the status report to the Dean, and the Dean marks it reviewed. The original files stay in the file history all the way. The staff and Coordinator screens are the shared Practicum board: the same Board and Table toggle, case window and confirmation window as the other process pages."
+ ],
+ "accounts": [
+  [
+   "Student demo (MSGC)",
+   "practicum.paolo@usls.edu.ph",
+   "Paolo Ramirez, 2690202. Andrea Villanueva (practicum.andrea@usls.edu.ph, Psychology) is the other practicum student and is not used here"
+  ],
+  [
+   "Graduate School Staff",
+   "staff@usls.edu.ph",
+   "Opens 8 · Practicum, forwards the MOA and the documents"
+  ],
+  [
+   "Academic Coordinator",
+   "academic@usls.edu.ph",
+   "Marks the practicum in progress, requests certificates, verifies completion, sends the report to the Dean"
+  ],
+  [
+   "Dean",
+   "dean@usls.edu.ph",
+   "Practicum Reports, marks the report reviewed"
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   "same for every demo account"
+  ]
+ ],
+ "data": [
+  [
+   "Practicum site",
+   "Guidance and Counseling Partner Center"
+  ],
+  [
+   "Supervisor",
+   "Ms. Angela Cruz"
+  ],
+  [
+   "MOA file",
+   "Paolo_Ramirez_Signed_MOA.pdf"
+  ],
+  [
+   "Required hours",
+   "200 (shown by the system)"
+  ],
+  [
+   "First completion",
+   "120 completed hours; Paolo_Ramirez_Initial_Practicum_Certificates.pdf; remark \"Initial certificates covering 120 completed practicum hours.\""
+  ],
+  [
+   "Coordinator request",
+   "Only 120 of the required 200 practicum hours are documented. Upload a new certificate covering the remaining hours."
+  ],
+  [
+   "Resubmission",
+   "200 completed hours; Paolo_Ramirez_Additional_Practicum_Certificate.pdf; remark \"The additional certificate covers the remaining 80 practicum hours.\""
+  ],
+  [
+   "Dean review comment",
+   "Practicum completed: 200 of 200 hours documented. Reviewed."
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - MOA",
+   "intro": "Paolo's demo account is reset first, so the case starts at Not submitted. The PDFs for this case are small generated files.",
+   "steps": [
+    {
+     "text": "Sign in as Paolo and click **Practicum** in the sidebar. The page reads **Not submitted** and the blue notice says **Psychology and MSGC students only**: his program, MSGC, is within the scope. **Eligibility Check / Pre-Practicum Requirements** is already **Completed** (every check **Verified**).",
+     "shots": [
+      {
+       "id": "practicum-01",
+       "caption": "Practicum page: eligibility verified, MOA Submission next."
+      }
+     ]
+    },
+    {
+     "text": "Scroll to **MOA Submission**. Type the **Practicum site / company** and the **Supervisor name**, choose the MOA PDF in **Practicum MOA PDF** and write a note in **Remarks for the reviewer**.",
+     "shots": [
+      {
+       "id": "practicum-02",
+       "caption": "MOA stage filled in."
+      }
+     ]
+    },
+    {
+     "text": "Click **Submit MOA stage**. Every student send now asks first: the window **Send this request?** shows the site and \"Check these details before you send.\" Click **Send request**.",
+     "shots": [
+      {
+       "id": "practicum-03",
+       "caption": "The Send this request? window."
+      },
+      {
+       "id": "practicum-04",
+       "caption": "After sending: status MOA Submitted and the green Request sent notice."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as GS Staff and open **8 · Practicum**. The page is a board of columns (**Awaiting Submission**, **Submitted**, **Eligibility Review**, **Documents Review**, **In Progress**, **Completion Review**, **Completed**, **Returned**). Paolo's card is in **Submitted**: site, 0/200 hrs, one visible message, **Next: Graduate School Staff**.",
+     "shots": [
+      {
+       "id": "practicum-05",
+       "caption": "Staff board: Paolo's card in Submitted."
+      }
+     ]
+    },
+    {
+     "text": "Click **View details** on Paolo's card. The case window shows Eligibility Eligible, MOA Uploaded, Documents Missing, hours 0/200, the supervisor, the automatic eligibility checks (all **Passed**) and the **MOA** link. The footer has **Close details**, **Reset demo case** (staff, demo mode only: it restores the case to the start), **Message / Return** and the step button.",
+     "shots": [
+      {
+       "id": "practicum-06",
+       "caption": "Case window with the MOA submitted."
+      }
+     ]
+    },
+    {
+     "text": "Click **Forward to Academic Coordinator**. The confirmation window **Confirm: Forward to Academic Coordinator** shows **MOA Submitted** to **MOA Under Review** and an optional **Comment sent with this action**; click **Forward to Academic Coordinator** in it. The board says \"Saved. The student record, queue, and monitoring indicators were updated.\" and the card moves to **Eligibility Review**.",
+     "shots": [
+      {
+       "id": "practicum-07",
+       "caption": "Confirmation window: MOA Submitted to MOA Under Review."
+      },
+      {
+       "id": "practicum-08",
+       "caption": "Result: the card is in Eligibility Review."
+      }
+     ]
+    },
+    {
+     "text": "Click **Table** above the board to see the same students as one table (Student, Eligibility, MOA, Documents, Hours, Coordinator, Dean report, Action), then click **Board** to go back. The Board and Table toggle is on every process page.",
+     "shots": [
+      {
+       "id": "practicum-09",
+       "caption": "The Table view of the same list."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as the Academic Coordinator and open **8 · Practicum**. Paolo's card is in **Eligibility Review** with **Next: Academic Coordinator**. Click **View details**: the MOA is Under Review and the step button is **Mark practicum in progress**. Click **Close details**.",
+     "shots": [
+      {
+       "id": "practicum-10",
+       "caption": "Coordinator's board: the card is in Eligibility Review."
+      },
+      {
+       "id": "practicum-11",
+       "caption": "Case window: MOA Under Review, Mark practicum in progress offered."
+      }
+     ]
+    },
+    {
+     "text": "Drag Paolo's card to the **In Progress** column. A card can only be dropped on the column its next step leads to, and the drop opens the same window as the button: **Confirm: Mark practicum in progress** (**MOA Under Review** to **Practicum In Progress**). Click **Mark practicum in progress**. The card stays in In Progress, now showing **Waiting for: Student**.",
+     "shots": [
+      {
+       "id": "practicum-12",
+       "caption": "Confirmation after the drop."
+      },
+      {
+       "id": "practicum-13",
+       "caption": "The card is in In Progress."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - Only 120 of 200 hours",
+   "steps": [
+    {
+     "text": "Sign back in as Paolo and open **Practicum**. The status is **Practicum In Progress**, the newest message (green) is the Coordinator's status change, **MOA Submission** is **Completed** and read-only, and **Practicum Document Submission** (Step 3) is the **Current stage**.",
+     "shots": [
+      {
+       "id": "practicum-14",
+       "caption": "Step 3 is open after the Coordinator marked the practicum in progress."
+      }
+     ]
+    },
+    {
+     "text": "Enter **Completed hours** 120, choose the initial certificates PDF and add the remark in **Remarks for the reviewer**.",
+     "shots": [
+      {
+       "id": "practicum-15",
+       "caption": "Only 120 hours entered, with the initial certificates."
+      }
+     ]
+    },
+    {
+     "text": "Click **Submit completion stage** and **Send request** in the window. The status becomes **Hours Incomplete**: the platform records the shortfall and does not treat the practicum as complete. The green notice says the documents were submitted and staff will forward them.",
+     "shots": [
+      {
+       "id": "practicum-16",
+       "caption": "Status Hours Incomplete after the 120-hour submission."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff, reopen **8 · Practicum**. Paolo's card is in **In Progress** showing 120/200 hrs. Click **View details**: Documents Pending Review, hours 120/200 and the button **Forward documents to Academic Coordinator**.",
+     "shots": [
+      {
+       "id": "practicum-17",
+       "caption": "Staff board: Paolo's card with 120/200 hrs."
+      },
+      {
+       "id": "practicum-18",
+       "caption": "Case window: Hours Incomplete, 120/200."
+      }
+     ]
+    },
+    {
+     "text": "Click **Forward documents to Academic Coordinator** and confirm in **Confirm: Forward documents to Academic Coordinator** (**Hours Incomplete** to **Documents Under Review**).",
+     "shots": [
+      {
+       "id": "practicum-19",
+       "caption": "Confirmation window."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - The Coordinator requests additional certificates",
+   "steps": [
+    {
+     "text": "As the Academic Coordinator, open **8 · Practicum** and click **View details** on Paolo's card. It shows Documents Under Review, hours 120/200 and the step button **Request additional certificates**, with the red note **Incomplete hours**.",
+     "shots": [
+      {
+       "id": "practicum-20",
+       "caption": "Coordinator's case window with 120/200 hours."
+      }
+     ]
+    },
+    {
+     "text": "Click **Request additional certificates**. This window requires a reason: type it in **Message / reason** (\"Required for this step.\") and click **Request additional certificates**. The card moves to **In Progress** with status Additional Certificates Requested and **Waiting for: Student**.",
+     "shots": [
+      {
+       "id": "practicum-21",
+       "caption": "Confirmation window with the reason."
+      },
+      {
+       "id": "practicum-22",
+       "caption": "Result: the card is back in In Progress, waiting for the student."
+      }
+     ]
+    },
+    {
+     "text": "Sign back in as Paolo and open **Request Center**: the Practicum request now shows **Additional Certificates Requested**.",
+     "shots": [
+      {
+       "id": "practicum-23",
+       "caption": "Request Center."
+      }
+     ]
+    },
+    {
+     "text": "Open **Practicum**. The Coordinator's message is the newest post (green). Step 3 is reopened and its upload is labelled **New additional certificates / hours proof PDF**; the earlier PDF stays under **Already submitted**.",
+     "shots": [
+      {
+       "id": "practicum-24",
+       "caption": "Practicum page with the green message and Step 3 reopened."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part D - Resubmission, verification and Dean review",
+   "steps": [
+    {
+     "text": "Enter **Completed hours** 200, choose the additional certificate PDF and add the resubmission remark.",
+     "shots": [
+      {
+       "id": "practicum-25",
+       "caption": "200 hours and the additional certificate."
+      }
+     ]
+    },
+    {
+     "text": "Click **Submit completion stage** and **Send request** (the step is open again, so the button keeps its name). Step 3 now reads \"200/200 hours - 2 submitted certificate files\" and both PDFs are listed.",
+     "shots": [
+      {
+       "id": "practicum-26",
+       "caption": "After the resubmission."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff, open Paolo's case with **View details** and click **Forward documents to Academic Coordinator** again, then confirm. The card is now in **Documents Review**.",
+     "shots": [
+      {
+       "id": "practicum-27",
+       "caption": "Staff forward the updated documents."
+      }
+     ]
+    },
+    {
+     "text": "As the Academic Coordinator, the card is in **Documents Review** with 200/200 hrs. Click **View details**: hours 200/200, **Certificate file 1** and **Certificate file 2**, and the button **Verify completion**.",
+     "shots": [
+      {
+       "id": "practicum-28",
+       "caption": "Coordinator's board: Documents Review, 200/200 hrs."
+      },
+      {
+       "id": "practicum-29",
+       "caption": "Case window: 200/200 and two certificate files."
+      }
+     ]
+    },
+    {
+     "text": "Click **Verify completion** and confirm (**Documents Under Review** to **Completed**). The card moves to **Completion Review**.",
+     "shots": [
+      {
+       "id": "practicum-30",
+       "caption": "Confirmation window."
+      },
+      {
+       "id": "practicum-31",
+       "caption": "The card is in Completion Review."
+      }
+     ]
+    },
+    {
+     "text": "Open the card again with **View details**, click **Send status report to Dean** and confirm (**Completed** to **Report Sent to Dean**). The card moves to **Completed** with the tag **Ready for Dean review** and **Next: Dean**.",
+     "shots": [
+      {
+       "id": "practicum-32",
+       "caption": "Confirmation window."
+      },
+      {
+       "id": "practicum-33",
+       "caption": "The report is with the Dean."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as the Dean and open **Practicum Reports**. The page shows a board with three columns, **With the Dean**, **Returned** and **Reviewed**, and Paolo's card is in **With the Dean** with the status Report Sent to Dean and the Dean's \"N waiting\" count. Another seeded report (Isabel Mendoza) is in the same column and is not used.",
+     "shots": [
+      {
+       "id": "practicum-34",
+       "caption": "Dean's Practicum Reports with the report waiting."
+      }
+     ]
+    },
+    {
+     "text": "Click **View details** on Paolo's card. The report page (**Practicum status report** for Paolo Ramirez) shows the summary (200/200 hours, certificates, remark), **View stage history**, the three submitted files (MOA, initial certificates, additional certificate), the whole case discussion, and at the bottom **Review comment** with the buttons **Mark reviewed** and **Return for revision**.",
+     "shots": [
+      {
+       "id": "practicum-35",
+       "caption": "The Dean's report page."
+      }
+     ]
+    },
+    {
+     "text": "Type a **Review comment** and click **Mark reviewed**. The window **Confirm: Mark reviewed** shows **Report Sent to Dean** to Approved / reviewed with the recorded comment; click **Mark reviewed**. Back on **Practicum Reports**, the card is in **Reviewed** with the tag **Dean Reviewed** and \"Finished - nothing more to do\".",
+     "shots": [
+      {
+       "id": "practicum-36",
+       "caption": "Confirmation window."
+      },
+      {
+       "id": "practicum-37",
+       "caption": "Dean Reviewed."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff, the card is in **Completed** with 200/200 hrs. Click **View details** and scroll to **Submitted file history**: the MOA, the initial certificates and the additional certificate are all kept, and the footer says no Graduate School Staff action is currently due.",
+     "shots": [
+      {
+       "id": "practicum-38",
+       "caption": "Staff board: Completed."
+      },
+      {
+       "id": "practicum-39",
+       "caption": "Submitted file history keeps every upload."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "Practicum is limited to Psychology and MSGC students. The rules panel on the practicum screens lists five rules, all marked as needing review (prototype values pending Graduate School validation).",
+  "Staff and the Academic Coordinator use the shared board: a drop opens the same confirmation window as the case-window button, and a card can only be dropped on the column its next step leads to. The Dean's Practicum Reports is a second board of the same kind; its case page has the Review comment box and the two decision buttons.",
+  "The Dean page is read when it opens. If the Dean was already signed in when the Coordinator sent the report, reload the page to see the new card.",
+  "Reset demo case (in the staff case window, demo mode only) restores a practicum case to its start, so the live demo can be repeated."
+ ]
+}

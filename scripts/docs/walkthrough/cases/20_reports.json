@@ -1,0 +1,165 @@
+{
+ "slug": "reports",
+ "title": "Reports and Analytics - what the Graduate School knows about all students at once",
+ "kind": "live",
+ "part": "2l",
+ "presenter": "Migui",
+ "owner": "GS Staff",
+ "duration": "6 min",
+ "story": [
+  "The lifecycle cases follow one student at a time. This case answers the other question: what does the Graduate School know about all of its students at once. Every figure on these screens is computed from the records and recorded events rather than typed in, so the numbers move as the other cases are run. The case reads them off the screen instead of promising fixed values.",
+  "**Reports & Analytics** has seven tabs: **Needs attention**, **Where students get stuck**, **Office speed**, **Records to fix**, **By year started**, **Overdue and pending** and **Registrar changes** (the daily list for the Registrar). Above the tabs, three filters (**Program**, **Year started**, **Period**) and a strip of six numbers apply to every tab that counts students. Each tab adds its own filters, and the lists can be downloaded as an Excel workbook or a PDF where the tab shows the download buttons."
+ ],
+ "accounts": [
+  [
+   "Graduate School Staff",
+   "staff@usls.edu.ph",
+   "Reports & Analytics, all seven tabs"
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   "same for every demo account"
+  ]
+ ],
+ "data": [
+  [
+   "Screen",
+   "Reports & Analytics, under Overview in the staff sidebar"
+  ],
+  [
+   "Tabs",
+   "Needs attention, Where students get stuck, Office speed, Records to fix, By year started, Overdue and pending, Registrar changes"
+  ],
+  [
+   "Downloads",
+   "Download Excel and Download PDF on Needs attention, Records to fix and Overdue and pending; CSV and Print on Registrar changes. Where students get stuck, Office speed and By year started have no download buttons"
+  ],
+  [
+   "Research Coordinator",
+   "Sees three tabs only: Needs attention, Where students get stuck and Records to fix"
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - Open the first report",
+   "steps": [
+    {
+     "text": "Sign in as **staff@usls.edu.ph** and open **Reports & Analytics** under Overview. The page says it shows which students need attention, where they get stuck, how fast offices work, where each year started stands and which records to fix. Above the tabs are the filters **Program**, **Year started** and **Period**, and a strip of six numbers: **Active students**, **Behind schedule**, **Requests waiting more than 7 days (all offices)**, **Median days to decide**, **Defenses held** and **Endorsements sent to the Dean**. Selecting a number opens the students behind it. The first tab, **Needs attention**, opens with a question card, **What is holding students back?**, and a bar chart of the causes, with the same counts as chips and in a table.",
+     "shots": [
+      {
+       "id": "reports-01",
+       "caption": "Reports & Analytics, first tab: Needs attention, with the causes chart."
+      }
+     ]
+    },
+    {
+     "text": "Select one bar or chip in the causes chart (for example the longest bar). The list card **Students who need attention** narrows to that cause and says **Showing only** with the cause name, and a **Show all causes** button appears beside the downloads. The table has the columns Student, Program, Stage, Risk, Main reason, Days in stage and Next owner; each student name links to the student record. The two buttons **Download Excel** and **Download PDF** use the same cause, so the file holds the rows on the screen. The downloaded files are not opened in this walkthrough.",
+     "shots": [
+      {
+       "id": "reports-02",
+       "caption": "Needs attention narrowed to one cause, with Show all causes and the download buttons."
+      }
+     ]
+    },
+    {
+     "text": "Select **Show all causes**. The table shows ten rows a page with paging controls below it. Each column heading is a button: selecting one sorts the table by that column, and the heading shows the sort direction.",
+     "shots": [
+      {
+       "id": "reports-03",
+       "caption": "Second page of the table, with the paging controls."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - The other tabs",
+   "steps": [
+    {
+     "text": "Select the **Where students get stuck** tab. The question card asks **Where do students wait the longest?** A bar for each stage is split into **On time**, **Slow** and **Stuck**, and a line under the chart gives the limits in days. The table shows the same counts for each stage. Selecting a count lists the students in that stage and zone, with the days in stage.",
+     "shots": [
+      {
+       "id": "reports-04",
+       "caption": "Where students get stuck: students per stage, split by how long they have been there."
+      }
+     ]
+    },
+    {
+     "text": "Select the **Office speed** tab. The question card asks **Which offices are slow to close requests?** Each office has a bar split by how long its open requests have waited (0-7 days and older bands). The table adds the open requests, the median and longest wait now, the number closed, the median days to close and the slowest 10 percent to close. This tab has no download buttons.",
+     "shots": [
+      {
+       "id": "reports-05",
+       "caption": "Office speed: open requests per office, by how long they have waited."
+      }
+     ]
+    },
+    {
+     "text": "Select the **Records to fix** tab. The list card asks **Which research students have records missing?** Three buttons filter the list by what is missing: **All**, **No research record** and **No adviser**, each with its count. The table shows Student, Program, Stage and What is missing. The buttons **Download Excel** and **Download PDF** follow the chosen filter.",
+     "shots": [
+      {
+       "id": "reports-06",
+       "caption": "Records to fix, with the What is missing buttons and the download buttons."
+      }
+     ]
+    },
+    {
+     "text": "Select the **By year started** tab. The question card asks **Where are the students of each year started?** Each bar is one school year students started, split into **On coursework**, **On thesis / dissertation**, **Graduated** and **On leave, AWOL or withdrawn** (this last group is shown apart from the others). The table gives the same counts under the same four headings, plus **All students**. Selecting a count opens the students behind it.",
+     "shots": [
+      {
+       "id": "reports-07",
+       "caption": "By year started: a bar for each year, split into coursework, thesis or dissertation, graduated and the rest."
+      }
+     ]
+    },
+    {
+     "text": "Under the chart, the card **More detail** has three buttons: **Every stage** (the default), **Graduation candidates** and **Defenses**. Selecting **Graduation candidates** shows its own filters, **Stage**, **Eligibility** and **Batch status**, and a table with the eligibility (Eligible or Needs verification), what is missing, the review window, the batch status and the next owner. Selecting **Defenses** shows the filters **Term**, **Status** and **Defense** and the defenses held and upcoming, with the panel and the verdict. The defense process itself is in {case:defense-scheduling} and {case:verdicts}; the batches are in {case:graduation}.",
+     "shots": [
+      {
+       "id": "reports-08",
+       "caption": "More detail: Graduation candidates, with its eligibility and batch filters."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - Overdue and pending, Registrar changes and the students behind a figure",
+   "steps": [
+    {
+     "text": "Select the **Overdue and pending** tab. The filters are **Stage**, **Term**, **Office** and **Type**. The table lists overdue tasks and requests still waiting for an answer, longest wait first, with the student, program, type (for example Pending request), what is waiting, the office that must act (Graduate School Staff, Dean, Student and so on), the date since which it waits and the days waiting. The buttons **Download Excel** and **Download PDF** use the same filters.",
+     "shots": [
+      {
+       "id": "reports-09",
+       "caption": "Overdue and pending: overdue tasks and pending requests, by office."
+      }
+     ]
+    },
+    {
+     "text": "Select the **Registrar changes** tab. The card **Daily changes** lists every change made in this system on the chosen date that the Registrar must apply in AIMS. It has a date box, **CSV** and **Print** buttons, three counters (**Changes today**, **Sent to Registrar**, **Not yet sent**) and a table in which each change has a **Mark as sent** button that turns to **Sent**. In this run nothing had been changed yet that day, so the screen reads **No changes on this date** and CSV and Print are greyed out; after the enrollment and withdrawal cases have been run the list fills. Marking a change as sent was not pressed in this walkthrough.",
+     "shots": [
+      {
+       "id": "reports-10",
+       "caption": "Registrar changes: the daily list, empty in this run."
+      }
+     ]
+    },
+    {
+     "text": "Open the students behind any figure. Each count in a table, and each bar in a chart, opens a window that lists the students behind it, with the student name linked to the student record. This is how a number on a chart is checked against real records. The strip of six numbers works the same way; for example, selecting **Active students** opens the list of active students for the filters chosen at the top.",
+     "shots": [
+      {
+       "id": "reports-11",
+       "caption": "The students behind a figure, opened from a count."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "The screens are measurements of the current records, not constants. Read the figures off the screen; the numbers in the text come from earlier capture runs and will differ after other cases are run.",
+  "Risk is shown from monitoring signals; where the official risk rules are not confirmed it reads Not Yet Assessed rather than an invented High, Medium or Low.",
+  "The Research Coordinator sees only three tabs (Needs attention, Where students get stuck and Records to fix). Analytics charts are no longer a separate tab; each chart sits on the tab that answers its question.",
+  "Rewritten 2026-11-04 to match frontend/src/pages/Reports.jsx and frontend/src/pages/reports/. The screenshot captions are the old ones until the case is captured again."
+ ]
+}

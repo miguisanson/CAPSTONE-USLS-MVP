@@ -1,0 +1,82 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+My Progress
+
+ACADEMICS
+
+Enrollment
+Graduation Endorsement
+
+RESEARCH
+
+Research Progress
+Research Adviser
+Defense Schedule
+Research Calendar
+
+REQUESTS
+
+Request Center
+Leave of Absence
+Readmission
+Return from AWOL
+Subject Withdrawal
+
+SUPPORT
+
+Messages
+Documents
+Activity Log
+Policy Assistant
+My Profile
+
+Student
+
+Your record updates as staff act on your requests. Nothing here changes official grades or enrollment.
+
+Student Portal
+Policy Assistant
+Miguel Yu · MAED
+MY
+Policy Assistant
+
+Answers come only from the uploaded policy documents and your own records, with the sources shown. For guidance only: final decisions stay with authorized personnel.
+
+Assistant
+
+Policy documents and your own record only
+
+Hi! I'm the Policy Assistant. I answer from the Graduate School policy documents and the record connected to your account, and show the document, page and section behind every policy answer. Ask about a procedure, a form or a deadline, or what your next step is.
+Can I file a leave of absence during the last two weeks of the semester?
+A student may file an LOA if the student withdraws after two weeks that the classes have already elapsed. 3) no leave of absence shall be granted during the semester within two (2) weeks before the last day of classes. A student returning from a leave of absence (LOA) or absence without leave (AWOL) shall declare his/her intention to enroll by writing to the University Registrar through the Graduate School Dean.
+Source: Graduate School Handbook 2022-2023 (p. 52, 3.4 ATTENDANCE - Leave of Absence)
+Offline answer
+Found by keyword search; Gemini was not used
+
+The assistant is answering from the policy documents without AI right now.
+
+SOURCES (1)
+
+Graduate School Handbook 2022-2023
+Page 52 · 3.4 ATTENDANCE › Leave of Absence
+What is my next step?
+What am I missing?
+What do I need before a research defense?
+Explain the leave, AWOL, and residency rules for students.
+
+Enter to send · Shift+Enter for a new line
+
+How this works
+Policy questions are answered only from the retrieved passages of the policy documents.
+Every answer lists its sources. Open one to see the document, page, section and exact passage.
+If the documents do not cover a question, it says so instead of guessing.
+Questions like “what is my next step?” use only your own record or queue.
+An “Offline answer” label means Gemini was not used and the answer is a keyword match.
+Private and read-only: the assistant uses the record connected to your signed-in account. It cannot see other students or change grades, enrollment, requests or official records.

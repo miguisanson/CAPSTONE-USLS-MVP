@@ -1,0 +1,226 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+My Progress
+
+ACADEMICS
+
+Enrollment
+Graduation Endorsement
+
+RESEARCH
+
+Research Progress
+Research Adviser
+Defense Schedule
+Research Calendar
+
+REQUESTS
+
+Request Center
+Leave of Absence
+Readmission
+Return from AWOL
+Subject Withdrawal
+
+SUPPORT
+
+Messages
+Documents
+Activity Log
+Policy Assistant
+My Profile
+
+Student
+
+Your record updates as staff act on your requests. Nothing here changes official grades or enrollment.
+
+Student Portal
+Research Progress
+Miguel Yu · MAED
+MY
+Research Progress
+Missing Requirements
+
+Upload your milestone files, submit them for review, and follow your title, proposal and final defense requirements.
+
+All requests
+Adviser and panel
+
+Assigned after Panel Matching; scheduling opens once a panel is in place
+
+Defense schedule
+
+Adviser: Dr. Celeste Tan
+
+No panel has been matched yet. The Research Coordinator does this after your title-defense package is endorsed.
+
+Rules applied on this screen
+8 rules from the Graduate School policies · 1 needs review
+
+Comprehensive exam must be passed before the title defense
+
+Yes
+
+A student who passes the comprehensive examination confers with the Dean for an adviser and is advanced to candidacy. Research stages (Form 1 title defense onward) stay locked until the comprehensive exam is marked Passed.
+
+Source: Graduate School Handbook 2022-2023, p. 57 (Comprehensive Examinations - Advancement to Candidacy)
+
+Enforced by the system
+
+Thesis / project paper writing period
+
+2 years
+
+Thesis or project paper writing must be finished within two years from the title defense (or proposal defense). The proposal must be submitted and defended within one year of the title defense.
+
+Source: Graduate School Handbook 2022-2023, p. 58 (Project Paper, Thesis & Dissertation - Standards)
+
+Documented only
+
+The deadline is tracked by staff; the system shows time in stage but does not block on it.
+
+Dissertation writing period
+
+3 years
+
+Dissertation writing must be finished within three years from the title defense. The proposal must be submitted and defended within one year of the title defense.
+
+Source: Graduate School Handbook 2022-2023, p. 58 (Project Paper, Thesis & Dissertation - Standards)
+
+Documented only
+
+The deadline is tracked by staff; the system shows time in stage but does not block on it.
+
+Similarity index of at most 15%
+
+15 percent
+
+The final draft undergoes Turnitin scanning and a similarity index rating of not more than 15% is required before the paper goes to the editor.
+
+Source: Graduate School Research Protocol AY 2024-2025 (Closed-door Final Defense - After the defense (Turnitin scanning))
+
+Documented only
+
+Staff check the uploaded Turnitin certificate; the percentage is not read from the file automatically.
+
+One change of title only
+
+1 requests
+
+A student may request only one change of the title of the study, before applying for the proposal defense.
+
+Source: Graduate School Research Protocol AY 2024-2025 (Change of Title of the Study)
+
+Documented only
+
+Not tracked by the system yet; the panel and the Research Coordinator enforce it.
+
+One change of research adviser only
+
+1 requests
+
+A student may request only one change of research adviser, before the proposal defense.
+
+Source: Graduate School Research Protocol AY 2024-2025 (Request for Change of Research Adviser)
+
+Enforced by the system
+
+Advising contract forms within 5 days of Form 3.1
+
+5 days
+
+Once the research adviser is appointed, the student emails Form 3.2 (Research Timetable) and Form 3.3 (Thesis/Dissertation Advising Contract) to the GS Research Coordinator within 5 days of receiving Form 3.1. The adviser tracker shows the due date and flags it when it is overdue.
+
+Source: Graduate School Research Protocol AY 2024-2025 (Designation of the Research Adviser - II. Advising Contract)
+
+Enforced by the system
+
+Adviser signature waiting: remind after 3 days
+
+3 days
+
+An adviser is reminded when an advisee's manuscript or endorsement has waited for their signature this many days.
+
+Source: Prototype rule — pending Graduate School validation
+
+Enforced by the system
+Needs review
+
+AUTOMATICALLY DETECTED STAGE
+
+Title Defense
+
+Complete Form 1 and upload three concept papers. Academic Coordinator endorsement and panel matching then update automatically.
+
+Missing Requirements
+
+RESEARCH TITLE
+
+Research title pending Form 1 submission
+
+ADVISER
+
+Dr. Celeste Tan
+
+Title Defense
+Proposal Defense
+Final Defense
+Completion
+Research title from uploaded Form 1 *
+This fills automatically after the Form 1 application PDF is uploaded below.
+
+Files you upload
+
+Only these items require action from you for this milestone.
+
+Form 1 application
+
+The completed application for title defense.
+
+0 of 1 file uploaded
+
+Upload required
+Upload PDF
+
+Concept papers
+
+Upload each of the three concept papers as a separate PDF. These files are used for panel matching.
+
+0 of 3 files uploaded
+
+Upload required
+Upload PDF
+
+Completed by staff or the system
+
+These update automatically after review, panel matching, or scheduling.
+
+Academic Coordinator endorsement
+
+Recorded by the Academic Coordinator after reviewing the submission.
+
+Pending
+
+Confirmed title defense schedule
+
+Added automatically after staff confirms a shared title defense schedule.
+
+Pending confirmed schedule
+
+Title defense result
+
+Recorded by the panel chair after the scheduled title defense.
+
+Pending confirmed schedule
+Message to the Research Coordinator
+Optional context for this submission.
+Submit Title Defense for review
+
+Upload all required files before submitting this milestone.

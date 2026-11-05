@@ -1,0 +1,157 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Leave of Absence
+Grace Fernandez · Graduate School Staff
+3
+GF
+Leave of Absence
+
+Record an LOA application and route the Dean decision. Time on leave still counts toward the maximum residence.
+
+How this works
+View recent activity
+Rules applied on this screen
+9 rules from the Graduate School policies · 3 need review
+
+1 In staff review, 2 With the Dean, 1 Leave scheduled, 2 On leave, 1 Ended
+
+Dragging a card to another column does the same as the buttons in its request window. On a keyboard or phone, use "Move to…" on the card.
+
+Refresh leave dates
+Daniel Fernandez: Review started.
+Search requests by name, student number or program
+All programs
+MAED
+MIT
+MSCS
+MSN
+All statuses
+In staff review
+Closed
+Leave scheduled
+With the Dean
+On leave
+All reasons
+Employment / professional obligation
+Family emergency
+Medical / health
+Showing 1 of 7 requests
+Clear 1 filter
+Board
+Table
+Requests
+	STUDENT	TYPE
+	WHAT IT IS ABOUT	STATUS
+	NEXT
+	NOTES	
+OPEN
+
+	
+
+Daniel Fernandez
+
+GS-2026-LOA-02 · MAED
+
+	Leave of Absence	
+
+AY 2026-2027 2nd Semester to AY 2027-2028 1st Semester (2 semesters)
+
+Reason: Employment / professional obligation
+
+Jan 10, 2027 to Nov 29, 2027
+
+	In staff review	Graduate School Staff	
+Awaiting your review
+	
+View
+Registrar list
+
+Dean-approved requests that go to the Registrar. The portal does not send any email: download the list, email it yourself, then mark it as sent. Mark it as acknowledged when the Registrar confirms.
+
+Download list (Excel)
+Download list (CSV)
+Mark as sent
+Mark as acknowledged
+
+Nothing ticked: a download includes every request still waiting to go out.
+
+Dean-approved requests for the Registrar
+	STUDENT	LEAVE PERIOD	DEAN DECISION	HANDOFF
+	
+
+Therese Lacson
+
+GS-2026-READ-01 · MAED
+
+	AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester (2 semesters)	Sep 8, 2026	Acknowledged
+	
+
+Olivia Cabrera
+
+2460017 · MSCS
+
+	AY 2026-2027 2nd Semester (1 semester)	Oct 13, 2026	Exported - Ready to Send
+	
+
+Hazel Castillo
+
+2360031 · MIT
+
+	AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester (2 semesters)	Sep 8, 2026	Acknowledged
+	
+
+Gabriel Domingo
+
+GS-2026-READ-02 · MAED
+
+	AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester (2 semesters)	Sep 8, 2026	Acknowledged
+Export history

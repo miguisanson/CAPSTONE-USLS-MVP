@@ -1,0 +1,377 @@
+{
+ "slug": "withdrawal",
+ "title": "Subject Withdrawal - handbook window, Dean approval, Registrar list",
+ "kind": "live",
+ "part": "2e",
+ "presenter": "Khloe",
+ "owner": "Student, GS Staff, Dean",
+ "duration": "10 min",
+ "story": [
+  "A student may withdraw from one subject until the end of the second week of classes (14 calendar days from the start of classes). It is not free: 10% of the term's total due is charged in the first week and 20% in the second, and after the window a single subject can no longer be withdrawn. The request needs the Dean's approval. Elena Navarro, an Active MAED student enrolled in three subjects, asks to withdraw from one of them, MAED-MAJ1. The platform judges the request against the dates of the semester, routes it to the Dean through Graduate School staff, and tags the subject as Withdrawn. Her other subjects and her program standing do not change.",
+  "The window is counted from the semester start date kept under Academic Semesters, so the case starts with the rule saying no. The demo database starts the current semester three days before the day of the run, so the window is open. To show the rule saying no, staff first move the recorded start date back to 1 August (the same Edit dates dialog as Part B): every subject of every student is then outside the window and Joshua Lim, an enrolled student, cannot send a request. Staff then correct the recorded start date to three days before the walkthrough, the way they would if the recorded date were wrong, and Elena's request goes through. The start date is set back to its seeded value at the end. These date changes are the demonstration setup, not part of the product's normal flow.",
+  "On the Graduate School and Dean sides, Subject Withdrawal is the same board page as Leave of Absence, Readmission and AWOL & Residency: the same header, the same Board and Table views, the same request window and the same step dialogs. Once you know one of them you know all four."
+ ],
+ "accounts": [
+  [
+   "Student (refused)",
+   "withdrawal.joshua@usls.edu.ph",
+   "Joshua Lim, 2690402 (demo key withdrawal-joshua)"
+  ],
+  [
+   "Student",
+   "withdrawal.elena@usls.edu.ph",
+   "Elena Navarro, 2690401 (demo key withdrawal-elena)"
+  ],
+  [
+   "Graduate School Staff",
+   "staff@usls.edu.ph",
+   "Academic Semesters, Subject Withdrawal board, 3 · Enrollment"
+  ],
+  [
+   "Dean",
+   "dean@usls.edu.ph",
+   "Approvals > Subject Withdrawal"
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   "same for all four accounts"
+  ]
+ ],
+ "data": [
+  [
+   "Demo students reset",
+   "withdrawal-elena, withdrawal-joshua (the reset button on the sign-in page)"
+  ],
+  [
+   "Subject",
+   "MAED-MAJ1"
+  ],
+  [
+   "Reason",
+   "I need to revise my first-semester study load."
+  ],
+  [
+   "Semester",
+   "AY 2026-2027 1st Semester (Current); seeded start is three days before the day of the run; moved to 2026-08-01 for Part A, back to three days before the day of the run in Part B, and restored to that seeded date at the end"
+  ],
+  [
+   "Rule values (Business Rules)",
+   "window 14 days, first-week boundary 7 days, fee 10% first week, 20% second week, 100% after the window (information only)"
+  ],
+  [
+   "Other cards on the board",
+   "Adrian Lim, Hazel Flores and Gian Lacson are other seeded demo requests; they are not touched"
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A - The rule says no (Joshua Lim, window closed)",
+   "steps": [
+    {
+     "text": "With the start date at 1 August (staff set it in the Edit dates dialog before this part), sign in as Joshua Lim and open **Subject Withdrawal** under **Requests** in the sidebar. The header carries the chip **Not submitted** and the line: Withdraw from one enrolled subject until the end of the second week of classes (fees apply). A blue notice, **Subject withdrawal is closed right now**, quotes the handbook rule (14 calendar days, 10% first week, 20% second week, p. 49) and lists each of his three subjects (MAED-COG2, MAED-MAJ2, MAED-MAJ4) with **Withdrawal window closed** and the deadline of Aug 14, 2026. It ends: If the recorded semester dates look wrong, ask Graduate School staff to correct them. There is no form and no Send button: outside the window the page shows only the reason.",
+     "shots": [
+      {
+       "id": "withdrawal-01",
+       "caption": "Joshua's Subject Withdrawal page: the window is closed, so the page shows the reason instead of a form."
+      }
+     ]
+    },
+    {
+     "text": "Open **Rules applied on this screen** (5 rules from the Graduate School policies). It lists the withdrawal window of **14 days** (Handbook p. 49, **Enforced by the system**), the first-week boundary of **7 days**, and the fee steps of 10 percent, 20 percent and 100 percent (**Documented only**: the portal shows the fee as information and does not collect payments).",
+     "shots": [
+      {
+       "id": "withdrawal-02",
+       "caption": "The five rules behind the page, each with its handbook page and whether the system enforces it."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - Staff move the semester start date to three days ago (setup for the demo)",
+   "steps": [
+    {
+     "text": "Sign in as **staff@usls.edu.ph**, open **Academic Semesters** (under Overview) and select **Edit dates** on the row **AY 2026-2027 1st Semester**, marked **Current**. The dialog **Edit dates: AY 2026-2027 1st Semester** says: Only the dates change; the semester name stays as it is. Set **Start date** to three days before today (the capture used 10/30/2026). **End date**, **Planning opens (optional)** and **Planning closes (optional)** stay as they are.",
+     "shots": [
+      {
+       "id": "withdrawal-03",
+       "caption": "Edit dates: only the start date is moved; the semester name stays."
+      }
+     ]
+    },
+    {
+     "text": "Select **Save dates**. A green notice says Updated AY 2026-2027 1st Semester. and the row now shows the new start date.",
+     "shots": [
+      {
+       "id": "withdrawal-04",
+       "caption": "The current semester now starts three days ago, so the first week of classes is still running."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - The student asks to withdraw (Elena Navarro)",
+   "steps": [
+    {
+     "text": "Sign in as Elena Navarro and open **Subject Withdrawal**. This time the page shows a form. The yellow note **When you can withdraw a subject** repeats the rule. The card **Ask to withdraw from a subject** says: Choose one eligible enrolled subject and state the reason for withdrawing. The **Enrolled subject** list shows her subjects, each marked **ELIGIBLE UNTIL** the deadline, and a green card **WITHDRAWAL DEADLINE** shows the date she can still withdraw, that it is the first week of classes and the 10% fee that applies (information only).",
+     "shots": [
+      {
+       "id": "withdrawal-05",
+       "caption": "Elena's page: the form is open, with the deadline and the fee shown at once."
+      }
+     ]
+    },
+    {
+     "text": "In **Enrolled subject** choose **MAED-MAJ1 - Curriculum Development and Evaluation**. The green card stays: Eligible until the deadline, the first week of classes, Fee: A charge of 10% of the term's total due applies, and the rule source (Handbook p. 49).",
+     "shots": [
+      {
+       "id": "withdrawal-06",
+       "caption": "MAED-MAJ1 chosen: eligible, with the fee consequence and its rule."
+      }
+     ]
+    },
+    {
+     "text": "Type the reason **I need to revise my first-semester study load.** in **Reason for withdrawing from this subject**.",
+     "shots": [
+      {
+       "id": "withdrawal-07",
+       "caption": "The reason typed in; the submit button is just below it."
+      }
+     ]
+    },
+    {
+     "text": "Select **Submit withdrawal request**. A box asks **Send this request?** and repeats the subject, the semester and the fee, ending Check these details before you send. Select **Send request**.",
+     "shots": [
+      {
+       "id": "withdrawal-08",
+       "caption": "The check box before anything is sent."
+      }
+     ]
+    },
+    {
+     "text": "The page now carries the chip **Submitted to GS Staff** and a green notice **Request sent**: Submitted within the withdrawal window (first week of classes), and staff will record and forward it to the Dean. Under it, a grey note says You cannot cancel this request yourself, and a card **Subject withdrawal** shows MAED-MAJ1 with the chip **Submitted** and **Waiting for: Graduate School Staff**, plus Subject, Semester, Withdrawal window, Window deadline, **Dean decision** Pending and **Registrar list** Pending.",
+     "shots": [
+      {
+       "id": "withdrawal-09",
+       "caption": "Request sent: the case card shows who has it now."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part D - Graduate School staff record and forward",
+   "steps": [
+    {
+     "text": "Back as **staff@usls.edu.ph**, open **Subject Withdrawal** under **Standalone processes** in the sidebar. The header has **How this works** and **View recent activity**, then **Rules applied on this screen**, a summary line (for example 2 Submitted, 1 With the Dean, 1 Not approved) and a toolbar with **Search students**, **All programs**, **All statuses** and the **Board** / **Table** switch. The board has one column per stage: **Submitted**, **Returned to student**, **With the Dean**, **Subject tagging** and, by the right arrow, **Excel export**, **Exported - email the Registrar** and **Not approved**. Elena's card is in **Submitted**: name, student number, subject, semester and week of classes, **Next: Graduate School Staff**, the chip **Fee 10% of the term**, **View details** and **Move to...**. The other cards are seeded requests of other demo students.",
+     "shots": [
+      {
+       "id": "withdrawal-10",
+       "caption": "The Subject Withdrawal board: Elena's card waits in Submitted."
+      }
+     ]
+    },
+    {
+     "text": "Select **Table**. The same requests appear as a list with the columns **Student**, **Type**, **What it is about**, **Status**, **Next** and **Notes**, and a **View** button on each row. Select **Board** to go back.",
+     "shots": [
+      {
+       "id": "withdrawal-11",
+       "caption": "The Table view of the same four requests."
+      }
+     ]
+    },
+    {
+     "text": "Select **View details** on Elena's card. The request window opens with the title **Elena Navarro** and the chip **Submitted**. **Where this request is** shows six steps (Request submitted, Staff forwards it, Dean decision, Subject tagged Withdrawn, Excel list exported, Emailed to the Registrar) with the current one marked. **The request** lists student, type, subject, semester, reason, **Withdrawal window**, **Window deadline**, the fee consequence (information only) and the academic record effect. Below it are the policy check, messages, files and the Registrar follow-up. The buttons at the bottom are **Close details**, **Record and forward to Dean** and **Return to student**.",
+     "shots": [
+      {
+       "id": "withdrawal-12",
+       "caption": "The request window, the same in all four standalone processes."
+      }
+     ]
+    },
+    {
+     "text": "Scroll to **History** and open **Who did what**. The first entry reads **Withdrawal request submitted** by the student, Not Submitted to Submitted to GS Staff, with the subject, reason, eligibility and fee text.",
+     "shots": [
+      {
+       "id": "withdrawal-13",
+       "caption": "The stage history: who did what, and when."
+      }
+     ]
+    },
+    {
+     "text": "Select **Record and forward to Dean**. A step dialog with the same title opens: Elena Navarro - Subject withdrawal, **Submitted** to **With the Dean**, and the line The request goes to the Dean, who decides. Nothing is decided yet. There is an optional **Note for the Dean**. Select **Record and forward to Dean** in the dialog.",
+     "shots": [
+      {
+       "id": "withdrawal-14",
+       "caption": "The step dialog: where the card goes, and an optional note for the Dean."
+      }
+     ]
+    },
+    {
+     "text": "The board shows a green notice: Elena Navarro: Record and forward to Dean: now 'With the Dean'. Her card is in **With the Dean** with the lock line **Waiting for: Dean**: staff cannot act on it any more.",
+     "shots": [
+      {
+       "id": "withdrawal-15",
+       "caption": "Forwarded: the card moved to With the Dean and is locked for staff."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part E - The Dean decides",
+   "steps": [
+    {
+     "text": "Sign in as **dean@usls.edu.ph** and open **Subject Withdrawal** under **Approvals**. The page is the same board with the chip **2 waiting** beside the title and the Dean's own line: Requests to withdraw from one subject that Graduate School staff forwarded for your decision. Approve, return or deny each one. Elena's card is in **With the Dean**.",
+     "shots": [
+      {
+       "id": "withdrawal-16",
+       "caption": "The Dean's Subject Withdrawal board."
+      }
+     ]
+    },
+    {
+     "text": "Select **View details** on Elena's card. The window now shows the first two steps ticked, **Dean decision** as current, the chip **With the Dean**, and the buttons **Close details**, **Return to student**, **Approve the withdrawal** and **Deny the withdrawal**.",
+     "shots": [
+      {
+       "id": "withdrawal-17",
+       "caption": "The Dean's request window with the three possible decisions."
+      }
+     ]
+    },
+    {
+     "text": "Select **Approve the withdrawal**. The step dialog shows **With the Dean** to **Approved - tag the subject** and says Approval sends the request back to staff to tag the subject as Withdrawn. The note is optional. Select **Approve the withdrawal** in the dialog.",
+     "shots": [
+      {
+       "id": "withdrawal-18",
+       "caption": "The approval dialog."
+      }
+     ]
+    },
+    {
+     "text": "The board notice reads Elena Navarro: Approve the withdrawal: now 'Approved - tag the subject'. Her card is now in **Subject tagging**, waiting for Graduate School Staff.",
+     "shots": [
+      {
+       "id": "withdrawal-19",
+       "caption": "Approved: the card has moved to Subject tagging."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part F - Staff tag the subject and export the list",
+   "steps": [
+    {
+     "text": "As staff, reopen **Subject Withdrawal**. Elena's card is in **Subject tagging**. Select **View details**, then **Tag the subject as Withdrawn**.",
+     "shots": [
+      {
+       "id": "withdrawal-20",
+       "caption": "Staff board: Elena's card is in Subject tagging."
+      }
+     ]
+    },
+    {
+     "text": "The step dialog shows **Approved - tag the subject** to **Tagged - ready for Excel export** and says: The selected subject shows Withdrawn in Official Offered Subjects. Any grade mark is applied by the Registrar. Select **Tag the subject as Withdrawn** in the dialog.",
+     "shots": [
+      {
+       "id": "withdrawal-21",
+       "caption": "The tag dialog."
+      }
+     ]
+    },
+    {
+     "text": "The card moves to the **Excel export** column (use the right arrow above the board) with the chip **Registrar: Pending Excel Export**.",
+     "shots": [
+      {
+       "id": "withdrawal-22",
+       "caption": "Tagged: the card waits in Excel export."
+      }
+     ]
+    },
+    {
+     "text": "Scroll down to the **Registrar list** block. It says Dean-approved withdrawals whose subject is tagged go to the Registrar and that the portal does not send any email. It offers **Prepare Excel export** and the line 1 tagged withdrawal waiting for the Excel list.",
+     "shots": [
+      {
+       "id": "withdrawal-23",
+       "caption": "The Registrar list block, with Prepare Excel export."
+      }
+     ]
+    },
+    {
+     "text": "Select **Prepare Excel export**. The window **Approved subject withdrawals** lists the tagged withdrawals with a tick box: student, subject, semester and deadline, fee (**10% of term (First week)**) and status **Tagged - ready for Excel export**. Elena is already ticked. Select **Download Excel list**; the file approved-subject-withdrawals-<date>.xlsx is saved.",
+     "shots": [
+      {
+       "id": "withdrawal-24",
+       "caption": "The export window with Elena ticked."
+      }
+     ]
+    },
+    {
+     "text": "A window **Withdrawal Excel export complete** says: The file was downloaded successfully. No email was sent by the portal. It names the file and lists the two steps that happen outside the portal: email the withdrawal update to the Registrar and wait for the Registrar's acknowledgement. Select **Got it**.",
+     "shots": [
+      {
+       "id": "withdrawal-25",
+       "caption": "After the export: no email is sent by the portal."
+      }
+     ]
+    },
+    {
+     "text": "Elena's card is now in **Exported - email the Registrar** with the chip **Registrar: Exported - Ready to Send** and **Waiting for: Graduate School Staff**. The board notice says 1 approved subject withdrawal exported as the file name.",
+     "shots": [
+      {
+       "id": "withdrawal-26",
+       "caption": "Exported: the card waits for the manual Registrar email."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part G - The result in Enrollment, and on the student's side",
+   "steps": [
+    {
+     "text": "As staff, open **3 · Enrollment** (under Lifecycle workflows), choose **MAED**, **AY 2026-2027 1st Semester (Current)** and **Navarro, Elena**. In **Official offered subjects**, MAED-MAJ1 now shows **Withdrawn** (Marked withdrawn for the semester; it cannot be silently reactivated in the same semester). MAED-COG1 and MAED-MAJ3 are still **Enrolled**.",
+     "shots": [
+      {
+       "id": "withdrawal-27",
+       "caption": "Enrollment: only MAED-MAJ1 is Withdrawn; her other subjects are unchanged."
+      }
+     ]
+    },
+    {
+     "text": "As Elena, open **Subject Withdrawal** again. The chip reads **Exported - Ready to Send** and the case card shows **Dean decision** Approved, **Registrar list** Exported - Ready to Send and the six steps ticked; **View messages** holds the notes that tell her what happened at each stage.",
+     "shots": [
+      {
+       "id": "withdrawal-28",
+       "caption": "Elena's view of the finished case."
+      }
+     ]
+    },
+    {
+     "text": "Last, as staff, restore the semester start date: **Academic Semesters**, **Edit dates** on the current semester, **Start date** back to three days before the day of the run (the seeded date), **Save dates**.",
+     "shots": [
+      {
+       "id": "withdrawal-30",
+       "caption": "Restoring the start date."
+      },
+      {
+       "id": "withdrawal-31",
+       "caption": "The semester dates are back to normal."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "Withdrawal is a student right transacted with the Registrar. The portal records it and prepares the list; it does not perform it. No email is sent: the export is a file that a person sends, and the status stays Exported - Ready to Send until a person records the acknowledgement.",
+  "Fees are information only. The portal shows the percentage that applies from the handbook (10% first week, 20% second week) and never computes or collects payment; the Business Office settles fees.",
+  "The withdrawn subject receives no grade and no academic penalty in the portal; any W mark is applied by the Registrar. Grades are out of scope.",
+  "A request is judged on the date it was submitted, so it stays valid if reviewers act after the deadline.",
+  "The semester start date is the single input behind the window. Changing it moves every deadline for every student, which is why it is maintained by staff only.",
+  "At Dean Review the card is locked for staff (Waiting for: Dean); only the Dean can approve, deny or return it. Staff can return a request to the student only while it is still Submitted."
+ ]
+}

@@ -1,0 +1,198 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Reports & Analytics
+Grace Fernandez · Graduate School Staff
+1
+GF
+Reports & Analytics
+
+Who is late, where each cohort stands, what is waiting, defenses and graduation. Filter, sort, and download Excel or PDF.
+
+Back to dashboard
+Students at risk
+Cohorts by stage
+Overdue and pending
+Defenses
+Graduation candidates
+Registrar changes
+Analytics
+Program
+Any program
+DBA
+DPSY
+EDD
+MAED
+MAN
+MAPSY
+MASS
+MBA
+MIT
+MSCS
+MSGC
+MSN
+Term
+Any term
+AY 2024-2025 1st Semester
+AY 2024-2025 2nd Semester
+AY 2025-2026 1st Semester
+AY 2025-2026 2nd Semester
+AY 2026-2027 1st Semester
+AY 2026-2027 2nd Semester
+AY 2027-2028 1st Semester
+AY 2027-2028 2nd Semester
+AY 2028-2029 1st Semester
+AY 2028-2029 2nd Semester
+Status
+Any status
+Upcoming
+Awaiting verdict
+Held
+Deferred
+Defense
+Any defense
+Final Defense
+Proposal Defense
+Title Defense
+Defenses held and upcoming
+
+Defenses held and coming up, with the panel and the verdict.
+
+Download Excel
+Download PDF
+
+16 rows
+
+Defenses held and upcoming
+STUDENT
+	PROGRAM
+	DEFENSE
+	DATE
+	STATUS
+	PANEL
+	VERDICT
+
+Gab Tolentino
+
+GS-2026-UD-03
+
+	MBA	Proposal Defense	Nov 23, 2026	Upcoming	
+Dr. Marco Villanueva (Panel Chair); Dr. Benjamin Reyes (Content Specialist); Dr. Teodoro Ramos (Method Specialist); Dr. Angela Cruz (External Panel)
+	Not yet recorded
+Bea Salonga
+
+GS-2026-UD-02
+
+	DBA	Proposal Defense	Nov 13, 2026	Upcoming	
+Dr. Angela Cruz (Panel Chair); Dr. Marco Villanueva (Content Specialist 1); Dr. Teresa Lim (Content Specialist 2); Dr. Teodoro Ramos (Method Specialist); Dr. Paolo Navarro (External Panel)
+	Not yet recorded
+Nico Barrientos
+
+GS-2026-UD-01
+
+	MBA	Proposal Defense	Nov 9, 2026	Upcoming	
+Dr. Marco Villanueva (Panel Chair); Dr. Benjamin Reyes (Content Specialist); Dr. Teodoro Ramos (Method Specialist); Dr. Angela Cruz (External Panel)
+	Not yet recorded
+Nico Barrientos
+
+GS-2026-UD-01
+
+	MBA	Title Defense	Aug 19, 2026	Held	
+Dr. Marco Villanueva (Panel Chair); Dr. Benjamin Reyes (Content Specialist); Dr. Teodoro Ramos (Method Specialist); Dr. Angela Cruz (External Panel)
+	Approved
+Miko Almario
+
+GS-2026-PM-05
+
+	MBA	Title Defense	Aug 19, 2026	Held	
+Dr. Marco Villanueva (Panel Chair); Dr. Benjamin Reyes (Content Specialist); Dr. Teodoro Ramos (Method Specialist); Dr. Angela Cruz (External Panel)
+	Approved
+Miguel Yu
+
+2260004
+
+	MAED	Proposal Defense	Aug 19, 2026	Held	
+Dr. Marlon Geronimo (Panel Chair); Dr. Liwayway Bautista (Content Specialist); Dr. Patricia Salvador (Method Specialist); Dr. Teodoro Ramos (External Panel)
+	Passed
+Liza Marquez
+
+GS-2026-PM-06
+
+	DBA	Title Defense	Aug 19, 2026	Held	
+Dr. Angela Cruz (Panel Chair); Dr. Marco Villanueva (Content Specialist 1); Dr. Teresa Lim (Content Specialist 2); Dr. Teodoro Ramos (Method Specialist); Dr. Paolo Navarro (External Panel)
+	Approved
+Gab Tolentino
+
+GS-2026-UD-03
+
+	MBA	Title Defense	Aug 19, 2026	Held	
+Dr. Marco Villanueva (Panel Chair); Dr. Benjamin Reyes (Content Specialist); Dr. Teodoro Ramos (Method Specialist); Dr. Angela Cruz (External Panel)
+	Approved
+Bea Salonga
+
+GS-2026-UD-02
+
+	DBA	Title Defense	Aug 19, 2026	Held	
+Dr. Angela Cruz (Panel Chair); Dr. Marco Villanueva (Content Specialist 1); Dr. Teresa Lim (Content Specialist 2); Dr. Teodoro Ramos (Method Specialist); Dr. Paolo Navarro (External Panel)
+	Approved
+Isabel Flores
+
+2260007
+
+	MAED	Final Defense	Aug 4, 2026	Held	
+Dr. Marlon Geronimo (Panel Chair); Dr. Celeste Tan (Content Specialist); Dr. Patricia Salvador (Method Specialist); Dr. Teodoro Ramos (External Panel)
+	Passed
+
+Showing 1–10 of 16
+
+Previous
+Page 1 of 2
+Next

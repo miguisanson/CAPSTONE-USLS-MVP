@@ -1,0 +1,253 @@
+{
+ "slug": "enrollment",
+ "title": "Enrollment — class-list import, single student and the enrollment guard",
+ "kind": "live",
+ "part": "2c",
+ "presenter": "Myrine",
+ "owner": "GS Staff",
+ "duration": "8 min",
+ "story": [
+  "After {case:course-adjustments} publishes the offering list, Graduate School Staff enroll students against it. There are two ways in: a Registrar class list that enrolls a batch, and the Enrollment screen for one student at a time. Both write the same record, so Enrollment Class List, Monitoring Sheet, the student's profile and the Student Portal show the same result.",
+  "The Enrollment screen is also where the handbook rules meet the action. A subject is offered only if it is on the official offering list; a completed subject cannot be added again; adding a subject after the first week of classes and going over the full-time load of 12 units are both stopped and explained with the rule and its handbook page. Staff can then either leave the change out or record a documented exception. Nothing is saved until that decision is made."
+ ],
+ "accounts": [
+  [
+   "Graduate School Staff",
+   "staff@usls.edu.ph",
+   "Runs the import and the Enrollment screen"
+  ],
+  [
+   "Password",
+   "DemoPass123!",
+   ""
+  ]
+ ],
+ "data": [
+  [
+   "Program",
+   "MAED - Master of Arts in Education"
+  ],
+  [
+   "Semester for the class list",
+   "AY 2026-2027 1st Semester (Current)"
+  ],
+  [
+   "Class list file",
+   "MAED_Class_List_Walkthrough.csv, built from the repository template Documents/Archive/Stakeholder_Meeting_Prep/Enrollment_Class_List_Template.csv (same columns) with real codes and numbers read in the app; the capture script writes it. The team's own ready files are in Documents/Sample_Data/Class_Lists."
+  ],
+  [
+   "Class list rows",
+   "2690501 Clarissa Dela Cruz and 2690502 Martin Gonzales, both MAED-MAJ2 with Dr. Marlon Geronimo, status Enrolled; 2670001 Miguel Sanson (not a student of record); 2560001 Daniel Cruz with MAED-XYZ9 (not a curriculum subject)"
+  ],
+  [
+   "Demo students reset",
+   "enrollment-clarissa, enrollment-martin"
+  ],
+  [
+   "Single-student enrollment",
+   "AY 2026-2027 2nd Semester (Next, the semester published in the Course Adjustments case); Daniel Cruz (2560001), who has nothing enrolled there yet; two subjects from the published list"
+  ],
+  [
+   "Guard: add after the first week",
+   "AY 2026-2027 1st Semester (Current): a second subject for a student who already has one in that semester, after the semester's start date has been moved back (see Part D)"
+  ],
+  [
+   "Guard: load",
+   "four more subjects on top of two, 18 units in total, in the Next semester"
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part A — Class-list import with a preview",
+   "steps": [
+    {
+     "text": "Sign in as Graduate School Staff and open **3 · Enrollment** under Lifecycle Workflows. The header has **Upload class list** and **Offering list** (a shortcut to Offering setup in {case:course-adjustments}). Under it are two collapsed rule panels. In the card with **Program**, **Academic semester** and **Student**, select **MAED — Master of Arts in Education** and **AY 2026-2027 1st Semester (Current)**. The student card shows four counters (**Completed**, **Enrolled**, **Not taken**, **Needs review**) and below them **Official offered subjects**, which holds only published offerings, next to the **Enrollment draft** panel.",
+     "shots": [
+      {
+       "id": "enrollment-01",
+       "caption": "Enrollment for MAED, current semester: filters, the two rule panels, Upload class list and Offering list."
+      }
+     ]
+    },
+    {
+     "text": "Click **Enrollment and academic load: rules applied**. The panel lists five rules, each with value, handbook page and an enforcement label: the normal part-time load (6 and 9 units, Documented only, shown as information), the **Full-time load** of 12 units (flagged, and a documented exception is needed before it can be saved; Enforced by the system; Handbook p. 48), residency enrollment, and the removal of an INC grade (Documented only). The second panel, **Adding or changing a subject: rules applied**, repeats the three add/change rules from {case:course-adjustments}. Close the panel.",
+     "shots": [
+      {
+       "id": "enrollment-02",
+       "caption": "Load rules with source page and enforcement label."
+      }
+     ]
+    },
+    {
+     "text": "Click **Upload class list** and choose **MAED_Class_List_Walkthrough.csv**. The window **Preview class list** opens before any record changes. Read the counters: **Rows detected** 4, **Ready** 2, **Already enrolled** 0, **Needs review** 2. Read each row: Clarissa Dela Cruz and Martin Gonzales show Ready to import; Miguel Sanson shows Student was not found; Daniel Cruz with MAED-XYZ9 shows Subject is not in this student's program. The foot of the window says rows that need review are skipped and valid rows are saved when you confirm.",
+     "shots": [
+      {
+       "id": "enrollment-03",
+       "caption": "Preview class list: row-by-row validation before anything is saved."
+      }
+     ]
+    },
+    {
+     "text": "Click **Confirm import**. The window **Class list imported** reads: Tagged 2 student-subject enrollment(s) ..., 1 student(s) not found, 1 subject(s) not offered or unknown, 1 faculty assignment(s) applied, and it names the skipped rows (Not found: 2670001:MAED-MAJ2; Not offered/unknown: 2560001:MAED-XYZ9). Rows that need review are skipped and never guessed. Click **Done**.",
+     "shots": [
+      {
+       "id": "enrollment-04",
+       "caption": "Import result: two rows enrolled, two skipped and named."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B — The same result in Enrollment Class List and Monitoring Sheet",
+   "steps": [
+    {
+     "text": "Open **Enrollment Class List** under Records. Select **MAED — Master of Arts in Education**, **AY 2026-2027 1st Semester (Current)** and **MAED-MAJ2 — Educational Leadership and Management** as the class list view. The page says **Read-only roster**: changes are made in Enrollment, never here. The roster header shows the faculty (Dr. Marlon Geronimo) and the chips for listed and active students. Clarissa Dela Cruz and Martin Gonzales are Enrolled with the source Class list import (MAED_Class_List_Walkthrough.csv), next to students enrolled before (source Requested MAED demo enrollment). **Export CSV** produces the file for the Registrar.",
+     "shots": [
+      {
+       "id": "enrollment-05",
+       "caption": "Enrollment Class List for MAED-MAJ2: the imported students with their source."
+      }
+     ]
+    },
+    {
+     "text": "Open **Monitoring Sheet**, select MAED and the current semester, and find the row of Clarissa Dela Cruz (2690501). Only the MAED-MAJ2 cell is marked Enrolled (R), matching the class list. The banner above the grid reports the consistency check between enrollment and student profiles; on the demo data it lists 2 inconsistency items that belong to another student (2360006, subject MAED-COG10 in the current semester), not to Clarissa.",
+     "shots": [
+      {
+       "id": "enrollment-15",
+       "caption": "Monitoring Sheet row for Clarissa Dela Cruz: MAED-MAJ2 shown as Enrolled."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C — Enrolling one student",
+   "steps": [
+    {
+     "text": "Return to **3 · Enrollment**. Select **AY 2026-2027 2nd Semester (Next)** and pick **Cruz, Daniel — 2560001** from the **Student** list (the box **Filter the student picker** narrows the list by name or number). Read the summary cards: **Completed**, **Enrolled**, **Not taken**, **Needs review**. **Official offered subjects** shows the semester's published offerings only, each with category, units, the student's status and the demand in students.",
+     "shots": [
+      {
+       "id": "enrollment-06",
+       "caption": "Enrollment for one student in the next semester: summary cards and the official offered subjects."
+      }
+     ]
+    },
+    {
+     "text": "Click **Add** on two subjects whose status is Not taken (the capture adds MAED-MOR and MAED-STAT). Their buttons change to **Selected**. Completed and already-enrolled subjects show a locked button and cannot be added. The **Enrollment draft** panel lists the two subjects and the total (2 subjects, 6 units) and has the **Source / reference** field, which reads Graduate School enrollment review; replace it with the real reference when one exists.",
+     "shots": [
+      {
+       "id": "enrollment-07",
+       "caption": "Enrollment draft: two subjects, six units, source reference."
+      }
+     ]
+    },
+    {
+     "text": "Click **Confirm enrollment**. The page confirms: Enrollment saved for Daniel Cruz. 2 subject(s) added and 0 removed; monitoring and profile views are synced, with shortcuts to **Monitoring sheet** and **Student profile**. The student's cards now show 2 under **Enrolled**.",
+     "shots": [
+      {
+       "id": "enrollment-08",
+       "caption": "Enrollment saved and synchronized."
+      }
+     ]
+    },
+    {
+     "text": "Scroll to the bottom of the page. **Curriculum version & study plan draft** lets staff tag the curriculum version (**Tag curriculum version**) and generate the study plan from the curriculum audit (**Generate study plan draft**), which is sent to the Academic Coordinator; **RECENT STUDY PLAN DRAFTS** lists them. It is shown here only; the demonstration does not generate a plan.",
+     "shots": [
+      {
+       "id": "enrollment-08b",
+       "caption": "Curriculum version and study plan draft panel at the foot of Enrollment."
+      }
+     ]
+    },
+    {
+     "text": "Open **Enrollment Class List** again for the next semester. The subject just enrolled (MAED-MOR) has a roster with the student, source Graduate School enrollment review.",
+     "shots": [
+      {
+       "id": "enrollment-09",
+       "caption": "Enrollment Class List for the next semester shows the same student."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part D — The enrollment guard",
+   "intro": "These are the cases where the system stops the change. Nothing is saved until the person decides, and a documented exception is recorded on the enrollment.",
+   "steps": [
+    {
+     "text": "Set up the first guard. The demo database dates the current semester as if classes began 3 days before it was created, so the first-week window for adding a subject is still open and the guard would not appear (from the 8th day of classes it does, with no set-up). In the live demo, open **Academic Semesters**, click **Edit dates** on **AY 2026-2027 1st Semester**, change **Start date** to 2026-09-01 and click **Save dates** (notice: Updated AY 2026-2027 1st Semester.). You restore the date after the refusal, because the withdrawal window is counted from the same date.",
+     "shots": [
+      {
+       "id": "enrollment-10s",
+       "caption": "Start date of the current semester moved back so that the first week is over."
+      }
+     ]
+    },
+    {
+     "text": "Return to **3 · Enrollment** with **AY 2026-2027 1st Semester (Current)** and **Cruz, Daniel — 2560001**. First registration of a subject in a semester is not an addition: click **Add** on one subject and **Confirm enrollment**; it saves. Then click **Add** on a second subject (the first one now shows **Enrolled** and is locked) and click **Confirm enrollment** again.",
+     "shots": [
+      {
+       "id": "enrollment-10a",
+       "caption": "A second subject in a semester that began two months ago."
+      }
+     ]
+    },
+    {
+     "text": "The page stops with **A business rule applies to this change** and the note Nothing was saved yet. The item reads: Adding a subject after the first week; the subject would be added 62 days after classes began (AY 2026-2027 1st Semester started 2026-09-01); adding a subject is allowed during the first week of classes with the written approval of the Associate Dean (window ended 2026-09-07; Graduate School Handbook 2022-2023, p. 49). The refusal cites the rule, the dates and the page. Under it a list of decisions offers **Do not enroll (recommended)**, already chosen, and **Enroll with the Associate Dean's written approval (documented exception)**; the buttons are **Cancel, change the selection** and **Save with these decisions**.",
+     "shots": [
+      {
+       "id": "enrollment-10",
+       "caption": "The guard names the rule, the dates and the handbook page, and offers the decision."
+      }
+     ]
+    },
+    {
+     "text": "Keep **Do not enroll (recommended)** and click **Save with these decisions**. The page reports 0 subject(s) added and 0 removed: the second subject was left out and the enrollment is unchanged.",
+     "shots": [
+      {
+       "id": "enrollment-12",
+       "caption": "Nothing was added."
+      }
+     ]
+    },
+    {
+     "text": "Put the start date back: open **Academic Semesters**, click **Edit dates** on the current semester, type the original **Start date** (the capture shows 2026-10-30) and click **Save dates**. The list shows the semester with its original dates and the **Current** badge again.",
+     "shots": [
+      {
+       "id": "enrollment-12r",
+       "caption": "Original start date restored; the notice reads Updated AY 2026-2027 1st Semester."
+      }
+     ]
+    },
+    {
+     "text": "Test the load rule. Open **3 · Enrollment** for **AY 2026-2027 2nd Semester (Next)** and the same student, click **Add** on four more subjects so that the **Enrollment draft** reaches 6 subjects and 18 units, then click **Confirm enrollment**.",
+     "shots": [
+      {
+       "id": "enrollment-13",
+       "caption": "Draft of 18 units."
+      }
+     ]
+    },
+    {
+     "text": "The rule panel appears again, this time under Academic load for AY 2026-2027 2nd Semester: the selection adds up to 18 units; the normal load is 6 to 9 units for a part-time student and 12 units for a full-time student per semester (Graduate School Handbook 2022-2023, p. 48); enroll only with a documented exception. **Save with these decisions** stays grey until the list **Choose what to do** is set to **Enroll with documented exception (approved overload)**. Click **Cancel, change the selection** to leave the record as it was.",
+     "shots": [
+      {
+       "id": "enrollment-14",
+       "caption": "Over the full-time load: the rule, its page and the exception option."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "A class list does not go through the add-after-the-first-week rule; it is the Registrar's record of who is enrolled, so it is read against the official offering list, the program and the student records instead. Rows that do not match are skipped and named, never guessed.",
+  "The class list must include a Faculty column. A row marked Dropped in a class list is accepted only with an Unexcused Absence Percent above the handbook limit of 20% or a Drop Exception Reason; the page says so under its title.",
+  "The team's ready demo files are in Documents/Sample_Data/Class_Lists (for example MAED_Class_List_Demo_MAJ2_3_Students.xlsx: Daniel Cruz and Grace Reyes show Ready to import; Miguel Sanson shows Student was not found unless he was added in Student Handoff first). The preview was checked with that file on the current screen; it was not confirmed.",
+  "Enrollment Class List is an output screen: changes are made in Enrollment or through a confirmed import, never on the roster.",
+  "Enrolling a student records the enrollment in the platform; it does not perform official enrollment, which stays with the Registrar. Grades and the course-completion status come from the official export.",
+  "The portal does not check student schedule conflicts or faculty double-booking.",
+  "Time-dependent: the add-after-the-first-week guard depends on today's date and the start date of the current semester (see Part D, first step). The 18-unit load guard does not."
+ ]
+}

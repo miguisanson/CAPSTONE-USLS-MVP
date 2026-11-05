@@ -1,0 +1,358 @@
+{
+ "slug": "verdicts",
+ "title": "Research - Defense verdicts: pass with revisions, deferral, re-defense, failure; reschedule and cancel",
+ "kind": "live",
+ "part": "2i",
+ "presenter": "Nat",
+ "owner": "GS Staff (books, reschedules, cancels), Panel Chair (verdict), Adviser, other panelists (evening only)",
+ "duration": "25 min",
+ "story": [
+  "Part of the research demo slot, after {case:defense-scheduling} and {case:calendars}. After a defense only the assigned Panel Chair (or Panel Lead) can record the official verdict, and only once the defense has started: before that the Verdicts page says \"The defense has not started yet.\" The sign-in page switch **Skip date waits** is ON by default for the demo, and then this date wait is skipped, so the presenter can record the verdict right after booking. Switch it OFF to show the real rule. The Proposal Defense has six possible outcomes. Each one has its own follow-up, and the research stage moves on only when that follow-up is done.",
+  "All the seeded upcoming defenses are in the future, so with Skip date waits OFF, to show the verdict screens live the GS Staff move three demonstration defenses to a short slot a few minutes ahead (a reschedule with a reason), and the chairs record the verdicts as soon as each start time has passed. With Skip date waits ON (the default), Part A and the waits are not needed and the chairs record the verdicts straight away: Nico Barrientos (Panel Chair Dr. Marco Villanueva) receives Passed with minor revisions; Bea Salonga (Panel Chair Dr. Angela Cruz) is Deferred, booked again, receives Provisional pass - re-defense required, and then the re-defense is booked and cancelled with a reason; Gab Tolentino (Panel Chair Dr. Marco Villanueva) receives Failed.",
+  "The booking form refuses a slot outside the hours a panelist entered (weekdays 8:00 AM to 5:00 PM) and that rule cannot be overridden. If the demo is run in office hours nothing extra is needed. This walk-through was recorded on a Monday evening, so it starts with Part 0: the six panelists first add today's hours in My Availability, which is exactly what a real panelist would do. Dates and times on the screens follow the clock of the day of the demo."
+ ],
+ "accounts": [
+  [
+   "GS Staff",
+   "staff@usls.edu.ph",
+   "Reschedules, rebooks and cancels defenses; reads the last verdict"
+  ],
+  [
+   "Panel Chair",
+   "marco.villanueva@usls.edu.ph",
+   "Dr. Marco Villanueva: records the verdicts for Nico Barrientos and Gab Tolentino"
+  ],
+  [
+   "Panel Chair",
+   "angela.cruz@usls.edu.ph",
+   "Dr. Angela Cruz: records the verdicts for Bea Salonga"
+  ],
+  [
+   "Research adviser",
+   "paolo.navarro@usls.edu.ph",
+   "Dr. Paolo Navarro: sees the revisions waiting for Nico Barrientos (his advisee)"
+  ],
+  [
+   "Other panelists (Part 0, evening only)",
+   "benjamin.reyes@usls.edu.ph, teodoro.ramos@usls.edu.ph, teresa.lim@usls.edu.ph",
+   "Add today's hours so the short slots are allowed"
+  ]
+ ],
+ "data": [
+  [
+   "Students",
+   "Nico Barrientos (2691201, MBA); Bea Salonga (2691202, DBA); Gab Tolentino (2691203, MBA) - all at the Proposal Defense"
+  ],
+  [
+   "Extra hours (Part 0, evening only)",
+   "I am available ONLY these hours - today, 08:00 AM to 11:59 PM, note \"Extra hours for the demonstration defenses\""
+  ],
+  [
+   "Reschedule slot",
+   "Today, a four-minute slot a few minutes ahead; venue Graduate School Conference Room; Requested by: Panel chair / Research adviser / Student"
+  ],
+  [
+   "Reschedule reasons",
+   "Panel chair asked to bring the defense forward to today; Research adviser asked for the first available slot; Student asked to be heard earlier"
+  ],
+  [
+   "Override reason",
+   "Requirements and lead time are waived for this demonstration defense; panel confirmed by phone."
+  ],
+  [
+   "Nico's verdict",
+   "Passed with minor revisions - remarks \"Clarify the sampling frame in Chapter 3 and correct the citation format.\""
+  ],
+  [
+   "Bea's verdicts",
+   "Deferred - \"Two panelists could not attend; the session did not take place.\" Then Provisional pass - re-defense required - \"Research questions need restating; the panel will hear the paper again after a full revision.\""
+  ],
+  [
+   "Gab's verdict",
+   "Failed - \"The study design does not yet answer the research questions; resubmit a revised proposal for a new defense.\""
+  ],
+  [
+   "Re-defense booking",
+   "Best shared option, Mon 16 Nov 2026, 8:00 AM-10:00 AM, override reason \"Re-defense follows the same protocol; requirements are re-checked when the student resubmits.\""
+  ],
+  [
+   "Cancellation reason",
+   "The student asked for more time to finish the full revision (asked by: Student)"
+  ]
+ ],
+ "parts": [
+  {
+   "title": "Part 0 - Only for a booking outside entered hours: the panelists add today's hours",
+   "steps": [
+    {
+     "text": "Sign in as Dr. Marco Villanueva (**marco.villanueva@usls.edu.ph**) and open **My Availability**. Under **Specific dates** choose **I am available ONLY these hours**, enter **First date** today, **From (Philippine time)** 08:00 AM and **To (Philippine time)** 11:59 PM, type the **Note** \"Extra hours for the demonstration defenses\" and select **Add date**.",
+     "shots": [
+      {
+       "id": "verdicts-28",
+       "caption": "Dr. Villanueva adds today's hours: available only 8:00 AM to 11:59 PM."
+      }
+     ]
+    },
+    {
+     "text": "After **Add date** the page says \"Date saved.\" and the new line appears under **Your dates** with the chip **Only these hours**. Repeat with the same entries for Dr. Angela Cruz, Dr. Benjamin Reyes, Dr. Teodoro Ramos, Dr. Paolo Navarro and Dr. Teresa Lim (they sit on the three panels). Specific hours on a date replace the weekly hours for that day.",
+     "shots": [
+      {
+       "id": "verdicts-29",
+       "caption": "The date is saved under Your dates."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part A - Only with Skip date waits OFF: staff move three defenses to a slot a few minutes ahead",
+   "steps": [
+    {
+     "text": "Sign in as GS Staff (**staff@usls.edu.ph**), open **7 · Defense Scheduling** and search **Barrientos** (Nico Barrientos). Scroll to **Final schedule**. Enter today's date, a **Start time** a few minutes from now and an **End time** four minutes later, and the venue \"Graduate School Conference Room\". Type the **Scheduling constraints** \"Booked as a short session for the walkthrough.\" The amber box **Needs a reason** appears (before the 14-day lead time): tick **Staff override** (under **Student readiness**) and **Warning override**, and write the **Reason for the staff override** \"Requirements and lead time are waived for this demonstration defense; panel confirmed by phone.\" In the blue box \"This stage is already booked ...\" write the **Reason for rescheduling** \"Panel chair asked to bring the defense forward to today\" and choose **Requested by** Panel chair.",
+     "shots": [
+      {
+       "id": "verdicts-01",
+       "caption": "Nico's booking moved to a short slot today: lead-time warning, override reason and the reason for rescheduling."
+      }
+     ]
+    },
+    {
+     "text": "Select **Reschedule defense**. Confirm the notice \"Defense rescheduled. The previous booking is kept in the history.\" and that the blue box now names today as the booked date.",
+     "shots": [
+      {
+       "id": "verdicts-02",
+       "caption": "The defense is rescheduled; the old booking stays in the history."
+      }
+     ]
+    },
+    {
+     "text": "Repeat for **Salonga** (Bea Salonga): a slot a few minutes after Nico's, reason \"Research adviser asked for the first available slot\", **Requested by** Research adviser.",
+     "shots": [
+      {
+       "id": "verdicts-03",
+       "caption": "Bea's booking moved to a slot after Nico's."
+      },
+      {
+       "id": "verdicts-04",
+       "caption": "Bea's booking saved."
+      }
+     ]
+    },
+    {
+     "text": "Repeat for **Tolentino** (Gab Tolentino): a slot after Bea's, reason \"Student asked to be heard earlier\", **Requested by** Student. The slots must not overlap because the three panels share panelists; an overlapping slot would show the red box \"Cannot be booked\" (\"Panel conflict with ...\", as in {case:defense-scheduling}) and the button stays disabled.",
+     "shots": [
+      {
+       "id": "verdicts-05",
+       "caption": "Gab's booking moved to a slot after Bea's."
+      },
+      {
+       "id": "verdicts-06",
+       "caption": "Gab's booking saved."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part B - Only with Skip date waits OFF: the verdict form is closed until the defense starts",
+   "steps": [
+    {
+     "text": "With **Skip date waits** switched OFF on the sign-in page, sign in as the Panel Chair Dr. Marco Villanueva (**marco.villanueva@usls.edu.ph**). In the faculty sidebar open **Verdicts**. Before the start time the group **Needs your verdict** says \"No verdicts are waiting for you\", and Nico Barrientos's Proposal Defense is listed under **Waiting on others** with its date and time, the chip **Scheduled** and, in amber, \"The defense has not started yet.\" There is no verdict form yet. The finished Title Defense stays under **Verdict history**. With Skip date waits ON this message does not appear: the form is open as soon as the defense is booked.",
+     "shots": [
+      {
+       "id": "verdicts-07",
+       "caption": "Verdicts before the start time: the defense waits under Waiting on others."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part C - Passed with minor revisions (the adviser confirms)",
+   "steps": [
+    {
+     "text": "With Skip date waits ON, open **Verdicts** right after booking; with it OFF, wait until the start time has passed and reload **Verdicts**. Nico's Proposal Defense is now under **Needs your verdict**, with the **Current-stage papers** (Proposal manuscript, Ethics Clearance) and the green panel **Submit panel chair verdict**. Open **Verdict result** and read the options: Passed; Passed with minor revisions; Provisional pass - revisions for panel approval; Provisional pass - re-defense required; Deferred; Failed. Choose **Passed with minor revisions**: the text under the field reads \"The student submits the revised manuscript; the research adviser confirms it and the stage completes.\" Type the **Remarks or conditions** \"Clarify the sampling frame in Chapter 3 and correct the citation format.\"",
+     "shots": [
+      {
+       "id": "verdicts-08",
+       "caption": "The verdict form with Passed with minor revisions chosen and the remarks typed."
+      }
+     ]
+    },
+    {
+     "text": "Select **Submit final verdict**. The notice \"Defense verdict submitted.\" appears and the card moves to **Verdict history**: the chip reads **Passed with minor revisions**, the green box reads \"Verdict: Passed with minor revisions\" with \"Submitted by Dr. Marco Villanueva\", the status **Awaiting revisions**, the follow-up sentence and the remarks. The form is replaced by **Entered the wrong verdict?**: the chair can correct the verdict, with a recorded reason, until the student or staff act on it.",
+     "shots": [
+      {
+       "id": "verdicts-09",
+       "caption": "The verdict is recorded; a correction is possible with a reason."
+      }
+     ]
+    },
+    {
+     "text": "Sign in as the research adviser Dr. Paolo Navarro (**paolo.navarro@usls.edu.ph**). Open **Signatures & Endorsements** and scroll to **Revisions to confirm**: Nico Barrientos, Proposal Defense - Passed with minor revisions, the chip **Awaiting revisions**, the panel's remarks and the line \"Waiting for the student to submit the revised manuscript.\" The button **Confirm the revisions** appears only after the student submits the revised manuscript; the stage then completes. Open the bell to see the notices that the reschedules created for the adviser.",
+     "shots": [
+      {
+       "id": "verdicts-10",
+       "caption": "Revisions to confirm: waiting for the student's revised manuscript."
+      },
+      {
+       "id": "verdicts-11",
+       "caption": "The adviser's bell with the reschedule and reminder notices."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff open **7 · Defense Scheduling** and choose Nico Barrientos. Above **Panel members** the amber box reads **Last verdict: Passed with minor revisions** with the follow-up sentence. Revisions are confirmed, they do not need a new defense, so the screen offers no new booking for this stage.",
+     "shots": [
+      {
+       "id": "verdicts-12",
+       "caption": "Staff see the last verdict on the scheduling screen."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part D - Deferred, then a re-defense that is booked and cancelled",
+   "steps": [
+    {
+     "text": "Sign in as the Panel Chair Dr. Angela Cruz (**angela.cruz@usls.edu.ph**), open **Verdicts**, and on Bea Salonga's Proposal Defense card choose **Deferred** (the text reads \"The defense did not take place; the Research Coordinator reschedules it. Nothing is reset.\"). Type the remarks \"Two panelists could not attend; the session did not take place.\"",
+     "shots": [
+      {
+       "id": "verdicts-13",
+       "caption": "The form with Deferred chosen."
+      }
+     ]
+    },
+    {
+     "text": "Select **Submit final verdict**. Confirm \"Defense verdict submitted.\" and that the card in **Verdict history** shows **Deferred**.",
+     "shots": [
+      {
+       "id": "verdicts-14",
+       "caption": "Deferred is recorded."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff open **7 · Defense Scheduling** and choose Bea Salonga. Confirm the amber box **Last verdict: Deferred** with \"The defense did not take place; the Research Coordinator reschedules it. Nothing is reset.\" The booking is no longer active, so a new one can be made.",
+     "shots": [
+      {
+       "id": "verdicts-15",
+       "caption": "Staff see Deferred and can book again."
+      }
+     ]
+    },
+    {
+     "text": "Book the defense again: in **Final schedule** enter today's date and a slot a few minutes ahead, after Gab's slot has ended (the panels share panelists), the same venue, tick the override boxes with the same reason and select **Set defense schedule**. Confirm \"Saved. The student record, queue, and monitoring indicators were updated.\"",
+     "shots": [
+      {
+       "id": "verdicts-16",
+       "caption": "Bea's deferred defense booked again for a few minutes ahead."
+      }
+     ]
+    },
+    {
+     "text": "With Skip date waits OFF, Dr. Cruz waits until the new start time has passed; either way she opens **Verdicts**, chooses **Provisional pass - re-defense required** (\"Re-defense following the same protocol: the student resubmits, the adviser re-signs, the defense is scheduled again.\"), types the remarks \"Research questions need restating; the panel will hear the paper again after a full revision.\" and selects **Submit final verdict**.",
+     "shots": [
+      {
+       "id": "verdicts-17",
+       "caption": "The form with Provisional pass - re-defense required chosen."
+      },
+      {
+       "id": "verdicts-18",
+       "caption": "The verdict is recorded in Verdict history."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff reopen Bea Salonga. The box reads **Last verdict: Provisional pass - re-defense required**. From **Best shared options** select the **Earliest option**, type the venue, tick **Warning override** and write the reason \"Re-defense follows the same protocol; requirements are re-checked when the student resubmits.\" The check reads **No conflicts found** (6 of 6 checked: adviser and five panelists).",
+     "shots": [
+      {
+       "id": "verdicts-19",
+       "caption": "Staff see Last verdict: re-defense required."
+      },
+      {
+       "id": "verdicts-20",
+       "caption": "The re-defense form: Earliest option, venue, override and reason."
+      }
+     ]
+    },
+    {
+     "text": "Select **Book the re-defense**. Confirm \"Saved. The student record, queue, and monitoring indicators were updated.\" and that the blue box now names the new date.",
+     "shots": [
+      {
+       "id": "verdicts-21",
+       "caption": "The re-defense is booked."
+      }
+     ]
+    },
+    {
+     "text": "Select **Cancel this booking instead**. The browser asks \"Why is this defense being cancelled? (required, recorded with the schedule)\" - type \"The student asked for more time to finish the full revision\" - and \"Who asked for the cancellation?\" - type \"Student\". The notice \"Defense cancelled. Book a new schedule when a date is agreed.\" appears. Open **View schedule history**: every booking of Bea is listed with its status (**Cancelled**, the verdict word, **Deferred**, **Rescheduled**, and **Finished** for the Title Defense) and the reasons recorded.",
+     "shots": [
+      {
+       "id": "verdicts-22",
+       "caption": "The re-defense is cancelled with a recorded reason."
+      },
+      {
+       "id": "verdicts-23",
+       "caption": "Schedule history of Bea Salonga: every booking and why it changed."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part E - Failed",
+   "steps": [
+    {
+     "text": "Sign in again as Dr. Marco Villanueva, open **Verdicts**, and on Gab Tolentino's Proposal Defense card choose **Failed** (the text reads \"Resubmission: at the Title stage a new set of three titles, otherwise a re-defense following the same protocol.\"). Type the remarks \"The study design does not yet answer the research questions; resubmit a revised proposal for a new defense.\"",
+     "shots": [
+      {
+       "id": "verdicts-24",
+       "caption": "The form with Failed chosen."
+      }
+     ]
+    },
+    {
+     "text": "Select **Submit final verdict**. Confirm \"Defense verdict submitted.\" and the card in **Verdict history**: chip **Failed**, \"Verdict: Failed\", the follow-up sentence and the remarks.",
+     "shots": [
+      {
+       "id": "verdicts-25",
+       "caption": "Failed is recorded."
+      }
+     ]
+    },
+    {
+     "text": "As GS Staff open **7 · Defense Scheduling** and choose Gab Tolentino. Confirm **Last verdict: Failed** with the same follow-up sentence. A new defense can then be booked with the same procedure (the button reads **Book the re-defense**) once the student has resubmitted.",
+     "shots": [
+      {
+       "id": "verdicts-26",
+       "caption": "Staff see Failed and the resubmission rule."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Part F - The calendar afterwards",
+   "steps": [
+    {
+     "text": "As GS Staff open **7 · Defense Scheduling** and select the **Calendar** tab. Set **Status** to **Everything**, choose **Agenda**, type **Tolentino** in **Student** and select Gab Tolentino's defense of today. The detail card shows the chips **Held** and **Verdict recorded**, and the earlier bookings of the same student appear struck through as **Rescheduled** and **Cancelled**.",
+     "shots": [
+      {
+       "id": "verdicts-27",
+       "caption": "The calendar after the verdicts: Gab's held defense with its verdict, and his old bookings."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "A verdict can be recorded only by the assigned Panel Chair or Panel Lead, only for a booked defense whose start time has passed, and only once per booking (a wrong one can be corrected with a reason until the student or staff act on it). Staff have read-only access to the Verdicts page. If the panel was changed after booking, the schedule is flagged Needs Re-confirmation and no verdict can be recorded until staff re-confirm or cancel it.",
+  "The six outcomes and their follow-up as shown on screen: Passed (stage complete; at the Title Defense the label is Approved and the panel records the selected title); Passed with minor revisions (the student submits the revised manuscript, the research adviser confirms); Provisional pass - revisions for panel approval (major revisions without a re-defense, the panel chair confirms the panel's approval); Provisional pass - re-defense required (resubmit, adviser re-signs, defense scheduled again); Deferred (the Research Coordinator reschedules, nothing is reset); Failed (resubmission: a new set of three titles at the Title stage, otherwise a re-defense). At the Final Defense an evaluation score field appears; a score below 85 (thesis) or 90 (dissertation) cannot be recorded as a plain pass.",
+  "LIMIT: the student step of Passed with minor revisions (submitting the revised manuscript), the adviser's Confirm the revisions button and the student's resubmission after Failed need a student sign-in. The three demonstration students used here have no portal login, so those screens are shown only up to \"Waiting for the student to submit the revised manuscript\" and the staff view of the Failed outcome. {case:proposal_final} runs the same verdict screens for Miguel Yu, who does have a login.",
+  "The demonstration defenses are in the future, so the walk-through books them a few minutes ahead and waits for the start time. Outside 8:00 AM to 5:00 PM the panelists add today's hours first (Part 0). The three students keep their verdicts afterwards, so running this case again needs a fresh demonstration database.",
+  "Grades and research outputs are out of scope; no email is sent. Notices are in-app (bell) and calendar entries."
+ ]
+}

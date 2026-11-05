@@ -1,0 +1,97 @@
+UNIVERSITY OF ST. LA SALLE
+
+Graduate School Lifecycle Portal
+
+Sign in with your Graduate School account. The screens you see depend on the role your account holds.
+
+Demo accounts
+DEMO MODE
+For presentations only. Expand to see ready-made accounts; nothing is filled in until you choose.
+
+Staff, Dean, Faculty and Student
+
+Demo password for every account below: DemoPass123!
+
+GS Staff
+staff@usls.edu.ph · Intake and records
+Fill form
+Sign in
+Academic Coordinator
+academic@usls.edu.ph · Coursework and practicum
+Fill form
+Sign in
+Research Coordinator
+research@usls.edu.ph · Research completion
+Fill form
+Sign in
+Administrator
+admin@usls.edu.ph · All staff screens (review)
+Fill form
+Sign in
+Dean
+dean@usls.edu.ph · Approvals
+Fill form
+Sign in
+Faculty
+liwayway.bautista@usls.edu.ph · Adviser and panel work
+Fill form
+Sign in
+Student
+student@usls.edu.ph · Student portal
+Fill form
+Sign in
+
+Student workflow demos
+
+Arranged in the Graduate School lifecycle sequence. Select a student to sign in, or reset one case for a clean walkthrough.
+
+1 · Student Handoff
+New-student profiles after admissions handoff.
+2
+Sofia Reyes
+GS-2026-HO-01 · MAED
+New student with a complete admissions handoff and portal profile
+Reset
+Anton Bautista
+GS-2026-HO-02 · MAED
+New student with one handoff item awaiting staff follow-up
+Reset
+2 · Course Adjustments
+Missing-subject demand scenarios for official course offerings.
+2
+3 · Enrollment
+Ready for single-student offered-subject enrollment.
+2
+5–7 · Research, Panel & Defense
+Courses and comprehensive exam complete; ready for Title Defense requirements.
+1
+8 · Practicum
+Psychology and MSGC students only; prerequisites complete.
+2
+9 · Graduation
+All prior requirements complete; ready for Graduation.
+2
+
+Standalone processes
+
+Leave, return, AWOL or residency, and early subject-withdrawal scenarios that branch from the main student lifecycle.
+
+Leave of Absence
+Leave requests checked against the handbook rules.
+2
+Readmission
+Approved-LOA personas ready to file return requests.
+2
+AWOL & Residency
+One automatically flagged AWOL return and one residency-ready persona.
+2
+Withdrawal
+Active subject enrollment; can withdraw a subject until the end of the second week of classes.
+2
+Sign in
+
+Accounts are created by the Graduate School office.
+
+Email
+Password
+Sign in

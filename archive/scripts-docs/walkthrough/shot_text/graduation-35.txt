@@ -1,0 +1,203 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+
+APPROVALS
+
+Approvals Queue
+8
+Course Adjustments
+1
+Leave of Absence
+1
+Readmission
+1
+AWOL & Residency
+1
+Subject Withdrawal
+1
+Practicum Reports
+1
+Graduation Endorsement
+2
+Admission & Coursework Reports
+
+MONITORING & SUPPORT
+
+Reports & Analytics
+Activity Log
+Policy Assistant
+Business Rules
+
+Dean
+
+Every decision is recorded against your account with the date and time.
+
+Dean Portal
+Graduation Endorsement
+Dr. Manuel Villaruz · Dean
+7
+DM
+Graduation Endorsement
+2 waiting
+
+The Academic Coordinator checks coursework, the Research Coordinator validates research evidence, and Graduate School staff prepare the endorsement list. You approve or return it, then export the approved list for the Registrar.
+
+All approvals
+Roster & workflow
+Endorsement batches
+
+1 Batch created, 1 Dean review, 1 Approved, ready to export
+
+Dragging a card to another column does the same as the buttons in its details window. On a keyboard or phone, use "Move to…" on the card.
+
+Search list
+All programs
+MAED
+MSGC
+All stages / statuses
+Dean Approved
+For Review
+Not Prepared
+Ready for Dean Review
+All completed courses
+MAED-COG1 — Teaching Strategies in Higher Education
+MAED-COG10 — Seminar on Contemporary Issues in Education
+MAED-COG2 — Learning Analytics
+MAED-COG3 — Inclusive Education
+MAED-COG4 — Action Research in the Classroom
+MAED-COG5 — School Administration and Supervision
+MAED-COG6 — Educational Policy and Planning
+MAED-COG7 — Guidance and Student Development
+MAED-COG8 — Instructional Design
+MAED-COG9 — Language and Literacy Education
+MAED-FED — Foundations of Education
+MAED-MAJ1 — Curriculum Development and Evaluation
+MAED-MAJ2 — Educational Leadership and Management
+MAED-MAJ3 — Assessment of Learning
+MAED-MAJ4 — Educational Technology and Instruction
+MAED-MAJ5 — Philosophy of Education
+MAED-MOR — Methods of Educational Research
+MAED-STAT — Statistics in Education
+MSGC-COG1 — Family Counseling
+MSGC-COG10 — Counseling Supervision
+MSGC-COG2 — Crisis Intervention
+MSGC-COG3 — Counseling Children and Adolescents
+MSGC-COG4 — Multicultural Counseling
+MSGC-COG5 — School Counseling
+MSGC-COG6 — Substance Abuse Counseling
+MSGC-COG7 — Ethics in Counseling
+MSGC-COG8 — Rehabilitation Counseling
+MSGC-COG9 — Play Therapy
+MSGC-FED — Foundations of Guidance and Counseling
+MSGC-MAJ1 — Theories of Counseling
+MSGC-MAJ2 — Group Counseling and Process
+MSGC-MAJ3 — Career Development and Counseling
+MSGC-MAJ4 — Assessment in Guidance
+MSGC-MAJ5 — Guidance Program Management
+MSGC-MOR — Methods of Research in Counseling
+MSGC-STAT — Statistics in Guidance and Counseling
+Showing 5 of 5 records
+Board
+Table
+Approve endorsement list applied to 1 candidate(s); 0 skipped.
+
+← 3 stages to the left
+
+Batch created
+1
+
+Staff forward it for coursework review.
+
+Batch 1 November 2026
+
+1 candidate · MAED
+
+Students: Isabel Flores
+
+Step 3: GS Staff forwards batch for coursework review
+
+Next: Graduate School Staff
+
+For Review
+View details
+
+Waiting for: Graduate School Staff
+
+Coursework review
+0
+
+The Academic Coordinator checks coursework.
+
+No candidates here
+
+Research and practicum check
+0
+
+The Research Coordinator checks the evidence.
+
+No candidates here
+
+Endorsement prep or revision
+0
+
+Staff prepare the list or revise it.
+
+No candidates here
+
+Dean review
+1
+
+The Dean approves or returns the list.
+
+Batch 2 October 2026
+
+1 candidate · MAED
+
+Students: Hector Ong
+
+Step 7: Dean reviews graduation batch
+
+Next: Dean
+
+Ready for Dean Review
+
+Some application documents are missing.
+
+View details
+Move to…
+Approved, ready to export
+1
+
+The Dean exports the approved list.
+
+Batch 3 November 2026
+
+1 candidate · MAED
+
+Students: Carlo Mendoza
+
+Step 8: Export Dean-approved list
+
+Next: Dean
+
+Dean Approved
+
+8 discussion messages
+
+View details
+
+Open View details to export the list.
+
+Exceptions
+0
+
+Missing requirements to correct.
+
+No candidates here

@@ -1,0 +1,181 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Reports & Analytics
+Grace Fernandez · Graduate School Staff
+1
+GF
+Reports & Analytics
+
+Who is late, where each cohort stands, what is waiting, defenses and graduation. Filter, sort, and download Excel or PDF.
+
+Back to dashboard
+Students at risk
+Cohorts by stage
+Overdue and pending
+Defenses
+Graduation candidates
+Registrar changes
+Analytics
+Program
+Any program
+DBA
+DPSY
+EDD
+MAED
+MAN
+MAPSY
+MASS
+MBA
+MIT
+MSCS
+MSGC
+MSN
+Stage
+Any stage
+Admission
+Coursework
+Comprehensive Exam
+Proposal Development
+Proposal Defense
+Data Collection
+Writing
+Final Defense
+LOA
+AWOL
+Withdrawal In Progress
+Withdrawn
+Completed
+Risk
+Any risk
+At Risk of Delay
+Delayed
+Students at risk or delayed
+
+Who is behind, what is late, since when, and who has to act next.
+
+Download Excel
+Download PDF
+
+18 rows
+
+Students at risk or delayed
+STUDENT
+	PROGRAM
+	STAGE
+	RISK
+	WHAT IS LATE
+	SINCE
+	DAYS LATE
+	NEXT OWNER
+
+Isabel Jacinto
+
+2460044
+
+	MBA	Coursework	Delayed	
+2 subject(s) missing or incomplete in the course audit
+	Nov 2, 2026	0	Academic Coordinator
+Lara Escobar
+
+2460047
+
+	MBA	Coursework	Delayed	
+15 subject(s) missing or incomplete in the course audit
+	Nov 2, 2026	0	Academic Coordinator
+Liza Marquez
+
+GS-2026-PM-06
+
+	DBA	Proposal Defense	At Risk of Delay	
+3 required document(s) missing at Form 4 - Proposal Defense Readiness
+	Nov 2, 2026	0	Student
+Maya Torres
+
+GS-2026-AWOL-01
+
+	MAED	AWOL	Delayed	
+14 subject(s) missing or incomplete in the course audit
+	Nov 2, 2026	0	Academic Coordinator
+Miko Almario
+
+GS-2026-PM-05
+
+	MBA	Proposal Defense	At Risk of Delay	
+3 required document(s) missing at Form 4 - Proposal Defense Readiness
+	Nov 2, 2026	0	Student
+Nico Barrientos
+
+GS-2026-UD-01
+
+	MBA	Proposal Defense	At Risk of Delay	
+3 required document(s) missing at Form 4 - Proposal Defense Readiness
+	Nov 2, 2026	0	Student
+Noel Navarro
+
+2560085
+
+	MAN	AWOL	Delayed	
+13 subject(s) missing or incomplete in the course audit
+	Nov 2, 2026	0	Academic Coordinator
+Paulo Garcia
+
+2360010
+
+	MAED	AWOL	Delayed	
+12 subject(s) missing or incomplete in the course audit
+	Nov 2, 2026	0	Academic Coordinator
+
+Showing 11–18 of 18
+
+Previous
+Page 2 of 2
+Next

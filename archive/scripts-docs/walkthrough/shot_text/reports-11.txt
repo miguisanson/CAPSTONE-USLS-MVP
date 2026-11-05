@@ -1,0 +1,1023 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Reports & Analytics
+Grace Fernandez · Graduate School Staff
+1
+GF
+Reports & Analytics
+
+Who is late, where each cohort stands, what is waiting, defenses and graduation. Filter, sort, and download Excel or PDF.
+
+Back to dashboard
+Students at risk
+Cohorts by stage
+Overdue and pending
+Defenses
+Graduation candidates
+Registrar changes
+Analytics
+Program
+Any program
+DPSY
+MAPSY
+MASS
+DBA
+MBA
+EDD
+MAED
+MSGC
+MIT
+MSCS
+MAN
+MSN
+Stage
+Any stage
+Admission
+Coursework
+Comprehensive Exam
+Proposal Development
+Proposal Defense
+Data Collection
+Writing
+Final Defense
+LOA
+AWOL
+Withdrawal In Progress
+Withdrawn
+Completed
+Risk
+Any risk
+On Track
+At Risk of Delay
+Delayed
+Not Yet Assessed
+Analytics
+
+Computed live from recorded transactions, for the students the filters above select. Select a bar or a chip to see the students.
+
+Lifecycle stage distribution
+
+Where students currently sit in the graduate lifecycle
+
+Admission
+Coursework
+Comprehensive Exam
+Proposal Development
+Proposal Defense
+Data Collection
+Writing
+Final Defense
+LOA
+AWOL
+Withdrawal In Progress
+Withdrawn
+Completed
+14
+74
+0
+16
+16
+10
+1
+5
+4
+4
+0
+0
+4
+Admission · 14
+Coursework · 74
+Comprehensive Exam · 0
+Proposal Development · 16
+Proposal Defense · 16
+Data Collection · 10
+Writing · 1
+Final Defense · 5
+LOA · 4
+AWOL · 4
+Withdrawal In Progress · 0
+Withdrawn · 0
+Completed · 4
+Risk level
+
+Computed from monitoring signals
+
+On Track
+At Risk of Delay
+Delayed
+Not Yet Assessed
+117
+5
+13
+13
+On Track · 117
+At Risk of Delay · 5
+Delayed · 13
+Not Yet Assessed · 13
+Students by college
+
+Program clusters under monitoring
+
+Education
+Business
+Nursing
+Engineering andTechnology
+Arts and Sciences
+49
+31
+24
+23
+21
+Education · 49
+Business · 31
+Nursing · 24
+Engineering and Technology · 23
+Arts and Sciences · 21
+Research gate position
+
+Active research cases by gate
+
+Completion Evidence
+Final Defense
+Form 1 - Title Defense
+Form 4 - ProposalDefense Readiness
+6
+1
+5
+5
+Completion Evidence · 6
+Final Defense · 1
+Form 1 - Title Defense · 5
+Form 4 - Proposal Defense Readiness · 5
+6
+Coursework students
+Students in this category
+STUDENT
+	PROGRAM
+	STAGE / STATUS
+	RISK
+	RELEVANT DATE
+
+Francis Alvarez
+
+2260060
+
+	EDD	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Jon Alvarez
+
+2360067
+
+	EDD	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Noel Alvarez
+
+2560117
+
+	MASS	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Camille Aquino
+
+2260037
+
+	MBA	
+
+Coursework
+
+Active
+
+	Delayed	Nov 2, 2026
+Roberto Aquino
+
+GS-2026-CA-02
+
+	MAED	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Ana Bautista
+
+2460106
+
+	MSGC	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Olivia Bautista
+
+2260104
+
+	MSGC	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Camille Bernardo
+
+2360054
+
+	DBA	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Enrico Cabrera
+
+2560105
+
+	MSGC	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Olivia Cabrera
+
+2460017
+
+	MSCS	
+
+Coursework
+
+Active
+
+	On Track	Oct 13, 2026
+Irene Castillo
+
+2360051
+
+	DBA	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Isabel Castillo
+
+2460107
+
+	MSGC	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Maureen Castillo
+
+GS-2026-LOA-01
+
+	MAED	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Ana Chua
+
+2360065
+
+	EDD	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Ana Chua
+
+2560079
+
+	MSN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Elise Co
+
+2360102
+
+	MSGC	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Clarissa Dela Cruz
+
+GS-2026-ENR-01
+
+	MAED	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Carla Dizon
+
+2460083
+
+	MAN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Katrina Dizon
+
+2460112
+
+	MSGC	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Rafael Dizon
+
+2360027
+
+	MIT	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Hector Escobar
+
+2360096
+
+	MAPSY	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Lara Escobar
+
+2460047
+
+	MBA	
+
+Coursework
+
+Active
+
+	Delayed	Nov 2, 2026
+Ben Fernandez
+
+2260042
+
+	MBA	
+
+Coursework
+
+Active
+
+	Delayed	Nov 2, 2026
+Bianca Fernandez
+
+2360064
+
+	EDD	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Clarisse Fernandez
+
+2260023
+
+	MIT	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Daniel Fernandez
+
+GS-2026-LOA-02
+
+	MAED	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Bianca Flores
+
+2460040
+
+	MBA	
+
+Coursework
+
+Active
+
+	Delayed	Nov 2, 2026
+Hazel Flores
+
+2360087
+
+	MAN	
+
+Coursework
+
+Active
+
+	On Track	Sep 8, 2026
+Lara Flores
+
+2460058
+
+	DBA	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Carla Francisco
+
+2260076
+
+	MSN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Diane Francisco
+
+2560078
+
+	MSN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Fatima Francisco
+
+2360111
+
+	MSGC	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Isabel Francisco
+
+2360084
+
+	MAN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Adrian Garcia
+
+2460097
+
+	MAPSY	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Irene Garcia
+
+2360099
+
+	MAPSY	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Elise Gonzales
+
+2460039
+
+	MBA	
+
+Coursework
+
+Active
+
+	Delayed	Nov 2, 2026
+Lorenzo Gonzales
+
+2260034
+
+	MIT	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Martin Gonzales
+
+GS-2026-ENR-02
+
+	MAED	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Ana Hernandez
+
+2260045
+
+	MBA	
+
+Coursework
+
+Active
+
+	Delayed	Nov 2, 2026
+Elise Hernandez
+
+2460120
+
+	MASS	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Elise Hernandez
+
+2360071
+
+	MSN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Grace Hernandez
+
+2360113
+
+	MSGC	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Lara Hernandez
+
+2460016
+
+	MSCS	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Irene Jacinto
+
+2460109
+
+	MSGC	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Isabel Jacinto
+
+2460044
+
+	MBA	
+
+Coursework
+
+Active
+
+	Delayed	Nov 2, 2026
+Martin Jacinto
+
+2360081
+
+	MSN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Adrian Lacson
+
+2560066
+
+	EDD	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Gian Lacson
+
+2460068
+
+	MSN	
+
+Coursework
+
+Active
+
+	On Track	Aug 28, 2026
+Adrian Lim
+
+2360006
+
+	MAED	
+
+Coursework
+
+Active
+
+	On Track	Aug 20, 2026
+Adrian Lim
+
+2460032
+
+	MIT	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Fatima Lim
+
+2360050
+
+	MBA	
+
+Coursework
+
+Active
+
+	Delayed	Nov 2, 2026
+Joshua Lim
+
+GS-2026-WD-02
+
+	MAED	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Bianca Mendoza
+
+2560052
+
+	DBA	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Olivia Mendoza
+
+2460116
+
+	MASS	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Lianne Mercado
+
+GS-2026-CA-01
+
+	MAED	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Elena Navarro
+
+GS-2026-WD-01
+
+	MAED	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Adrian Ong
+
+2560024
+
+	MIT	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Irene Ong
+
+2360091
+
+	MAPSY	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Jerome Ong
+
+2560089
+
+	MAN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Rafael Ong
+
+2360029
+
+	MIT	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Gian Pang
+
+2260028
+
+	MIT	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Carla Reyes
+
+2460056
+
+	DBA	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Grace Reyes
+
+2560002
+
+	MAED	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Lorenzo Reyes
+
+2360074
+
+	MSN	
+
+Coursework
+
+Active
+
+	On Track	Sep 7, 2026
+Olivia Reyes
+
+2360077
+
+	MSN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Benjamin Santos
+
+2460003
+
+	MAED	
+
+Coursework
+
+Active
+
+	On Track	Aug 12, 2026
+Bianca Santos
+
+2360036
+
+	MBA	
+
+Coursework
+
+Active
+
+	Delayed	Nov 2, 2026
+Hazel Santos
+
+2260062
+
+	EDD	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Noel Santos
+
+2260088
+
+	MAN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Adrian Tan
+
+2360075
+
+	MSN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Isabel Tan
+
+2560094
+
+	MAPSY	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Camille Villanueva
+
+2560080
+
+	MSN	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Elise Villanueva
+
+2560022
+
+	MSCS	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026
+Noel Villanueva
+
+2360018
+
+	MSCS	
+
+Coursework
+
+Active
+
+	On Track	Nov 2, 2026

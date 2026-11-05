@@ -1,0 +1,87 @@
+1
+00:00:01,399 --> 00:00:07,399
+Next, we have the Leave of Absence. Meet Daniel, a Master of Arts in Education student.
+
+2
+00:00:08,300 --> 00:00:15,400
+Under Requests, Daniel opens Leave of Absence. Right away, the form shows the limit: two semesters at a time.
+
+3
+00:00:16,399 --> 00:00:24,199
+Here we have a panel that lists every rule the screen follows, each with its page in the Handbook.
+
+4
+00:00:27,699 --> 00:00:31,800
+Now Daniel picks the dates, chooses a reason, and adds a short explanation.
+
+5
+00:00:32,899 --> 00:00:37,099
+Before sending, Daniel gets a summary to check.
+
+6
+00:00:37,299 --> 00:00:41,799
+The request is sent, and now it waits for Graduate School staff.
+
+7
+00:00:42,000 --> 00:00:45,399
+So let's switch over. Graduate School staff signs in.
+
+8
+00:00:47,700 --> 00:00:54,799
+Here we have the Leave of Absence board. Each column is a stage, and each card is a request.
+
+9
+00:00:56,700 --> 00:01:03,500
+Graduate School staff drags the card to In staff review. The server checks every move before it counts.
+
+10
+00:01:09,799 --> 00:01:18,000
+Next is the policy check. It gives advice, either Pass or Needs review. But it never makes the decision. The Dean does.
+
+11
+00:01:22,299 --> 00:01:27,700
+So Graduate School staff forwards the request to the Dean.
+
+12
+00:01:27,900 --> 00:01:33,700
+The card moves to With the Dean, and staff can no longer change it.
+
+13
+00:01:33,900 --> 00:01:37,299
+Now it's the Dean's turn. The Dean signs in.
+
+14
+00:01:45,299 --> 00:01:50,099
+The Dean drags the card to Leave scheduled.
+
+15
+00:01:50,299 --> 00:01:56,700
+And the leave is approved and flagged for the Registrar. The Dean could also have denied it.
+
+16
+00:01:57,400 --> 00:02:05,399
+Back to the office side. Graduate School staff signs in again.
+
+17
+00:02:09,099 --> 00:02:14,800
+For this demo, Graduate School staff starts the leave by hand.
+
+18
+00:02:15,000 --> 00:02:18,400
+Daniel is now on leave, and enrollment is closed.
+
+19
+00:02:19,199 --> 00:02:26,300
+Next, we have the Registrar list. The portal doesn't send e-mail. Graduate School staff sends it the official way.
+
+20
+00:02:31,800 --> 00:02:36,300
+Then Graduate School staff marks the list as sent to the Registrar.
+
+21
+00:02:37,099 --> 00:02:43,600
+Let's check back on Daniel. Daniel signs in one more time.
+
+22
+00:02:43,800 --> 00:02:47,200
+And Daniel's page now shows the status On leave.

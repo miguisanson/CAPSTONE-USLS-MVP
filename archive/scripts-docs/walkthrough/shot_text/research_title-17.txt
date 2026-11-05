@@ -1,0 +1,615 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+AWOL & Residency
+
+MONITORING & SUPPORT
+
+Work Queue
+Policy Assistant
+Business Rules
+
+Academic Coordinator
+
+Figures are computed live from recorded transactions.
+
+Academic Coordinator Portal
+Research Gate
+Dr. Ramon Alvarez · Academic Coordinator
+DR
+Research Gate
+
+Check Form 1, Form 4, or completion evidence and set readiness or revision state. The Academic Coordinator endorses Form 1; the panel chair records each defense verdict.
+
+How this works
+View recent activity
+Rules applied on this screen
+8 rules from the Graduate School policies · 1 needs review
+Research Gate
+Adviser designation
+Choose a student
+
+Pick the record this action applies to
+
+YM
+
+Selected student
+
+2260004 - Yu, Miguel - MAED
+
+Research Gate record
+
+The stage and checklist are calculated from uploads, endorsements, and workflow results
+
+STUDENT
+
+Miguel Yu
+
+STUDENT ID
+
+2260004
+
+PROGRAM
+
+Master of Arts in Education
+
+ADVISER
+
+Dr. Celeste Tan
+
+RESEARCH TITLE
+
+Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses
+
+CURRENT STAGE
+
+Title Defense
+
+AUTOMATIC RESEARCH PROGRESS
+
+1
+Current:
+Title Defense
+Pending Staff Action
+2
+Upcoming:
+Proposal Defense
+Locked
+3
+Upcoming:
+Final Defense
+Locked
+4
+Upcoming:
+Completion
+Locked
+
+COMPLETED REQUIREMENTS
+
+2
+
+PENDING REQUIREMENTS
+
+3
+
+Title Defense requirements
+
+Uploaded and pending documents appear together. Open any file to preview it.
+
+Pending Staff Action
+
+Form 1 application
+
+The completed application for title defense.
+
+STUDENT UPLOAD · 1/1 FILES
+
+Verified
+Yu_Miguel_Form1_Application_for_Title_Defense.pdf · PDF · Nov 2, 2026
+
+Concept papers
+
+Upload each of the three concept papers as a separate PDF. These files are used for panel matching.
+
+STUDENT UPLOAD · 3/3 FILES
+
+Verified
+Yu_Miguel_ConceptPaper3_Student_Perceptions_Online_Courses.pdf · PDF · Nov 2, 2026
+Yu_Miguel_ConceptPaper2_Predicting_Course_Persistence.pdf · PDF · Nov 2, 2026
+Yu_Miguel_ConceptPaper1_Dashboard_Feedback_Engagement.pdf · PDF · Nov 2, 2026
+
+Academic Coordinator endorsement
+
+Recorded by the Academic Coordinator after reviewing the submission.
+
+STAFF / SYSTEM MANAGED
+
+Pending
+Form 1 endorsements
+
+Confirmed title defense schedule
+
+Added automatically after staff confirms a shared title defense schedule.
+
+STAFF / SYSTEM MANAGED
+
+Pending confirmed schedule
+
+Title defense result
+
+Recorded by the panel chair after the scheduled title defense.
+
+STAFF / SYSTEM MANAGED
+
+Pending confirmed schedule
+
+Panel Matching
+
+System-generated from the active paper body after required clearances.
+
+Recommended panel available
+Open matching
+Verify submitted requirements
+
+DEFENSE RESULT GATE
+
+Title defense result
+
+Confirm the defense schedule first. The student cannot move to the next Research Gate stage until a passing result is recorded.
+
+Pending confirmed schedule
+Form 1 Endorsements
+
+Academic Coordinator review and in-system signature queue
+
+Review the student's uploaded Form 1 and details before endorsing. The endorsement immediately updates Research Gate progress.
+
+Waiting and endorsed
+
+1 waiting
+
+Miguel Yu
+
+2260004 · MAED
+
+Waiting
+
+Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses
+
+Francis Jacinto
+
+2460059 · EDD
+
+Endorsed
+
+Mentoring of Beginning Teachers in Private Schools
+
+Gab Tolentino
+
+GS-2026-UD-03 · MBA
+
+Endorsed
+
+Inventory Accuracy and Order Fulfilment Time in a Cold-Chain Warehouse
+
+Olivia Bautista
+
+2260114 · MASS
+
+Endorsed
+
+Community Participation in Barangay Disaster Preparedness
+
+Camille Chua
+
+2260015 · MSCS
+
+Endorsed
+
+Anomaly Detection in Server Logs using Machine Learning
+
+Isabel Mendoza
+
+2360101 · MAPSY
+
+Endorsed
+
+Workplace Stress and Work-Life Balance of Hospital Employees
+
+Elise Gonzales
+
+2560086 · MAN
+
+Endorsed
+
+Burnout and Turnover Intention of Staff Nurses in Emergency Rooms
+
+Bea Fontanilla
+
+GS-2026-PM-04 · MBA
+
+Endorsed
+
+Trust, Perceived Risk, and E-Wallet Adoption among Young Working Adults
+
+Olivia Chua
+
+2260072 · MSN
+
+Endorsed
+
+Text-Message Follow-Up and Diabetes Self-Management in Community Clinics
+
+Diane Navarro
+
+2460095 · MAPSY
+
+Endorsed
+
+Social Media Use, Self-Esteem, and Anxiety among College Students
+
+Gian Reyes
+
+2360053 · DBA
+
+Endorsed
+
+Digital Payment Ecosystems and the Financial Inclusion of Micro-Entrepreneurs
+
+Hector Ong
+
+2360008 · MAED
+
+Endorsed
+
+Reflective Practice Models for Graduate Educators
+
+Nico Baltazar
+
+GS-2026-PM-07 · MBA
+
+Endorsed
+
+Influencer Credibility and Purchase Intention on Short-Video Platforms
+
+Ben Bautista
+
+2360041 · MBA
+
+Endorsed
+
+Succession Planning in Family-Owned Retail Businesses
+
+Nico Barrientos
+
+GS-2026-UD-01 · MBA
+
+Endorsed
+
+Reorder Point Policies and Service Levels for a Regional Hardware Distributor
+
+Fatima Santos
+
+2360090 · MAN
+
+Endorsed
+
+Nurse Staffing and Patient Safety Culture in Provincial Hospitals
+
+Jon Alvarez
+
+2460046 · MBA
+
+Endorsed
+
+Lean Process Improvement in a Food Manufacturing Plant
+
+Isabel Flores
+
+2260007 · MAED
+
+Endorsed
+
+Inclusive Learning Strategies for Graduate Education
+
+Rafael Ocampo
+
+GS-2026-PM-02 · MAPSY
+
+Endorsed
+
+Academic Burnout, Coping, and Psychological Well-Being of Working Graduate Students
+
+Gian Castillo
+
+2260035 · MBA
+
+Endorsed
+
+E-Wallet Adoption and Perceived Risk among Young Working Adults
+
+Marielle Bernardo
+
+2260118 · MASS
+
+Endorsed
+
+Migration, Remittances, and Household Livelihood in Rural Communities
+
+Fatima Castillo
+
+2360021 · MSCS
+
+Endorsed
+
+Predicting Student Course Failure from Learning Management System Data
+
+Miko Almario
+
+GS-2026-PM-05 · MBA
+
+Endorsed
+
+Demand Forecasting and Safety Stock Policy for a Consumer Goods Distributor
+
+Jerome Castillo
+
+2560108 · MSGC
+
+Endorsed
+
+Career Decision Self-Efficacy of Senior High School Learners
+
+Martin Evangelista
+
+2460014 · MSCS
+
+Endorsed
+
+Sensor-Based Fault Prediction for Water Pump Maintenance
+
+Nicole Dizon
+
+2560093 · MAPSY
+
+Endorsed
+
+Health Behavior Change and Treatment Adherence among Patients with Hypertension
+
+Daniel Bernardo
+
+2460055 · DBA
+
+Endorsed
+
+Strategic Renewal and Innovation in Third-Generation Family Firms
+
+Martin Pang
+
+2260098 · MAPSY
+
+Endorsed
+
+Academic Burnout, Coping, and Well-Being of Working Graduate Students
+
+Ana Abad
+
+2260043 · MBA
+
+Endorsed
+
+Social Media Marketing and Purchase Intention of Local Coffee Shops
+
+Marielle Navarro
+
+2360061 · EDD
+
+Endorsed
+
+Curriculum Alignment of a Teacher Education Program with National Standards
+
+Bea Salonga
+
+GS-2026-UD-02 · DBA
+
+Endorsed
+
+Governance and Continuity Planning in Second-Generation Family Enterprises
+
+Jon Aquino
+
+2260119 · MASS
+
+Endorsed
+
+Social Media and Political Participation of First-Time Voters
+
+Nicole Cabrera
+
+2360033 · MIT
+
+Endorsed
+
+Adoption of Cloud Accounting Systems by Small Enterprises
+
+Elena Mendoza
+
+2260011 · MAED
+
+Endorsed
+
+Peer Feedback and Writing Quality among Senior High School Students
+
+Jasper Lorenzo
+
+GS-2026-PM-03 · MSCS
+
+Endorsed
+
+Vibration-Based Predictive Maintenance of CNC Machine Tools using Machine Learning
+
+Lorenzo Evangelista
+
+2260038 · MBA
+
+Endorsed
+
+Inventory Control and Order Fulfillment in a Distribution Company
+
+Katrina Cabrera
+
+2260073 · MSN
+
+Endorsed
+
+Nurse-Led Patient Education and Wound Care Outcomes
+
+Daniel Aquino
+
+2260103 · MSGC
+
+Endorsed
+
+Help-Seeking Behavior and Counseling Services among Junior High School Students
+
+Grace Tan
+
+2360115 · MASS
+
+Endorsed
+
+Youth Volunteerism and Civic Engagement in Local Government Projects
+
+Rafael Pang
+
+2260063 · EDD
+
+Endorsed
+
+Instructional Leadership of School Heads and Teacher Morale
+
+Martin Flores
+
+2360030 · MIT
+
+Endorsed
+
+Information Security Awareness among University Employees
+
+Liza Marquez
+
+GS-2026-PM-06 · DBA
+
+Endorsed
+
+Succession Planning and Firm Continuity in Philippine Family Enterprises
+
+Enrico Lim
+
+2260048 · MBA
+
+Endorsed
+
+Employee Engagement and Retention in Call Center Companies
+
+Nicolas Valdez
+
+GS-2026-RES-01 · MAED
+
+Endorsed
+
+Blended Learning Readiness of Public School Teachers
+
+Olivia Jacinto
+
+2560100 · MAPSY
+
+Endorsed
+
+Resilience and Help-Seeking Behavior of Senior High School Students
+
+Noel Abad
+
+2560025 · MIT
+
+Endorsed
+
+Chatbot Support for Student Enrollment Inquiries
+
+Nicole Alvarez
+
+2360092 · MAPSY
+
+Endorsed
+
+Intrinsic Motivation and Persistence of Adult Learners
+
+Camille Dizon
+
+GS-2026-PM-01 · MSN
+
+Endorsed
+
+Text-Message Reminders and Medication Adherence among Adults with Hypertension
+
+Miguel Yu
+
+2260004 · Master of Arts in Education
+
+RESEARCH TITLE
+
+Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses
+
+ADVISER
+
+Dr. Celeste Tan
+
+CURRENT STAGE
+
+Title Defense
+
+UPLOADED
+
+Nov 2, 2026
+
+Uploaded Form 1
+
+Yu_Miguel_Form1_Application_for_Title_Defense.pdf
+
+Draw signature
+
+Clear drawing
+Signature finalized
+
+Signature finalized and ready to submit.
+
+Endorse and sign Form 1
+
+Draw the signature and finalize it first.

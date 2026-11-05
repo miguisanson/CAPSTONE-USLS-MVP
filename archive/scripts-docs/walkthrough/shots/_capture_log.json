@@ -1,0 +1,12 @@
+[
+ {
+  "case": "case_00_front",
+  "kind": "note",
+  "message": "shot front-login"
+ },
+ {
+  "case": "case_00_front",
+  "kind": "note",
+  "message": "shot front-dashboard"
+ }
+]

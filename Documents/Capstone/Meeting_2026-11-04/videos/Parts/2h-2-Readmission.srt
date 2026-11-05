@@ -1,0 +1,75 @@
+1
+00:00:01,300 --> 00:00:10,200
+Now let's look at Readmission, for students coming back from a leave. Therese has been on approved leave, and signs in.
+
+2
+00:00:11,199 --> 00:00:19,800
+Here we have the Readmission page. Enrollment stays closed until the readmission is approved. The leave that is ending is already filled in.
+
+3
+00:00:20,699 --> 00:00:27,900
+The rule says a returning student must write an intent to enroll. That's on page fifty-three of the Handbook.
+
+4
+00:00:30,800 --> 00:00:41,500
+So Therese picks the return semester and gives a reason. There's nothing to tick. The system shows what it already checked in the records, and what staff still need to confirm.
+
+5
+00:00:45,299 --> 00:00:51,500
+The request is sent. It goes to Graduate School staff first, and then to the Dean.
+
+6
+00:00:51,700 --> 00:00:55,500
+Let's switch to the office. Graduate School staff signs in.
+
+7
+00:00:57,799 --> 00:01:05,200
+Here we have the Readmission board. It works the same way, with its own columns. Therese's card is in Submitted.
+
+8
+00:01:09,500 --> 00:01:16,000
+Opening it, the request shows the return semester, the intention, and the leave it's linked to.
+
+9
+00:01:16,200 --> 00:01:30,099
+Next, we have the return checklist. It follows page forty-five of the Handbook. The system already checked the written intention and the subjects left. The Business Office clearance and the interview are for staff to confirm.
+
+10
+00:01:30,299 --> 00:01:37,399
+The policy check also flags an early return. Only the Dean can allow that, so it shows Needs review.
+
+11
+00:01:40,799 --> 00:01:49,500
+When forwarding, Graduate School staff ticks the two office checks. Anything left unticked reaches the Dean as Needs review.
+
+12
+00:01:51,599 --> 00:01:55,799
+Now it's the Dean's turn. The Dean signs in to decide.
+
+13
+00:02:03,900 --> 00:02:09,100
+The Dean approves the return and adds a note.
+
+14
+00:02:09,300 --> 00:02:17,500
+And Therese is active again. Readmission restores the student's standing, but it doesn't enroll any subjects. The Academic Coordinator does that next.
+
+15
+00:02:18,199 --> 00:02:25,900
+Back to the office side. Graduate School staff signs in again.
+
+16
+00:02:26,099 --> 00:02:34,200
+On the staff board, the Academic Coordinator is now the next owner, and the case is flagged for the Registrar.
+
+17
+00:02:34,400 --> 00:02:42,200
+Here we have the same Registrar list as before. Download it, send it, mark it sent, and then mark it acknowledged.
+
+18
+00:02:42,900 --> 00:02:47,500
+Then Therese signs back in.
+
+19
+00:02:47,699 --> 00:02:52,600
+Therese can see the approval, along with the messages from staff and the Dean.

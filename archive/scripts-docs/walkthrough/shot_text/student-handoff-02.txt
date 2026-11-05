@@ -1,0 +1,88 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Student Handoff
+Grace Fernandez · Graduate School Staff
+1
+GF
+Student Handoff
+
+Create the Graduate School monitoring record from an admission or enrollment signal.
+
+How this works
+View recent activity
+Import from monitoring sheet
+
+Upload the AC Student Monitoring Excel file — students, programs, and course audits are created automatically
+
+Full sheet
+MSN_Monitoring_Sheet_walkthrough_204902.xlsx
+Choose a different file
+
+Expected format: AC Student Monitoring template — program in cell A1, one student per row.
+
+Import students
+Upload history
+
+Every uploaded workbook is preserved. Open a version to review conflicts between its values and the current record.
+
+0 backups
+
+No monitoring-sheet backups yet.
+
+Onboarding report & Dean approval
+Refresh
+
+Each import batch is checked, reported to the Dean, and only then recorded as an admission completion. The checklist is derived from the import — it is not ticked by hand.
+
+No import batches yet
+
+Import a monitoring sheet to open an onboarding report.

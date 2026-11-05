@@ -5,6 +5,9 @@ server/node_modules/
 References/MVP-FIGMA/node_modules/
 __pycache__/
 *.py[cod]
+.venv/
+.pnpm-store/
+.rag_index/
 
 # Build output
 dist/
@@ -26,7 +29,17 @@ server/.env.*
 # Runtime data
 server/uploads/*
 !server/uploads/.gitkeep
+# Every runtime upload (AGENTS.md Rule 4); the seed reads Documents/Sample_Data, never uploads/.
+uploads/*
+# Except the built-in policy library the seed and the assistant start from (test_policy_documents).
+!uploads/policy_documents/
+uploads/policy_documents/*
+!uploads/policy_documents/997a09cc6a-GRADUATE-SCHOOL-HANDBOOK-22-23.pdf
+!uploads/policy_documents/556e4ad322-Complete-GS-Research-Protocol-Updated-for-AY2024-2025-without-publication-protocol-1.docx
+uploads/research_evidence/*
+uploads/student_requests/*
 *.sqlite3
+*.sqlite3*
 usls_gs_demo.sqlite3
 
 # Logs and OS/editor files
@@ -38,7 +51,50 @@ npm-debug.log*
 
 # Private local notes and deployment files
 PRIVATE_UBUNTU_HOSTING_NOTES.txt
-deploy/
+deploy/tunnel.env
 
 # Ignore accidental nested copies of this repository
 CAPSTONE-USLS-MVP/
+
+# Temporary document-build scratch folder
+_handout/
+
+# Local reference copies of teammates branches (not part of the app)
+Other_Branches/
+
+# GSD Core install (reinstall: npx @opengsd/gsd-core@latest --claude --local).
+# Its working plans in .planning/ ARE committed.
+.claude/settings.local.json
+.claude/.gsd-profile
+.claude/.gsd-runtime
+.claude/agents/gsd-*
+.claude/commands/gsd-*
+.claude/gsd-*
+.claude/hooks/
+.claude/scripts/
+
+# Runtime copy of the Operations Manual draft seeded into the policy library at startup
+uploads/policy_documents/*Operations*Manual*
+
+# Unattended-run watchdog heartbeat
+.planning/.run-heartbeat
+
+# Playwright harness output (screenshots, auth sessions, reports, temp state)
+frontend/e2e-artifacts/
+frontend/playwright-report/
+frontend/test-results/
+
+# Per-install runtime files (the generated session secret key)
+instance/
+
+# Recorded demo videos (large; kept on this PC, rebuilt with scripts/demo/record_demo.py)
+Documents/Capstone/Meeting_2026-11-04/videos/**/*.mp4
+
+# Isolated agent development worktrees
+.worktrees/
+
+# Playwright output when a spec is started from the repo root
+test-results/
+
+# Per-visitor demo databases
+demo_sandboxes/

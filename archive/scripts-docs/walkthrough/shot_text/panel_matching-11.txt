@@ -1,0 +1,200 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Research Gate
+Grace Fernandez · Graduate School Staff
+2
+GF
+Research Gate
+
+Check Form 1, Form 4, or completion evidence and set readiness or revision state. The Academic Coordinator endorses Form 1; the panel chair records each defense verdict.
+
+How this works
+View recent activity
+Rules applied on this screen
+8 rules from the Graduate School policies · 1 needs review
+Research Gate
+Adviser designation
+Choose a student
+
+Pick the record this action applies to
+
+YM
+
+Selected student
+
+2260004 - Yu, Miguel - MAED
+
+Research Gate record
+
+The stage and checklist are calculated from uploads, endorsements, and workflow results
+
+STUDENT
+
+Miguel Yu
+
+STUDENT ID
+
+2260004
+
+PROGRAM
+
+Master of Arts in Education
+
+ADVISER
+
+Dr. Celeste Tan
+
+RESEARCH TITLE
+
+Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses
+
+CURRENT STAGE
+
+Title Defense
+
+AUTOMATIC RESEARCH PROGRESS
+
+1
+Current:
+Title Defense
+Pending Staff Action
+2
+Upcoming:
+Proposal Defense
+Locked
+3
+Upcoming:
+Final Defense
+Locked
+4
+Upcoming:
+Completion
+Locked
+
+COMPLETED REQUIREMENTS
+
+3
+
+PENDING REQUIREMENTS
+
+2
+
+Title Defense requirements
+
+Uploaded and pending documents appear together. Open any file to preview it.
+
+Pending Staff Action
+
+Form 1 application
+
+The completed application for title defense.
+
+STUDENT UPLOAD · 1/1 FILES
+
+Verified
+Yu_Miguel_Form1_Application_for_Title_Defense.pdf · PDF · Nov 2, 2026
+
+Concept papers
+
+Upload each of the three concept papers as a separate PDF. These files are used for panel matching.
+
+STUDENT UPLOAD · 3/3 FILES
+
+Verified
+Yu_Miguel_ConceptPaper3_Student_Perceptions_Online_Courses.pdf · PDF · Nov 2, 2026
+Yu_Miguel_ConceptPaper2_Predicting_Course_Persistence.pdf · PDF · Nov 2, 2026
+Yu_Miguel_ConceptPaper1_Dashboard_Feedback_Engagement.pdf · PDF · Nov 2, 2026
+
+Academic Coordinator endorsement
+
+Recorded by the Academic Coordinator after reviewing the submission.
+
+STAFF / SYSTEM MANAGED
+
+Endorsed
+
+Confirmed title defense schedule
+
+Added automatically after staff confirms a shared title defense schedule.
+
+STAFF / SYSTEM MANAGED
+
+Pending confirmed schedule
+
+Title defense result
+
+Recorded by the panel chair after the scheduled title defense.
+
+STAFF / SYSTEM MANAGED
+
+Pending confirmed schedule
+
+Panel Matching
+
+System-generated from the active paper body after required clearances.
+
+Final panel selected
+Open matching
+
+Dr. Liwayway Bautista · Dr. Patricia Salvador · Dr. Teodoro Ramos
+
+Verify submitted requirements
+
+DEFENSE RESULT GATE
+
+Title defense result
+
+Confirm the defense schedule first. The student cannot move to the next Research Gate stage until a passing result is recorded.
+
+Pending confirmed schedule
+
+Read-only for GS staff. The assigned panel chair or panel lead submits the verdict from the Faculty Portal.

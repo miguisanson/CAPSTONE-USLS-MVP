@@ -1,0 +1,490 @@
+Skip to main content
+
+USLS Graduate School
+
+LIFECYCLE MONITORING
+
+OVERVIEW
+
+Dashboard
+Reports & Analytics
+Academic Semesters
+
+RECORDS
+
+Students
+Faculty
+Monitoring Sheet
+Enrollment Class List
+
+LIFECYCLE WORKFLOWS
+
+1 · Student Handoff
+2 · Course Adjustments
+3 · Enrollment
+4 · Course Audit
+5 · Research Gate
+6 · Panel Matching
+7 · Defense Scheduling
+8 · Practicum
+9 · Graduation Endorsement
+
+STANDALONE PROCESSES
+
+Leave of Absence
+Readmission
+AWOL & Residency
+Subject Withdrawal
+
+MONITORING & SUPPORT
+
+Work Queue
+Activity Log
+Policy Assistant
+Policy Documents
+Business Rules
+
+Graduate School Staff
+
+Figures are computed live from recorded transactions.
+
+Graduate School Staff Portal
+Panel Matching
+Grace Fernandez · Graduate School Staff
+2
+GF
+Panel Matching
+
+Nominate panel members (after the Academic Coordinator's endorsement of Form 1) using specialization, availability, workload, and eligibility notes.
+
+How this works
+View recent activity
+Rules applied on this screen
+11 rules from the Graduate School policies · 2 need review
+Choose a student
+
+Pick the record this action applies to
+
+LJ
+
+Selected student
+
+GS-2026-PM-03 - Lorenzo, Jasper - MSCS
+
+Panel recommendation workspace
+
+Review why each faculty member ranks where they do, adjust the suggested panel, then finalize it
+
+Faculty profiles
+
+Three concept papers content ready
+
+3 of 3 PDFs uploaded. 3 of 3 successfully read. Source: Three concept papers body text only; research titles and filenames excluded.
+
+Similarity match (keyword TF-IDF)
+Ready
+
+Paper analysis: Keyword analysis (local, no AI service)
+
+Keyword TF-IDF similarity between the paper and each faculty member's expertise records.
+
+Research title (display only; excluded from matching): Vibration-Based Predictive Maintenance of CNC Machine Tools using Machine Learning
+
+machine learning
+data
+detection
+sensor
+energy
+anomaly
+conveyor
+systems
+consumption
+optimization
+industrial
+motors
+sensors
+model
+machine
+applies
+condition
+monitoring
+Anomaly Detection in Conveyor Systems using Sensor Data.pdf
+Text extracted
+
+Analyzed keywords: anomaly, detection, conveyor, systems, data
+
+Anomaly Detection in Conveyor Systems using Sensor Data This concept paper applies anomaly detection to condition monitoring data from conveyor systems in a manufacturing plant to support automation and reduce unplanned...
+
+Energy Consumption Optimization of Industrial Motors with IoT Sensors.pdf
+Text extracted
+
+Analyzed keywords: energy, consumption, optimization, industrial, motors
+
+Energy Consumption Optimization of Industrial Motors with IoT Sensors This concept paper measures the energy consumption of industrial motors on a production line with IoT sensors and builds a data model to identify...
+
+Vibration-Based Predictive Maintenance of CNC Machine Tools using Machine Learning.pdf
+Text extracted
+
+Analyzed keywords: machine learning, sensor, machine, develops, predictive
+
+This concept paper develops a predictive maintenance model that uses vibration sensor signals from CNC machine tools to predict bearing faults before failure. Machine learning classifiers will be trained on labeled...
+
+EXPERTISE MATCH
+
+60 pts
+
+paper vs. faculty records
+
+AVAILABILITY
+
+25 pts
+
+conflict-free windows
+
+WORKLOAD
+
+15 pts
+
+other student panels
+
+Thesis panel needs 3 members: Panel Chair, Content Specialist, Method Specialist. Expertise counts most; candidates who share no topic with the paper are listed after those who do.
+
+Not eligible for this student's panel
+
+Dr. Marlon Geronimo: Adviser of this student; an adviser cannot sit on the student's panel.
+Search faculty
+Specialization
+Department / program
+Availability
+All availability
+Available
+Limited availability
+No availability recorded
+Showing the top 11 ranked candidates. The suggested panel is highlighted and preselected; open "Why" on any row to see the evidence.
+RANK / FACULTY
+EXPERTISE MATCH
+AVAILABILITY & WORKLOAD
+SCORE BREAKDOWN
+1
+Dr. Daniel Uy
+Suggested: Panel Chair
+
+Engineering and Technology
+
+optimization
+detection
+motors
+energy consumption
+automation
+
+Engineering systems, automation, data modeling, and predictive analytics
+
+Why this score
+
+Available
+
+5 conflict-free windows
+
+0 other student panels
+
+98.4/100
+
+60/60 · 23.4/25 · 15/15
+
+2
+Dr. Paolo Navarro
+Suggested: Content Specialist
+
+Business
+
+manufacturing
+industrial
+
+Human resource management, organizational behavior, leadership, and workplace research
+
+Why this score
+
+Available
+
+5 conflict-free windows
+
+2 other student panels
+
+34.6/100
+
+1.2/60 · 23.4/25 · 10/15
+
+3
+Dr. Marco Villanueva
+
+Business
+
+Overloaded
+optimization
+reduce
+manufacturing plant
+maintenance
+scheduling
+
+Operations management, supply chain analytics, quality systems, and process improvement
+
+Why this score
+
+Available
+
+3 conflict-free windows
+
+5 other student panels
+
+26.9/100
+
+7.2/60 · 17.2/25 · 2.5/15
+
+4
+Dr. Patricia Salvador
+
+Education
+
+training
+
+Online learning, learning management systems, education technology, and curriculum development
+
+Why this score
+
+Available
+
+3 conflict-free windows
+
+3 other student panels
+
+26/100
+
+1.3/60 · 17.2/25 · 7.5/15
+
+5
+Dr. Adriana Santos
+
+Nursing
+
+No topic match
+
+No distinctive topic in common with the paper
+
+Health informatics, public health, and medical systems
+
+Why this score
+
+Available
+
+4 conflict-free windows
+
+0 other student panels
+
+35.3/100
+
+0/60 · 20.3/25 · 15/15
+
+6
+Dr. Liwayway Bautista
+Suggested: Method Specialist
+
+Education
+
+No topic match
+
+No distinctive topic in common with the paper
+
+Learning analytics, online learning, and student engagement in graduate education
+
+Why this score
+
+Available
+
+5 conflict-free windows
+
+2 other student panels
+
+33.4/100
+
+0/60 · 23.4/25 · 10/15
+
+7
+Dr. Celeste Tan
+
+Arts and Sciences
+
+No topic match
+
+No distinctive topic in common with the paper
+
+Psychology, student well-being, and behavioral research
+
+Why this score
+
+Limited availability
+
+2 conflict-free windows
+
+1 other student panel
+
+26.6/100
+
+0/60 · 14.1/25 · 12.5/15
+
+8
+Dr. Benjamin Reyes
+
+Business
+
+No topic match
+
+No distinctive topic in common with the paper
+
+Finance, business analytics, accounting, and financial technology
+
+Why this score
+
+Available
+
+3 conflict-free windows
+
+3 other student panels
+
+25.2/100
+
+0.5/60 · 17.2/25 · 7.5/15
+
+9
+Dr. Teresa Lim
+
+Business
+
+No topic match
+
+No distinctive topic in common with the paper
+
+Marketing strategy, consumer behavior, digital commerce, and brand analytics
+
+Why this score
+
+Limited availability
+
+2 conflict-free windows
+
+2 other student panels
+
+24.1/100
+
+0/60 · 14.1/25 · 10/15
+
+10
+Dr. Angela Cruz
+
+Business
+
+Overloaded
+No topic match
+
+No distinctive topic in common with the paper
+
+Strategic management, entrepreneurship, organizational innovation, and family business
+
+Why this score
+
+Available
+
+4 conflict-free windows
+
+5 other student panels
+
+23.6/100
+
+0.8/60 · 20.3/25 · 2.5/15
+
+11
+Dr. Teodoro Ramos
+
+Education
+
+Overloaded
+No topic match
+
+No distinctive topic in common with the paper
+
+Learning analytics, online learning assessment, and educational data science
+
+Why this score
+
+Limited availability
+
+2 conflict-free windows
+
+8 other student panels
+
+14.7/100
+
+0.6/60 · 14.1/25 · 0/15
+
+Expertise match
+Availability
+Workload
+
+Review and adjust the panel set
+
+The suggested panel is preselected: the strongest methods profile takes the Method seat and the rest follow by score. Staff may change any role before finalizing.
+
+Staff review
+Panel Chair
+Select faculty
+#1 Dr. Daniel Uy - 98.4/100
+#2 Dr. Paolo Navarro - 34.6/100
+#3 Dr. Marco Villanueva - 26.9/100
+#4 Dr. Patricia Salvador - 26/100
+#5 Dr. Adriana Santos - 35.3/100
+#6 Dr. Liwayway Bautista - 33.4/100
+#7 Dr. Celeste Tan - 26.6/100
+#8 Dr. Benjamin Reyes - 25.2/100
+#9 Dr. Teresa Lim - 24.1/100
+#10 Dr. Angela Cruz - 23.6/100
+#11 Dr. Teodoro Ramos - 14.7/100
+Content Specialist
+Select faculty
+#1 Dr. Daniel Uy - 98.4/100
+#2 Dr. Paolo Navarro - 34.6/100
+#3 Dr. Marco Villanueva - 26.9/100
+#4 Dr. Patricia Salvador - 26/100
+#5 Dr. Adriana Santos - 35.3/100
+#6 Dr. Liwayway Bautista - 33.4/100
+#7 Dr. Celeste Tan - 26.6/100
+#8 Dr. Benjamin Reyes - 25.2/100
+#9 Dr. Teresa Lim - 24.1/100
+#10 Dr. Angela Cruz - 23.6/100
+#11 Dr. Teodoro Ramos - 14.7/100
+Method Specialist
+Select faculty
+#1 Dr. Daniel Uy - 98.4/100
+#2 Dr. Paolo Navarro - 34.6/100
+#3 Dr. Marco Villanueva - 26.9/100
+#4 Dr. Patricia Salvador - 26/100
+#5 Dr. Adriana Santos - 35.3/100
+#6 Dr. Liwayway Bautista - 33.4/100
+#7 Dr. Celeste Tan - 26.6/100
+#8 Dr. Benjamin Reyes - 25.2/100
+#9 Dr. Teresa Lim - 24.1/100
+#10 Dr. Angela Cruz - 23.6/100
+#11 Dr. Teodoro Ramos - 14.7/100
+
+Panel composition rules
+
+Suggested panel satisfies the protocol
+All 3 panel seats required for a Thesis are filled.
+Every required role is seated exactly once.
+Every seat has a different faculty member.
+The student's adviser and co-adviser are not on the panel.
+Dr. Daniel Uy chairs the panel (University-affiliated faculty).
+A Thesis panel has no External Panel seat.
+Dr. Liwayway Bautista has recorded research-methods expertise.
+
+Source: Graduate School Research Protocol (AY 2024-2025), Title Defense - panel composition. Checked again on the server when the panel is finalized.
+
+Finalize selected panel
