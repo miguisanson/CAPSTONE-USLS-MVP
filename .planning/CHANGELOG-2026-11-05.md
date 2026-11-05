@@ -20,3 +20,27 @@ Branch: **`v6.4-migui`** (new) = `v6.2-migui` + Natalie's `v6.3-natalie`. Reseed
 
 ## Open
 - I-369 (question): two browsers are now two separate demos; option of a "share this demo" code.
+
+---
+
+# 2026-11-05 afternoon — final polish loop on `v6.4.1-test` (from `v6.4-migui` @ 67d4432)
+
+Owner: no questions; every open question takes the policy-faithful default the stakeholders agreed to (IM42-IM44).
+Plan: Fable review `.planning/research/FABLE-REVIEW-2026-11-05.md`. **Reseed after pulling** (`npm run seed`): new columns
+`ResearchEvidenceFile.similarity_percent`, `AwolCase.staff_checks_json`, new table `ComprehensiveExamResult`.
+
+| What | Issues | Merge |
+|---|---|---|
+| Screen words in plain English, no pronouns for people; `check:ui` now fails on he/she/they in screen text | F5-01/02/12/13, I-081, I-369 | 2969867 |
+| Research Gate cards: "3 of 5 done · Still to do: A, B +3 more", requirement tiles in View, old picker gone (page 5,300 -> 1,250 px); one verdict form everywhere; no free-text source reference | F5-03/08/09 | 3d09151, d2587b0d |
+| Boards: phone list collapses finished stages, filter chips Needs my action / Waiting on others / Finished; Finished wins over "Waiting for"; AWOL headline; Dean graduation Next; task links open the student | F5-04/05/07/11/16, I-348 | 5486732, d2587b0d |
+| Loading skeletons on list/report/record pages and the Research Gate; residency purpose from the stage, semester read-only, check runs by itself | F5-10/15, I-299 | 2973d56, 895331e4 |
+| Withdrawal + Graduation: Sent to Registrar and Acknowledged/Registrar Received; the Dean's approval tags the subject Withdrawn; a resent withdrawal keeps its first date; readmission and Return from AWOL need Business Office clearance + interview before the Dean; LOA two-week check again at approval; finished denials have no owner; Research Coordinator home counts research students | F5-06/07/14, I-167, I-273, I-278, I-297, I-302, I-306, I-324 | 685f32f1, f9e105d8, ac9471c3 |
+| Hard 14-day lead time (demo "skip date waits" also skips it); manuscript date from the adviser's Form 4, read-only; enrollment status derived from subjects; one Form 4 at the proposal gate; Failed/Deferred refuse a passing score; Turnitin similarity % (over 15 refused); one 20 % drop rule | I-170, I-174, I-277, I-284, I-285, I-313, I-326, I-327 | f9e105d8, 2a5a3c4d |
+| Staff record the comprehensive exam result with provenance; Advise Slip print view after the Dean approves a readmission | I-335, I-304 | 895331e4 |
+| Research Gate board 4.0 s -> 1.2 s (exam eligibility computed once per student; the board looked empty under load) | - | 91613959 |
+| Field label holds only the label (hint/error outside), so screen readers do not read the hint twice | I-370 | d2587b0d |
+| Operations Manual follows the new rules, "Known gaps" table (deferred I-279, I-293, I-317, I-319, I-326 per member, I-346); .docx + .pdf rebuilt; UAT.md keeps the demo accounts panel | IM44, I-334 | f7a43d8e, d8a007c9 |
+
+Notes: the e2e dist must be built with `node scripts/e2e.mjs test --build` (a plain `npm run build:web` has no `/__ui` gallery).
+Never `git stash` inside a worktree (the stash list is shared).
