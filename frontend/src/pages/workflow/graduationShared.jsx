@@ -194,6 +194,8 @@ const GRADUATION_BATCH_STAGES = [
 ];
 
 export function graduationRowStatus(row) {
+  // Dean-approved but no longer eligible: the export would refuse it, so it is not "ready" (I-374)
+  if (row.export_blocked_reason) return "Not Eligible";
   return row.endorsement?.endorsement_status || "Not Prepared";
 }
 
