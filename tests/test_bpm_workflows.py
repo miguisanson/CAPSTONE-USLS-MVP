@@ -3222,6 +3222,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                     "Written intention to enroll",
                     "Evaluation of subject/grade requirements",
                     "Clearance from Business Office",
+                    "Interview (reason for delay, residency requirements)",
                 ],
             })
             self.assertEqual(response.status_code, 200, response.get_json())

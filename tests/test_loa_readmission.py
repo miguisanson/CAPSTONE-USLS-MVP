@@ -674,11 +674,10 @@ class LeaveCaseTests(unittest.TestCase):
         # The system items are worked out from the request and the records; nothing is "ticked by the student".
         self.assertEqual([row["confirmed"] for row in detail["checklist"]], [True, True, False, False])
         self.assertTrue(all("checked" not in row for row in detail["checklist"]))
-        self.act(self.staff_client(), case_id, "forward", confirmed_items=STAFF_CHECKS[:1])
+        self.assertEqual(self.act(self.staff_client(), case_id, "forward", confirmed_items=STAFF_CHECKS[:1]).status_code, 409)  # IM45
+        self.assertEqual(self.act(self.staff_client(), case_id, "forward", confirmed_items=STAFF_CHECKS).status_code, 200)
         detail = self.staff_client().get(f"/api/leave-cases/{case_id}").get_json()["case"]
-        self.assertEqual([row["confirmed"] for row in detail["checklist"]], [True, True, True, False])
-        self.assertEqual(detail["eligibility_result"], "Needs Review")
-        self.assertEqual(detail["policy_snapshot"]["recommendation"], "Needs Review")
+        self.assertEqual([row["confirmed"] for row in detail["checklist"]], [True, True, True, True])
 
     # ---- owner rule 2026-11-04: never make a user enter what the system knows ----------
     def test_readmission_asks_the_student_to_tick_nothing_and_shows_what_the_records_show(self):
@@ -1368,15 +1367,19 @@ class LeaveCaseTests(unittest.TestCase):
         shown = self.staff_client().get(f"/api/leave-cases/{case_id}").get_json()["case"]
         self.assertFalse(shown["awol_proposed"])
 
-    def test_an_unverified_readmission_checklist_reaches_the_dean_as_needs_review(self):
+    def test_staff_cannot_forward_a_readmission_until_both_office_checks_are_ticked(self):  # IM45 (F6-02)
         self.make_on_leave("Running Term", "Term One")
         body = {"target_return_term": "Term Two", "return_intent": "Ready.", "readmission_items": CHECKLIST}
         self.assertEqual(self.student_client().post("/api/student-portal/requests/readmission", json=body).status_code, 200)
         case_id = self.case()
-        self.assertEqual(self.act(self.staff_client(), case_id, "forward").status_code, 200)
-        detail = self.dean_client().get(f"/api/leave-cases/{case_id}").get_json()["case"]
-        self.assertEqual(detail["eligibility_result"], "Needs Review")
+        for ticked in ([], STAFF_CHECKS[:1]):
+            refused = self.act(self.staff_client(), case_id, "forward", confirmed_items=ticked)
+            self.assertEqual(refused.status_code, 409, refused.get_json())
+            self.assertIn("Tick ", refused.get_json()["error"])
+        detail = self.staff_client().get(f"/api/leave-cases/{case_id}").get_json()["case"]
+        self.assertEqual(detail["status"], "Submitted")
         self.assertFalse(any(row["confirmed"] for row in detail["checklist"] if row["source"] == "staff"))
+        self.assertEqual(self.act(self.staff_client(), case_id, "forward", confirmed_items=STAFF_CHECKS).status_code, 200)
         bad = self.act(self.staff_client(), self.case(), "forward", confirmed_items=["Made-up item"])
         self.assertIn(bad.status_code, {400, 409})
 

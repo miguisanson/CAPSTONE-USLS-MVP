@@ -8101,6 +8101,11 @@ def _leave_h_forward(case, account, comment, data, move):
         unknown = sorted(confirmed - set(readmission_requirements()))
         if unknown:
             raise LeaveError("Unknown readmission checklist item: " + ", ".join(unknown))
+        missing = returnee_checks_missing(confirmed)
+        if missing:
+            raise LeaveError(
+                f"Tick {missing} first. Graduate School staff confirm the returnee checks before a readmission goes to the Dean "
+                "(Handbook p.45).", 409)
         # System items are worked out from the records; a name sent for one is ignored.
         case.staff_checks_json = json.dumps({item: item in confirmed for item in READMISSION_STAFF_ITEMS})
     review = leave_policy_review(case)
@@ -8191,14 +8196,15 @@ def _leave_h_approve(case, account, comment, data, move):
     if case.kind == KIND_READMISSION:
         # I-297: like residency (I-012), the Dean decides only after staff confirmed the office checks.
         if not all(row["confirmed"] for row in leave_checklist_state(case) if row["source"] == "staff"):
+            missing = returnee_checks_missing({row["item"] for row in leave_checklist_state(case) if row["confirmed"]})
             raise LeaveError(
-                "Graduate School staff have not confirmed the Business Office clearance and the interview yet, "
-                "so this readmission cannot be approved. Return it to staff to confirm them.", 409)
+                f"Graduate School staff have not confirmed {missing} yet, so this readmission cannot be approved. "
+                "Return the case for revision so staff can confirm the checks before it comes back to the Dean.", 409)
     if case.kind == KIND_LOA and not demo_skip_date_waits():
         # I-302: the two-week no-grant rule is checked again on the day of the decision (Handbook p.53).
         filing = loa_filing_check(case.start_term)
         if filing["status"] == "Fail":
-            raise LeaveError(filing["detail"], 409)
+            raise LeaveError(f"{filing['detail']} Deny it or return it for a later semester.", 409)
     result = leave_result_text(case, "approved")
     extra = ""
     if case.kind == KIND_LOA:
@@ -9067,7 +9073,7 @@ def withdrawal_registrar_advance(application: WithdrawalApplication, target: str
     application.updated_at = now
     add_log(
         "withdrawal", application.student_id, workflow_actor_label(account), "Registrar handoff",
-        f"Withdrawal list {target.lower()}", "Graduate School Staff", f"Handoff status: {previous} to {application.status}.",
+        f"Withdrawal list {target.lower()}", "", f"Handoff status: {previous} to {application.status}.",
         previous_status=previous, new_status=application.status, visibility="internal",
     )
 
@@ -19057,9 +19063,10 @@ def register_routes(app: Flask) -> None:
                     db.session.rollback()
                     return jsonify(error=f"{off.course.code}: {exc}"), 400
                 schedule = schedule.strip()
-                if schedule != (off.schedule or "") and offering_timetable_is_governed(off):
+                if (schedule != (off.schedule or "") or faculty_id != off.assigned_faculty_id
+                        or section.strip() != (off.section or "")) and offering_timetable_is_governed(off):
                     db.session.rollback()
-                    return jsonify(error=f"{off.course.code}: this timetable is approved or published. Create a revision in the Schedule tab."), 409
+                    return jsonify(error=f"{off.course.code}: this timetable is approved or published, so its schedule, teacher and section are fixed. Create a revision in the Schedule tab."), 409
                 if schedule and schedule != (off.schedule or "") and not parse_offering_schedule(schedule):
                     db.session.rollback()
                     return jsonify(error=f"{off.course.code}: choose a schedule from the dropdown."), 400
@@ -19079,8 +19086,13 @@ def register_routes(app: Flask) -> None:
     def course_offerings_update(offering_id: int):
         data = request.get_json(silent=True) or {}
         off = CurriculumOffering.query.get_or_404(offering_id)
-        if "schedule" in data and (data.get("schedule") or "").strip() != (off.schedule or "") and offering_timetable_is_governed(off):
-            return jsonify({"error": "This timetable is approved or published. Create a revision in the Schedule tab."}), 409
+        changes = (
+            ("schedule" in data and (data.get("schedule") or "").strip() != (off.schedule or ""))
+            or ("faculty_id" in data and (safe_int(data.get("faculty_id")) or None) != off.assigned_faculty_id)
+            or ("section" in data and (data.get("section") or "").strip().upper() != (off.section or ""))
+        )
+        if changes and offering_timetable_is_governed(off):
+            return jsonify({"error": "This timetable is approved or published, so its schedule, teacher and section are fixed. Create a revision in the Schedule tab."}), 409
         if "faculty_id" in data:
             faculty_id = safe_int(data.get("faculty_id")) or None
             if faculty_id:
@@ -19589,7 +19601,9 @@ def register_routes(app: Flask) -> None:
                 if not subject_enrollment or not subject_enrollment.course or not subject_enrollment.term:
                     return jsonify({"error": "This withdrawal request is not linked to a valid subject enrollment."}), 400
                 if subject_enrollment.status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
-                    return jsonify({"error": f"The selected subject is already {subject_enrollment.status}."}), 409
+                    return jsonify({"error": (
+                        f"{subject_enrollment.course.code} is already {subject_enrollment.status}, so there is nothing to withdraw. "
+                        "Deny the request and tell the student.")}), 409
                 application.effective_date = application.effective_date or (
                     application.created_at.date() if application.created_at else ph_today()
                 )
@@ -19661,9 +19675,10 @@ def register_routes(app: Flask) -> None:
             previous_status = item.status
             if decision == "approve" and not all(row["confirmed"] for row in awol_staff_checklist(item)):
                 # I-273: like readmission (I-297), the Dean decides only after staff confirmed the office checks.
+                missing = returnee_checks_missing({row["item"] for row in awol_staff_checklist(item) if row["confirmed"]})
                 return jsonify({"error": (
-                    "Graduate School staff have not confirmed the Business Office clearance and the interview yet, "
-                    "so this return cannot be approved. Return it to staff to confirm them.")}), 400
+                    f"Graduate School staff have not confirmed {missing} yet, so this return cannot be approved. "
+                    "Return the case for revision so staff can confirm the checks before it comes back to the Dean.")}), 400
             if decision == "approve":
                 if item.full_reenrollment_required:
                     item.status = "Re-enrollment Required"
@@ -25588,8 +25603,9 @@ def workflow_case_is_closed(slug: str, student_id: int, latest_entry: Transactio
     if record is None:
         return False
     if slug == "graduation":
-        return record.endorsement_status == "Registrar Received"  # like LOA: open until the Registrar acknowledged
-    return record.status in WORKFLOW_FINAL_STATUSES.get(slug, ()) and record.status not in {"Exported - Ready to Send", "Sent to Registrar"}
+        # IM45: the Graduate School's duty ends when the list is sent; the acknowledgement is optional.
+        return record.endorsement_status in {"Sent to Registrar", "Registrar Received"}
+    return record.status in WORKFLOW_FINAL_STATUSES.get(slug, ()) and record.status != "Exported - Ready to Send"
 
 
 def queue_open_cases(student_ids: list[int]) -> list[dict]:
@@ -33657,6 +33673,11 @@ def handle_awol(data: MultiDict) -> int:
         unknown = sorted(confirmed - set(READMISSION_STAFF_ITEMS))
         if unknown:
             raise ValueError("Unknown returnee checklist item: " + ", ".join(unknown))
+        missing = returnee_checks_missing(confirmed)
+        if missing:
+            raise ValueError(
+                f"Tick {missing} first. Graduate School staff confirm the returnee checks before a return from AWOL goes to the Dean "
+                "(Handbook p.45).")
         item.staff_checks_json = json.dumps({name: name in confirmed for name in READMISSION_STAFF_ITEMS})
         review = awol_policy_review(student, {
             "workflow_action": "return_from_awol",
@@ -38135,6 +38156,12 @@ def onboarding_requirements() -> list[str]:
 # The system works out the first two from the request and the records; only an office can confirm the last two.
 READMISSION_SYSTEM_ITEMS = ["Written intention to enroll", "Evaluation of subject/grade requirements"]
 READMISSION_STAFF_ITEMS = ["Clearance from Business Office", "Interview (reason for delay, residency requirements)"]
+_RETURNEE_CHECK_WORDS = {READMISSION_STAFF_ITEMS[0]: "the Business Office clearance", READMISSION_STAFF_ITEMS[1]: "the interview"}
+
+
+def returnee_checks_missing(confirmed) -> str:
+    """Plain words for the returnee office checks (Handbook p.45) that are not ticked; "" when both are."""
+    return " and ".join(word for item, word in _RETURNEE_CHECK_WORDS.items() if item not in confirmed)
 
 
 def readmission_requirements() -> list[str]:
@@ -43321,8 +43348,21 @@ def build_demo_database() -> dict:
         seed_report_history()  # two earlier terms of decided cases for the Reports (I-181)
         keep_endorsed_candidates_out_of_completed()  # not Completed while the Dean has not approved (F-25)
         seed_stage_events()  # last: the stage clock, and the risk levels that read it
+        seed_comprehensive_exam_results()
         accept_privacy_notice_for_seeded_accounts()
         return sync_result
+
+
+def seed_comprehensive_exam_results() -> None:
+    """IM45 (F6-07): every seeded "Passed" comprehensive exam gets a result row stamped like an import, so the history is not empty."""
+    recorded = {sid for (sid,) in db.session.query(ComprehensiveExamResult.student_id).all()}
+    exam_day = ph_today() - timedelta(days=120)
+    for student in Student.query.filter_by(comprehensive_exam_status="Passed").order_by(Student.id).all():
+        if student.id not in recorded:
+            db.session.add(ComprehensiveExamResult(
+                student_id=student.id, result="Passed", exam_date=exam_day, source="Imported",
+                reason="Demo data: result carried in with the results sheet.", recorded_by="Demo data", recorded_at=now_utc()))
+    db.session.commit()
 
 
 def accept_privacy_notice_for_seeded_accounts() -> None:

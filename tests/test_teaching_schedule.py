@@ -258,6 +258,26 @@ class TeachingScheduleTests(unittest.TestCase):
         result = self.coordinator.patch(f"/api/course-offerings/{offering_id}", json={"schedule": "Monday 1PM"})
         self.assertEqual(result.status_code, 409, result.get_json())
 
+    def test_teacher_and_section_of_a_published_timetable_cannot_be_changed_from_offering_setup(self):
+        # IM45 (F6-03): the guard covers the teacher and the section, not only the schedule
+        plan = self.ready_plan()
+        approved = self.action(plan, "approve").get_json()["plan"]
+        self.assertEqual(self.action(approved, "publish").status_code, 200)
+        with app.app_context():
+            off = CurriculumOffering.query.filter_by(course_id=self.f.course_ids[0], semester="2nd Semester").one()
+            offering_id, program_id, faculty_id, section = off.id, off.program_id, off.assigned_faculty_id, off.section
+        url = f"/api/course-offerings/{offering_id}"
+        other = self.f.faculty_b_id if faculty_id != self.f.faculty_b_id else self.f.faculty_a_id
+        for body in ({"faculty_id": other}, {"section": "Q"}):
+            result = self.coordinator.patch(url, json=body)
+            self.assertEqual(result.status_code, 409, (body, result.get_json()))
+        bulk = self.coordinator.patch("/api/course-offerings/bulk", json={
+            "program_id": program_id, "term_id": self.term,
+            "offerings": [{"id": offering_id, "faculty_id": other, "schedule": off.schedule or "", "section": section or ""}]})
+        self.assertEqual(bulk.status_code, 409, bulk.get_json())
+        same = self.coordinator.patch(url, json={"faculty_id": faculty_id, "section": section or ""})
+        self.assertEqual(same.status_code, 200, same.get_json())
+
     def test_a_section_is_a_single_letter_a_to_z(self):
         with app.app_context():
             offering_id = CurriculumOffering.query.filter_by(course_id=self.f.course_ids[0], semester="2nd Semester").one().id

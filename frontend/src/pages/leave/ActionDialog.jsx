@@ -93,7 +93,7 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
       from={fromLabel}
       to={toLabel}
       explanation={CONFIRM_TEXT[action.action] || action.confirm}
-      actions={[{ key: action.action, label: action.label, tone: PANEL_TONE[action.tone] || "approve", requireComment: Boolean(action.needs_comment) }]}
+      actions={[{ key: action.action, label: action.label, tone: PANEL_TONE[action.tone] || "approve", requireComment: Boolean(action.needs_comment), disabled: unverified.length > 0, hint: unverified.length > 0 ? "Tick both office checks first. The Dean decides only after staff confirm both checks." : undefined }]}
       onConfirm={decide}
       onCancel={onCancel}
       withReason={!isForward}
