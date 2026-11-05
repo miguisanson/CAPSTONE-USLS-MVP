@@ -2,6 +2,7 @@
 import os
 import tempfile
 import unittest
+from datetime import timedelta
 
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
@@ -14,7 +15,7 @@ os.environ.setdefault("USLS_UPLOAD_DIR", tempfile.mkdtemp(prefix="uploads-"))
 
 from app import (  # noqa: E402
     AdviserAppointment, PracticumRecord, ScheduleRequest, Student, UserAccount, WORKFLOW_DEMO_STUDENTS,
-    app, build_demo_database, db, practicum_roster_payload,
+    app, build_demo_database, db, ph_today, practicum_roster_payload,
 )
 
 
@@ -66,6 +67,8 @@ class Seed2Tests(unittest.TestCase):
                 if not dates:
                     continue
                 first = min(dates)
+                if first <= ph_today() - timedelta(weeks=12):
+                    continue  # older than the seed window: the seed keeps every appointment inside it (test_seed_quality)
                 for item in AdviserAppointment.query.filter_by(student_id=student.id, source="Migrated from the existing adviser record").all():
                     checked += 1
                     self.assertLessEqual(item.applied_at.date(), first, student.student_number)

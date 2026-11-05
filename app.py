@@ -41635,7 +41635,11 @@ def align_adviser_dates() -> int:
         dates = [day for (day,) in db.session.query(ScheduleRequest.preferred_date).filter_by(student_id=student.id).all() if day]
         if not dates:
             continue
-        appointed = datetime.combine(min(dates) - timedelta(days=30), time(9, 0))
+        first = min(dates)
+        # the seed keeps every appointment inside its last 12 weeks (test_seed_quality), so a defense older than that stays as it is
+        appointed = datetime.combine(max(first - timedelta(days=30), ph_today() - timedelta(weeks=12)), time(9, 0))
+        if appointed.date() >= first:
+            continue
         for item in AdviserAppointment.query.filter_by(student_id=student.id, source="Migrated from the existing adviser record").all():
             if item.applied_at and item.applied_at > appointed:
                 item.applied_at = item.created_at = item.updated_at = appointed
