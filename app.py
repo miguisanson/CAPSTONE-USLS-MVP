@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+from contextvars import ContextVar
 import os
 import random
 import re
@@ -36825,6 +36826,20 @@ def research_milestone_reviewed_after_submission(student: Student, gate: str) ->
     )
 
 
+_research_exam_memo: ContextVar[dict | None] = ContextVar("research_exam_memo", default=None)
+
+
+def research_exam_eligibility(student: Student) -> dict:
+    """comprehensive_exam_eligibility(), remembered per student while the Research Gate board is built (it was
+    recomputed for every requirement: ~4 s for 50 students, so the board stayed empty under load)."""
+    memo = _research_exam_memo.get()
+    if memo is None:
+        return comprehensive_exam_eligibility(student)
+    if student.id not in memo:
+        memo[student.id] = comprehensive_exam_eligibility(student)
+    return memo[student.id]
+
+
 def research_requirement_state(
     student: Student | None,
     gate: str,
@@ -36834,8 +36849,9 @@ def research_requirement_state(
     presentation = research_requirement_presentation(gate, item_name)
     if not presentation:
         return {"status": doc.status if doc else "Missing", "status_label": doc.status if doc else "Missing"}
-    if student and not comprehensive_exam_eligibility(student)["research_allowed"]:
-        return {"status": "Locked", "status_label": research_lock_status(comprehensive_exam_eligibility(student))}
+    exam = research_exam_eligibility(student) if student else None
+    if exam and not exam["research_allowed"]:
+        return {"status": "Locked", "status_label": research_lock_status(exam)}
     if student:
         _, demo_config = workflow_demo_config_for_student(student)
         verified_demo_case = (
@@ -37044,6 +37060,14 @@ PANEL_VERDICT_WAITING_ON = "Panel chair or Graduate School staff"
 
 def research_gate_overview_rows() -> list[dict]:
     """The Research Gate board rows (shared by the board and the Research Coordinator home)."""
+    token = _research_exam_memo.set({})
+    try:
+        return _research_gate_overview_rows()
+    finally:
+        _research_exam_memo.reset(token)
+
+
+def _research_gate_overview_rows() -> list[dict]:
     rows = []
     cases = (
         ResearchCase.query.join(Student, Student.id == ResearchCase.student_id)
