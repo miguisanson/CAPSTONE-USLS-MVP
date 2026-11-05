@@ -31,7 +31,13 @@
   Rung note: subagents write the failing tests themselves from the packet brief (brief = contract); main session reviews + gates.
 - MERGED 2a5a3c4d `pkt/derive5` (P-G screens follow P-F) + 6ac1bddb (Turnitin picker waits for the %, p75), ac9471c3
   `pkt/follow5` (P-H) + 7e843f5e (p91/p114/p105 follow-ups). All packets of the Fable plan are merged except `pkt/im43` (running).
-- Next: merge im43; full Python gate on the final commit; full `npm run e2e` (with `--build` the e2e dist has the /__ui gallery);
+- MERGED 895331e4 `pkt/im43` (I-335 comprehensive exam recorded by staff, I-304 Advise Slip, gate skeleton; **RESEED NEEDED**
+  ComprehensiveExamResult) + d8a007c9 manual. Python gate on 685f32f1: 1,198 tests, 6 fail = I-236 + test_demo_password +
+  test_night8_seed (policy_document differs) + 3 test_policy_assistant (Ops Manual outranks the Handbook as first source);
+  the gate ran 78 min while the manual was rebuilt in the same checkout, so these 5 are being re-run on HEAD.
+  Running: `pkt/im43b` in `wt/im43b` (I-248 three concept titles + pick list, I-252 verified practicum hours).
+  RULE: never `git stash` in worktrees (shared stash list; derive5 and im43 swapped stashes once, both recovered).
+- Next: full Python gate on the final commit; full `npm run e2e` (with `--build` the e2e dist has the /__ui gallery);
   changelog; push v6.4.1-test (owner allows pushing the current branch).
 - (old) Next after these: P-D research gate polish, P-F questions round 2 (app.py, after P-C merges), P-G derived inputs, P-E loading states.
 
