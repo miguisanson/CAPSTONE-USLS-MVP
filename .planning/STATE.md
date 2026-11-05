@@ -45,6 +45,12 @@
   Form 4; autopilot 27/30 then guide fixes, Withdrawal autopilot passes alone, times out under parallel load). ISSUES I-373 (GET
   student rewrites current_stage) -> `pkt/readonly5` in `wt/readonly5` (Sonnet). Fable review #2 of 67d4432..HEAD running ->
   `.planning/research/FABLE-REVIEW2-2026-11-05.md`.
+- MERGED ae1f744d readonly5 (I-373: GET no longer saves research progress). Running: `pkt/im45` in `wt/im45` (IM45: closed at
+  Sent to Registrar, forward needs both returnee checks, F6-03..07; owns app.py), `pkt/persona5` in `wt/persona5` (I-375 task
+  lands on the send action, I-377 phone popup table, I-240 staff export/print on Graduation + Practicum; frontend only).
+- Persona UAT (dean-phone, staff-rushed; reports in E:/Temp/claude/persona-uat/) -> I-374..I-378. I-374 (P1: Dean export says 4
+  ready, exports none — "Seeded history" endorsements app.py ~41815 are Dean Approved + registrar Pending for Coursework students)
+  and I-376/I-378 wait for app.py after im45.
 - Full Python gate on 70704d19 (isolated worktree `CAPSTONE-USLS-MVP-wt/gate`): 1,239 tests, 2 failed = test_crosscut queue aging +
   I-236 timetable guard, both fixed in fix6 (54327294) right after. Fable review 2: no P1; IM45 -> packet after readonly5.
 - Next (old line): full Python gate on the final commit; full `npm run e2e` (with `--build` the e2e dist has the /__ui gallery);
