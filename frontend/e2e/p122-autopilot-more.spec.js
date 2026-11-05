@@ -42,7 +42,7 @@ const PLAN = {
   verdicts: { reset: [], resetAfter: false, writes: ["POST /research-gate/*/verdict"], miguel: (row) => { expect(row.column, "Miguel moved to Proposal Defense").toBe(2); } },
   "proposal-final": {
     reset: [], resetAfter: true, resetKeys: ["research-miguel"],
-    writes: [["POST /student-portal/requests/research-gate", 3], ["POST /faculty-portal/adviser-approvals/*", 5], ["POST /transactions/research-gate", 5], "POST /transactions/panel-matching", ["POST /transactions/defense-scheduling", 2], ["POST /research-gate/*/verdict", 2]],
+    writes: [["POST /student-portal/requests/research-gate", 3], ["POST /faculty-portal/adviser-approvals/*", 4], ["POST /transactions/research-gate", 5], "POST /transactions/panel-matching", ["POST /transactions/defense-scheduling", 2], ["POST /research-gate/*/verdict", 2]],
     // Completed research leaves the Research Gate board: the student record says Completed.
     miguel: async (row, playwright) => {
       expect(row, "Miguel left the Research Gate board").toBeUndefined();

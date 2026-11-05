@@ -290,6 +290,8 @@ test.describe("conA Dean Practicum Reports is the shared board (finding 1 / I-12
     await expect(boardOf(page)).toBeVisible();
     await expect(page.getByRole("group", TOGGLE)).toBeVisible();
     expect(await noOverflow(page), "no sideways scroll at 390").toBe(true);
+    // CHANGED BY ux5 phone filter chips (p127): the phone list starts on "Needs my action"; a card waiting on others sits behind its chip.
+    await page.getByRole("group", { name: "Filter cards" }).getByRole("button", { name: /^Waiting on others \(\d+\)$/ }).click();
     const lock = wrapperOf(cardOf(boardOf(page), "Rhea Returned")).getByText("Waiting for: Academic Coordinator");
     await lock.scrollIntoViewIfNeeded();
     await expect(lock).toBeVisible();

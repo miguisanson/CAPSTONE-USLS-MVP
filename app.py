@@ -19011,6 +19011,13 @@ def register_routes(app: Flask) -> None:
         db.session.commit()
         return jsonify({"ok": True, "message": f"{course.code} is now offered for {term.label}."})
 
+    def offering_timetable_is_governed(off) -> bool:
+        """True when an approved or published timetable owns this offering's schedule (IM38, I-372)."""
+        return ClassSection.query.join(TeachingSchedulePlan).filter(
+            ClassSection.offering_id == off.id,
+            TeachingSchedulePlan.status.in_(["Approved", "Published"]),
+        ).first() is not None
+
     @app.route("/api/course-offerings/bulk", methods=["PATCH"])
     @require_api_login("academic_coordinator", "admin")
     def course_offerings_bulk_update():
@@ -19050,6 +19057,9 @@ def register_routes(app: Flask) -> None:
                     db.session.rollback()
                     return jsonify(error=f"{off.course.code}: {exc}"), 400
                 schedule = schedule.strip()
+                if schedule != (off.schedule or "") and offering_timetable_is_governed(off):
+                    db.session.rollback()
+                    return jsonify(error=f"{off.course.code}: this timetable is approved or published. Create a revision in the Schedule tab."), 409
                 if schedule and schedule != (off.schedule or "") and not parse_offering_schedule(schedule):
                     db.session.rollback()
                     return jsonify(error=f"{off.course.code}: choose a schedule from the dropdown."), 400
@@ -19069,6 +19079,8 @@ def register_routes(app: Flask) -> None:
     def course_offerings_update(offering_id: int):
         data = request.get_json(silent=True) or {}
         off = CurriculumOffering.query.get_or_404(offering_id)
+        if "schedule" in data and (data.get("schedule") or "").strip() != (off.schedule or "") and offering_timetable_is_governed(off):
+            return jsonify({"error": "This timetable is approved or published. Create a revision in the Schedule tab."}), 409
         if "faculty_id" in data:
             faculty_id = safe_int(data.get("faculty_id")) or None
             if faculty_id:

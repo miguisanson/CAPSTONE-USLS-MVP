@@ -367,7 +367,8 @@ test.describe("I-116: staff home, Work Queue", () => {
   test("(b) the staff home button says 'Open Subject Withdrawal' (the page's name), not the server's 'Open Withdrawal'", async ({ page }) => {
     await patchJson(page, "**/api/tasks**", addTasks);
     await homeReady(page);
-    const row = main(page).locator("li", { hasText: "Record and forward withdrawal request" });
+    // the mocked task comes first; a real withdrawal row (other specs leave one) may follow, and its link also opens the board (I-348/F5-16)
+    const row = main(page).locator("li", { hasText: "Record and forward withdrawal request" }).first();
     await expect(row.getByRole("link", { name: "Open Subject Withdrawal" })).toHaveAttribute("href", "/workflow/withdrawal?show=open"); // I-198 (pkt/staffux): staff task links open the open requests
     await expect(main(page)).not.toContainText("Open Withdrawal");
     const awol = main(page).locator("li", { hasText: "Review automatic AWOL policy alert" }).first();

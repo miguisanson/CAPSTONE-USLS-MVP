@@ -18,13 +18,15 @@ export default {
     },
     {
       id: "rs-check", title: "Choose the student and run the policy check", role: "staff", route: "/workflow/awol", page: "AWOL & Residency",
-      do: "Select Record residency, find the student, add a note and wait for the policy check. The purpose comes from the stage, the semester is the active one, and the result lists three checks.",
+      do: "Select Record residency, find the student, add a note and wait for the policy check. The purpose comes from the stage when it can (otherwise pick it), the semester is the active one, and the result lists three checks.",
       actions: [
         { click: { role: "button", name: "Record residency", exact: true } },
         { type: { label: "Search a student", in: "dialog" }, text: "Valdez" },
         { click: { role: "button", name: "Nicolas Valdez", in: "dialog" } },
         { type: { label: "Staff notes", in: "dialog" }, text: "Thesis writing continues without subject enrollment; adviser confirmed progress this semester." },
-        { wait: { text: "Eligible for Residency" }, timeout: 20000 },
+        // The stage decides the purpose when it can (I-299); this demo student's stage does not, so staff pick it.
+        { select: { label: "Residency purpose", in: "dialog" }, label: "Thesis / dissertation work", optional: true },
+        { wait: { text: "Eligible for Residency", in: "dialog" }, timeout: 20000 }, // in the window: the board behind it has the same chip
       ],
       doneWhen: "manual",
       rule: "A residency semester is allowed only with no subject enrollment, for a permitted purpose, and never as a substitute for a leave of absence.",
