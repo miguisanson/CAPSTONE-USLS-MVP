@@ -81,7 +81,9 @@ test.describe("I-205: Research Gate overview", () => {
     // a card opens the per-student record below
     const blocked = overview.items.find((row) => row.state === "blocked");
     await section.getByRole("searchbox").fill(blocked.student.name);
-    await section.getByRole("button", { name: `Open the Research Gate record of ${blocked.student.name}` }).click();
+    await section.getByRole("button", { name: `Open the Research Gate record of ${blocked.student.name}` }).first().click();
+    // F5-03: View opens the requirements window first; the full record is one click from there
+    await page.getByRole("dialog").getByRole("button", { name: "Open the full record" }).click();
     await expect(page.getByRole("heading", { name: "Research Gate record" })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`student_id=${blocked.student.id}`));
   });

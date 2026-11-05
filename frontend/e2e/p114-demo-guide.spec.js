@@ -17,6 +17,8 @@ import { ARTIFACTS_DIR, BASE_URL, REPO_ROOT } from "./support/paths.mjs";
 import { PASSWORD } from "./support/accounts.js";
 import { GUIDES, RESET_KEYS } from "../src/lib/demoGuide/guides/index.js";
 import { caseStatus, isDone, offScript, resolveStep, routeMatches, writeMatches } from "../src/lib/demoGuide/engine.js";
+// I-297: the Dean approves a readmission only after staff confirm these two (Handbook p.45)
+const READMISSION_STAFF_CHECKS = ["Clearance from Business Office", "Interview (reason for delay, residency requirements)"];
 
 const SHOTS = join(ARTIFACTS_DIR, "screens", "p114");
 mkdirSync(SHOTS, { recursive: true });
@@ -222,7 +224,7 @@ test.describe("the Readmission guide on the real case", () => {
       const read = await okJson(await staff.context.request.get(`/api/demo/guide-state?process=readmission&student_number=${THERESE.student_number}`), "guide state");
       expect(read.case.status).toBe("Submitted");
       expect(read.student.name).toBe("Therese Lacson");
-      await okJson(await staffApi.post(`/api/leave-cases/${read.case.id}/transition`, { data: { action: "forward", eligibility_result: "Eligible" } }), "staff forward");
+      await okJson(await staffApi.post(`/api/leave-cases/${read.case.id}/transition`, { data: { action: "forward", eligibility_result: "Eligible", readmission_items: READMISSION_STAFF_CHECKS } }), "staff forward");
       // skip ahead: staff did the next steps another way; "Continue from here" re-reads the record
       await staffPanel.getByRole("button", { name: "Continue from here" }).click();
       await expect(step(staffPanel, "The Dean decides")).toBeVisible();
