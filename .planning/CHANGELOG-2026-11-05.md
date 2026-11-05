@@ -44,3 +44,20 @@ Plan: Fable review `.planning/research/FABLE-REVIEW-2026-11-05.md`. **Reseed aft
 
 Notes: the e2e dist must be built with `node scripts/e2e.mjs test --build` (a plain `npm run build:web` has no `/__ui` gallery).
 Never `git stash` inside a worktree (the stash list is shared).
+
+## Evening — Fable review 2, persona UAT rounds, fixes (`v6.4.1-test`)
+
+| What | Issues | Merge |
+|---|---|---|
+| Fable review 2 of the whole day's diff: no P1; decisions IM45 (closed at Sent to Registrar; staff forward of a returnee needs both checks) | F6-01..07 | ea0903ca |
+| A page view no longer saves research progress | I-373 | ae1f744d |
+| Persona UAT (8 personas: dean-phone, staff-rushed, student-thesis, coordinator-academic, student-leave, coordinator-research, faculty-rare at 200 % zoom) -> I-374..I-391 | - | - |
+| Dean graduation export promises only what it can export; seeded past approvals are with the Registrar | I-374 | eb1021b2 |
+| Registrar task lands on the ticked Registrar row; Reports popups stack on a phone; Export CSV + Print on Graduation and Practicum | I-375, I-377, I-240 | 0f0bdc2e |
+| "With the Registrar" finished columns on Withdrawal and Graduation; returnees forward one at a time; tasks past the due date | I-376, I-378, I-379 | eb1021b2, dc00b9d4 |
+| Student research page says whose move it is; no upload on verified files; the two schedule approvals name each other; Course Audit next step; calmer proposed-rule badges | I-380..I-382, I-384 | b7ff69df, dc00b9d4 |
+| Practicum case waiting for verified hours in the seed; every practicum case on the board | I-383 | dc00b9d4 |
+| Student pages: office tasks without due dates, no form codes, form first; scheduling dead end links to Panel Matching | I-385..I-387 | 9de9bc28 |
+| Faculty pages reflow at 200 % zoom; plain advisee/availability wording; "Withdraw my acceptance" | I-390, I-391 | cf42ba9c |
+
+Reseed after pulling (`npm run seed`).

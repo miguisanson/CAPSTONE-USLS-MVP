@@ -51,6 +51,10 @@
 - MERGED ea0903ca im45 (IM45 done; F6-06 not a bug: now_utc() is naive Manila time) + d0877db8 manual rebuilt. Running
   `pkt/seedfix` in `wt/seedfix` (I-374 seed history + ready count = export filter, I-378 finished Registrar column, I-376 server,
   I-379 group forward vs returnee checks; owns app.py).
+- MERGED 9de9bc28 persona7, dc00b9d4 seed2 (**RESEED NEEDED**), cf42ba9c persona8. Final gates on cf42ba9c running: full Python in
+  `wt/gate` -> `E:/Temp/claude/pygate-cf42ba9.log`; full e2e in the main checkout -> `E:/Temp/claude/e2e-full2.log` (do not
+  rebuild the manual or dist in the main checkout until it ends). Running `pkt/rc5` in `wt/rc5` (I-388 RC home Ready students,
+  I-387 server Ready vs Missing Requirements, I-389 panel load counts).
 - MERGED b7ff69df persona6 (I-380..I-382, I-384 frontend). Persona round 3 (student-leave, coordinator-research) -> I-385..I-389.
   Running `pkt/persona7` in `wt/persona7` (frontend: I-385 office tasks on student pages, I-386 AWOL page words/layout,
   I-387 scheduling dead end -> Panel Matching link). Queued for app.py after seed2: I-388 (RC home Ready students), I-389
