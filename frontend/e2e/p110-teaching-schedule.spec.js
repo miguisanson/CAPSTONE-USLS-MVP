@@ -45,7 +45,8 @@ test.describe("semester teaching availability (faculty)", () => {
 });
 test.describe("semester schedule review (academic coordinator)", () => {
   test.use({ storageState: join(AUTH_DIR, "academic-coordinator.json") });
-  test("coordinator reviews draft and explicitly approves and publishes without a Dean decision", async ({ page }) => {
+  // I-236: since 26c8892 the coordinator UI has no Schedule tab, "Create draft", "Approve schedule" or "Publish schedule" (the /api/teaching-schedules/<id> approve/publish endpoints are unused by the UI); schedules are picked per row in Offering setup (p84).
+  test.fixme("coordinator reviews draft and explicitly approves and publishes without a Dean decision", async ({ page }) => {
     let active = null;
     const calls = [];
     await page.route(/\/api\/teaching-schedules(?:\/\d+)?(\?.*)?$/, async route => {
