@@ -52,15 +52,15 @@ STATUS_INFO = [
      "description": "The leave is ending. The student files a readmission request to come back."},
     {"key": "Approved", "label": "Approved", "owner": STAFF, "tone": "good", "phase": "done",
      "description": "The Dean approved it. Staff send the decision to the Registrar."},
-    {"key": "Denied", "label": "Denied", "owner": STAFF, "tone": "bad", "phase": "done",
-     "description": "The Dean denied the request. Staff tell the student what they can do next."},
+    {"key": "Denied", "label": "Denied", "owner": "", "tone": "bad", "phase": "done",
+     "description": "The Dean denied the request. Staff tell the student the options."},
     {"key": "Withdrawn", "label": "Withdrawn by student", "owner": "", "tone": "muted", "phase": "done",
      "description": "The student took the request back before the Dean decided."},
     {"key": "Cancelled", "label": "Cancelled before it started", "owner": "", "tone": "muted", "phase": "done",
      "description": "An approved leave was cancelled before it began."},
     {"key": "Closed", "label": "Closed", "owner": "", "tone": "muted", "phase": "done",
      "description": "The leave is over: the student came back."},
-    {"key": "Expired", "label": "Leave ended, no return", "owner": STAFF, "tone": "bad", "phase": "done",
+    {"key": "Expired", "label": "Leave ended, no return", "owner": "", "tone": "bad", "phase": "done",
      "description": "The leave ended without a return. Staff confirmed the student as AWOL."},
 ]
 STATUS_BY_KEY = {item["key"]: item for item in STATUS_INFO}
