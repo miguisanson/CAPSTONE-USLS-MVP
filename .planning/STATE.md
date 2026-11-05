@@ -1,5 +1,14 @@
 # State
 
+## 2026-11-05 - v6.4.1-test: final polish loop before submission (2026-11-07)
+
+- **Branch `v6.4.1-test`** made from `v6.4-migui` @ 67d4432 (owner 2026-11-05). All loop work lands here; Khloe's branch is merged later by the owner.
+- Owner rules for this loop: no questions to the owner; every `question` row in ISSUES.md is decided with the policy-faithful
+  default (Ops Manual / Handbook / Research Protocol), as the stakeholders agreed at the last meeting. Do not redo Khloe's or Natalie's work drastically.
+- Step 1 (running): Fable full review -> `.planning/research/FABLE-REVIEW-2026-11-05.md` (findings, question-row defaults, packets).
+  Screenshot sweep for it: `frontend/e2e-artifacts/screens/` (log `E:/Temp/claude/sweep-2026-11-05.log`).
+- Next: packets from the review, max 3 helpers, one app.py packet at a time; gate after each merge.
+
 ## 2026-11-05 - v6.4-migui: merge with Natalie + private demo sandbox + Demo Guide from the top (session "v6.4 merge")
 
 - **Branch `v6.4-migui`** = v6.2-migui + Natalie's `v6.3-natalie` (Research Gate), merged by the owner's decisions M1-M7 in
