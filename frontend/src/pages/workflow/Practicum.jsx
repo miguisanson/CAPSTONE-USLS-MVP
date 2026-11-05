@@ -163,7 +163,8 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
     boardNotice.show(reset.resetError ? "error" : "success", reset.resetError || reset.resetMessage);
     setSelectedStudentId(null);
   }, [reset.resetMessage, reset.resetError]); // eslint-disable-line react-hooks/exhaustive-deps
-  const rows = (context.roster || []).filter((row) => row.eligibility?.eligible === true);
+  // Eligible students, and every student who already has a practicum case (the home lists those cases too, so the board must).
+  const rows = (context.roster || []).filter((row) => row.eligibility?.eligible === true || Boolean(row.record));
   const [filters, setFilters] = useOpenFilters(EMPTY_FILTERS);
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
   const statusOptions = useMemo(() => uniqueValues(rows.map((row) => row.record?.status || "Not Submitted")).map((value) => ({ value, label: value })), [rows]);

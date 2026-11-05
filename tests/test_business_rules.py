@@ -200,9 +200,9 @@ class BusinessRulesTests(unittest.TestCase):
                 self.assertIn(rule.value_type, {"int", "decimal", "text", "bool"}, rule.key)
                 self.assertTrue(rule.title and rule.description, rule.key)
                 self.assertTrue(rule.source_title, rule.key)
-                if rule.source_title.startswith("Prototype rule"):
+                if rule.source_title.startswith("Proposed rule"):
                     self.assertEqual(rule.status, "needs_review", rule.key)
-                    self.assertIn("pending Graduate School validation", rule.source_title)
+                    self.assertIn("awaiting sign-off", rule.source_title)
                 else:
                     self.assertEqual(rule.status, "active", rule.key)
                     if rule.source_title.startswith("Graduate School Handbook"):
@@ -255,7 +255,7 @@ class BusinessRulesTests(unittest.TestCase):
             for key in ("faculty.teaching_load_limit_units", "practicum.required_hours"):
                 rule = BusinessRule.query.filter_by(key=key).one()
                 self.assertEqual(rule.status, "needs_review")
-                self.assertIn("Prototype rule", rule.source_title)
+                self.assertIn("Proposed rule", rule.source_title)
 
     def test_rule_value_falls_back_to_the_catalog_when_the_register_is_empty(self):
         # Tests (and a freshly reset database) can have no rows yet.

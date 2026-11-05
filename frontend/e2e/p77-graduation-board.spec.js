@@ -303,6 +303,19 @@ test.describe("P7.7 Graduation actions as the Dean", () => {
     await shot(page, "dean-ready-1366.png");
   });
 
+  // I-378 (Graduation part): finished batches have their own column, like the Withdrawal board's "With the Registrar".
+  for (const sentStatus of ["Sent to Registrar", "Registrar Received"]) {
+    test(`a batch that is ${sentStatus} sits in With the Registrar, not in Approved`, async ({ page }) => {
+      await mockRoster(page, (roster) => { staffScenario(roster); setBatchStatus(roster, sentStatus); });
+      await page.goto("/dean/approvals/graduation");
+      const board = page.getByRole("region", { name: BOARD });
+      await expect(board).toBeVisible();
+      await expect(cardsOf(column(board, "With the Registrar")).filter({ hasText: BATCH })).toHaveCount(1);
+      await expect(cardsOf(column(board, "Approved, ready to export")).filter({ hasText: BATCH })).toHaveCount(0);
+      await expect(column(board, "With the Registrar")).toContainText("acknowledgement is optional");
+    });
+  }
+
   test("an approved batch offers Export, and says Exported once it was", async ({ page }) => {
     await mockRoster(page, (roster) => { staffScenario(roster); setBatchStatus(roster, "Dean Approved"); });
     await page.goto("/dean/approvals/graduation");

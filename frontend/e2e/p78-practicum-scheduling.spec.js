@@ -144,7 +144,8 @@ test.describe("Practicum (staff)", () => {
     const board = main(page).getByRole("region", { name: "Practicum workflow board" });
     await expect(board.getByText("Paolo Ramirez", { exact: true })).toBeVisible();
     await main(page).getByPlaceholder(/Search students/).fill("Andrea");
-    await expect(main(page).getByText(/Showing 1 of 2/)).toBeVisible();
+    // CHANGED BY seed2 (I-383): the board also lists the students with a case that are not eligible, so the total is no longer exactly 2.
+    await expect(main(page).getByText(/Showing 1 of \d+/)).toBeVisible();
     await expect(board.getByText("Paolo Ramirez", { exact: true })).toHaveCount(0);
     await main(page).getByPlaceholder(/Search students/).fill("zzzz-nobody");
     // CHANGED BY p98 (I-155): a search that matches nothing keeps the columns (each says "No practicum students here") instead of replacing the board with an empty-state box.

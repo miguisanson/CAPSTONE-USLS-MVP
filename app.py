@@ -2984,6 +2984,9 @@ def comprehensive_exam_eligibility(student: Student, audit: dict | None = None) 
         "completed_units": qualifying_total,
         "required_units": required_units,
         "missing_subjects": missing_count,
+        # the same two figures the student record shows: subjects being taken now, and subjects not taken yet
+        "current_count": len(audit.get("current", [])),
+        "missing_count": audit.get("missing_count", len(audit.get("missing", []))),
         "failed_subjects": failed_count,
         "required_subjects": len(audit.get("completed", [])) + missing_count,
     }
@@ -41625,6 +41628,64 @@ SEED_HISTORY_TABLES = (
 )
 
 
+def align_adviser_dates() -> int:
+    """Move a seeded adviser date that falls after the student's first defense to 30 days before it (I-383 leftover)."""
+    moved = 0
+    for student in Student.query.all():
+        dates = [day for (day,) in db.session.query(ScheduleRequest.preferred_date).filter_by(student_id=student.id).all() if day]
+        if not dates:
+            continue
+        appointed = datetime.combine(min(dates) - timedelta(days=30), time(9, 0))
+        for item in AdviserAppointment.query.filter_by(student_id=student.id, source="Migrated from the existing adviser record").all():
+            if item.applied_at and item.applied_at > appointed:
+                item.applied_at = item.created_at = item.updated_at = appointed
+                if item.adviser_responded_at:
+                    item.adviser_responded_at = appointed + timedelta(hours=8)
+                moved += 1
+        for item in AdviserAssignment.query.filter_by(student_id=student.id).all():
+            if item.assigned_at and item.assigned_at > appointed:
+                item.assigned_at = appointed
+    db.session.commit()
+    return moved
+
+
+# Nicole Alvarez, MAPSY: no e2e spec or demo guide uses her (checked in frontend/e2e/DATA-OWNERSHIP.md).
+PRACTICUM_HOURS_CHECK_STUDENT = "2360092"
+
+
+def seed_practicum_waiting_for_hours() -> int:
+    """One practicum case at Documents Under Review: certificates uploaded, 200 hours reported, nothing verified yet."""
+    student = Student.query.filter_by(student_number=PRACTICUM_HOURS_CHECK_STUDENT).first()
+    if not student or PracticumRecord.query.filter_by(student_id=student.id).first():
+        return 0
+    stored_name = f"seed-practicum-certificates-{student.student_number}.pdf"
+    write_demo_pdf(REQUEST_UPLOAD_ROOT, stored_name, "Practicum certificates",
+                   f"Demo certificates for {student.name}, student number {student.student_number}: 200 practicum hours.")
+    certificate = StudentRequestAttachment(
+        student_id=student.id, request_type="practicum", workflow_stage="Documents Submitted",
+        original_name="practicum-certificates.pdf", stored_name=stored_name, mime_type="application/pdf",
+        uploaded_by_name=student.name, uploaded_by_role="Student", uploaded_at=now_utc() - timedelta(days=3),
+    )
+    db.session.add(certificate)
+    db.session.flush()
+    db.session.add(PracticumRecord(
+        student_id=student.id, moa_status="Verified", moa_uploaded=True,
+        practicum_site="Community Counselling Center", supervisor_name="Ms. Rina Lopez",
+        required_hours=practicum_required_hours(), completed_hours=practicum_required_hours(),
+        document_status="Pending Review", certificate_attachment_id=certificate.id, certificate_count=1,
+        status="Documents Under Review", remarks="Certificates covering all 200 practicum hours.",
+    ))
+    add_task(student.id, "Verify the practicum hours", "Academic Coordinator", 3, 50)
+    add_log(
+        "practicum", student.id, "Student", "Practicum workflow",
+        "Practicum status updated: Documents Under Review", "Academic Coordinator",
+        "The student sent the certificates and reported 200 hours.",
+        previous_status="Practicum In Progress", new_status="Documents Under Review",
+    )
+    db.session.commit()
+    return 1
+
+
 def spread_seed_history(today: date | None = None) -> int:
     """Move the seed-day timestamps of the demo history to 1-12 weeks before the seed day (I-070).
 
@@ -43373,6 +43434,8 @@ def build_demo_database() -> dict:
         generate_reminders()  # the reminders that are due today (a page view no longer makes them)
         db.session.commit()
         spread_seed_history()  # history over the previous weeks
+        align_adviser_dates()  # an adviser is appointed before the first defense, not after it
+        seed_practicum_waiting_for_hours()  # the Academic Coordinator's "Verify the hours" step shows in the demo (I-383)
         seed_report_history()  # two earlier terms of decided cases for the Reports (I-181)
         keep_endorsed_candidates_out_of_completed()  # not Completed while the Dean has not approved (F-25)
         seed_stage_events()  # last: the stage clock, and the risk levels that read it
