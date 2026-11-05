@@ -184,6 +184,8 @@ test.describe("P7.3 boards of the same kind behave the same", () => {
         expect(await noOverflow(page)).toBe(true);
         if (slug === "awol") {
           const board = page.getByRole("region", { name: region });
+          // CHANGED BY ux5 phone filter chips (p127): the phone list starts on "Needs my action"; the reason shows on a card waiting on others.
+          await page.getByRole("group", { name: "Filter cards" }).getByRole("button", { name: /^Waiting on others \(\d+\)$/ }).click();
           const closedAwol = column(board, "AWOL").locator("h3 button[aria-expanded=false]");
           if (await closedAwol.count()) await closedAwol.click(); // CHANGED BY p126 (F5-05): a stage with no card for staff starts closed
           await expect(cardsOf(column(board, "AWOL")).first().getByText("Waiting for: Student", { exact: true })).toBeVisible();

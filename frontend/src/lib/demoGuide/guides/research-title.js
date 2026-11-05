@@ -57,10 +57,11 @@ export default {
     },
     {
       id: "rt-verify", title: "Staff verify the submitted requirements", role: "staff", route: "/workflow/research-gate", page: "Research Gate",
-      do: "Open Research Gate, find the student's card and select View. The files are listed with what is still pending. Select Verify submitted requirements: the package moves on to the Academic Coordinator.",
+      do: "Open Research Gate, find the student's card and select View: the files are listed with what is still pending. Select Open the full record, then Verify submitted requirements: the package moves on to the Academic Coordinator.",
       actions: [
         { type: { label: "Search requests" }, text: "Miguel" },
         { click: { role: "button", name: "Open the Research Gate record of Miguel Yu" } },
+        { click: { role: "button", name: "Open the full record", in: "dialog" } }, // View is a window now; the record is one more click
         { wait: { role: "button", name: "Verify submitted requirements" }, timeout: 20000 },
         { pause: 1500, caption: "The files the student sent" },
         { click: { role: "button", name: "Verify submitted requirements" } },

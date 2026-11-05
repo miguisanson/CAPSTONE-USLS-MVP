@@ -25,6 +25,7 @@ const FIND = [
 const VERIFY = [
   ...FIND,
   { click: { role: "button", name: "Open the Research Gate record of Miguel Yu" } },
+  { click: { role: "button", name: "Open the full record", in: "dialog" } }, // View is a window now; the record is one more click
   { wait: { role: "button", name: "Verify submitted requirements" }, timeout: 20000 },
   { pause: 1200, caption: "The documents and what is still pending" },
   { click: { role: "button", name: "Verify submitted requirements" } },
@@ -87,7 +88,7 @@ export default {
     {
       id: "pf-sign", title: "The adviser signs each document", role: "faculty", route: "/faculty-portal/signatures", page: "Signatures & Endorsements",
       do: "The adviser opens Signatures & Endorsements, reviews each of the uploaded documents that need a signature, draws a signature, finalizes it and signs. The signature is saved with that exact file.",
-      actions: [...times(3, SIGN), { pause: 1500, caption: "All three documents are signed" }],
+      actions: [...times(2, SIGN), { pause: 1500, caption: "Both documents are signed" }], // I-284 (IM42): one Form 4 at the proposal gate, so two adviser documents (Form 4.1 is not signed)
       doneWhen: { apiWrite: "POST /faculty-portal/adviser-approvals/*" },
       rule: "The adviser signs the exact file the student uploaded; replacing the file removes the signature.",
       ifAsked: [{ q: "Can staff sign for the adviser?", a: "No. Only the assigned adviser can sign an adviser document." }],
@@ -137,6 +138,7 @@ export default {
       actions: [
         ...FIND,
         { click: { role: "button", name: "Open the Research Gate record of Miguel Yu" } },
+        { click: { role: "button", name: "Open the full record", in: "dialog" } }, // View is a window now; the record is one more click
         { wait: { role: "button", name: "Record ethics clearance" }, timeout: 20000 },
         { click: { role: "button", name: "Record ethics clearance" } },
         { wait: { text: "Saved." }, timeout: 20000 },

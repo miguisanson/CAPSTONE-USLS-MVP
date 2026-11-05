@@ -654,11 +654,13 @@ class QueueAndRiskTests(CrossCutBase):
 
     def test_queue_aging_does_not_count_finished_cases(self):
         with app.app_context():
-            db.session.add(WithdrawalApplication(student_id=self.student_id, status="Exported - Ready to Send",
+            # IM42 (I-324): a withdrawal stays open until the Registrar acknowledged it ("Withdrawn Confirmed");
+            # "Exported - Ready to Send" and "Sent to Registrar" are still waiting.
+            db.session.add(WithdrawalApplication(student_id=self.student_id, status="Withdrawn Confirmed",
                                                  dean_decision="Approved"))
-            add_log("withdrawal", self.student_id, "Graduate School Staff · Grace", "Approved subject withdrawals workbook",
-                    "Approved subject withdrawal added to Registrar Excel list", "Graduate School Staff", "",
-                    new_status="Exported - Ready to Send")
+            add_log("withdrawal", self.student_id, "Graduate School Staff · Grace", "Registrar acknowledged",
+                    "Registrar acknowledged the subject withdrawal", "Graduate School Staff", "",
+                    new_status="Withdrawn Confirmed")
             open_student = Student(student_number="9900110", first_name="Still", last_name="Open", email="o@example.test",
                                    program_id=self.program_id, entry_year=2025, current_stage="Coursework", standing="Active")
             db.session.add(open_student)
