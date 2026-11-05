@@ -8,7 +8,9 @@
 - Step 1 (running): Fable full review -> `.planning/research/FABLE-REVIEW-2026-11-05.md` (findings, question-row defaults, packets).
   Screenshot sweep for it: `frontend/e2e-artifacts/screens/` (log `E:/Temp/claude/sweep-2026-11-05.log`).
 - Fable review DONE (28f9d52): `.planning/research/FABLE-REVIEW-2026-11-05.md`; question-row defaults recorded as IM42-IM44.
-- Running (Sonnet, 3 helpers, branched from 28f9d52): `pkt/words` in `CAPSTONE-USLS-MVP-wt/words` (P-A screen words + pronoun guard),
+- MERGED 2969867: `pkt/words` (P-A: plain words, pronoun guard `personPronoun` in check:ui; build + check:ui 0; edited e2e spec lines
+  not run yet -> run with the next e2e batch). Worktree removed.
+- Running (Sonnet, 3 helpers): `pkt/rgate5` in `wt/rgate5` (P-D Research Gate polish, from 2969867),
   `pkt/logic5` in `wt/logic5` (P-C backend logic, owns app.py), `pkt/boards5` in `wt/boards5` (P-B boards, phone list, deep links).
   Rung note: subagents write the failing tests themselves from the packet brief (brief = contract); main session reviews + gates.
 - Next after these: P-D research gate polish, P-F questions round 2 (app.py, after P-C merges), P-G derived inputs, P-E loading states.
