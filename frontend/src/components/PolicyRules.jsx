@@ -45,8 +45,7 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
   // Staff always see the count (even "none need review"), so every board's panel reads the same (I-207).
   const gsStaff = canOpenPage && user.role !== "dean";
   const needsReview = gsStaff ? items.filter((rule) => rule.status === "needs_review").length : 0;
-  // Staff see it in calm words: the defaults were agreed with the Graduate School and only await the written sign-off (I-384).
-  const sourceOf = (rule) => (/^Prototype rule/i.test(rule.citation || "") ? (gsStaff ? "Proposed rule (agreed with the Graduate School, awaiting sign-off)" : "Graduate School policy") : rule.citation);
+  const sourceOf = (rule) => (!gsStaff && /^(Prototype|Proposed) rule/i.test(rule.citation || "") ? "Graduate School policy" : rule.citation);
 
   return (
     <section className={`rounded-2xl border border-brand-100 bg-brand-50/40 ${className}`} aria-label={title}>

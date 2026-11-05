@@ -129,7 +129,7 @@ test("key numbers, staff: own open tasks, students monitored, at risk or delayed
   const stats = officeStats({ role: "staff", own: { total: 6, overdue: 2, dueSoon: 1 }, waiting: { total: 9 }, kpis });
   assert.deepEqual(stats.map((s) => s.key), ["tasks", "students", "risk", "defenses"]);
   assert.equal(stats[0].value, 6);
-  assert.match(stats[0].sub, /2 overdue/);
+  assert.match(stats[0].sub, /^2 tasks past the due date$/);
   assert.equal(stats[0].tone, "danger");
   assert.equal(stats[1].value, 120);
   assert.match(stats[1].sub, /100 active students/);

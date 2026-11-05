@@ -241,7 +241,7 @@ export function officeStats({ role, own, waiting, kpis }) {
     key: "tasks",
     label: "Your open tasks",
     value: own.total,
-    sub: `${own.overdue} overdue`,
+    sub: `${own.overdue} ${own.overdue === 1 ? "task" : "tasks"} past the due date`,
     tone: own.overdue ? "danger" : own.total ? "warning" : "neutral",
     to: queue,
   };

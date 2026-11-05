@@ -21,7 +21,7 @@ from __future__ import annotations
 
 HANDBOOK = "Graduate School Handbook 2022-2023"
 PROTOCOL = "Graduate School Research Protocol AY 2024-2025"
-PROTOTYPE = "Prototype rule — pending Graduate School validation"
+PROTOTYPE = "Proposed rule (agreed with the Graduate School, awaiting sign-off)"
 
 GRADES_OUT_OF_SCOPE = "Grades are outside the system's scope (stakeholder decision)."
 

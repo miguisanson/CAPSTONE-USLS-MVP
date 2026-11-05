@@ -257,7 +257,7 @@ test.describe("Move to... on a phone (F-18)", () => {
 // ------------------------------------------------------------------ I-214: rule badges
 const PROTOTYPE_RULES = {
   items: [
-    { key: "x1", title: "Leave length", description: "How long a leave may last.", value: 1, value_type: "int", unit: "semesters", citation: "Prototype rule — pending Graduate School validation", enforced: true, status: "needs_review" },
+    { key: "x1", title: "Leave length", description: "How long a leave may last.", value: 1, value_type: "int", unit: "semesters", citation: "Proposed rule (agreed with the Graduate School, awaiting sign-off)", enforced: true, status: "needs_review" },
   ],
 };
 
@@ -271,7 +271,7 @@ test.describe("rule badges for the Dean and the student (F-11)", () => {
       await expect(rules).toBeVisible();
       await rules.getByRole("button").first().click();
       await expect(rules).toContainText("Leave length");
-      await expect(rules).not.toContainText(/Prototype rule|pending Graduate School validation|Needs review|need review/i);
+      await expect(rules).not.toContainText(/Prototype rule|Proposed rule|awaiting sign-off|pending Graduate School validation|Needs review|need review/i);
     });
   });
   test.describe("dean", () => {
@@ -283,7 +283,7 @@ test.describe("rule badges for the Dean and the student (F-11)", () => {
       await expect(rules).toBeVisible();
       await rules.getByRole("button").first().click();
       await expect(rules).toContainText("Leave length");
-      await expect(rules).not.toContainText(/Prototype rule|pending Graduate School validation|Needs review|need review/i);
+      await expect(rules).not.toContainText(/Prototype rule|Proposed rule|awaiting sign-off|pending Graduate School validation|Needs review|need review/i);
     });
   });
   test.describe("staff keeps them", () => {

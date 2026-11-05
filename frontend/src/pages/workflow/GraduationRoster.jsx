@@ -168,7 +168,12 @@ const GRADUATION_BOARD_COLUMNS = [
   {
     label: "Approved, ready to export",
     description: "The Dean exports; staff then mark it sent.",
-    statuses: ["Dean Approved", "Sent to Registrar", "Registrar Received"],
+    statuses: ["Dean Approved"],
+  },
+  {
+    label: "With the Registrar",
+    description: "Sent. Closed; acknowledgement is optional.",
+    statuses: ["Sent to Registrar", "Registrar Received"],
   },
   {
     label: "Exceptions",
