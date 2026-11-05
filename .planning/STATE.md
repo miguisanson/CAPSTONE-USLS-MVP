@@ -51,6 +51,10 @@
 - MERGED ea0903ca im45 (IM45 done; F6-06 not a bug: now_utc() is naive Manila time) + d0877db8 manual rebuilt. Running
   `pkt/seedfix` in `wt/seedfix` (I-374 seed history + ready count = export filter, I-378 finished Registrar column, I-376 server,
   I-379 group forward vs returnee checks; owns app.py).
+- Fable review 3 (`.planning/research/FABLE-REVIEW3-2026-11-05.md`): no P1; F7-01 (stored research status stale since I-373;
+  fix: show the live progress status on the 3 chips, NOT a seed-time sync, which would move demo student Nicolas Valdez off
+  Writing and break the residency guide), F7-02 (seed graduation history only on Completed students) + 7 P3 -> packet after
+  `pkt/last5` (running in `wt/last5`: I-006, I-371, I-303, I-345).
 - MERGED 37f1afe6 round4 (I-392..I-395) + f325322f student-home test + d5cf6cf7 (picker asks readiness=live; plain list stays
   cheap, fixes the query-count test the 16056e36 gate caught: 1,261 tests, only that one failed). Full e2e on f325322f: 1,040 passed, 2 failed
   (p23 label -> fixed, p79 load-flaky) -> 33/33 re-run; autopilot 34/34 on the d5cf6cf7 build. Python gate on d5cf6cf7 in `wt/gate` -> `E:/Temp/claude/pygate-d5cf.log`.
