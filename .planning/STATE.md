@@ -1,5 +1,17 @@
 # State
 
+## PAUSED 2026-11-05 night by the owner (to play a game) — resume here
+
+- Branch `v6.4.1-test` @ the commit after 97045aec (all merged work pushed). Owner's loop instructions: Desktop
+  `C:/Users/Windows10/Desktop/USLS-final-loop-instructions.md` (copy in `.planning/LOOP-INSTRUCTIONS-2026-11-05.md`).
+- In flight when paused: `pkt/f7` (worktree `CAPSTONE-USLS-MVP-wt/f7`, WIP commit 1e06453a, pushed): Fable review 3 fixes
+  (`.planning/research/FABLE-REVIEW3-2026-11-05.md`): F7-01 show the live research status on the 3 chips (NOT a seed-time sync),
+  F7-02 seed graduation history only on Completed students, F7-03..09 P3. Tests started in `tests/test_f7.py`, app.py partly
+  edited, nothing gated. Resume: re-brief a Sonnet helper on that worktree (same brief as in this STATE's Fable 3 bullet).
+- Last gates: Python full 1,261 on 16056e36 (1 fail, fixed in d5cf6cf7); Python on d5cf6cf7 was stopped mid-run (re-run);
+  e2e full on f325322f 1,040 passed (2 handled); autopilot 34/34. After f7: full Python + full e2e + autopilot, then push.
+- After pulling on any machine: `npm run seed` (schema + seed changed today).
+
 ## 2026-11-05 - v6.4.1-test: final polish loop before submission (2026-11-07)
 
 - **Branch `v6.4.1-test`** made from `v6.4-migui` @ 67d4432 (owner 2026-11-05). All loop work lands here; Khloe's branch is merged later by the owner.
