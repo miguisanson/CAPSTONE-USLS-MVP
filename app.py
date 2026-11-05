@@ -33,8 +33,9 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet, InvalidToken
-from flask import Flask, Response, has_app_context, has_request_context, jsonify, redirect, request, send_from_directory, session
+from flask import Flask, Response, g as flask_g, has_app_context, has_request_context, jsonify, redirect, request, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
+from flask_sqlalchemy.session import Session as _FlaskSqlaSession
 from sqlalchemy import and_, event, func, inspect, or_, text, true
 from sqlalchemy import event as _sa_event
 from sqlalchemy.engine import Engine
@@ -70,7 +71,18 @@ def env_float(name: str, default: float) -> float:
     return float(raw) if raw is not None and raw.strip() else default
 
 
-db = SQLAlchemy()
+class SandboxSession(_FlaskSqlaSession):
+    """Sends a request's queries to the visitor's private demo sandbox (see register_demo_sandbox);
+    outside a request, or with no sandbox on `g`, it is the normal Flask-SQLAlchemy session."""
+
+    def get_bind(self, mapper=None, clause=None, bind=None, **kwargs):
+        engine = flask_g.get("usls_sandbox_engine") if has_app_context() else None
+        if engine is not None and bind is None:
+            return engine
+        return super().get_bind(mapper=mapper, clause=clause, bind=bind, **kwargs)
+
+
+db = SQLAlchemy(session_options={"class_": SandboxSession})
 
 
 @event.listens_for(Engine, "connect")
@@ -370,7 +382,11 @@ def demo_mode_enabled() -> bool:
 
 # Set by the sign-in page's "Skip date waits" switch (POST /api/auth/demo-settings); None = use DEMO_SKIP_DATE_WAITS.
 # shortcut: kept in memory, so a restart goes back to the environment default (ON); fine for a one-process demo.
-DEMO_RUNTIME = {"skip_date_waits": None}
+DEMO_RUNTIME = {"skip_date_waits": None, "sandbox": {}}  # "sandbox": the switch per sandbox id when sandboxes are on
+
+
+def current_sandbox_id() -> str | None:
+    return flask_g.get("usls_sandbox_id") if has_app_context() else None
 
 
 def demo_skip_date_waits() -> bool:
@@ -380,7 +396,10 @@ def demo_skip_date_waits() -> bool:
     (default ON)."""
     if not demo_mode_enabled():
         return False
-    if DEMO_RUNTIME["skip_date_waits"] is not None:
+    own = DEMO_RUNTIME["sandbox"].get(current_sandbox_id())
+    if own is not None:
+        return own
+    if DEMO_RUNTIME["skip_date_waits"] is not None and current_sandbox_id() is None:
         return DEMO_RUNTIME["skip_date_waits"]
     return os.getenv("DEMO_SKIP_DATE_WAITS", "1").strip().lower() not in {"0", "false", "no", "off"}
 
@@ -449,6 +468,142 @@ def resolve_secret_key(environ=None) -> str:
     return os.urandom(32).hex()
 
 
+SANDBOX_COOKIE = "usls_sandbox"
+SANDBOX_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+_SANDBOX_ENGINES: dict = {}
+_SANDBOX_LOCK = threading.Lock()
+
+
+def _main_sqlite_path() -> str | None:
+    with app.app_context():
+        url = db.engine.url
+    if url.get_backend_name() != "sqlite" or not url.database or url.database == ":memory:":
+        return None
+    return url.database
+
+
+def demo_sandbox_enabled() -> bool:
+    """Per-visitor demo databases: demo mode + SQLite + DEMO_SANDBOX (default ON; under a test runner only when set)."""
+    raw = os.getenv("DEMO_SANDBOX")
+    if raw is None and app.config.get("TESTING"):
+        return False
+    if (raw or "1").strip().lower() in {"0", "false", "no", "off"} or not demo_mode_enabled():
+        return False
+    return _main_sqlite_path() is not None
+
+
+def demo_sandbox_dir() -> Path:
+    # shortcut: uploaded files stay in the shared uploads/ folder (names are random); only the database is private.
+    folder = Path(os.getenv("DEMO_SANDBOX_DIR", "").strip() or Path(__file__).resolve().parent / "demo_sandboxes")
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def refresh_demo_sandbox_template() -> None:
+    """Snapshot the main SQLite database as `_template.sqlite3`; new sandboxes start from it."""
+    source = _main_sqlite_path()
+    if not source:
+        return
+    target = demo_sandbox_dir() / "_template.sqlite3"
+    partial = target.with_suffix(".partial")
+    src, dst = sqlite3.connect(source), sqlite3.connect(partial)
+    try:
+        src.backup(dst)
+    finally:
+        dst.close()
+        src.close()
+    os.replace(partial, target)
+
+
+def dispose_demo_sandboxes() -> None:
+    with _SANDBOX_LOCK:
+        engines = list(_SANDBOX_ENGINES.values())
+        _SANDBOX_ENGINES.clear()
+    for engine in engines:
+        engine.dispose()
+
+
+def _forget_demo_sandbox(sandbox_id: str) -> None:
+    with _SANDBOX_LOCK:
+        engine = _SANDBOX_ENGINES.pop(sandbox_id, None)
+    DEMO_RUNTIME["sandbox"].pop(sandbox_id, None)
+    if engine is not None:
+        engine.dispose()
+    for suffix in ("", "-wal", "-shm"):
+        with contextlib.suppress(OSError):
+            (demo_sandbox_dir() / f"{sandbox_id}.sqlite3{suffix}").unlink()
+
+
+def remove_idle_demo_sandboxes(max_idle_hours: float | None = None) -> None:
+    hours = max_idle_hours if max_idle_hours is not None else env_float("DEMO_SANDBOX_IDLE_HOURS", 24)
+    cutoff = datetime.now().timestamp() - hours * 3600
+    for path in demo_sandbox_dir().glob("*.sqlite3"):
+        if SANDBOX_ID_RE.match(path.stem) and path.stat().st_mtime < cutoff:
+            _forget_demo_sandbox(path.stem)
+
+
+def _open_demo_sandbox(sandbox_id: str):
+    """The visitor's engine; the file is copied from the template when it does not exist yet."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import NullPool
+
+    path = demo_sandbox_dir() / f"{sandbox_id}.sqlite3"
+    with _SANDBOX_LOCK:
+        engine = _SANDBOX_ENGINES.get(sandbox_id)
+        if engine is None:
+            if not path.exists():
+                template = demo_sandbox_dir() / "_template.sqlite3"
+                if not template.exists():
+                    refresh_demo_sandbox_template()
+                shutil.copyfile(template, path)
+            engine = _SANDBOX_ENGINES[sandbox_id] = create_engine(f"sqlite:///{path}", poolclass=NullPool)
+    with contextlib.suppress(OSError):
+        os.utime(path)
+    return engine
+
+
+def register_demo_sandbox(app: Flask) -> None:
+    @app.before_request
+    def pick_demo_sandbox():
+        if not demo_sandbox_enabled():
+            return None
+        sandbox_id = request.cookies.get(SANDBOX_COOKIE, "")
+        valid = bool(SANDBOX_ID_RE.match(sandbox_id))
+        if not valid and not request.path.startswith("/api/"):
+            return None  # page and asset fetches do not each make a database copy
+        if not valid:
+            sandbox_id = secrets.token_hex(16)
+            flask_g.usls_sandbox_new = True
+            remove_idle_demo_sandboxes()
+        flask_g.usls_sandbox_id = sandbox_id
+        flask_g.usls_sandbox_engine = _open_demo_sandbox(sandbox_id)
+        return None
+
+    @app.after_request
+    def set_demo_sandbox_cookie(response):
+        if flask_g.get("usls_sandbox_new"):
+            response.set_cookie(
+                SANDBOX_COOKIE, flask_g.usls_sandbox_id, max_age=2 * 24 * 3600, httponly=True,
+                samesite="Lax", secure=app.config["SESSION_COOKIE_SECURE"],
+            )
+        return response
+
+    @app.route("/api/demo/sandbox/reset", methods=["POST"])
+    def demo_sandbox_reset():
+        if not demo_mode_enabled():
+            return jsonify({"error": "Not found."}), 404
+        if not demo_sandbox_enabled():
+            return jsonify({"ok": True, "sandbox": False})
+        old_id = current_sandbox_id()
+        db.session.remove()
+        if old_id:
+            _forget_demo_sandbox(old_id)
+        new_id = secrets.token_hex(16)
+        flask_g.usls_sandbox_id, flask_g.usls_sandbox_new = new_id, True
+        flask_g.usls_sandbox_engine = _open_demo_sandbox(new_id)
+        return jsonify({"ok": True, "sandbox": True})
+
+
 def create_app() -> Flask:
     database_url = resolve_database_url()
 
@@ -466,6 +621,7 @@ def create_app() -> Flask:
     # Oversize uploads are refused with a JSON 413 before anything is saved.
     app.config["MAX_CONTENT_LENGTH"] = env_int("MAX_UPLOAD_MB", 30) * 1024 * 1024
     db.init_app(app)
+    register_demo_sandbox(app)
 
     @app.after_request
     def add_security_headers(response):
@@ -13600,7 +13756,7 @@ def register_routes(app: Flask) -> None:
         """Tell the sign-in page whether to offer the demo panel. Public, no secrets."""
         return no_store(jsonify({
             "demo_mode": demo_mode_enabled(), "show_accounts": demo_accounts_listing_enabled(),
-            "skip_date_waits": demo_skip_date_waits(),
+            "skip_date_waits": demo_skip_date_waits(), "sandbox": current_sandbox_id() is not None,
         }))
 
     @app.route("/api/auth/demo-settings", methods=["POST"])
@@ -13616,7 +13772,12 @@ def register_routes(app: Flask) -> None:
         value = (request.get_json(silent=True) or {}).get("skip_date_waits")
         if value is not None and not isinstance(value, bool):
             return jsonify({"error": "skip_date_waits must be true, false or null."}), 400
-        DEMO_RUNTIME["skip_date_waits"] = value
+        if current_sandbox_id():
+            DEMO_RUNTIME["sandbox"].pop(current_sandbox_id(), None)
+            if value is not None:
+                DEMO_RUNTIME["sandbox"][current_sandbox_id()] = value
+        else:
+            DEMO_RUNTIME["skip_date_waits"] = value
         return no_store(jsonify({"skip_date_waits": demo_skip_date_waits()}))
 
     @app.route("/api/auth/demo-accounts")
@@ -42842,6 +43003,8 @@ if __name__ == "__main__":
     if "--seed" in sys.argv:
         with app.app_context():
             build_demo_database()
+            if demo_sandbox_enabled():
+                refresh_demo_sandbox_template()
             print(f"Seeded {Student.query.count()} student(s) and {Faculty.query.count()} faculty from imported source sheets.")
             fingerprint = _load_fingerprint_module().database_fingerprint(db.engine.url.database)
             print(f"Demo data fingerprint: {fingerprint}")
