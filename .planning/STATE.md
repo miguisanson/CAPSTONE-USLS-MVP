@@ -51,6 +51,7 @@
 - MERGED ea0903ca im45 (IM45 done; F6-06 not a bug: now_utc() is naive Manila time) + d0877db8 manual rebuilt. Running
   `pkt/seedfix` in `wt/seedfix` (I-374 seed history + ready count = export filter, I-378 finished Registrar column, I-376 server,
   I-379 group forward vs returnee checks; owns app.py).
+- Persona round 4 (admin, student-new; all 9 cards now run once today) -> I-392..I-395 -> `pkt/round4` in `wt/round4` running.
 - GATES 2026-11-05 night: full Python on cf42ba9c 1,257 OK; full e2e on 2f19f624 1,041 passed / 3 failed -> fixed in 5bf5e7bc
   (RC tile counts tasks only; p126-polish5 route leak; p79 load-flaky) -> 34 re-run passed; autopilot project 34/34 passed.
   Final Python gate on 16056e36 running in `wt/gate` -> `E:/Temp/claude/pygate-final.log`.
