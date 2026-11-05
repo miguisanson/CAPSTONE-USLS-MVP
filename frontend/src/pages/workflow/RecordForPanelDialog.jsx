@@ -13,6 +13,7 @@ import { formatClock, formatDate } from "../../lib/format";
 // Every one needs a reason. The server stamps the verdict "Recorded by <you> for the panel"; the chair, the adviser and
 // the student see the stamp, and every later change is in the history.
 const TITLE_GATE = "Form 1 - Title Defense";
+const PROVISIONAL = "Provisional pass - revisions or re-defense"; // merge v6.4 M1: the panel picks the follow-up
 
 const JOBS = {
   record: { title: "Record the verdict for the panel", button: "Record for the panel", busy: "Recording…", reasonLabel: "Why are you recording this for the panel?", reasonHint: "For example: the panel chair is away and sent the result by email." },
@@ -41,6 +42,7 @@ export default function RecordForPanelDialog({ mode, row, onClose, onDone }) {
   const [remarks, setRemarks] = useState("");
   const [title, setTitle] = useState("");
   const [score, setScore] = useState("");
+  const [followUp, setFollowUp] = useState("");
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,16 +52,18 @@ export default function RecordForPanelDialog({ mode, row, onClose, onDone }) {
   const isTitle = defense?.defense_type === "Title Defense" || verdict?.gate === TITLE_GATE;
   const isFinal = defense?.defense_type === "Final Defense";
   const needsResult = mode !== "confirm";
-  const canSave = !busy && reason.trim().length >= 5 && (!needsResult || result) && (mode !== "correct" || result !== verdict?.result);
+  const canSave = !busy && reason.trim().length >= 5 && (!needsResult || result) && (result !== PROVISIONAL || followUp) && (mode !== "correct" || result !== verdict?.result || (result === PROVISIONAL && followUp !== verdict?.provisional_follow_up));
+
+  const followUpPayload = result === PROVISIONAL ? { provisional_follow_up: followUp } : {};
 
   async function save() {
     setBusy(true);
     setError("");
     try {
       const response = mode === "record"
-        ? await api.recordVerdictForPanel(defense.id, { result, remarks, selected_title: title, evaluation_score: score, reason: reason.trim() })
+        ? await api.recordVerdictForPanel(defense.id, { result, remarks, selected_title: title, evaluation_score: score, reason: reason.trim(), ...followUpPayload })
         : mode === "correct"
-          ? await api.correctVerdictForPanel(verdict.id, { result, remarks, selected_title: title, evaluation_score: score, reason: reason.trim() })
+          ? await api.correctVerdictForPanel(verdict.id, { result, remarks, selected_title: title, evaluation_score: score, reason: reason.trim(), ...followUpPayload })
           : await api.confirmRevisionsForPanel(verdict.id, { note, reason: reason.trim() });
       onDone(response.message || "Saved.");
     } catch (err) {
@@ -116,8 +120,18 @@ export default function RecordForPanelDialog({ mode, row, onClose, onDone }) {
         {needsResult && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Verdict" required hint={chosen?.summary}>
-              <Select placeholder={mode === "correct" ? "Choose the correct verdict" : null} options={options} value={result} onChange={(event) => setResult(event.target.value)} />
+              <Select placeholder={mode === "correct" ? "Choose the correct verdict" : null} options={options} value={result} onChange={(event) => { setResult(event.target.value); setFollowUp(""); }} />
             </Field>
+            {result === PROVISIONAL && (
+              <Field label="Required follow-up" required>
+                <Select
+                  placeholder="Choose revisions or re-defense"
+                  options={[{ value: "revisions", label: "Revisions for panel approval" }, { value: "re-defense", label: "Re-defense" }]}
+                  value={followUp}
+                  onChange={(event) => setFollowUp(event.target.value)}
+                />
+              </Field>
+            )}
             <Field label="Remarks or conditions">
               <Textarea rows={3} value={remarks} onChange={(event) => setRemarks(event.target.value)} placeholder="Optional conditions, revisions, or notes" />
             </Field>

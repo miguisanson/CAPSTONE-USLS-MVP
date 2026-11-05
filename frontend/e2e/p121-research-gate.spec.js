@@ -128,7 +128,11 @@ test.describe("I-361: staff record, and correct, the verdict for the panel", () 
     await page.setViewportSize({ width: 1920, height: 1080 });
     await shot(page, "dialog-1920.png");
     await page.setViewportSize({ width: 1366, height: 768 });
+    // merge v6.4 (M1): the single provisional pass asks which follow-up the panel chose
+    await dialog.getByLabel(/^Verdict/).selectOption("Provisional pass - revisions or re-defense");
+    await expect(dialog.getByLabel(/^Required follow-up/)).toBeVisible();
     await dialog.getByLabel(/^Verdict/).selectOption("Passed");
+    await expect(dialog.getByLabel(/^Required follow-up/)).toHaveCount(0);
     await dialog.getByLabel(/^Remarks/).fill("Clean defense, no conditions.");
     await dialog.getByLabel(/^Why are you recording/).fill("The panel chair is away and sent the result by email.");
     await expect(save).toBeEnabled();

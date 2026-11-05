@@ -323,7 +323,7 @@ export default function StageBoard({
                   <h3 className="section-title min-w-0 break-words">{column.label}</h3>
                   <span data-testid="stage-count" className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">{column.count ?? columnItems.length}</span>
                 </header>
-                <div data-testid="stage-scroll" className={`space-y-2 ${columnBodyClassName}`}>{columnItems.map((item) => renderItem(item, column))}</div>
+                <div data-testid="stage-scroll" className={columnBodyClassName ? `space-y-2 ${columnBodyClassName}` : "space-y-3"}>{columnItems.map((item) => renderItem(item, column))}</div>
                 {renderColumnFooter ? renderColumnFooter(column, columnItems) : null}
               </section>
             ))

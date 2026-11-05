@@ -49,7 +49,7 @@ const SCHEDULE_STATE_TEXT = {
   Confirmed: (s) => `Your ${s.defense_type || "defense"} is booked for ${fmtDay(s.preferred_date)}.`,
   "Needs Re-confirmation": () => "Your panel changed. Waiting for the Research Coordinator to confirm the date again.",
   Held: (s) => `Your ${s.defense_type || "defense"} took place on ${fmtDay(s.preferred_date)}.`,
-  Deferred: () => "Your defense was deferred. Waiting for the Research Coordinator to set a new date.",
+  Deferred: () => "Your defense was deferred. Upload this stage's requirements again; then the Research Coordinator sets a new date.",
   Rescheduled: () => "Your defense was moved. The newer booking replaces this one.",
   Cancelled: () => "Your last booking was cancelled. You can request a new date.",
 };

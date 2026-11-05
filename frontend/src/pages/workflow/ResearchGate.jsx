@@ -77,6 +77,20 @@ export function ResearchGateForm({ context, studentId, submit, submitting, resul
     }
   }
 
+  async function confirmPanelRevisions() {
+    setStaffVerdictBusy(true);
+    setStaffVerdictNotice(null);
+    try {
+      const response = await api.confirmRevisionsForPanel(staffAction.verdict.id, { note: "", reason: (staffVerdict.confirm_reason || "").trim() });
+      setStaffVerdictNotice({ tone: "success", text: response.message || "Revisions confirmed." });
+      await refetch?.();
+    } catch (error) {
+      setStaffVerdictNotice({ tone: "danger", text: error.message || "The revisions could not be confirmed." });
+    } finally {
+      setStaffVerdictBusy(false);
+    }
+  }
+
   async function correctPanelVerdict() {
     const payload = {
       result: verdictResult,
@@ -302,6 +316,17 @@ export function ResearchGateForm({ context, studentId, submit, submitting, resul
             <Button variant="secondary" className="mt-3" disabled={staffVerdictBusy || !(staffVerdict.reason || "").trim() || (verdictResult === PROVISIONAL && !staffVerdict.provisional_follow_up)} onClick={correctPanelVerdict}>
               {staffVerdictBusy ? "Saving…" : "Correct panel verdict"}
             </Button>
+          )}
+          {staffAction.can_confirm_revisions && (
+            // merge v6.4 M4: staff and the Research Coordinator may confirm the revisions for the panel, with a reason
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+              <Field label="Reason for confirming the revisions for the panel" required>
+                <Input value={staffVerdict.confirm_reason || ""} onChange={(event) => setStaffVerdict((current) => ({ ...current, confirm_reason: event.target.value }))} placeholder="For example: the chair approved the revised paper by email" />
+              </Field>
+              <Button variant="secondary" disabled={staffVerdictBusy || (staffVerdict.confirm_reason || "").trim().length < 5} onClick={confirmPanelRevisions}>
+                {staffVerdictBusy ? "Confirming…" : "Confirm revisions"}
+              </Button>
+            </div>
           )}
           {staffVerdictNotice && <InlineNotice tone={staffVerdictNotice.tone} className="mt-3">{staffVerdictNotice.text}</InlineNotice>}
         </Card>

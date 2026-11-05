@@ -22,7 +22,7 @@ export default {
       rule: "A verdict can be recorded only for a defense that has taken place; the demonstration skips the date wait.",
       ifAsked: [
         { q: "Does the panel chair have to sign in?", a: "No. The chair can record the verdict in the Faculty Portal, but staff and the Research Coordinator can record it for the panel from the card. Either way the verdict names who recorded it." },
-        { q: "What are the possible verdicts?", a: "Approved moves the student on; Deferred means the defense did not take place and is rescheduled; Disapproved means a new title set or a re-defense." },
+        { q: "What are the possible verdicts?", a: "Five: Passed; Passed with minor revisions; Provisional pass, revisions or re-defense (the panel picks which); Deferred; Failed. Deferred and Failed send the student back to upload that stage's requirements before the defense is booked again." },
       ],
     },
     {
@@ -32,7 +32,7 @@ export default {
         ...FIND,
         { click: { role: "button", name: "Record the verdict for the panel for Miguel Yu" } },
         { wait: { text: "Record the verdict for the panel" }, timeout: 20000 },
-        { select: { label: "Verdict", in: "dialog" }, label: "Approved" },
+        { select: { label: "Verdict", in: "dialog" }, label: "Passed" },
         { type: { label: "Remarks or conditions", in: "dialog" }, text: "Title approved as submitted." },
         { type: { label: "Title selected by the panel", in: "dialog" }, text: "Learning Analytics Feedback Dashboards and the Engagement of Working Graduate Students in Blended Courses" },
         { type: { label: "Why are you recording this for the panel", in: "dialog" }, text: "The panel chair sent the result by email." },

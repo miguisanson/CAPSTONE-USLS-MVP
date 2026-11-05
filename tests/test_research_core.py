@@ -594,6 +594,11 @@ class VerdictOutcomeTests(ResearchCoreBase):
             self.assertTrue(any(
                 t.owner_role == "Research Coordinator" and "Reschedule" in t.title for t in self.open_tasks()
             ))
+        # Merge v6.4 (Fable review): the board says the student is next, not the Research Coordinator.
+        row = next(item for item in self.staff().get("/api/research-gate/overview").get_json()["items"]
+                   if item["student"]["id"] == self.student_id)
+        self.assertEqual((row["state"], row["waiting_on"]), ("blocked", "Student"))
+        self.assertIn("resubmit", row["reason"].lower())
 
     def test_chair_can_correct_a_verdict_before_it_is_acted_on_with_a_reason(self):
         schedule_id = self.at_proposal_ready_for_verdict()

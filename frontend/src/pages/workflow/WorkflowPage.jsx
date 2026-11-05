@@ -331,7 +331,7 @@ function workflowGuidance(slug) {
     "course-audit":
       "Run at the end of the semester. Pick a subject to see its enrolled students, then tick who completed it. Saving updates each student's course audit and missing count; a student who clears all subjects advances to Proposal Development.",
     "research-gate":
-      "Reads the student's stored PDF evidence for the selected gate. The Academic Coordinator endorses Form 1; the panel chair records each defense verdict (pass, minor or major revisions, deferral, failure) and the stage completes only when its follow-up is done. Staff cannot manually mark an absent document as received.",
+      "Reads the student's stored PDF evidence for the selected gate. The Academic Coordinator endorses Form 1; the panel chair, or Graduate School staff or the Research Coordinator for the panel, records each defense verdict (Passed; Passed with minor revisions; Provisional pass, revisions or re-defense; Deferred; Failed) and the stage completes only when its follow-up is done. Staff cannot manually mark an absent document as received.",
     "panel-matching":
       "Opens after the Academic Coordinator has endorsed Form 1. The Research Coordinator nominates the panel: the system reads the uploaded papers, ranks faculty expertise with availability and current panel load, and the panel size follows the paper type (the external panelist joins from the proposal defense). The student's adviser cannot sit on the panel. The proposal panel carries to the final defense unless changed with a reason.",
     "defense-scheduling":

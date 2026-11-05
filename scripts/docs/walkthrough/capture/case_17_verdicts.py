@@ -206,7 +206,7 @@ def run(rt: Runtime) -> None:
         rt.step("B1 chair opens the verdict page before the defense starts", early_look)
 
     # ---- Part C: Nico - Passed with minor revisions -------------------------------------------------
-    def verdict(page, name, result_label, remarks, shot_form, shot_done, key):
+    def verdict(page, name, result_label, remarks, shot_form, shot_done, key, follow_up=None):
         start = slots[key][0]
         act = h.sched_state(api, ids[key.rstrip("2")])["active"]
         if act:  # the booking that is really on record (a resumed run may have booked it earlier)
@@ -216,6 +216,8 @@ def run(rt: Runtime) -> None:
         art = article(page, name)
         art.scroll_into_view_if_needed()
         art.get_by_label("Verdict result").select_option(label=result_label)
+        if follow_up:  # merge v6.4: one provisional pass; the panel picks revisions or re-defense
+            art.get_by_label("Required follow-up").select_option(follow_up)
         art.get_by_label("Remarks or conditions").fill(remarks)
         facts[f"{key}_form"] = art.inner_text()[-1200:]
         art.scroll_into_view_if_needed()
@@ -281,10 +283,10 @@ def run(rt: Runtime) -> None:
     def redefense_verdict():
         start = slots["bea2"][0]
         verdict_key = "bea2"
-        verdict(cruz, "Bea Salonga", "Provisional pass - re-defense required",
-                "Research questions need restating; the panel will hear the paper again after a full revision.", 17, 18, verdict_key)
+        verdict(cruz, "Bea Salonga", "Provisional pass – revisions or re-defense",
+                "Research questions need restating; the panel will hear the paper again after a full revision.", 17, 18, verdict_key, follow_up="re-defense")
     if (h.sched_state(api, ids["bea"])["outcome"] or {}).get("effect") != "redefense":
-        rt.step("D4 Dr. Cruz records 'Provisional pass - re-defense required'", redefense_verdict)
+        rt.step("D4 Dr. Cruz records 'Provisional pass – revisions or re-defense' (re-defense)", redefense_verdict)
 
     def staff_redefense():
         h.open_defense_scheduling(rt, staff)

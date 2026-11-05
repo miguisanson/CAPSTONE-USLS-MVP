@@ -74,7 +74,7 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
   const activeSchedule = schedules.find((schedule) => schedule.is_active && schedule.defense_type === form.defense_type);
   const flaggedSchedule = schedules.find((schedule) => schedule.needs_reconfirmation && schedule.defense_type === form.defense_type);
   const isRetry = !activeSchedule && schedules.some(
-    (schedule) => schedule.defense_type === form.defense_type && ["Failed", "Provisional pass - re-defense required"].includes(schedule.defense_outcome)
+    (schedule) => schedule.defense_type === form.defense_type && ["Failed", "Provisional pass - re-defense required", "Provisional pass - revisions or re-defense"].includes(schedule.defense_outcome)
   );
   const usesManuscriptDate = form.defense_type !== "Title Defense";
   const overrideNeedsReason = form.override_requirements || form.override_conflicts;

@@ -36800,7 +36800,7 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
     by_status = {
         "Revisions Pending": ("blocked", student_owner, "Revisions requested after the defense; the student has to submit the revised paper."),
         "Revisions Submitted - Awaiting Confirmation": ("waiting", "Panel chair", "Revised paper submitted; the panel chair has to confirm it."),
-        "Defense Deferred": ("ready", research, "Defense deferred; it has to be rescheduled."),
+        "Defense Deferred": ("blocked", student_owner, "Defense deferred; the student resubmits this stage's requirements before it is booked again."),
         "Re-defense Required": ("blocked", student_owner, "Re-defense required; the student has to resubmit first."),
         "Resubmission Required": ("blocked", student_owner, "Resubmission required; the student has to upload again."),
     }
