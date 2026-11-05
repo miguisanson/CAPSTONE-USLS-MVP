@@ -52,8 +52,8 @@
   `pkt/seedfix` in `wt/seedfix` (I-374 seed history + ready count = export filter, I-378 finished Registrar column, I-376 server,
   I-379 group forward vs returnee checks; owns app.py).
 - MERGED 37f1afe6 round4 (I-392..I-395) + f325322f student-home test + d5cf6cf7 (picker asks readiness=live; plain list stays
-  cheap, fixes the query-count test the 16056e36 gate caught: 1,261 tests, only that one failed). Running: full e2e on
-  f325322f -> `E:/Temp/claude/e2e-full4.log`; Python gate on d5cf6cf7 in `wt/gate` -> `E:/Temp/claude/pygate-d5cf.log`.
+  cheap, fixes the query-count test the 16056e36 gate caught: 1,261 tests, only that one failed). Full e2e on f325322f: 1,040 passed, 2 failed
+  (p23 label -> fixed, p79 load-flaky) -> 33/33 re-run; autopilot 34/34 on the d5cf6cf7 build. Python gate on d5cf6cf7 in `wt/gate` -> `E:/Temp/claude/pygate-d5cf.log`.
 - Persona round 4 (admin, student-new; all 9 cards now run once today) -> I-392..I-395 -> `pkt/round4` in `wt/round4` running.
 - GATES 2026-11-05 night: full Python on cf42ba9c 1,257 OK; full e2e on 2f19f624 1,041 passed / 3 failed -> fixed in 5bf5e7bc
   (RC tile counts tasks only; p126-polish5 route leak; p79 load-flaky) -> 34 re-run passed; autopilot project 34/34 passed.
