@@ -45,35 +45,37 @@ test.describe("semester teaching availability (faculty)", () => {
 });
 test.describe("semester schedule review (academic coordinator)", () => {
   test.use({ storageState: join(AUTH_DIR, "academic-coordinator.json") });
-  // I-236: since 26c8892 the coordinator UI has no Schedule tab, "Create draft", "Approve schedule" or "Publish schedule" (the /api/teaching-schedules/<id> approve/publish endpoints are unused by the UI); schedules are picked per row in Offering setup (p84).
-  test.fixme("coordinator reviews draft and explicitly approves and publishes without a Dean decision", async ({ page }) => {
+  test("coordinator prepares, explicitly approves and publishes the semester schedule without a Dean decision", async ({ page }) => {
     let active = null;
     const calls = [];
     await page.route(/\/api\/teaching-schedules(?:\/\d+)?(\?.*)?$/, async route => {
       if (route.request().method() !== "GET") {
-        const body = route.request().postDataJSON(); calls.push(body.action);
+        const body = route.request().postDataJSON(); calls.push(body.action || "draft");
         if (!active) active = structuredClone(plan);
-        if (body.action === "approve") active.status = "Approved";
-        if (body.action === "publish") active.status = "Published";
+        if (body.action === "approve") { active.status = "Approved"; active.approved_at = "2099-08-01T09:00:00Z"; }
+        if (body.action === "publish") { active.status = "Published"; active.published_at = "2099-08-02T09:00:00Z"; }
         active.version++;
+        return route.fulfill({ json: { term, terms: [term], plan: active } });
       }
       await route.fulfill({ json: { term, terms: [term], availability: [], plan: active, rules: { start: "07:30", end: "21:00", duration: 90, gap: 15 } } });
     });
     await page.goto("/");
     await page.locator("aside nav").getByRole("link", { name: /Course Adjustments$/ }).click();
-    await page.getByRole("tab", { name: "Schedule", exact: true }).click();
-    await page.getByRole("button", { name: "Create draft", exact: true }).click();
-    await expect(page.getByText("TEST-A", { exact: true }).first()).toBeVisible();
-    await expect(page.getByLabel("Schedule for TEST-A", { exact: true })).toBeVisible();
+    await page.getByRole("tab", { name: "Offering setup" }).click();
+    const panel = page.getByRole("region", { name: "Semester schedule" });
+    await expect(panel.getByText("Not prepared", { exact: true })).toBeVisible();
+    await panel.getByRole("button", { name: "Prepare the semester schedule", exact: true }).click();
+    await expect(panel.getByText("Draft", { exact: true })).toBeVisible();
     expect(calls).not.toContain("publish");
+    await expect(panel.getByRole("button", { name: "Publish schedule", exact: true })).toHaveCount(0);
     await screens(page, "coordinator-draft");
-    await page.getByRole("button", { name: "Approve schedule", exact: true }).click();
+    await panel.getByRole("button", { name: "Approve schedule", exact: true }).click();
     const dialog = page.getByRole("dialog");
-    if (await dialog.isVisible()) await dialog.getByRole("button", { name: "Approve schedule", exact: true }).click();
-    await expect(page.getByText("Approved", { exact: true }).first()).toBeVisible();
-    await page.getByRole("button", { name: "Publish schedule", exact: true }).click();
-    if (await dialog.isVisible()) await dialog.getByRole("button", { name: "Publish schedule", exact: true }).click();
-    await expect(page.getByText("Published", { exact: true }).first()).toBeVisible();
-    expect(calls).toContain("approve"); expect(calls).toContain("publish");
+    await dialog.getByRole("button", { name: "Approve schedule", exact: true }).click();
+    await expect(panel.getByText("Approved", { exact: true })).toBeVisible();
+    await panel.getByRole("button", { name: "Publish schedule", exact: true }).click();
+    await dialog.getByRole("button", { name: "Publish schedule", exact: true }).click();
+    await expect(panel.getByText("Published", { exact: true })).toBeVisible();
+    expect(calls).toContain("draft"); expect(calls).toContain("approve"); expect(calls).toContain("publish");
   });
 });
