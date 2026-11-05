@@ -248,11 +248,12 @@ test.describe("Research Gate (research coordinator)", () => {
     await shotsAt(page, "research-gate");
   });
 
-  test("with no student chosen it asks for one", async ({ page }) => {
+  test("with no student chosen it shows the board, not a student picker (F5-03)", async ({ page }) => {
     await openFromSidebar(page, /5 · Research Gate/);
     await page.goto("/workflow/research-gate");
-    await expect(main(page).getByRole("heading", { level: 2, name: "Choose a student" })).toBeVisible();
-    await expect(main(page).getByText("Select a student to begin")).toBeVisible();
+    await expect(main(page).getByRole("region", { name: "Research Gate board" })).toBeVisible();
+    await expect(main(page).getByRole("heading", { level: 2, name: "Choose a student" })).toHaveCount(0);
+    await expect(main(page).getByText("Select a student to begin")).toHaveCount(0);
   });
 });
 

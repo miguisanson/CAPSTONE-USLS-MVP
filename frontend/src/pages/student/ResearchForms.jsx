@@ -152,6 +152,8 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
   const replacesExistingUpload = requirement.item_name === "Ethics Clearance";
   const needsSimilarity = /turnitin/i.test(requirement.item_name);
   const [similarity, setSimilarity] = useState("");
+  // the server needs the Turnitin percentage with the file (I-327), so the file picker waits for it
+  const similarityMissing = needsSimilarity && requirement.status !== "Complete" && similarity === "";
 
   async function upload(file) {
     if (titlePackageLocked) {
@@ -219,15 +221,15 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
         </div>
         <div className="flex items-center gap-2">
           <StatusChip status={requirement.status_label} dot={false} />
-          <Button as="label" variant="secondary" icon={titlePackageLocked ? Lock : FileUp} className={titlePackageLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
-            {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading…" : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
-            <input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={busy || titlePackageLocked} onChange={(e) => upload(e.target.files?.[0])} />
+          <Button as="label" variant="secondary" icon={titlePackageLocked ? Lock : FileUp} className={titlePackageLocked || similarityMissing ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
+            {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading…" : similarityMissing ? "Enter the similarity first" : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
+            <input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={busy || titlePackageLocked || similarityMissing} onChange={(e) => upload(e.target.files?.[0])} />
           </Button>
         </div>
       </div>
-      {needsSimilarity && !files.length && (
+      {needsSimilarity && !titlePackageLocked && requirement.status !== "Complete" && (
         <div className="mt-2 max-w-xs">
-          <Field label="Similarity (%)" hint="The percentage shown on the Turnitin certificate, 0 to 100. Enter it before choosing the file.">
+          <Field label="Similarity (%)" hint="The percentage shown on the Turnitin certificate, 0 to 100. The file can be chosen once it is entered.">
             <Input type="number" min="0" max="100" step="0.1" value={similarity} onChange={(e) => setSimilarity(e.target.value)} />
           </Field>
         </div>
