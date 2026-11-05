@@ -186,7 +186,7 @@ test.describe("My Advisees", () => {
       await expect(row).toContainText(entry.student.current_stage || "Not set");
       await expect(row.locator("td").nth(4)).toHaveText(String(entry.documents.length));
       if (entry.pending_count) await expect(row.locator("td").nth(5)).toContainText(`${entry.pending_count} pending`);
-      else await expect(row.locator("td").nth(5)).toHaveText("None");
+      else await expect(row.locator("td").nth(5)).toHaveText("No signature needed");
     }
     await shots(page, "advisees");
   });
@@ -489,8 +489,8 @@ test.describe("Panel invitations", () => {
     await expect(accepted).toContainText("Room 204");
     await expect(accepted).toContainText("Scheduled");
     await expect(accepted).toContainText("Answered");
-    await expect(accepted.getByRole("button", { name: "Accept" })).toHaveCount(0); // already accepted
-    await expect(accepted.getByRole("button", { name: "Decline" })).toBeVisible();
+    await expect(accepted.getByRole("button", { name: "Accept", exact: true })).toHaveCount(0); // already accepted
+    await expect(accepted.getByRole("button", { name: "Withdraw my acceptance" })).toBeVisible();
     const declined = page.getByRole("listitem").filter({ hasText: "Mock Declined" });
     await expect(declined).toContainText("Your reason: Out of the country.");
     await expect(declined.getByRole("button", { name: "Decline" })).toHaveCount(0);

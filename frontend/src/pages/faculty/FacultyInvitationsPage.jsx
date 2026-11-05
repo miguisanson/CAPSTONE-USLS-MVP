@@ -26,7 +26,7 @@ function ScheduleLine({ schedule }) {
 }
 
 // Inline "reason" box used for declining an invitation and for "cannot attend".
-function ReasonForm({ label, confirmLabel, busy, error, onCancel, onSubmit }) {
+function ReasonForm({ label, confirmLabel, effect, busy, error, onCancel, onSubmit }) {
   const [reason, setReason] = useState("");
   const [localError, setLocalError] = useState("");
   const submit = (event) => {
@@ -40,6 +40,7 @@ function ReasonForm({ label, confirmLabel, busy, error, onCancel, onSubmit }) {
   };
   return (
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-red-100 bg-red-50/40 p-3">
+      {effect && <p className="text-sm text-slate-700">{effect}</p>}
       <Field label={label} required>
         <Textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} maxLength={500} />
       </Field>
@@ -59,6 +60,7 @@ function InvitationCard({ invitation, onChanged }) {
   const schedule = invitation.schedule;
   const activeSchedule = schedule && schedule.is_active ? schedule : null;
   const student = invitation.student || {};
+  const withdrawing = invitation.status === "Accepted";
 
   const run = async (action) => {
     setBusy(true);
@@ -119,8 +121,9 @@ function InvitationCard({ invitation, onChanged }) {
 
       {mode === "decline" ? (
         <ReasonForm
-          label="Why are you declining?"
-          confirmLabel="Confirm decline"
+          label={withdrawing ? "Why are you withdrawing?" : "Why are you declining?"}
+          confirmLabel={withdrawing ? "Confirm withdrawal" : "Confirm decline"}
+          effect={withdrawing ? "Your acceptance is cancelled and the Research Coordinator is asked to find a replacement panelist. You can accept again later only if the invitation is sent again." : undefined}
           busy={busy}
           error={error}
           onCancel={() => { setMode(null); setError(""); }}
@@ -147,7 +150,7 @@ function InvitationCard({ invitation, onChanged }) {
             )}
             {invitation.status !== "Declined" && (
               <Button variant="secondary" onClick={() => { setMode("decline"); setError(""); }} disabled={busy}>
-                Decline
+                {withdrawing ? "Withdraw my acceptance" : "Decline"}
               </Button>
             )}
             {activeSchedule && invitation.status !== "Declined" && (
