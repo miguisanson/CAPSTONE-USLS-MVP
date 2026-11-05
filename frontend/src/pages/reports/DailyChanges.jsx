@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckSquare, Download, FileText, Printer, RefreshCw, Square } from "lucide-react";
 import { api } from "../../api";
-import { Button, DataTable, InlineNotice, Input, SectionCard, Spinner, StatCard, StatusChip } from "../../components/ui/index.js";
+import { Button, DataTable, InlineNotice, Input, SectionCard, SkeletonTable, StatCard, StatusChip } from "../../components/ui/index.js";
 import { csvCell, downloadBlob, formatClock, formatDate, todayISO } from "../../lib/format";
 import { printDataTable } from "../../lib/print";
 
@@ -153,7 +153,7 @@ export default function DailyChanges() {
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
 
       {loading ? (
-        <Spinner label="Loading changes…" />
+        <SkeletonTable />
       ) : (
         <DataTable
           caption="Changes recorded on the selected date"

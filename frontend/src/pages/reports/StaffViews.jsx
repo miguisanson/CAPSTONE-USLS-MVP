@@ -5,12 +5,12 @@ import { useState } from "react";
 import { AlertTriangle, FileSpreadsheet, FileText } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, DataTable, EmptyState, Spinner } from "../../components/ui/index.js";
+import { Button, DataTable, EmptyState, SkeletonTable } from "../../components/ui/index.js";
 import { BLUE, BarsChart, ChartCard, ChartChips, GREEN, AMBER, ORANGE, RED, ListSection } from "./ChartParts.jsx";
 import ListDialog, { CountButton } from "./ListDialog.jsx";
 import { columnsFor } from "./ReportPanel.jsx";
 
-const Loading = ({ error, label }) => (error ? <EmptyState icon={AlertTriangle} title="Could not load this report" hint={error} /> : <Spinner label={label} />);
+const Loading = ({ error }) => (error ? <EmptyState icon={AlertTriangle} title="Could not load this report" hint={error} /> : <SkeletonTable />);
 const dash = (value) => (value == null ? "-" : value);
 
 // ---------------------------------------------------------------- S1 Needs attention

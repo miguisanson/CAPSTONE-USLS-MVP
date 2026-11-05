@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { api } from "../../api";
-import { Button, Card, EmptyState, Field, InlineNotice, Input, PageHeader, SectionCard, Select, Spinner, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, EmptyState, Field, InlineNotice, Input, PageHeader, SectionCard, Select, Skeleton, StatusChip } from "../../components/ui/index.js";
 import { useConfirm } from "../../components/confirm";
 import { formatTimeRange } from "./FacultyContext";
 import { formatDateTime } from "../../lib/format";
@@ -84,7 +84,7 @@ export default function FacultySchedule() {
     <PageHeader title="Schedule" forms="teaching-schedule" icon={CalendarDays} description="Enter teaching availability for each semester. Your defense availability is managed separately in My Availability." />
     {error && <InlineNotice tone="danger" title="Could not save or load teaching availability">{error}</InlineNotice>}
     {notice && <InlineNotice tone="success">{notice}</InlineNotice>}
-    {loading ? <Spinner label="Loading teaching availability…" /> : data && <>
+    {loading ? <Skeleton lines={6} /> : data && <>
       <SectionCard title="Teaching availability" action={<StatusChip status={dirty ? "Draft" : data.availability?.status || "Missing"} dot={false} />}>
         <Field label="Semester"><Select aria-label="Semester" value={selectedTerm} placeholder={null} onChange={(event) => selectTerm(event.target.value)} options={(data.terms || []).map((term) => ({ value: term.id, label: term.label }))} disabled={busy} /></Field>
         <p className="text-sm text-slate-600">Available periods permit scheduling. Preferred periods improve recommendations within your availability. Unavailable periods always take precedence. All times are Philippine time.</p>

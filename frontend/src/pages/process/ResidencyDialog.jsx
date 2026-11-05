@@ -1,9 +1,16 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
 import { Button, Field, InlineNotice, Modal, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import StudentPicker from "../../components/StudentPicker";
+
+// The stage decides the purpose (the server's awol_policy_review checks the same pairs); other stages leave it to staff.
+const PURPOSE_BY_STAGE = {
+  "Comprehensive Exam": "Comprehensive examination",
+  Writing: "Awaiting research publication",
+  "Final Defense": "Awaiting research publication",
+};
 
 /**
  * "Record residency": the one thing on the AWOL & Residency page that starts a case from
@@ -17,22 +24,24 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
   const { data: meta } = useApi(() => api.meta(), []);
   const [student, setStudent] = useState({ id: null, label: "" });
   const [reason, setReason] = useState("");
-  const [termId, setTermId] = useState("");
-  const [notes, setNotes] = useState("");
+  const [stage, setStage] = useState("");
+    const [notes, setNotes] = useState("");
   const [review, setReview] = useState(null);
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const activeTerm = String(meta?.terms?.find((item) => item.is_active_planning_term)?.id || "");
-  const selectedTerm = termId || activeTerm;
+  const activeTermLabel = meta?.terms?.find((item) => item.is_active_planning_term)?.label || "";
+  const selectedTerm = activeTerm;
+  const stagePurpose = PURPOSE_BY_STAGE[stage] || "";
   // The handbook has no staff override (I-012): residency is recorded only when the checker clears the case.
   const blockedReason = review && review.recommendation !== "Eligible for Residency"
     ? "The policy checker says this case needs human review, so residency cannot be recorded. Fix the flagged record or use leave of absence instead."
     : "";
 
-  async function runCheck() {
-    if (!student.id || !reason) {
+  async function runCheck(studentId = student.id, purpose = reason) {
+    if (!studentId || !purpose) {
       setError("Choose a student and a residency purpose first.");
       return;
     }
@@ -40,9 +49,9 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
     setError("");
     try {
       const response = await api.awolPolicyReview({
-        student_id: student.id,
+        student_id: studentId,
         workflow_action: "record_residency",
-        residency_reason: reason,
+        residency_reason: purpose,
       });
       setReview(response.review);
     } catch (err) {
@@ -51,6 +60,24 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
       setChecking(false);
     }
   }
+
+  // Choosing a student fills the purpose from the stage and runs the check at once; with no answer from the stage, staff pick it.
+  useEffect(() => {
+    if (!student.id) return undefined;
+    let live = true;
+    setStage("");
+    setReason("");
+    setReview(null);
+    api.student(student.id).then((data) => {
+      if (!live) return;
+      const next = PURPOSE_BY_STAGE[data?.student?.current_stage] || "";
+      setStage(data?.student?.current_stage || "");
+      if (!next) return;
+      setReason(next);
+      runCheck(student.id, next);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [student.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save(event) {
     event.preventDefault();
@@ -91,8 +118,8 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button variant="secondary" icon={ClipboardCheck} loading={checking} onClick={runCheck} disabled={checking || saving}>
-            {checking ? "Checking…" : "Run residency policy checker"}
+          <Button variant="secondary" icon={ClipboardCheck} loading={checking} onClick={() => runCheck()} disabled={checking || saving || !student.id || !reason}>
+            {checking ? "Checking…" : "Check again"}
           </Button>
           <Button
             type="submit"
@@ -124,33 +151,39 @@ export default function ResidencyDialog({ reasons, onClose, onSaved }) {
               onChange={(id, label) => {
                 setStudent({ id, label: label || "" });
                 setReview(null);
+                if (!id) { setReason(""); setStage(""); }
               }}
             />
           </div>
-          <Field label="Residency purpose" required>
-            {/* The dialog's first focus goes here, not to the student search: that box opens its result list the moment it is focused and the list would cover the form. */}
-            <Select
-              data-autofocus=""
-              value={reason}
-              onChange={(event) => {
-                setReason(event.target.value);
-                setReview(null);
-              }}
-              placeholder="Select handbook purpose"
-              options={reasons}
-              required
-            />
-          </Field>
+          {stagePurpose ? (
+            <div>
+              <p className="field-label">Residency purpose</p>
+              <p data-testid="residency-purpose" className="text-sm text-ink">{stagePurpose}</p>
+              <p className="meta mt-0.5">From the student's stage: {stage}.</p>
+            </div>
+          ) : (
+            <Field label="Residency purpose" required hint={student.id ? "The stage does not decide this one." : undefined}>
+              {/* The dialog's first focus goes here, not to the student search: that box opens its result list the moment it is focused and the list would cover the form. */}
+              <Select
+                data-autofocus=""
+                value={reason}
+                onChange={(event) => {
+                  setReason(event.target.value);
+                  setReview(null);
+                  if (event.target.value && student.id) runCheck(student.id, event.target.value);
+                }}
+                placeholder="Select handbook purpose"
+                options={reasons}
+                required
+              />
+            </Field>
+          )}
         </div>
-        <Field label="Semester" required>
-          <Select
-            value={selectedTerm}
-            onChange={(event) => setTermId(event.target.value)}
-            placeholder="Select semester"
-            options={(meta?.terms || []).map((term) => ({ value: String(term.id), label: term.label }))}
-            required
-          />
-        </Field>
+        <div>
+          <p className="field-label">Semester</p>
+          <p data-testid="residency-semester" className="text-sm text-ink">{activeTermLabel || "No active semester"}</p>
+          <p className="meta mt-0.5">The active semester; past semesters cannot be recorded.</p>
+        </div>
         <Field label="Staff notes" hint="Optional. Kept with the residency record.">
           <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
         </Field>

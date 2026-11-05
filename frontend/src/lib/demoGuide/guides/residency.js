@@ -18,15 +18,12 @@ export default {
     },
     {
       id: "rs-check", title: "Choose the student and run the policy check", role: "staff", route: "/workflow/awol", page: "AWOL & Residency",
-      do: "Select Record residency, find the student, choose the purpose and the semester, add a note and select Run residency policy checker. The result lists three checks.",
+      do: "Select Record residency, find the student, add a note and wait for the policy check. The purpose comes from the stage, the semester is the active one, and the result lists three checks.",
       actions: [
         { click: { role: "button", name: "Record residency", exact: true } },
         { type: { label: "Search a student", in: "dialog" }, text: "Valdez" },
         { click: { role: "button", name: "Nicolas Valdez", in: "dialog" } },
-        { select: { label: "Residency purpose", in: "dialog" }, label: "Thesis / dissertation work" },
-        { select: { label: "Semester", in: "dialog" }, label: "AY 2026-2027 1st Semester" },
         { type: { label: "Staff notes", in: "dialog" }, text: "Thesis writing continues without subject enrollment; adviser confirmed progress this semester." },
-        { click: { role: "button", name: "Run residency policy checker", in: "dialog" } },
         { wait: { text: "Eligible for Residency" }, timeout: 20000 },
       ],
       doneWhen: "manual",

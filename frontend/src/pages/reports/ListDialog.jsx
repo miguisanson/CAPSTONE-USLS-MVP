@@ -4,7 +4,7 @@
 import { AlertTriangle, FileSpreadsheet, FileText, Users } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, DataTable, EmptyState, Modal, Spinner } from "../../components/ui/index.js";
+import { Button, DataTable, EmptyState, Modal, SkeletonTable } from "../../components/ui/index.js";
 import { columnsFor } from "./ReportPanel.jsx";
 
 export const STUDENT_COLUMNS = [
@@ -45,7 +45,7 @@ function Rows({ title, count, columns, rows, downloads, csvName }) {
 function Remote({ title, endpoint, params, pick, columns, filterRows }) {
   const { data, error } = useApi(() => api.reportV2(endpoint, params), [endpoint, JSON.stringify(params)]);
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load this list" hint={error} />;
-  if (!data) return <Spinner label="Loading the students…" />;
+  if (!data) return <SkeletonTable />;
   const rows = (pick ? pick(data) : data.rows).filter(filterRows || (() => true));
   const downloads = (
     <div className="flex flex-wrap gap-2">

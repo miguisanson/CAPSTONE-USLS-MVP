@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ListTodo, AlertTriangle, Flag, CheckCircle2, ShieldCheck, RefreshCw, ArrowRight, ShieldAlert } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Button, Card, DataTable, EmptyState, Field, InlineNotice, PageHeader, Pagination, SearchInput, Spinner, StatCard, StatusChip, Textarea } from "../components/ui/index.js";
+import { Button, Card, DataTable, EmptyState, Field, InlineNotice, PageHeader, Pagination, SearchInput, SkeletonTable, StatCard, StatusChip, Textarea } from "../components/ui/index.js";
 import { formatDate, relativeDays, SEVERITY } from "../lib/format";
 import { useAuth } from "../auth";
 import { PAGE, openPageLabel } from "../lib/labels.js";
@@ -87,7 +87,7 @@ function AtRiskPanel() {
   const counts = { high: 0, medium: 0, low: 0 };
   students.forEach((row) => { counts[row.severity] = (counts[row.severity] || 0) + 1; });
 
-  if (loading) return <Spinner label="Finding students at risk…" />;
+  if (loading) return <SkeletonTable />;
   if (error) return <InlineNotice tone="danger" title="Could not load at-risk students">{error}</InlineNotice>;
 
   return (
@@ -291,7 +291,7 @@ function ConflictsPanel({ state }) {
     }
   }
 
-  if (loading) return <Spinner label="Loading conflicts…" />;
+  if (loading) return <SkeletonTable />;
   if (error) return <InlineNotice tone="danger" title="Could not load conflicts">{error}</InlineNotice>;
 
   return (

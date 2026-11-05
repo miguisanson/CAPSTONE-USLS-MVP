@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AlertTriangle, Clock } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { EmptyState, Spinner, StatCard } from "../../components/ui/index.js";
+import { EmptyState, SkeletonTable, StatCard } from "../../components/ui/index.js";
 import { AMBER, BLUE, BarsChart, ChartCard, GREEN, ORANGE, RED } from "./ChartParts.jsx";
 import ListDialog, { CountButton } from "./ListDialog.jsx";
 import { DEFAULT_STAGES } from "../../lib/stages.js";
@@ -24,7 +24,7 @@ const BAND_TEXT = ["#fff", "#0f172a", "#fff", "#fff"];
 function useDecisions(scope, scopeKey) {
   return useApi(() => api.reportV2("decisions", scope), [scopeKey]);
 }
-const Loading = ({ error, label }) => (error ? <EmptyState icon={AlertTriangle} title="Could not load this report" hint={error} /> : <Spinner label={label} />);
+const Loading = ({ error }) => (error ? <EmptyState icon={AlertTriangle} title="Could not load this report" hint={error} /> : <SkeletonTable />);
 const dash = (value) => (value == null ? "-" : value);
 const caseRow = (c) => ({
   ...c,
