@@ -233,7 +233,7 @@ export function PanelMatchingForm({ context, studentId, submit, submitting, refe
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard size="sm" tone="success" icon={BookOpenCheck} label="Expertise match" value={`${weights.expertise} pts`} sub="paper vs. faculty records" />
         <StatCard size="sm" tone="info" icon={CalendarCheck} label="Availability" value={`${weights.availability} pts`} sub="conflict-free windows" />
-        <StatCard size="sm" tone="warning" icon={Users} label="Workload" value={`${weights.workload} pts`} sub="other student panels" />
+        <StatCard size="sm" tone="warning" icon={Users} label="Workload" value={`${weights.workload} pts`} sub="other student panels (any stage)" />
       </div>
       <div className={`rounded-xl border px-4 py-3 text-sm ${toneOf("neutral").notice}`}>
         {context.research_case_type || "Thesis"} panel needs {roles.length} members: {roles.join(", ")}. Expertise counts most; candidates who share no topic with the paper are listed after those who do.
@@ -355,6 +355,11 @@ export function PanelMatchingForm({ context, studentId, submit, submitting, refe
                   placeholder="Select faculty"
                   options={selectorOptions.map((item) => ({ value: item.faculty_id, label: `#${rankByFacultyId.get(item.faculty_id)} ${item.faculty_name} - ${item.score}/100` }))}
                 />
+                {(() => {
+                  // I-389: an overloaded faculty member can still be suggested, but the seat says so.
+                  const overload = (recs.find((item) => item.faculty_id === Number(selectedIds[index]))?.flags || []).find((flag) => flag.type === "overload");
+                  return overload ? <p className="mt-1 text-xs font-medium text-amber-800" data-testid="seat-overload-warning">Overloaded: {overload.message}</p> : null;
+                })()}
               </Field>
             ))}
           </div>

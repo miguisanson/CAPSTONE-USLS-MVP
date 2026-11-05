@@ -88,7 +88,20 @@ export default function Dashboard() {
     );
   }
 
-  const actions = officeActions(data.own.items, role);
+  const taskActions = officeActions(data.own.items, role);
+  // I-388: the Research Coordinator's Ready students (the panel to match, the date to book) are their own move.
+  const researchReady = data.dashboard?.research_ready;
+  const readyItems = (researchReady?.items || []).map((entry) => ({
+    key: `ready-${entry.student_id}`,
+    title: entry.student_name,
+    detail: [entry.stage, entry.reason].filter(Boolean).join(". "),
+    tone: "neutral",
+    status: "Ready",
+    target: { to: entry.to || researchReady.view_all, label: "Open the Research Gate" },
+  }));
+  const actions = readyItems.length
+    ? { items: [...readyItems, ...taskActions.items], total: taskActions.total + researchReady.total }
+    : taskActions;
   const waiting = officeWaiting(data.all.items, role);
   // F5-14: the Research Coordinator's "Waiting on others" lists the students waiting on a panel verdict (max 3), not tasks.
   const researchWaiting = data.dashboard?.research_waiting;
@@ -104,7 +117,7 @@ export default function Dashboard() {
     : waiting.items;
   // the tasks API counts every open task; the page of 200 may hold fewer than the total
   const heldByOthers = Math.max((data.all.total ?? 0) - (data.own.total ?? 0), waiting.total);
-  const stats = officeStats({ role, own: { ...actions, total: data.own.total ?? actions.total }, waiting: { total: heldByOthers }, kpis: data.dashboard?.kpis || null });
+  const stats = officeStats({ role, own: { ...actions, total: (data.own.total ?? taskActions.total) + (researchReady?.total || 0) }, waiting: { total: heldByOthers }, kpis: data.dashboard?.kpis || null });
   const queue = `/work-queue?owner=${encodeURIComponent(office)}`;
   const activity = data.dashboard
     ? officeActivity(data.dashboard.recent_logs, undefined, role).map((entry) => ({
@@ -141,7 +154,11 @@ export default function Dashboard() {
       actions={actions.items.map(toRow)}
       actionsSubtitle="Your office's open tasks, most urgent first"
       actionsEmpty={{ title: "Nothing is waiting on you", hint: `New tasks for the ${office} will appear here.` }}
-      actionsAll={actions.total > actions.items.length ? { to: queue, label: `View all ${actions.total}` } : undefined}
+      actionsAll={
+        researchReady?.total > readyItems.length
+          ? { to: researchReady.view_all, label: `View all ${researchReady.total} ready students` }
+          : actions.total > actions.items.length ? { to: queue, label: `View all ${actions.total}` } : undefined
+      }
       waiting={{
         title: "Waiting on others",
         subtitle: "Another office or the student holds these. Nothing to do here until that office or the student acts.",

@@ -2569,8 +2569,16 @@ def faculty_cv_rag_answer(faculty: Faculty, question: str) -> dict:
     }
 
 
+def faculty_panel_load(faculty_id: int, exclude_student_id: int | None = None) -> int:
+    """I-389: the one panel-load count on every screen: students whose panel (any gate, all time) has this faculty."""
+    query = db.session.query(func.count(func.distinct(PanelAssignment.student_id))).filter(PanelAssignment.faculty_id == faculty_id)
+    if exclude_student_id is not None:
+        query = query.filter(PanelAssignment.student_id != exclude_student_id)
+    return query.scalar() or 0
+
+
 def faculty_dict(faculty: Faculty) -> dict:
-    workload = PanelAssignment.query.filter_by(faculty_id=faculty.id).count()
+    workload = faculty_panel_load(faculty.id)
     term = get_active_term()
     teaching_load = faculty_teaching_load_units(faculty, term)
     preferred = (
@@ -23244,6 +23252,7 @@ def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
     student_query = filtered_students_query(filters)
     student_ids = [sid for (sid,) in student_query.with_entities(Student.id).all()]
     research_waiting = None
+    research_ready = None
     if locked_owner == ROLE_LABELS["research_coordinator"]:
         # F5-14: the Research Coordinator's open work also counts the students the Research Gate board shows as
         # Ready or Blocked, and "Waiting on others" lists the students waiting on a panel verdict.
@@ -23261,6 +23270,17 @@ def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
                 {"student_id": row["student"]["id"], "student_name": row["student"]["name"], "stage": row["stage"],
                  "reason": row["reason"], "to": "/workflow/research-gate"}
                 for row in verdict_rows[:3]
+            ],
+            "view_all": "/workflow/research-gate",
+        }
+        # I-388: the Ready students are the coordinator's own move (match the panel, book the date): "Needs your action".
+        ready_rows = [row for row in gate_rows if row["state"] == "ready"]
+        research_ready = {
+            "total": len(ready_rows),
+            "items": [
+                {"student_id": row["student"]["id"], "student_name": row["student"]["name"], "stage": row["stage"],
+                 "reason": row["reason"], "to": "/workflow/research-gate"}
+                for row in ready_rows[:3]
             ],
             "view_all": "/workflow/research-gate",
         }
@@ -23431,6 +23451,7 @@ def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
         "recent_logs": [log_dict(l) for l in recent_logs],
         "open_tasks": [task_dict(t) for t in open_tasks],
         "research_waiting": research_waiting,
+        "research_ready": research_ready,
     }
 
 
@@ -28202,8 +28223,22 @@ def student_directory_brief(student: Student, research_case=_TERM_NOT_GIVEN, act
         "Completion Evidence": "Completed",
     }
     payload["research_stage"] = stage_by_gate.get(gate, student.current_stage)
-    payload["readiness_status"] = research_case.status if research_case else "Research Gate not started"
+    payload["readiness_status"] = live_readiness_status(student, research_case)
     return payload
+
+
+READINESS_LABELS = {"ready": "Ready", "blocked": "Blocked", "done": "Complete"}
+
+
+def live_readiness_status(student: Student, research_case: ResearchCase | None) -> str:
+    """I-387: the picker says what the Research Gate board says (the stored case status goes stale)."""
+    if not research_case:
+        return "Research Gate not started"
+    row = research_gate_overview_row(student, research_case)
+    if not row:
+        return research_case.status
+    return READINESS_LABELS.get(row["state"]) or f"Waiting on {row['waiting_on']}"
+
 
 
 def identity_text(value: str | None) -> str:
@@ -34526,11 +34561,15 @@ def faculty_profile_dict(faculty: Faculty, include_calendar_events: bool = False
     assignments = (
         PanelAssignment.query.filter_by(faculty_id=faculty.id)
         .order_by(PanelAssignment.assigned_at.desc())
-        .limit(8)
         .all()
     )
     payload["current_assignments"] = []
+    listed = set()
     for assignment in assignments:
+        # I-389: a student seated at several gates is listed once per role (the newest seat).
+        if (assignment.student_id, assignment.panel_role) in listed or len(listed) >= 8:
+            continue
+        listed.add((assignment.student_id, assignment.panel_role))
         research_case = (
             ResearchCase.query.filter_by(student_id=assignment.student_id)
             .order_by(ResearchCase.opened_at.desc())
@@ -39106,12 +39145,7 @@ def panel_matching_result(student: Student, profile: dict | None = None) -> dict
 
         # Do not count this student's own panel during regeneration; otherwise the
         # same recommendation would change merely because it was saved.
-        workload = (
-            db.session.query(func.count(func.distinct(PanelAssignment.student_id)))
-            .filter(PanelAssignment.faculty_id == faculty.id, PanelAssignment.student_id != student.id)
-            .scalar()
-            or 0
-        )
+        workload = faculty_panel_load(faculty.id, exclude_student_id=student.id)
         calendar_connected = google_calendar_configured(faculty)
         calendar_error = None
         recurring_days = 0
