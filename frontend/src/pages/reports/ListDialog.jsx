@@ -34,6 +34,7 @@ function Rows({ title, count, columns, rows, downloads, csvName }) {
         rows={rows}
         rowKey={(row, index) => `${row.student_id ?? row.student}-${index}`}
         minWidth="md"
+        stackOnPhone
         pageSize={10}
         csv={downloads ? undefined : { filename: csvName }}
         empty={{ icon: Users, title: "Nobody is in this list", hint: "Change the filters at the top of the page to see more." }}

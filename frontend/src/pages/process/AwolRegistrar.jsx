@@ -47,7 +47,7 @@ export default function AwolRegistrar({ ctx }) {
   if (!ctx.isStaff) return null;
   return (
     <div className="space-y-4">
-      <RegistrarPanel slug="awol" cases={ctx.cases} onChanged={() => ctx.reload()} />
+      <RegistrarPanel slug="awol" cases={ctx.cases} onChanged={() => ctx.reload()} focusStudentId={ctx.registrarFocus} />
       {residency.length > 0 && (
         <section aria-labelledby="residency-reports-heading" className="rounded-xl border border-slate-200 bg-white p-4">
           <h3 id="residency-reports-heading" className="card-title">Residency reports</h3>

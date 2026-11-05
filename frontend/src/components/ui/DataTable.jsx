@@ -87,6 +87,7 @@ function SortIcon({ dir }) {
  *                  caller fetches the page. (Default server page size is 25.)
  * @param csv       true | { filename, columns: [{ header, value(row) }] }: Export CSV button. Exports every row that
  *                  matches the search and sort (client mode), or the rows given (server mode)
+ * @param stackOnPhone  on a phone (below sm) each row becomes a block of "Header: value" lines, so nothing scrolls sideways
  * @param sortable  false turns off the default sorting for the whole table (a column can still say `sortable: true`)
  * @param sort      { key, dir: "asc" | "desc" } to control sorting; with onSort(key, dir) (dir null = cleared) the
  *                  caller sorts, otherwise the table sorts its own rows
@@ -110,6 +111,7 @@ export function DataTable({
   pagination,
   csv,
   sortable = true,
+  stackOnPhone = false,
   sort,
   onSort,
   className = "",
@@ -285,9 +287,9 @@ export function DataTable({
         ) : noRows ? (
           <EmptyState {...emptyCopy} size="sm" />
         ) : (
-          <table className={cx("w-full text-sm", MIN_WIDTH[minWidth] || MIN_WIDTH.sm)}>
+          <table className={cx("w-full text-sm", MIN_WIDTH[minWidth] || MIN_WIDTH.sm, stackOnPhone && "max-sm:block max-sm:min-w-0")}>
             {caption && <caption className="sr-only">{caption}</caption>}
-            <thead className={cx("bg-slate-50", stickyHeader && "sticky top-0 z-10")}>
+            <thead className={cx("bg-slate-50", stickyHeader && "sticky top-0 z-10", stackOnPhone && "max-sm:sr-only")}>
               <tr>
                 {columns.map((col, ci) => {
                   const dir = sortState && sortState.key === col.key ? sortState.dir : null;
@@ -329,7 +331,7 @@ export function DataTable({
                 })}
               </tr>
             </thead>
-            <tbody>
+            <tbody className={stackOnPhone ? "max-sm:block" : undefined}>
               {visibleRows.map((row, ri) => (
                 <tr
                   key={getKey(row, ri)}
@@ -346,13 +348,15 @@ export function DataTable({
                         }
                       : undefined
                   }
-                  className={cx("border-t border-slate-100 hover:bg-slate-50", clickable && "cursor-pointer")}
+                  className={cx("border-t border-slate-100 hover:bg-slate-50", clickable && "cursor-pointer", stackOnPhone && "max-sm:block max-sm:px-1 max-sm:py-2")}
                 >
                   {columns.map((col, ci) => (
                     <td
                       key={col.key}
+                      data-label={typeof col.header === "string" ? col.header : undefined}
                       className={cx(
                         "min-w-0 break-words px-3 text-slate-700",
+                        stackOnPhone && "max-sm:block max-sm:!py-1 max-sm:before:block max-sm:before:text-[11px] max-sm:before:font-semibold max-sm:before:uppercase max-sm:before:tracking-wide max-sm:before:text-slate-500 max-sm:before:content-[attr(data-label)]",
                         pad,
                         ALIGN[col.align || "left"],
                         stickyFirst && ci === 0 && "sticky left-0 z-[1] bg-white",
