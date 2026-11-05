@@ -517,23 +517,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(return_response.status_code, 400, return_response.get_json())
             response = self._dean_client().post(f"/api/approvals/workflow/withdrawal/{application.id}/decide", json={"decision": "approve"})
             self.assertEqual(response.status_code, 200)
-            db.session.refresh(application)
-            db.session.refresh(selected_enrollment)
-            self.assertEqual(application.status, "Approved - Awaiting Subject Tag")
-            self.assertEqual(application.registrar_status, "Pending Subject Tag")
-            self.assertEqual(selected_enrollment.status, "Enrolled")
-
-            blocked_report = staff.post(
-                "/api/withdrawal/approved.xlsx",
-                json={"application_ids": [application.id]},
-            )
-            self.assertEqual(blocked_report.status_code, 409, blocked_report.get_json())
-
-            self._transition(staff, "withdrawal", {
-                "student_id": self.student.id,
-                "workflow_action": "tag_subject_withdrawn",
-                "workflow_comment": "Tag the approved student as withdrawn from the selected subject.",
-            })
+            # I-306: the Dean's approval tags the subject Withdrawn at once; there is no staff tag step.
             db.session.refresh(application)
             db.session.refresh(selected_enrollment)
             db.session.refresh(other_enrollment)
@@ -5521,12 +5505,12 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             ).first()
             self.assertIsNotNone(notice)
             self.assertEqual(notice.workflow_request_id, application.id)
-            self.assertEqual(notice.workflow_stage, "Approved - Awaiting Subject Tag")
+            self.assertEqual(notice.workflow_stage, "Subject Tagged - Registrar Preparation")  # I-306: tagged on approval
             self.assertEqual(notice.visibility, "student_visible")
             audit = TransactionLog.query.filter_by(
                 transaction_slug="withdrawal",
                 student_id=self.student_id,
-                new_status="Approved - Awaiting Subject Tag",
+                new_status="Subject Tagged - Registrar Preparation",
             ).order_by(TransactionLog.id.desc()).first()
             self.assertEqual(audit.workflow_request_id, application.id)
             self.assertEqual(audit.actor_user_id, self.dean_id)

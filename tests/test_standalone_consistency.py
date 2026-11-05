@@ -331,11 +331,9 @@ class StandaloneConsistencyTests(unittest.TestCase):
         self.assertEqual(forward.get_json()["case"]["status"], "Dean Review")
         approve = self.move("withdrawal", application_id, "approve", client=self.dean())
         self.assertEqual(approve.status_code, 200, approve.get_json())
-        self.assertEqual(approve.get_json()["case"]["status"], "Approved - Awaiting Subject Tag")
-        tag = self.move("withdrawal", application_id, "tag")
-        self.assertEqual(tag.status_code, 200, tag.get_json())
-        case = tag.get_json()["case"]
-        self.assertEqual(case["status"], "Subject Tagged - Registrar Preparation")
+        # I-306: approval tags the subject at once, so the card goes straight to the Excel export.
+        self.assertEqual(approve.get_json()["case"]["status"], "Subject Tagged - Registrar Preparation")
+        case = self.staff().get(f"/api/process-cases/withdrawal/{application_id}").get_json()["case"]
         self.assertEqual([a["action"] for a in case["actions"]], ["export"])
         exported = self.move("withdrawal", application_id, "export")
         self.assert_refused(exported, "Excel")
@@ -343,7 +341,7 @@ class StandaloneConsistencyTests(unittest.TestCase):
             enrollment = SubjectEnrollment.query.filter_by(student_id=self.students["withdrawal"]).one()
             self.assertEqual(enrollment.status, "Withdrawn")
         detail = self.staff().get(f"/api/process-cases/withdrawal/{application_id}").get_json()["case"]
-        self.assertGreaterEqual(len(detail["events"]), 3)
+        self.assertGreaterEqual(len(detail["events"]), 2)  # forward and approve; no staff tag step (I-306)
 
     def test_a_withdrawal_with_no_subject_cannot_be_forwarded_to_the_dean(self):
         """I-164: the Dean cannot approve a request that names no subject, so staff may not forward it."""

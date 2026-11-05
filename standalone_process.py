@@ -53,7 +53,7 @@ STATUS_INFO_BY_SLUG = {
         {"key": "Extension Approved - Refresher Required", "label": "Approved with a 6-unit refresher", "owner": ACADEMIC_COORDINATOR,
          "tone": "good", "phase": "done",
          "description": "The Dean approved the return with a graded 6-unit refresher requirement."},
-        {"key": "Return Denied", "label": "Return denied", "owner": STAFF, "tone": "bad", "phase": "done",
+        {"key": "Return Denied", "label": "Return denied", "owner": "", "tone": "bad", "phase": "done",
          "description": "The Dean denied the return. The student stays AWOL; staff explain what happens next."},
         {"key": "Residency", "label": "Residency active", "owner": STAFF, "tone": "info", "phase": "residency",
          "description": "The student is on a no-subject residency semester."},
@@ -76,12 +76,12 @@ STATUS_INFO_BY_SLUG = {
         {"key": "Subject Tagged - Registrar Preparation", "label": "Tagged - ready for Excel export", "owner": STAFF, "tone": "good",
          "phase": "registrar",
          "description": "The subject is tagged Withdrawn. Staff export the approved-withdrawals Excel list."},
-        {"key": "Exported - Ready to Send", "label": "Exported - email to the Registrar", "owner": STAFF, "tone": "good", "phase": "done",
-         "description": "The Excel list was exported. Staff email it to the Registrar; the portal does not send it."},
+        {"key": "Exported - Ready to Send", "label": "Exported - email to the Registrar", "owner": STAFF, "tone": "good", "phase": "registrar",
+         "description": "The Excel list was exported. Staff email it to the Registrar, then mark it as sent; the portal does not send it."},
         {"key": "Sent to Registrar", "label": "Sent to the Registrar", "owner": "", "tone": "muted", "phase": "done",
-         "description": "Older record: the list was sent to the Registrar."},
-        {"key": "Withdrawn Confirmed", "label": "Registrar confirmed", "owner": "", "tone": "muted", "phase": "done",
-         "description": "Older record: the Registrar confirmed the withdrawal."},
+         "description": "Staff emailed the list to the Registrar. Marking the Registrar's acknowledgement is optional."},
+        {"key": "Withdrawn Confirmed", "label": "Registrar acknowledged", "owner": "", "tone": "muted", "phase": "done",
+         "description": "The Registrar acknowledged the list. The withdrawal is complete."},
         {"key": "Denied", "label": "Denied", "owner": "", "tone": "bad", "phase": "done",
          "description": "The Dean denied the request. The student stays enrolled in the subject."},
         {"key": "Cancelled", "label": "Cancelled", "owner": "", "tone": "muted", "phase": "done",
@@ -120,7 +120,7 @@ BOARD_COLUMNS = {
         {"key": "export", "label": "Excel export", "statuses": ["Subject Tagged - Registrar Preparation"],
          "description": "Tagged. Staff export the approved-withdrawals Excel list."},
         {"key": "sent", "label": "Exported - email the Registrar", "statuses": ["Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"],
-         "description": "Exported lists (and older acknowledged records). Staff email the file to the Registrar."},
+         "description": "Exported lists. Staff email the file to the Registrar, then mark it as sent (and acknowledged, if the Registrar replies)."},
         {"key": "not_approved", "label": "Not approved", "statuses": ["Denied", "Cancelled"],
          "description": "Denied by the Dean, or cancelled."},
     ],
@@ -179,7 +179,7 @@ TRANSITIONS = {
               confirm="The declaration goes back to the student, who corrects it and files it again."),
         _move("deny", "Deny the return", ["Dean Review"], "Return Denied", {"dean"}, kinds=[KIND_AWOL],
               comment=True, tone="danger", batch=True,
-              confirm="The student stays AWOL. Staff tell the student what they can do next."),
+              confirm="The student stays AWOL. Staff tell the student the options."),
         _move("complete_reenrollment", "Mark re-enrollment complete", ["Re-enrollment Required"], "Re-enrollment Completed",
               {"staff", "academic_coordinator"}, kinds=[KIND_AWOL], tone="primary",
               confirm="The courses are re-enrolled: the student becomes Active again and this case closes."),
@@ -198,9 +198,9 @@ TRANSITIONS = {
         _move("return", "Return to student", ["Dean Review"], "Returned for Clarification",
               {"dean"}, kinds=[KIND_WITHDRAWAL], comment=True, tone="warn", student_sees_comment=True,
               confirm="The request goes back to the student, who corrects it and sends it again."),
-        _move("approve", "Approve the withdrawal", ["Dean Review"], "Approved - Awaiting Subject Tag", {"dean"},
+        _move("approve", "Approve the withdrawal", ["Dean Review"], "Subject Tagged - Registrar Preparation", {"dean"},
               kinds=[KIND_WITHDRAWAL], batch=True,
-              confirm="Approval sends the request back to staff to tag the subject as Withdrawn."),
+              confirm="Approval tags the subject as Withdrawn at once. Staff then export the Registrar's Excel list."),
         _move("deny", "Deny the withdrawal", ["Dean Review"], "Denied", {"dean"}, kinds=[KIND_WITHDRAWAL],
               comment=True, tone="danger", batch=True,
               confirm="The student stays enrolled in the subject and is told why."),
@@ -211,6 +211,12 @@ TRANSITIONS = {
         _move("export", "Prepare the Excel export", ["Subject Tagged - Registrar Preparation"], "Exported - Ready to Send",
               {"staff"}, kinds=[KIND_WITHDRAWAL], tone="secondary", opens="export",
               confirm="Downloading the Excel list moves the tagged withdrawals to Exported."),
+        _move("send", "Mark as sent to the Registrar", ["Exported - Ready to Send"], "Sent to Registrar", {"staff"},
+              kinds=[KIND_WITHDRAWAL], batch=True,
+              confirm="Use this after the Excel list was emailed to the Registrar. The Graduate School's part is then done."),
+        _move("acknowledge", "Mark as acknowledged", ["Sent to Registrar"], "Withdrawn Confirmed", {"staff"},
+              kinds=[KIND_WITHDRAWAL], tone="secondary", batch=True,
+              confirm="The Registrar replied that the list was received. This step is optional."),
     ],
 }
 
@@ -302,7 +308,7 @@ _WITHDRAWAL_STEPS = [
     ("Dean decision", ["Dean Review"]),
     ("Subject tagged Withdrawn", ["Approved - Awaiting Subject Tag", "Approved - Registrar Preparation"]),
     ("Excel list exported", ["Subject Tagged - Registrar Preparation"]),
-    ("Emailed to the Registrar", ["Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"]),
+    ("Emailed to the Registrar", ["Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"]),  # complete only from "Sent to Registrar"
 ]
 _AWOL_STEPS = [
     ("AWOL flagged", ["AWOL Declared"]),
@@ -358,7 +364,7 @@ def timeline_steps(slug: str, kind: str, status: str, reached=()) -> list[dict]:
             return labelled(2, "denied")
         if status == "Cancelled":
             return labelled(0, "stopped")
-        if status in {"Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"}:
+        if status in {"Sent to Registrar", "Withdrawn Confirmed"}:
             return [{"label": label, "state": "complete"} for label, _s in steps]
         if status == "Submitted to GS Staff":
             return [{"label": label, "state": "current" if index == 0 else "upcoming"} for index, (label, _s) in enumerate(steps)]

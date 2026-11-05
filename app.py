@@ -4238,8 +4238,8 @@ def withdrawal_policy_statement() -> str:
         f"not classes were attended ({rule_citation('withdrawal.window_days')}). It is not free: "
         f"{rule_value('withdrawal.fee_percent_first_week', 10)}% of the term's total due is charged "
         f"in the first week and {rule_value('withdrawal.fee_percent_second_week', 20)}% in the second. "
-        "After the window a single subject cannot be withdrawn; the student may still withdraw "
-        "from all subjects (paying the full fees for the semester) or file a Leave of Absence."
+        "After the second week a single subject cannot be withdrawn."
+        " To leave the semester, file a Leave of Absence (full fees apply, Handbook p.51)."
     )
 
 
@@ -4310,9 +4310,8 @@ def subject_withdrawal_window(
     else:
         eligible, status, tier, fee = False, "Withdrawal window closed", "After the second week", fee_after
         consequence = (
-            f"A single subject can no longer be withdrawn. A student who withdraws from all "
-            f"subjects pays {fee_after}% of the fees for the semester "
-            f"({rule_citation('withdrawal.fee_percent_after_window')}). " + FEE_INFORMATION_ONLY
+            "After the second week a single subject cannot be withdrawn."
+            " To leave the semester, file a Leave of Absence (full fees apply, Handbook p.51). " + FEE_INFORMATION_ONLY
         )
     if consequence is None:
         consequence = (
@@ -4344,8 +4343,8 @@ def withdrawal_window_closed_message(window: dict) -> str:
     return (
         f"A single subject can only be withdrawn until {_withdrawal_window_phrase(days)}, whether "
         f"or not classes were attended ({window.get('rule_source') or rule_citation('withdrawal.window_days')})."
-        f"{deadline_text} After that the student may still withdraw from all subjects but pays the "
-        "full fees for the semester, or may file a Leave of Absence. Contact Graduate School staff "
+        f"{deadline_text} After the second week a single subject cannot be withdrawn."
+        " To leave the semester, file a Leave of Absence (full fees apply, Handbook p.51). Contact Graduate School staff "
         "if the recorded semester dates are incorrect."
     )
 
@@ -6452,7 +6451,7 @@ POLICY_SNIPPETS = [
      "text": "Completion requires the final manuscript, panel approval, ethics clearance, a Turnitin certificate (similarity not more than 15%), the Form 9 editor certification, and the Form 10 approval sheet."},
     {"id": "withdrawal", "title": "Withdrawal", "source": "Graduate School Handbook 2022-2023, pp. 49-51",
      "tags": ["withdrawal", "withdraw", "attrition", "drop out", "drop", "fees"],
-     "text": "A student may withdraw subjects until the end of the second week from the start of classes (14 calendar days), whether or not classes were attended. 10% of the term's total due is charged within the first week and 20% within the second week. After that a single subject cannot be withdrawn; the student may still withdraw all subjects but pays the full fees for the semester, or file a Leave of Absence. The request is approved by the Dean; the portal shows the fee consequence but does not compute payments."},
+     "text": "A student may withdraw subjects until the end of the second week from the start of classes (14 calendar days), whether or not classes were attended. 10% of the term's total due is charged within the first week and 20% within the second week. After the second week a single subject cannot be withdrawn. To leave the semester, file a Leave of Absence (full fees apply, Handbook p.51). The request is approved by the Dean; the portal shows the fee consequence but does not compute payments."},
     {"id": "graduation", "title": "Graduation Endorsement", "source": "GS Handbook — Graduation",
      "tags": ["graduation", "endorsement", "candidate", "registrar"],
      "text": "Graduation endorsement checks coursework, research, practicum (if applicable), and clearance completion, then compiles the candidate endorsement list for Dean approval and registrar hand-off."},
@@ -8102,6 +8101,17 @@ def _leave_h_approve(case, account, comment, data, move):
     student = case.student
     if student.standing in {"AWOL", "Withdrawn", "Graduated"}:
         raise LeaveError(f"The student's record is now {student.standing}; this request can no longer be approved.", 409)
+    if case.kind == KIND_READMISSION:
+        # I-297: like residency (I-012), the Dean decides only after staff confirmed the office checks.
+        if not all(row["confirmed"] for row in leave_checklist_state(case) if row["source"] == "staff"):
+            raise LeaveError(
+                "Graduate School staff have not confirmed the Business Office clearance and the interview yet, "
+                "so this readmission cannot be approved. Return it to staff to confirm them.", 409)
+    if case.kind == KIND_LOA and not demo_skip_date_waits():
+        # I-302: the two-week no-grant rule is checked again on the day of the decision (Handbook p.53).
+        filing = loa_filing_check(case.start_term)
+        if filing["status"] == "Fail":
+            raise LeaveError(filing["detail"], 409)
     result = leave_result_text(case, "approved")
     extra = ""
     if case.kind == KIND_LOA:
@@ -8952,6 +8962,26 @@ def leave_export_log_dict(item: LeaveExportLog) -> dict:
 
 
 AWOL_REGISTRAR_TASK = "Send the approved AWOL return to the Registrar"
+
+
+def withdrawal_registrar_advance(application: WithdrawalApplication, target: str, account: UserAccount) -> None:
+    """Exported -> Sent to Registrar -> Acknowledged (card status "Withdrawn Confirmed"), one step at a time."""
+    order = {"Exported - Ready to Send": "Sent to Registrar", "Sent to Registrar": "Acknowledged"}
+    if application.status not in order or order[application.status] != target:
+        raise ValueError(f"The withdrawal is \"{application.status}\"; it cannot move to \"{target}\" now.")
+    previous = application.status
+    now = now_utc()
+    application.registrar_status = target
+    if target == "Sent to Registrar":
+        application.status, application.registrar_sent_at = "Sent to Registrar", now
+    else:
+        application.status, application.registrar_confirmed_at, application.completed_at = "Withdrawn Confirmed", now, now
+    application.updated_at = now
+    add_log(
+        "withdrawal", application.student_id, workflow_actor_label(account), "Registrar handoff",
+        f"Withdrawal list {target.lower()}", "Graduate School Staff", f"Handoff status: {previous} to {application.status}.",
+        previous_status=previous, new_status=application.status, visibility="internal",
+    )
 
 
 def leave_registrar_advance(case: LeaveCase, target: str, account: UserAccount) -> None:
@@ -10205,6 +10235,8 @@ def process_case_apply(slug: str, kind: str, record, action: str, account: UserA
                 _process_dean_decide("withdrawal", record.id, action, comment)
             elif action == "return":
                 create_workflow_message("withdrawal", student, account, "Student", "Remarks", comment, "return", "student_visible")
+            elif action in {"send", "acknowledge"}:
+                withdrawal_registrar_advance(record, "Sent to Registrar" if action == "send" else "Acknowledged", account)
             elif action == "export":
                 raise ProcessError(
                     "Exporting downloads the Registrar's Excel list, so it is done from 'Prepare Excel export', not by moving the card.", 409)
@@ -15415,12 +15447,15 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Choose one of your enrolled subjects to withdraw from."}), 400
         if subject_enrollment.status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
             return jsonify({"error": "Only an active enrolled subject can be withdrawn. Refresh and choose another subject."}), 400
-        withdrawal_window = subject_withdrawal_window(subject_enrollment)
+        resending = bool(current and current.status in {"Returned", "Returned for Clarification"})
+        # I-278: a request sent back for clarification keeps its first submission date (window and fee).
+        first_filed = current.created_at.date() if resending and current.created_at else None
+        withdrawal_window = subject_withdrawal_window(subject_enrollment, as_of=first_filed)
         if not withdrawal_window["eligible"]:
             return jsonify({"error": withdrawal_window_closed_message(withdrawal_window)}), 409
 
         previous_status = current.status if current else "Not Submitted"
-        application = current if current and current.status in {"Returned", "Returned for Clarification"} else WithdrawalApplication(student_id=student.id)
+        application = current if resending else WithdrawalApplication(student_id=student.id)
         if not application.id:
             db.session.add(application)
         application.reason = (data.get("reason") or application.reason or "").strip()
@@ -15437,7 +15472,7 @@ def register_routes(app: Flask) -> None:
         application.registrar_report_generated_at = None
         application.registrar_sent_at = None
         application.registrar_confirmed_at = None
-        application.effective_date = ph_today()
+        application.effective_date = first_filed or ph_today()
         application.status = "Submitted to GS Staff"
         application.decided_at = None
         application.completed_at = None
@@ -16050,35 +16085,7 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "academic_coordinator", "research_coordinator")
     def research_gate_overview():
         """Every active student with research records (a case, document checks, a panel or a booking), at their gate, with ready / blocked / waiting and why (I-205, AD12)."""
-        rows = []
-        cases = (
-            ResearchCase.query.join(Student, Student.id == ResearchCase.student_id)
-            .filter(active_student_clause()).order_by(ResearchCase.opened_at.desc(), ResearchCase.id.desc()).all()
-        )
-        seen = set()
-        for case in cases:
-            if case.student_id in seen:
-                continue
-            seen.add(case.student_id)
-            row = research_gate_overview_row(db.session.get(Student, case.student_id), case)
-            if row:
-                rows.append(row)
-        for student in Student.query.filter(active_student_clause()).order_by(Student.last_name, Student.first_name).all():
-            if student.id in seen:
-                continue
-            # Merge v6.4 (M6): real research records only. Empty "Missing" rows are made for every student by other
-            # screens, so they would put coursework students who have not started research on the board as Blocked.
-            has_research_record = bool(
-                DocumentCheck.query.filter(DocumentCheck.student_id == student.id, DocumentCheck.status != "Missing").first()
-                or PanelAssignment.query.filter_by(student_id=student.id).first()
-                or ScheduleRequest.query.filter_by(student_id=student.id).first()
-            )
-            if not has_research_record:
-                continue
-            row = research_gate_overview_row(student, None)
-            if row:
-                rows.append(row)
-        rows.sort(key=lambda row: (row["student"]["name"] or "").lower())
+        rows = research_gate_overview_rows()
         counts = {key: sum(row["state"] == key for row in rows) for key in ("ready", "blocked", "waiting", "done")}
         return jsonify({"items": rows, "counts": counts, "stages": ["Title Defense", "Proposal Defense", "Completion"]})
 
@@ -19458,18 +19465,23 @@ def register_routes(app: Flask) -> None:
                 application.effective_date = application.effective_date or (
                     application.created_at.date() if application.created_at else ph_today()
                 )
-                application.status = "Approved - Awaiting Subject Tag"
+                # I-306: the subject is tagged Withdrawn the moment the Dean approves; staff go straight to the export.
+                try:
+                    apply_approved_subject_withdrawal(application)
+                except ValueError as exc:
+                    return jsonify({"error": str(exc)}), 409
+                application.status = "Subject Tagged - Registrar Preparation"
                 application.requirement_status = "Not Applicable"
-                application.registrar_status = "Pending Subject Tag"
+                application.registrar_status = "Pending Excel Export"
                 application.completed_at = None
                 result = (
                     f"Withdrawal approved by Dean; {subject_enrollment.course.code} "
-                    "assigned to GS Staff for subject-withdrawal tagging"
+                    "tagged as Withdrawn and ready for the Registrar Excel export"
                 )
                 next_owner = "Graduate School Staff"
                 add_task(
                     application.student_id,
-                    "Tag approved subject withdrawal and export the Registrar update",
+                    "Export the approved subject withdrawals and email the Registrar",
                     "Graduate School Staff",
                     3,
                     60,
@@ -23045,6 +23057,27 @@ def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
     filters = filters or {}
     student_query = filtered_students_query(filters)
     student_ids = [sid for (sid,) in student_query.with_entities(Student.id).all()]
+    research_waiting = None
+    if locked_owner == ROLE_LABELS["research_coordinator"]:
+        # F5-14: the Research Coordinator's open work also counts the students the Research Gate board shows as
+        # Ready or Blocked, and "Waiting on others" lists the students waiting on a panel verdict.
+        gate_rows = research_gate_overview_rows()
+        other_filters = MultiDict(filters)
+        other_filters.pop("owner", None)
+        allowed = {sid for (sid,) in filtered_students_query(other_filters).with_entities(Student.id).all()}
+        student_ids = sorted(set(student_ids) | {
+            row["student"]["id"] for row in gate_rows if row["state"] in {"ready", "blocked"} and row["student"]["id"] in allowed
+        })
+        verdict_rows = [row for row in gate_rows if row["state"] == "waiting" and row["waiting_on"] == PANEL_VERDICT_WAITING_ON]
+        research_waiting = {
+            "total": len(verdict_rows),
+            "items": [
+                {"student_id": row["student"]["id"], "student_name": row["student"]["name"], "stage": row["stage"],
+                 "reason": row["reason"], "to": "/workflow/research-gate"}
+                for row in verdict_rows[:3]
+            ],
+            "view_all": "/workflow/research-gate",
+        }
     empty = len(student_ids) == 0
 
     def students_scope():
@@ -23211,6 +23244,7 @@ def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
         "workflow_distribution": workflow_rows,
         "recent_logs": [log_dict(l) for l in recent_logs],
         "open_tasks": [task_dict(t) for t in open_tasks],
+        "research_waiting": research_waiting,
     }
 
 
@@ -33649,8 +33683,20 @@ def handle_graduation(data: MultiDict) -> int:
         next_owner = "Dean"
         result = "Graduation endorsement list prepared for Dean review"
         add_task(student.id, "Review graduation endorsement list", "Dean", 5, 55)
-    elif requested_status == "Sent to Registrar":
-        raise ValueError("Use the export action on a Dean-approved endorsement to hand it off externally. Export is the terminal step.")
+    elif requested_status in {"Sent to Registrar", "Registrar Received"}:
+        account = require_workflow_actor("staff")
+        sending = requested_status == "Sent to Registrar"
+        if sending:
+            if endorsement.endorsement_status != "Dean Approved" or endorsement.registrar_status != GRADUATION_EXPORTED_STATUS:
+                raise ValueError("The Dean must approve and export the endorsed list before staff mark it as sent to the Registrar.")
+        elif endorsement.endorsement_status != "Sent to Registrar":
+            raise ValueError("Mark the list as sent to the Registrar before recording the Registrar's acknowledgement.")
+        endorsement.endorsement_status = requested_status
+        endorsement.registrar_status = "Sent to Registrar" if sending else "Acknowledged"
+        if not sending:
+            endorsement.registrar_received_at = now_utc()
+        next_owner = ""  # nobody waits: the Registrar's acknowledgement is optional
+        result = "Endorsed graduation list sent to the Registrar" if sending else "Registrar acknowledged the endorsed graduation list"
     else:
         raise ValueError("Choose the next available graduation workflow action.")
 
@@ -36959,6 +37005,43 @@ def research_stage_status(milestone: dict) -> str:
     return "Pending Staff Action"
 
 
+PANEL_VERDICT_WAITING_ON = "Panel chair or Graduate School staff"
+
+
+def research_gate_overview_rows() -> list[dict]:
+    """The Research Gate board rows (shared by the board and the Research Coordinator home)."""
+    rows = []
+    cases = (
+        ResearchCase.query.join(Student, Student.id == ResearchCase.student_id)
+        .filter(active_student_clause()).order_by(ResearchCase.opened_at.desc(), ResearchCase.id.desc()).all()
+    )
+    seen = set()
+    for case in cases:
+        if case.student_id in seen:
+            continue
+        seen.add(case.student_id)
+        row = research_gate_overview_row(db.session.get(Student, case.student_id), case)
+        if row:
+            rows.append(row)
+    for student in Student.query.filter(active_student_clause()).order_by(Student.last_name, Student.first_name).all():
+        if student.id in seen:
+            continue
+        # Merge v6.4 (M6): real research records only. Empty "Missing" rows are made for every student by other
+        # screens, so they would put coursework students who have not started research on the board as Blocked.
+        has_research_record = bool(
+            DocumentCheck.query.filter(DocumentCheck.student_id == student.id, DocumentCheck.status != "Missing").first()
+            or PanelAssignment.query.filter_by(student_id=student.id).first()
+            or ScheduleRequest.query.filter_by(student_id=student.id).first()
+        )
+        if not has_research_record:
+            continue
+        row = research_gate_overview_row(student, None)
+        if row:
+            rows.append(row)
+    rows.sort(key=lambda row: (row["student"]["name"] or "").lower())
+    return rows
+
+
 def research_gate_overview_row(student: Student, case: ResearchCase | None) -> dict | None:
     """I-205: where one student stands at their research gate, in the words of the Research Gate overview.
 
@@ -37005,7 +37088,7 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
         elif first["source_type"].endswith("_schedule"):
             state, owner, reason = "ready", research, "Panel is in place; the defense has not been scheduled yet."
         elif first["source_type"] == "system_defense_result":
-            state, owner, reason = "waiting", "Panel chair or Graduate School staff", "Defense is scheduled; the panel chair or Graduate School staff has not recorded the verdict yet."
+            state, owner, reason = "waiting", PANEL_VERDICT_WAITING_ON, "Defense is scheduled; the panel chair or Graduate School staff has not recorded the verdict yet."
         elif first["source_type"] == "ethics_clearance_record":
             state, owner, reason = "ready", research, "The ethics clearance has to be recorded."
         else:
@@ -40364,6 +40447,7 @@ def seed_maed_personas() -> None:
                 "GS Staff",
                 "Student submitted a Leave of Absence application for staff eligibility review.\n"
                 f"Requested period: {term_label}.\n"
+                "Reason category: Family emergency.\n"
                 "Reason/remarks: Family and health reasons.",
                 previous_status="Active",
                 new_status="Submitted",
@@ -42550,13 +42634,6 @@ def normalize_withdrawal_workflow_states() -> int:
         if application.requirement_status != "Not Applicable":
             application.requirement_status = "Not Applicable"
             updated += 1
-        if application.status in {"Withdrawn Confirmed", "Sent to Registrar"}:
-            application.status = "Exported - Ready to Send"
-            application.registrar_status = "Exported - Ready to Send"
-            application.registrar_reference = None
-            application.registrar_sent_at = None
-            application.completed_at = None
-            updated += 1
         if application.status == "Exported - Ready to Send" and application.subject_enrollment:
             application.withdrawal_scope = "Subject"
             application.registrar_status = "Exported - Ready to Send"
@@ -42634,13 +42711,6 @@ def normalize_immediate_standing_outcomes() -> int:
         enrollment.confirmed_at = enrollment.confirmed_at or now_utc()
         item.student.standing = "Active"
         item.student.enrollment_tag = "Residency"
-        updated += 1
-    for item in GraduationEndorsement.query.filter(
-        GraduationEndorsement.endorsement_status.in_(["Sent to Registrar", "Registrar Received"])
-    ).all():
-        item.endorsement_status = "Dean Approved"
-        item.registrar_status = "Exported - Ready to Send"
-        item.updated_at = now_utc()
         updated += 1
     return updated
 
@@ -42729,6 +42799,7 @@ def ensure_demo_request_submission_logs() -> int:
                 "GS Staff",
                 "Student submitted a Leave of Absence application for staff eligibility review.\n"
                 "Requested period: AY 2026-2027 1st Semester to AY 2026-2027 2nd Semester.\n"
+                "Reason category: Family emergency.\n"
                 "Reason/remarks: Demo queue case.\n"
                 f"Application PDF: {attachment.original_name}.",
             )

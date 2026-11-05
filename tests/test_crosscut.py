@@ -173,8 +173,8 @@ class WithdrawalLifecycleTests(CrossCutBase):
         dean = self.dean().post(f"/api/approvals/workflow/withdrawal/{application.id}/decide", json={"decision": "approve"})
         self.assertEqual(dean.status_code, 200, dean.get_json())
         self._after_dean_open = open_tasks(self.student_id, "Review withdrawal request")
-        tag = staff.post("/api/transactions/withdrawal", json={**body, "workflow_action": "tag_subject_withdrawn", "workflow_comment": "Tagged."})
-        self.assertEqual(tag.status_code, 200, tag.get_json())
+        # I-306: the Dean's approval already tagged the subject; there is no staff tag step.
+        self.assertEqual(WithdrawalApplication.query.get(application.id).status, "Subject Tagged - Registrar Preparation")
         export = staff.post("/api/withdrawal/approved.xlsx", json={"application_ids": [application.id]})
         self.assertEqual(export.status_code, 200)
         db.session.expire_all()
