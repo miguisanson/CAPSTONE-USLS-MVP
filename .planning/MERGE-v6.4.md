@@ -50,3 +50,8 @@ panel from a board card ("Record for the panel" dialog, reason required, "Record
 
 Mechanical (no owner choice): her R-030 becomes **R-034**; her `p114-research-gate.spec.js` becomes **`p124-research-gate.spec.js`**;
 STATE.md keeps both sides' blocks; reseed after the merge (her 5 new `DefenseVerdict` columns).
+
+## Result (2026-11-05)
+Merged as 1da6e65 on `v6.4-migui`; follow-ups c3e602f, 0421871, 17b9a8e (Fable review). Natalie's tests kept; changed only where an
+owner decision changed the rule: staff give a reason (M3) in `test_gs_staff_can_record_and_correct_the_panel_verdict` and p124.
+Gates: see `.planning/CHANGELOG-2026-11-05.md`.

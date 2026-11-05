@@ -1,15 +1,17 @@
 # State
 
-## 2026-11-05 - v6.4-migui: merge with Natalie + sandbox + Demo Guide from the top (session "v6.4 merge")
+## 2026-11-05 - v6.4-migui: merge with Natalie + private demo sandbox + Demo Guide from the top (session "v6.4 merge")
 
 - **Branch `v6.4-migui`** = v6.2-migui + Natalie's `v6.3-natalie` (Research Gate), merged by the owner's decisions M1-M7 in
-  `.planning/MERGE-v6.4.md`. After pulling: `npm run seed` (Natalie added 5 `DefenseVerdict` columns; IM4).
-- Follow-ups landed: I-365 (Research Gate board only reads; columns share the width; coursework students whose research is
-  locked are not listed), the built-in policy library (Handbook, Research Protocol) is tracked in git again.
-- In progress: private demo sandbox per visitor (`pkt/sandbox`, contract `.planning/demo-sandbox/CONTRACT.md`, test
-  `tests/test_demo_sandbox.py`) and Demo Guide "Start over" / every start from step 1 / switch hides the list (`pkt/guide-reset`).
-- Next: merge both packets, full Python gate + `npm run e2e`, push `v6.4-migui`, main checkout on `v6.4-migui`,
-  `deploy/UPDATE-SITE.cmd`.
+  `.planning/MERGE-v6.4.md`. **After pulling: `npm run seed`** (Natalie added 5 `DefenseVerdict` columns; IM4). Natalie: work on
+  `v6.4-migui` from now on (`git fetch`, `git switch v6.4-migui`, `npm run seed`).
+- Landed (details `.planning/CHANGELOG-2026-11-05.md`): the merge, I-365 Research Gate board fixes, I-368 policy library tracked again,
+  8 Fable-review fixes, I-366 private demo sandbox per browser (`DEMO_SANDBOX`, default ON in demo mode, contract
+  `.planning/demo-sandbox/CONTRACT.md`), I-367 Demo Guide (every start from step 1 on fresh data, "Start over", the switch hides the list).
+- Gates: full Python 1,171 (only I-236) on 97e4ff4 + targeted after; build + check:ui 0; full e2e 973 passed / 5 known
+  (p110, p84:376 = I-236; p79 flaky; p88 + p73 cross-spec data I-364); autopilot project 41/41.
+- Live site: main checkout switched to `v6.4-migui`, then `deploy/site-update.ps1` (reseed needed: schema changed).
+- Next: I-369 (two browsers = two demos; "share this demo" code?), the open audit rows in ISSUES.md.
 
 ## 2026-11-04 evening - Demo Guide autopilot (packet `pkt/autopilot`, worktree `CAPSTONE-USLS-MVP-wt/kauto`, branch from v6.2-migui; not merged, not pushed)
 
