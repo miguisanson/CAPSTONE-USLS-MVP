@@ -18,14 +18,17 @@ export function Field({ label, hint, error, required, children }) {
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   return (
     <FieldContext.Provider value={{ describedBy, invalid: Boolean(error), required: Boolean(required) }}>
-      <label className="block">
-        <span className="field-label">
-          {label} {required && <span className="text-red-500">*</span>}
-        </span>
-        {children}
+      <div>
+        <label className="block">
+          <span className="field-label">
+            {label} {required && <span className="text-red-500">*</span>}
+          </span>
+          {children}
+        </label>
+        {/* outside the <label>, so the control's accessible name is only the label (I-370) */}
         {hint && <span id={hintId} className="meta mt-1 block">{hint}</span>}
         {error && <span id={errorId} role="alert" className="mt-1 block text-xs font-medium text-red-700">{error}</span>}
-      </label>
+      </div>
     </FieldContext.Provider>
   );
 }

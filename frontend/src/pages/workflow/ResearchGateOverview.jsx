@@ -54,7 +54,9 @@ function requirementStatuses(row) {
 function progressLine(row) {
   const total = row.requirements.length;
   const done = row.requirements.filter((item) => item.met).length;
-  return `${done} of ${total} requirements · ${row.missing.length ? `Missing: ${row.missing.join(", ")}` : "Nothing missing"}`;
+  const more = row.missing.length - 2;
+  const todo = row.missing.slice(0, 2).join(", ") + (more > 0 ? ` +${more} more` : "");
+  return `${done} of ${total} done · ${row.missing.length ? `Still to do: ${todo}` : "Nothing left"}`;
 }
 
 function GateCard({ row, canAct, onView, onAct }) {

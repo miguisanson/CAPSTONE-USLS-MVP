@@ -39,7 +39,7 @@ export function Tabs({ label, tabs, value, onChange, className = "" }) {
             onClick={() => onChange(tab.key)}
             onKeyDown={(event) => onKeyDown(event, index)}
             className={cx(
-              "inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 max-sm:min-h-11",
+              "inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-[color,background-color,transform] duration-200 motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 max-sm:min-h-11",
               selected ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50",
             )}
           >

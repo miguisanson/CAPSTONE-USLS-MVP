@@ -64,7 +64,7 @@ test.describe("I-362: the Research Gate board (staff)", () => {
     await expect(nico).toContainText("2691201");
     await expect(nico).toContainText("MBA");
     await expect(nico).toContainText("Adviser:");
-    await expect(nico).toContainText(/\d+ of \d+ requirements · (Missing:|Nothing missing)/); // F5-03: one line, tiles live in View
+    await expect(nico).toContainText(/\d+ of \d+ done · (Still to do:|Nothing left)/); // F5-03: one line, tiles live in View
     await expect(nico).toContainText("Next:");
     await expect(nico.getByLabel(/^Requirements of Nico Barrientos/)).toHaveCount(0);
     await expect(nico.getByRole("button", { name: `Open the Research Gate record of ${NICO}` })).toBeVisible();

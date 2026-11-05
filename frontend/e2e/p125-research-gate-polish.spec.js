@@ -26,7 +26,7 @@ test("F5-03: a card is one short line, the picker is gone, View holds the requir
       await expect(page.getByText("Choose a student")).toHaveCount(0);
       await expect(page.locator("[data-requirement]"), "no requirement tiles on the board").toHaveCount(0);
       const first = page.locator("main article").first();
-      await expect(first).toContainText(/\d+ of \d+ requirements/);
+      await expect(first).toContainText(/\d+ of \d+ done/);
       const height = await page.evaluate(() => document.documentElement.scrollHeight);
       console.log(`P-D page height at ${width}px:`, height);
       if (width === 1366) expect(height, "page far shorter than the old ~5,300 px").toBeLessThan(2600);
