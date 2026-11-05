@@ -40,7 +40,7 @@ async function signedIn(browser, email, { width = 1366, height = 768, reducedMot
   const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width, height }, reducedMotion });
   expect((await context.request.post("/api/auth/login", { data: { email, password: PASSWORD } })).ok(), `sign in as ${email}`).toBeTruthy();
   await expect.poll(async () => (await (await context.request.get("/api/auth/me")).json()).user?.email).toBe(email);
-  await context.addInitScript(() => { try { window.localStorage.setItem("usls-demo-guide-on", "1"); } catch { /* none */ } });
+  await context.addInitScript(() => { try { if (window.localStorage.getItem("usls-demo-guide-on") === null) window.localStorage.setItem("usls-demo-guide-on", "1"); } catch { /* none */ } });
   return { context, page: await context.newPage() };
 }
 const bar = (page) => page.getByTestId("autopilot-bar");
@@ -206,6 +206,7 @@ function guideTest(guide) {
 const startBox = (page) => page.getByRole("region", { name: "Start a guided demo" });
 async function startDemo(browser, guide, viewport = { width: 1366, height: 768 }) {
   const context = await browser.newContext({ baseURL: BASE_URL, viewport });
+  await context.addInitScript(() => { try { if (window.localStorage.getItem("usls-demo-guide-on") === null) window.localStorage.setItem("usls-demo-guide-on", "1"); } catch { /* none */ } }); // the list shows only while the switch is on
   const page = await context.newPage();
   await page.goto("/login");
   await startBox(page).getByRole("button", { name: new RegExp(`^${guide.title}`) }).click();

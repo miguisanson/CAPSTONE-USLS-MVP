@@ -307,7 +307,7 @@ export default function Login() {
             />
           </div>
 
-          {demoMode && (
+          {demoMode && guideOn && (
             <section aria-labelledby="start-demo-title" className="rounded-2xl border border-amber-300 bg-amber-50">
               <div className="space-y-1 px-4 pb-2 pt-4">
                 <h2 id="start-demo-title" className="card-title flex items-center gap-2 !text-amber-900">
@@ -368,7 +368,7 @@ export default function Login() {
                 <PresenterSwitch
                   icon={Compass}
                   title="Demo guide panel"
-                  hint="On: after signing in, the guide panel and its button show in the top bar. Off: the app looks as usual. This browser only."
+                  hint="On: the guided demo list shows here, and after signing in the guide panel and its button show in the top bar. Off: the list is hidden and the app looks as usual. This browser only."
                   checked={guideOn}
                   stateId="demo-guide-panel-state"
                   onChange={(wanted) => {

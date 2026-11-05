@@ -73,6 +73,7 @@ const bar = (page) => page.getByTestId("autopilot-bar");
 const startBox = (page) => page.getByRole("region", { name: "Start a guided demo" });
 async function startDemo(browser, guide) {
   const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width: 1366, height: 768 } });
+  await context.addInitScript(() => { try { if (window.localStorage.getItem("usls-demo-guide-on") === null) window.localStorage.setItem("usls-demo-guide-on", "1"); } catch { /* none */ } }); // the list shows only while the switch is on
   const page = await context.newPage();
   await page.goto("/login");
   await startBox(page).getByRole("button", { name: new RegExp(`^${guide.title}`) }).click();

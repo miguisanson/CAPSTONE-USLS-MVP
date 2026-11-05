@@ -90,6 +90,8 @@ export const api = {
   demoAccounts: () => request("/auth/demo-accounts"),
   setDemoSettings: (payload) => request("/auth/demo-settings", { method: "POST", body: JSON.stringify(payload) }),
   demoStudents: () => request("/auth/demo-students"),
+  // The Demo Guide starts every run from a fresh private copy of the data. An old server has no such route (404): callers ignore that.
+  resetDemoSandbox: () => request("/demo/sandbox/reset", { method: "POST", body: JSON.stringify({}) }),
   demoGuideState: (params = {}) => request(`/demo/guide-state?${queryString(params)}`),
   resetDemoStudent: (demoKey) =>
     request(`/auth/demo-students/${encodeURIComponent(demoKey)}/reset`, {

@@ -41,6 +41,7 @@ async function apiAs(playwright, email) {
 
 /** A browser signed in through the API, with its own session. */
 const GUIDE_ON = "usls-demo-guide-on"; // the per-browser switch from the sign-in page (src/lib/demoGuide/prefs.js)
+const SAVED_KEY = "usls-demo-guide"; // the panel's own memory (src/lib/demoGuide/prefs.js)
 /** Before the first page script: turn the switch on, unless this browser already has an answer (so "off" survives a reload). */
 const switchOn = (context) => context.addInitScript((key) => { try { if (window.localStorage.getItem(key) === null) window.localStorage.setItem(key, "1"); } catch { /* none */ } }, GUIDE_ON);
 
@@ -79,7 +80,15 @@ async function openGuide(page, title = "Readmission") {
   const panel = panelOf(page);
   await expect(panel).toBeVisible();
   const choice = panel.getByRole("button", { name: new RegExp(`^${title}`) });
-  if (await choice.count()) await choice.first().click();
+  if (await choice.count()) {
+    // Picking a guide in the panel now resets the data and signs out (p125), which these mocked-record tests do not want:
+    // write the panel's saved choice instead and reload, so the guide is open on the page the test is on.
+    const saved = JSON.stringify({ guideId: GUIDES.find((item) => item.title === title).id, open: true, mini: false, slideshow: true });
+    await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [SAVED_KEY, saved]);
+    await page.reload();
+    await page.waitForLoadState("networkidle"); // let the guide finish its first reads, so no late re-read lands on a click
+    await expect(panel).toBeVisible();
+  }
   return panel;
 }
 
@@ -441,6 +450,8 @@ test.describe("off script (the record is answered by page.route)", () => {
     const { context, page } = await openAs(browser, "staff@usls.edu.ph");
     try {
       await page.route("**/api/demo/guide-state**", (route) => route.fulfill({ status: 500, json: { error: "boom" } }));
+      // The guide is already chosen when the page loads (a pick in the panel would reload it): no reload racing the Try again click.
+      await page.addInitScript(([key, value]) => window.localStorage.setItem(key, value), [SAVED_KEY, JSON.stringify({ guideId: "readmission", open: false, mini: false })]);
       await page.goto("/workflow/readmission");
       const panel = await openGuide(page);
       await expect(panel).toContainText("Could not read the record");
@@ -584,8 +595,10 @@ test.describe("the switch on the sign-in page", () => {
 test.describe("the sign-in page: Start a guided demo", () => {
   const startBox = (page) => page.getByRole("region", { name: "Start a guided demo" });
   const stateFor = (over = {}) => stateBody({ role: "student", skip_date_waits: false, ...over });
-  const freshPage = async (browser, width = 1366, height = 800) => {
+  // The guided-demo list only shows while the switch is on (owner 2026-11-05): these tests turn it on, unless `on` is false.
+  const freshPage = async (browser, width = 1366, height = 800, on = true) => {
     const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width, height } });
+    if (on) await switchOn(context);
     return { context, page: await context.newPage() };
   };
 
@@ -664,7 +677,7 @@ test.describe("the sign-in page: Start a guided demo", () => {
   });
 
   test("the Demo guide panel switch: off by default, says On or Off, remembered on reload", async ({ browser }) => {
-    const { context, page } = await freshPage(browser, 1366, 900);
+    const { context, page } = await freshPage(browser, 1366, 900, false);
     try {
       await page.goto("/login");
       const toggle = page.getByRole("switch", { name: /Demo guide panel/ });

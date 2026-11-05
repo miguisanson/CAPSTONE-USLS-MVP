@@ -10,13 +10,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Compass, Crosshair, EyeOff, ListChecks, PanelLeft, PanelRight, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Compass, Crosshair, EyeOff, ListChecks, PanelLeft, PanelRight, RotateCcw, X } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { Button, InlineNotice, ProgressBar, Select } from "./ui/index.js";
 import DemoAutopilotBar from "./DemoAutopilotBar.jsx";
 import { GUIDES, RESET_KEYS, guideById } from "../lib/demoGuide/guides/index.js";
-import { switchToAccount } from "../lib/demoGuide/session.js";
+import { startFromTop, switchToAccount } from "../lib/demoGuide/session.js";
 import { sayLine } from "../lib/demoGuide/narration.js";
 import { SAVED_KEY, guideEnabled, setGuideEnabled, watchGuideEnabled } from "../lib/demoGuide/prefs.js";
 import { ROLE_NAMES, caseStatus, isDone, offScript, resolveStep, roleMatches } from "../lib/demoGuide/engine.js";
@@ -147,7 +147,7 @@ export default function DemoGuide() {
   useEffect(() => watchGuideEnabled(setEnabled), []);
 
   // Esc collapses the panel to the pill (a second Esc closes it), unless a dialog is open (the dialog takes the Esc).
-  // Right arrow (or Alt+Right) = Next: the app does the step itself; Left arrow = Back. Not while typing in a field.
+  // Right arrow (or Alt+Right) = Next: the app does the step itself; Left arrow only LOOKS at the previous step (nothing is undone; the bar has no Back, see DemoAutopilotBar). Not while typing in a field.
   const keyNext = useRef(null);
   useEffect(() => {
     if (!open && !keyNext.current) return undefined;
@@ -158,7 +158,7 @@ export default function DemoGuide() {
       else if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && !typing && !event.ctrlKey && !event.metaKey && nav.current.index >= 0) {
         event.preventDefault(); // Alt+Left would otherwise be the browser's Back
         if (event.key === "ArrowRight" && keyNext.current) keyNext.current();
-        else setBrowse(Math.max(0, Math.min(nav.current.count - 1, nav.current.index + (event.key === "ArrowRight" ? 1 : -1))));
+        else if (event.key === "ArrowLeft") setBrowse(Math.max(0, nav.current.index - 1));
       }
     };
     document.addEventListener("keydown", onKey);
@@ -345,12 +345,9 @@ export default function DemoGuide() {
   }
 
   function choose(id) {
-    setBrowse(null);
-    setRefusal(null);
-    setNotice("");
-    setData(null);
-    setLoad("idle");
-    update({ guideId: id, open: true, mini: false, slideshow: true }); // collapses by itself when the app starts a step
+    // Every start is the same: fresh data, sign out, step 1 (session.js). The page reloads, so nothing else to clear here.
+    autopilot.stop();
+    startFromTop(guideById(id));
   }
   function toggle() {
     if (open) {
@@ -628,6 +625,7 @@ export default function DemoGuide() {
       )}
       {!collapsed && (
         <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-2.5">
+          {guide && <Button size="sm" variant="secondary" icon={RotateCcw} onClick={() => choose(guide.id)}>Start over</Button>}
           {guide && <Button size="sm" variant="secondary" onClick={() => update({ guideId: null, slideshow: false })}>Change demo</Button>}
           <Button size="sm" variant="secondary" icon={EyeOff} className="ml-auto" onClick={stopGuide}>Stop the demo guide</Button>
         </div>
@@ -651,9 +649,8 @@ export default function DemoGuide() {
           status={autopilot.status}
           caption={autopilot.caption}
           error={autopilot.error}
-          canBack={shownIndex > 0}
           canNext={Boolean(resolved) && (behind || !resolved.finished) && load !== "error"}
-          onBack={() => setBrowse(Math.max(0, shownIndex - 1))}
+          onStartOver={() => choose(guide.id)}
           onNext={slideNext}
           onTakeOver={autopilot.takeOver}
           onRetry={() => {
