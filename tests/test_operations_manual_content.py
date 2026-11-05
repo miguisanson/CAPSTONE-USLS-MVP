@@ -261,9 +261,16 @@ class FinalLoopManualTests(unittest.TestCase):
         self.assertIn("Known gaps (not built in this version)", text)
         for ref in ("I-279", "I-293", "I-317", "I-319", "I-326", "I-346"):
             self.assertIn(ref, text)
-        for ref in ("I-248", "I-252", "I-304", "I-335"):
+        for ref in ("I-248", "I-252"):
             self.assertIn(ref, text)
         self.assertIn("planned", text.lower())
+        # built on 2026-11-05 (pkt/im43): no longer gaps
+        for ref in ("I-304", "I-335"):
+            self.assertNotIn(ref, text)
+
+    def test_the_advise_slip_and_the_exam_result_are_described_where_they_happen(self):
+        self.assertIn("produces the Advise Slip", _chapter_text(READMISSION))
+        self.assertIn("record the examination result", _chapter_text(COMPRE))
 
     def test_withdrawal_chapter_follows_the_new_rules(self):
         text = _chapter_text(WITHDRAWAL)
