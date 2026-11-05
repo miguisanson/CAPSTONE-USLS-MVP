@@ -123,7 +123,7 @@ class SectionJBackendTests(unittest.TestCase):
                 db.session.add(DocumentCheck(student_id=student.id, gate="Completion Evidence", item_name=item, status="Complete"))
             db.session.add(PracticumRecord(
                 student_id=student.id, practicum_site="Test Partner Organization",
-                supervisor_name="Test Supervisor", required_hours=200, completed_hours=200,
+                supervisor_name="Test Supervisor", required_hours=200, completed_hours=200, verified_hours=200,
                 document_status="Verified", completion_status="Completed and accepted", status="Dean Reviewed",
             ))
             application_file = StudentRequestAttachment(

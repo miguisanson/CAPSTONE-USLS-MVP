@@ -204,7 +204,7 @@ test.describe("Student forms never ask for what the system knows", () => {
       await expect(main).toContainText("200"); // as text
       await expect(page.locator("label.block").filter({ has: page.locator(".field-label", { hasText: /^Required hours/ }) }).locator("input")).toHaveCount(0);
       await main.locator('input[type="file"]').setInputFiles(PDF);
-      await ctl(page, "Completed hours").fill("200");
+      await ctl(page, "Hours you completed (your own report)").fill("200");
       await submitButton(page, "Submit completion stage").click();
       await confirmSend(page);
       expect(lastWrite(writes, "requests/practicum").body).toEqual({

@@ -1703,7 +1703,7 @@ class VerdictFlowTests(ResearchCoreBase):
         self.faculty_client("Chair Person").post(f"/api/faculty-portal/defense-verdicts/{schedule_id}", json={"result": "Failed"})
         response = self.student().post(
             "/api/student-portal/research-evidence/upload",
-            data={"gate": TITLE, "item_name": "Three concept papers", "file": (BytesIO(b"%PDF-1.4\nnew title one\n%%EOF\n"), "new-1.pdf")},
+            data={"gate": TITLE, "item_name": "Three concept papers", "paper_title": "A new first title", "file": (BytesIO(b"%PDF-1.4\nnew title one\n%%EOF\n"), "new-1.pdf")},
             content_type="multipart/form-data")
         self.assertEqual(response.status_code, 200, response.get_json())
         with app.app_context():

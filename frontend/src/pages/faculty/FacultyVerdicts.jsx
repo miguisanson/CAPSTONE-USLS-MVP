@@ -156,7 +156,7 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
           <p className="text-sm font-semibold text-ink">Submit panel chair verdict</p>
         </div>
         <div className="mt-3">
-          <VerdictFields options={options} result={result} values={draft} onChange={(patch) => setDraft(scheduleId, patch)} showTitle={panel.gate === TITLE_GATE} showScore={panel.gate === FINAL_GATE} />
+          <VerdictFields options={options} result={result} values={draft} onChange={(patch) => setDraft(scheduleId, patch)} showTitle={panel.gate === TITLE_GATE} conceptTitles={panel.concept_titles} showScore={panel.gate === FINAL_GATE} />
         </div>
         <Button icon={Gavel} className="mt-3" disabled={busy || (result === PROVISIONAL && !draft.provisional_follow_up)} onClick={() => submitVerdict(panel)}>{busy ? "Submitting…" : "Submit final verdict"}</Button>
         <EApprovalNote className="mt-2" />

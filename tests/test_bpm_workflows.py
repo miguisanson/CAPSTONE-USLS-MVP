@@ -398,6 +398,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             record.status = "Documents Submitted"
             db.session.commit()
             self._transition(staff, "practicum", {"student_id": self.student.id, "status": "Documents Under Review"})
+            self._transition(academic, "practicum", {"student_id": self.student.id, "status": "Completed"}, 400)  # hours not verified yet (I-252)
+            self._transition(academic, "practicum", {"student_id": self.student.id, "status": "Record Verified Hours", "verified_hours": "200"})
             self._transition(academic, "practicum", {"student_id": self.student.id, "status": "Completed", "document_status": "Verified"})
             self._transition(academic, "practicum", {"student_id": self.student.id, "status": "Report Sent to Dean", "document_status": "Verified"})
             self.assertEqual(record.status, "Report Sent to Dean")
@@ -415,7 +417,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         with app.app_context():
             record = PracticumRecord(
                 student_id=self.student_id, practicum_site="Partner Site", required_hours=200,
-                completed_hours=200, document_status="Verified", status="Report Sent to Dean",
+                completed_hours=200, verified_hours=200, document_status="Verified", status="Report Sent to Dean",
                 completion_status="Completed and accepted", report_sent_at=datetime.now(),
             )
             db.session.add(record)
@@ -636,7 +638,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 practicum_site="Test Partner Organization",
                 supervisor_name="Test Supervisor",
                 required_hours=200,
-                completed_hours=200,
+                completed_hours=200, verified_hours=200,
                 document_status="Verified",
                 completion_status="Completed and accepted",
                 status="Dean Reviewed",
@@ -766,7 +768,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.add(PracticumRecord(
                 student_id=self.student_id,
                 required_hours=200,
-                completed_hours=200,
+                completed_hours=200, verified_hours=200,
                 document_status="Verified",
                 completion_status="Completed and accepted",
                 status="Dean Reviewed",
@@ -5536,7 +5538,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.add(PracticumRecord(
                 student_id=student.id,
                 required_hours=200,
-                completed_hours=200,
+                completed_hours=200, verified_hours=200,
                 document_status="Verified",
                 completion_status="Completed and accepted",
                 status="Dean Reviewed",

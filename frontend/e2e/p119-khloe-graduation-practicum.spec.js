@@ -204,7 +204,7 @@ test.describe("Khloe practicum as staff", () => {
     const board = main.getByRole("region", { name: "Practicum workflow board" });
     const card = board.getByRole("article").filter({ hasText: "Andrea Villanueva" });
     await expect(card).toContainText("Community Counselling Center");
-    await expect(card).toContainText("40/200 hrs");
+    await expect(card).toContainText("40 hrs reported, not verified");
     await expect(card).toContainText("Submitted");
     await expect(card).toContainText("Updated");
     await expect(card.getByText("1 visible message")).toBeVisible();

@@ -154,6 +154,10 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
   const [similarity, setSimilarity] = useState("");
   // the server needs the Turnitin percentage with the file (I-327), so the file picker waits for it
   const similarityMissing = needsSimilarity && requirement.status !== "Complete" && similarity === "";
+  // I-248: each concept paper carries its own title; the panel picks the study's title from the three.
+  const needsPaperTitle = requirement.item_name === "Three concept papers";
+  const [paperTitle, setPaperTitle] = useState("");
+  const paperTitleMissing = needsPaperTitle && paperTitle.trim() === "";
 
   async function upload(file) {
     if (titlePackageLocked) {
@@ -168,7 +172,8 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
     setBusy(true);
     setError("");
     try {
-      const result = await api.uploadResearchEvidence(gate, requirement.item_name, file, needsSimilarity ? similarity : undefined);
+      const result = await api.uploadResearchEvidence(gate, requirement.item_name, file, needsSimilarity ? similarity : undefined, needsPaperTitle ? paperTitle.trim() : undefined);
+      setPaperTitle("");
       await onSaved(result);
     } catch (err) {
       setError(err.message || "Could not upload this evidence.");
@@ -221,9 +226,9 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
         </div>
         <div className="flex items-center gap-2">
           <StatusChip status={requirement.status_label} dot={false} />
-          <Button as="label" variant="secondary" icon={titlePackageLocked ? Lock : FileUp} className={titlePackageLocked || similarityMissing ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
-            {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading…" : similarityMissing ? "Enter the similarity first" : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
-            <input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={busy || titlePackageLocked || similarityMissing} onChange={(e) => upload(e.target.files?.[0])} />
+          <Button as="label" variant="secondary" icon={titlePackageLocked ? Lock : FileUp} className={titlePackageLocked || similarityMissing || paperTitleMissing ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
+            {titlePackageLocked ? "Locked after panel match" : busy ? "Uploading…" : similarityMissing ? "Enter the similarity first" : paperTitleMissing ? "Enter the paper title first" : replacesExistingUpload && files.length ? "Replace PDF" : files.length >= needed ? "Add another" : "Upload PDF"}
+            <input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={busy || titlePackageLocked || similarityMissing || paperTitleMissing} onChange={(e) => upload(e.target.files?.[0])} />
           </Button>
         </div>
       </div>
@@ -231,6 +236,13 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
         <div className="mt-2 max-w-xs">
           <Field label="Similarity (%)" hint="The percentage shown on the Turnitin certificate, 0 to 100. The file can be chosen once it is entered.">
             <Input type="number" min="0" max="100" step="0.1" value={similarity} onChange={(e) => setSimilarity(e.target.value)} />
+          </Field>
+        </div>
+      )}
+      {needsPaperTitle && !titlePackageLocked && (
+        <div className="mt-2 max-w-xl">
+          <Field label="Title of the concept paper" required hint="Type the title of the paper you are about to upload. The panel picks the title of your study from the three titles.">
+            <Input value={paperTitle} maxLength={220} onChange={(event) => setPaperTitle(event.target.value)} />
           </Field>
         </div>
       )}
@@ -256,6 +268,7 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
                     />
                   )}
                 </span>
+                {file.paper_title && <span className="meta min-w-0 break-words font-semibold text-slate-700">Title: {file.paper_title}</span>}
                 {file.compliance_status && (
                   <div className="flex items-center gap-2">
                     <StatusChip status={file.compliance_status} dot={false} />

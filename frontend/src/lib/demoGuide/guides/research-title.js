@@ -27,12 +27,15 @@ export default {
     },
     {
       id: "rt-papers", title: "Three concept papers", role: "student", route: "/student/research", page: "Research",
-      do: "Choose the three concept papers one after the other, each as its own PDF. Each paper is checked against the concept paper guidelines.",
+      do: "Type the title of each concept paper, then choose its PDF; do this three times. Each paper is checked against the concept paper guidelines.",
       actions: [
+        { type: { label: "Title of the concept paper" }, text: "Peer feedback rubrics and writing confidence" },
         { upload: { css: 'input[type="file"]', nth: 1 }, fixture: "research-concept-1.pdf" },
         { wait: { text: "1 of 3 files uploaded" }, timeout: 20000 },
+        { type: { label: "Title of the concept paper" }, text: "Mentoring and thesis completion in graduate education" },
         { upload: { css: 'input[type="file"]', nth: 1 }, fixture: "research-concept-2.pdf" },
         { wait: { text: "2 of 3 files uploaded" }, timeout: 20000 },
+        { type: { label: "Title of the concept paper" }, text: "Digital portfolios as evidence of research growth" },
         { upload: { css: 'input[type="file"]', nth: 1 }, fixture: "research-concept-3.pdf" },
         { wait: { text: "3 of 3 files uploaded" }, timeout: 20000 },
         { pause: 1500, caption: "All three papers are in" },
