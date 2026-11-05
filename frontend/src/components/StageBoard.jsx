@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Inbox, Loader2, Lock, Move } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Inbox, Loader2, Lock, Move } from "lucide-react";
 import { useIsPhone } from "../hooks";
 import { EmptyState, InlineNotice, StatusLegend } from "./ui/index.js";
 
@@ -23,6 +23,8 @@ import { EmptyState, InlineNotice, StatusLegend } from "./ui/index.js";
  *   lockReason     (item) => string: why a card that cannot be moved cannot be moved, e.g.
  *                  "Waiting for: Student". A card that cannot be dragged shows a lock and this text
  *                  (real text, not a tooltip) and has no "Move to..." menu - the same on every board.
+ *   needsMe        (item) => boolean: the card waits on the signed-in role (default: canDrag). Phone list: only stages with such a card start open.
+ *   isFinished     (item) => boolean: the card is done (default: its lock reason starts with "Finished"). Phone list: stages of only such cards sit behind "Show finished (n)".
  *   showMoveMenu   (item) => boolean (default true): the "Move to..." button under a card
  *   checkMove      (item, toColumn) => { allowed: boolean, reason?: string }
  *                  default: allowed everywhere else
@@ -55,6 +57,8 @@ export default function StageBoard({
   getColumnKey,
   renderCard,
   canDrag = () => true,
+  needsMe = canDrag,
+  isFinished = (item) => /^Finished/.test((lockReason && lockReason(item)) || ""),
   lockReason,
   showMoveMenu = () => true,
   checkMove,
@@ -71,6 +75,9 @@ export default function StageBoard({
   boardNotice = null,
 }) {
   const phone = useIsPhone();
+  const boardId = useId().replace(/:/g, "");
+  const [phoneOpen, setPhoneOpen] = useState({}); // phone list: stage key -> opened/closed by the viewer
+  const [showFinished, setShowFinished] = useState(false);
   const [dragging, setDragging] = useState(null); // { id, from }
   const [hoverColumn, setHoverColumn] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -310,23 +317,67 @@ export default function StageBoard({
   const hoverVerdict = draggedItem && hoverColumn ? verdict(draggedItem, hoverColumn) : null;
 
   if (phone) {
+    // F5-05: only the stages that hold a card waiting on the signed-in role start open; finished stages wait behind
+    // "Show finished (n)" at the end. A card is "mine" when the viewer can move it (canDrag); a stage is finished when
+    // every card in it reads "Finished ..." (lockReason).
     const groups = columns.map((column) => ({ column, columnItems: items.filter((item) => getColumnKey(item) === column.key) })).filter((group) => group.columnItems.length);
+    const stageFinished = ({ columnItems }) => columnItems.every((item) => isFinished(item) && !needsMe(item));
+    const live = groups.filter((group) => !stageFinished(group));
+    const finished = groups.filter(stageFinished);
+    const finishedCount = finished.reduce((sum, group) => sum + group.columnItems.length, 0);
+    const isOpen = (group) => (group.column.key in phoneOpen ? phoneOpen[group.column.key] : group.columnItems.some((item) => needsMe(item)));
+    const renderGroup = (group) => {
+      const { column, columnItems } = group;
+      const open = isOpen(group);
+      const bodyId = `${boardId}-${column.key}`;
+      return (
+        <section key={column.key} aria-label={column.label} className="space-y-3">
+          <header className="flex items-center gap-2">
+            <h3 className="section-title min-w-0 flex-1 break-words">
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls={bodyId}
+                onClick={() => setPhoneOpen((current) => ({ ...current, [column.key]: !open }))}
+                className="flex min-h-11 w-full cursor-pointer items-center gap-1.5 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200 ${open ? "" : "-rotate-90"}`} />
+                <span className="min-w-0 break-words">{column.label}</span>
+              </button>
+            </h3>
+            <span data-testid="stage-count" className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">{column.count ?? columnItems.length}</span>
+          </header>
+          {open && (
+            <>
+              <div id={bodyId} data-testid="stage-scroll" className={columnBodyClassName ? `space-y-2 ${columnBodyClassName}` : "space-y-3"}>{columnItems.map((item) => renderItem(item, column))}</div>
+              {renderColumnFooter ? renderColumnFooter(column, columnItems) : null}
+            </>
+          )}
+        </section>
+      );
+    };
     return (
       <div data-testid="stage-board">
         <BoardNotice notice={activeNotice.notice} onDismiss={activeNotice.dismiss} />
         <StatusLegend className="mb-3" />
         <div ref={regionRef} role="region" aria-label={phoneAriaLabel} className="space-y-5">
           {groups.length ? (
-            groups.map(({ column, columnItems }) => (
-              <section key={column.key} aria-label={column.label} className="space-y-3">
-                <header className="flex items-center justify-between gap-2">
-                  <h3 className="section-title min-w-0 break-words">{column.label}</h3>
-                  <span data-testid="stage-count" className="micro rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">{column.count ?? columnItems.length}</span>
-                </header>
-                <div data-testid="stage-scroll" className={columnBodyClassName ? `space-y-2 ${columnBodyClassName}` : "space-y-3"}>{columnItems.map((item) => renderItem(item, column))}</div>
-                {renderColumnFooter ? renderColumnFooter(column, columnItems) : null}
-              </section>
-            ))
+            <>
+              {live.map(renderGroup)}
+              {finished.length > 0 && (
+                <div data-testid="finished-stages" className="space-y-3">
+                  <button
+                    type="button"
+                    aria-expanded={showFinished}
+                    onClick={() => setShowFinished((current) => !current)}
+                    className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                  >
+                    {showFinished ? `Hide finished (${finishedCount})` : `Show finished (${finishedCount})`}
+                  </button>
+                  {showFinished && finished.map(renderGroup)}
+                </div>
+              )}
+            </>
           ) : (
             <div data-testid="board-empty">
               <EmptyState size="sm" icon={Inbox} title={emptyText} className="px-1" />

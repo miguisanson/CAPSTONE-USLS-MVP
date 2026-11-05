@@ -86,15 +86,16 @@ test("actions: dueSoon counts own tasks that are not overdue and fall due within
 
 test("where a task opens: its own action_url, else the workflow page its title names, else the student record, else the work queue", () => {
   const to = (title, role = "staff", extra = {}) => taskTarget(task("Graduate School Staff", title, "2026-10-20", extra), role).to;
-  assert.equal(to("Anything", "staff", { action_url: "/workflow/awol" }), "/workflow/awol?show=open", "every request board opens on the open requests (I-198)");
+  assert.equal(to("Anything", "staff", { action_url: "/workflow/awol" }), "/workflow/awol?show=open&student_id=7", "every request board opens on the open requests (I-198); a one-student board opens that request (I-348)");
   assert.equal(to("Record and forward practicum MOA"), "/workflow/practicum?show=open");
-  assert.equal(to("Record and forward withdrawal request"), "/workflow/withdrawal?show=open");
+  assert.equal(to("Record and forward withdrawal request"), "/workflow/withdrawal?show=open&student_id=7");
+  assert.equal(to("Record and forward withdrawal request", "staff", { student_id: null }), "/workflow/withdrawal?show=open", "no student: the board only");
   assert.equal(to("Prepare graduation endorsement list"), "/workflow/graduation?show=open");
   assert.equal(to("Export endorsed list for manual Registrar email"), "/workflow/graduation?show=open");
   assert.equal(to("Complete admission handoff missing items"), "/workflow/student-handoff");
   assert.equal(to("Resolve missing curriculum subjects"), "/course-adjustments");
-  assert.equal(to("Tell the Registrar the approved leave was cancelled"), "/workflow/leave-of-absence?show=open", "a leave task opens the board on the open requests (I-196)");
-  assert.equal(to("Review student readmission request"), "/workflow/readmission?show=open");
+  assert.equal(to("Tell the Registrar the approved leave was cancelled"), "/workflow/leave-of-absence?show=open&student_id=7", "a leave task opens the board on the open requests (I-196)");
+  assert.equal(to("Review student readmission request"), "/workflow/readmission?show=open&student_id=7");
   assert.equal(to("Send the adviser application to the Dean"), "/workflow/research-gate?view=adviser");
   assert.equal(to("Receive Forms 3.2 and 3.3 (advising contract)"), "/workflow/research-gate?view=adviser");
   assert.equal(to("Something unknown"), "/students/7", "staff may open the student record");
@@ -187,7 +188,7 @@ test("waiting (I-083): identical alerts held by one owner are one row with a cou
   assert.match(waiting.items[0].detail, /With the Academic Coordinator\. Paulo Garcia, Clarisse Tan, Maya Torres/);
   // I-116: the grouped row opens that owner's queue already searching for the alert's title; a single row does not
   assert.equal(waiting.items[0].target.to, "/work-queue?owner=Academic%20Coordinator&q=Review%20automatic%20AWOL%20policy%20alert");
-  assert.equal(waiting.items[1].target.to, "/work-queue?owner=Dean");
+  assert.equal(waiting.items[1].target.to, "/workflow/awol?show=open&student_id=7");
 });
 
 test("button words (I-116): every 'Open <page>' label is the page's name from labels.js", () => {
@@ -233,7 +234,7 @@ test("key numbers, a coordinator WITH the coordinator dashboard payload: own tas
   assert.deepEqual(ac.map((s) => s.key), ["tasks", "students", "risk", "soon"]);
   assert.deepEqual(ac.map((s) => s.value), [5, 12, 4, 2]);
   assert.equal(ac[1].label, "Students with open work");
-  assert.equal(ac[1].to, "/students", "the Academic Coordinator has a Students page");
+  assert.equal(ac[1].to, "/work-queue?owner=Academic%20Coordinator", "the caseload links to the office's work queue (I-339)");
   assert.equal(ac[2].to, "/students?risk=At Risk of Delay/Delayed");
   const rc = officeStats({ role: "research_coordinator", own, waiting: { total: 9 }, kpis });
   assert.deepEqual(rc.map((s) => s.key), ["tasks", "students", "defenses", "soon"]);
@@ -244,7 +245,7 @@ test("key numbers, a coordinator WITH the coordinator dashboard payload: own tas
     assert.ok(stats.every((s) => !String(s.to || "").startsWith("/activity") && !String(s.to || "").includes("drilldown")), "no staff-only link");
   }
   assert.ok(rc.every((s) => !String(s.to || "").startsWith("/students")), "the Research Coordinator has no Students page");
-  assert.equal(rc[1].to, "/monitoring-sheet");
+  assert.equal(rc[1].to, "/work-queue?owner=Research%20Coordinator");
   assert.equal(rc[2].to, "/workflow/defense-scheduling", "the Research Coordinator's own page");
 });
 
@@ -296,4 +297,12 @@ test("waiting (I-129): a coordinator sees only work about its own process; staff
   assert.ok(!ac.includes("Decide on the readmission request") && !ac.includes("Something nobody can place"));
   assert.equal(officeWaiting(tasks, "staff").total, 8, "staff are not narrowed");
   assert.equal(officeWaiting(tasks, "admin").total, 8, "the administrator works as the Graduate School office and is not narrowed")
+});
+
+test("waiting rows use the same link rule as 'Needs your action' (F5-16, I-348)", () => {
+  const w = officeWaiting([task("Dean", "Decide on the leave of absence request", "2026-10-20"), task("Dean", "Dean late", "2026-10-20")], "staff");
+  const byTitle = Object.fromEntries(w.items.map((i) => [i.title, i.target]));
+  assert.equal(byTitle["Decide on the leave of absence request"].to, "/workflow/leave-of-absence?show=open&student_id=7");
+  assert.equal(byTitle["Decide on the leave of absence request"].label, "Open Leave of Absence");
+  assert.equal(byTitle["Dean late"].to, "/work-queue?owner=Dean", "no board named: the owner's queue");
 });

@@ -252,6 +252,9 @@ test.describe("Staff dashboard Leave of Absence link (I-196)", () => {
     await expect(link).toBeVisible();
     await link.click();
     await expect(page).toHaveURL(/\/workflow\/leave-of-absence\?show=open/);
+    // CHANGED BY p126 (I-348): a task about one student's request opens that request's window; close it to reach the board.
+    const window_ = page.getByRole("dialog");
+    if (await window_.waitFor({ state: "visible", timeout: 5000 }).then(() => true, () => false)) await page.keyboard.press("Escape");
     const preset = page.getByRole("button", { name: /Open requests only/ });
     await expect(preset).toBeVisible();
     const closed = new Set(["Closed", "Approved", "Expired", "Denied", "Withdrawn", "Cancelled"]);

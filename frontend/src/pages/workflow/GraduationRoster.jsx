@@ -306,12 +306,19 @@ function ViewDetailsButton({ onClick, label }) {
   );
 }
 
+// F5-04: once the Dean has approved a batch its application documents were checked, so the document badge goes, and
+// "Next" names the one step left: the Dean's export, then the hand-off to the Registrar.
+const graduationNextText = (group) => {
+  if (group.boardStatus !== "Dean Approved") return group.nextOwners.join(", ");
+  return graduationGroupExported(group) ? "Done - with the Registrar" : "Dean (export)";
+};
+
 function graduationBatchBadges(group) {
   const applicationComplete = group.rows.length > 0 && group.rows.every((row) => row.has_submitted_documents);
   const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
   return [
     graduationReadyForDeanReview(group) && <GroupBadge key="dean" tone="ready">Ready for Dean review</GroupBadge>,
-    !applicationComplete && <GroupBadge key="docs" tone="warning">Application document issue</GroupBadge>,
+    !applicationComplete && group.boardStatus !== "Dean Approved" && <GroupBadge key="docs" tone="warning">Application document issue</GroupBadge>,
     messageCount > 0 && <GroupBadge key="msg" tone="warning">{messageCount} message{messageCount === 1 ? "" : "s"}</GroupBadge>,
   ].filter(Boolean);
 }
@@ -355,7 +362,7 @@ function GraduationBatchCard({ group, accountRole, selectedIds, expanded, onTogg
       selection={onToggleBatch ? selectionWords(selection.selectedCount, group.rows.length) : ""}
       chip={facts.chip}
       badges={facts.badges}
-      facts={[{ label: "Students", value: facts.students }, { label: "Next", value: group.nextOwners.join(", ") }]}
+      facts={[{ label: "Students", value: facts.students }, { label: "Next", value: graduationNextText(group) }]}
       stages={graduationBatchStages(group)}
       onOpenStages={() => onViewBatch(group)}
       openStagesLabel={`View details for ${group.label}`}
@@ -620,7 +627,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
       count: facts.count,
       updated: group.updatedAt ? formatDate(group.updatedAt) : "",
       students: facts.students,
-      next: group.nextOwners.join(", "),
+      next: graduationNextText(group),
       chip: facts.chip,
       badges: facts.badges,
       stages: graduationBatchStages(group),
@@ -789,6 +796,8 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           getColumnKey={graduationBoardColumnKey}
           renderCard={renderGraduationBoardCard}
           canDrag={(item) => graduationBoardCanDrag(item, accountRole)}
+          needsMe={(item) => graduationBoardCanDrag(item, accountRole) || (item.kind !== "student" && accountRole === "dean" && item.group.boardStatus === "Dean Approved" && !graduationGroupExported(item.group))}
+          isFinished={(item) => item.kind !== "student" && item.group.boardStatus === "Dean Approved" && graduationGroupExported(item.group)}
           lockReason={(item) => graduationBoardLockReason(item, accountRole)}
           showMoveMenu={(item) => !(item.kind === "student" && item.stage === "stage-1")}
           checkMove={(item, toColumn) => graduationBoardCheckMove(item, toColumn, accountRole)}

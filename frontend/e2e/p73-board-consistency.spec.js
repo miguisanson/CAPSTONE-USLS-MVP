@@ -184,6 +184,8 @@ test.describe("P7.3 boards of the same kind behave the same", () => {
         expect(await noOverflow(page)).toBe(true);
         if (slug === "awol") {
           const board = page.getByRole("region", { name: region });
+          const closedAwol = column(board, "AWOL").locator("h3 button[aria-expanded=false]");
+          if (await closedAwol.count()) await closedAwol.click(); // CHANGED BY p126 (F5-05): a stage with no card for staff starts closed
           await expect(cardsOf(column(board, "AWOL")).first().getByText("Waiting for: Student", { exact: true })).toBeVisible();
         }
       });

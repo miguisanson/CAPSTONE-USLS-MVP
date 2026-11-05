@@ -29,13 +29,5 @@
       "reason": "AD3: standalone print window, no React"
     }
   },
-  "personPronoun": {
-    "lib/staffHome.js": {
-      "hits": [
-        "their",
-        "them"
-      ],
-      "reason": "Rule 6 hit in a file another packet owns (P-B boards / P-D research gate); that packet removes the words and this entry"
-    }
-  }
+  "personPronoun": {}
 }

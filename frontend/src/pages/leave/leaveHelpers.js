@@ -57,6 +57,8 @@ export function cardLines(item) {
 export function keyFact(item) {
   if (item.kind === "LOA" || item.kind === "LOA_EXTENSION") return item.reason_category || "Reason not given";
   if (item.kind === "READMISSION") return whenText(item);
+  // F5-11: an AWOL card says which kind it is; the residence result stays in its own box (caseRequirements).
+  if (item.kind === "AWOL") return item.status === "AWOL Declared" ? "AWOL - no return filed" : item.kind_label || "Return from AWOL";
   return cardLines(item)[0] || "";
 }
 
@@ -109,18 +111,18 @@ export function caseRequirements(item) {
 }
 
 function nothingToDoReason(item, vocabulary) {
-  if (item.owner === "Dean") return "A request with the Dean can only be moved by the Dean.";
-  if (item.owner === "Student") return "This request is waiting for the student. Only the student can move it.";
   const info = (vocabulary?.statuses || []).find((status) => status.key === item.status);
   if (info?.phase === "done") return "This request is finished, so it cannot be moved.";
+  if (item.owner === "Dean") return "A request with the Dean can only be moved by the Dean.";
+  if (item.owner === "Student") return "This request is waiting for the student. Only the student can move it.";
   return "No step is open for this request right now.";
 }
 
 // The short reason a card sits still, shown on the card itself (StageBoard's lockReason).
 export function lockReasonFor(item, vocabulary) {
-  if (item.owner) return `Waiting for: ${item.owner}`;
   const info = (vocabulary?.statuses || []).find((status) => status.key === item.status);
-  if (info?.phase === "done") return "Finished - nothing more to do";
+  if (info?.phase === "done") return "Finished - nothing more to do"; // a finished request is not waiting for anyone (F5-07)
+  if (item.owner) return `Waiting for: ${item.owner}`;
   return "No step is open right now";
 }
 
@@ -181,6 +183,12 @@ export function caseFlags(item, role) {
   }
   if (item.batch_name) flags.push({ key: "batch", tone: "muted", text: `Batch: ${item.batch_name}` });
   return flags;
+}
+
+/** The request a task is about: the student's newest request that has not ended (null when there is none). */
+export function openCaseOfStudent(cases, studentId) {
+  const own = (cases || []).filter((item) => String(item.student?.id) === String(studentId) && !ENDED_STATUSES.has(item.status));
+  return own.sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")))[0] || null;
 }
 
 export function matchesFilters(item, filters) {
