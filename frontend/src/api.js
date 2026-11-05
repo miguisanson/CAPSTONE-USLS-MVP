@@ -130,6 +130,7 @@ export const api = {
       body: JSON.stringify({ course_ids: courseIds }),
     }),
   student: (id) => request(`/students/${id}`),
+  recordComprehensiveExam: (id, payload) => request(`/students/${id}/comprehensive-exam`, { method: "POST", body: JSON.stringify(payload) }),
   duplicateStudents: () => request("/students/duplicates"),
   mergeStudents: (payload) =>
     request("/students/merge", { method: "POST", body: JSON.stringify(payload) }),

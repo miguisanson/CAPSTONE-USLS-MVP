@@ -1390,6 +1390,20 @@ class MonitoringEdit(db.Model):
     course = db.relationship("Course")
 
 
+class ComprehensiveExamResult(db.Model):
+    """One comprehensive exam result recorded in the portal (I-335). Append-only; the newest row is the
+    current result and also sets Student.comprehensive_exam_status. Provenance is always a manual entry."""
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("student.id"), nullable=False, index=True)
+    result = db.Column(db.String(10), nullable=False)  # Passed | Failed
+    exam_date = db.Column(db.Date, nullable=False)
+    source = db.Column(db.String(30), nullable=False, default="Manual entry")
+    reason = db.Column(db.Text, nullable=False)
+    recorded_by_user_id = db.Column(db.Integer, db.ForeignKey("user_account.id"))
+    recorded_by = db.Column(db.String(160), nullable=False)
+    recorded_at = db.Column(db.DateTime, default=now_utc, nullable=False)
+
+
 class RecordEdit(db.Model):
     """One correction to a text or value someone typed (a message, a remark, a request field).
 
@@ -2860,6 +2874,52 @@ def ensure_monitoring_template_courses() -> int:
     if changed:
         db.session.commit()
     return changed
+
+
+COMPREHENSIVE_EXAM_RESULTS = ("Passed", "Failed")
+
+
+def comprehensive_exam_record_dict(row: "ComprehensiveExamResult") -> dict:
+    return {
+        "id": row.id, "result": row.result, "exam_date": iso(row.exam_date), "source": row.source,
+        "reason": row.reason, "recorded_by": row.recorded_by, "recorded_at": iso(row.recorded_at),
+    }
+
+
+def comprehensive_exam_history(student: Student) -> dict:
+    rows = (ComprehensiveExamResult.query.filter_by(student_id=student.id)
+            .order_by(ComprehensiveExamResult.recorded_at.desc(), ComprehensiveExamResult.id.desc()).all())
+    history = [comprehensive_exam_record_dict(row) for row in rows]
+    return {"status": student.comprehensive_exam_status or "Not Taken", "current": history[0] if history else None, "history": history}
+
+
+def record_comprehensive_exam(student: Student, account: UserAccount, result: str, exam_date_text: str, reason: str) -> None:
+    """Graduate School staff record the exam result (Handbook p.56 RES-04, p.77 GRD-04): a manual entry with
+    who, when and why, written to the activity log; Passed unlocks the research steps."""
+    result = (result or "").strip().capitalize()
+    if result not in COMPREHENSIVE_EXAM_RESULTS:
+        raise ValueError("Choose Passed or Failed.")
+    try:
+        exam_day = datetime.strptime((exam_date_text or "").strip(), "%Y-%m-%d").date()
+    except ValueError:
+        raise ValueError("Enter the date of the exam.") from None
+    if exam_day > ph_today():
+        raise ValueError("The exam date cannot be in the future.")
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValueError("Say where the result comes from (for example, the result sheet).")
+    previous = student.comprehensive_exam_status or "Not Taken"
+    db.session.add(ComprehensiveExamResult(
+        student_id=student.id, result=result, exam_date=exam_day, source="Manual entry", reason=reason,
+        recorded_by_user_id=account.id, recorded_by=account.full_name, recorded_at=now_utc(),
+    ))
+    student.comprehensive_exam_status = result
+    add_log(
+        "comprehensive-exam", student.id, workflow_actor_label(account), "Manual entry",
+        f"Comprehensive exam recorded as {result}", "Graduate School Staff",
+        f"Exam date {exam_day.isoformat()}. Reason: {reason}", previous_status=previous, new_status=result,
+        visibility="internal",
+    )
 
 
 def comprehensive_exam_eligibility(student: Student, audit: dict | None = None) -> dict:
@@ -8571,6 +8631,7 @@ def leave_case_dict(case: LeaveCase, role: str = "staff", detail: bool = False) 
         "eligibility_result": case.eligibility_result,
         "staff_notes": case.staff_notes,
         "dean_remarks": case.dean_remarks,
+        "advise_slip_url": f"/api/leave-cases/{case.id}/advise-slip" if (kind == KIND_READMISSION and case.status == "Approved") else None,
         "edits": record_edit_info("leave_case", case),
         "batch_name": case.batch_name,
         "prior_stage": case.prior_stage,
@@ -14424,6 +14485,19 @@ def register_routes(app: Flask) -> None:
             "message": f"Merged duplicate into {target.name} ({target.student_number}).",
         })
 
+    @app.route("/api/students/<int:student_id>/comprehensive-exam", methods=["POST"])
+    @require_api_login("staff")
+    def student_comprehensive_exam_record(student_id: int):
+        student = Student.query.get_or_404(student_id)
+        data = request_payload()
+        try:
+            record_comprehensive_exam(student, current_account(), data.get("result"), data.get("exam_date"), data.get("reason"))
+        except ValueError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        db.session.commit()
+        return jsonify({"ok": True, "comprehensive_exam": comprehensive_exam_history(student)})
+
     # Full student profile: lifecycle stage, audit, research, docs, panel,
     # schedules, tasks, activity trail, and decision-support recommendations.
     @app.route("/api/students/<int:student_id>")
@@ -14482,6 +14556,7 @@ def register_routes(app: Flask) -> None:
         return jsonify(
             {
                 "student": student_brief(student),
+                "comprehensive_exam": comprehensive_exam_history(student),
                 "stages": STAGES,
                 "stage_index": STAGES.index(student.current_stage) if student.current_stage in STAGES else 0,
                 "course_audit": course_audit_dict(audit),
@@ -20813,6 +20888,39 @@ def register_routes(app: Flask) -> None:
         account = current_account()
         case = _leave_case_or_404(case_id)
         return jsonify({"case": leave_case_dict(case, role=account.role, detail=True), "vocabulary": leave_vocabulary()})
+
+    @app.route("/api/leave-cases/<int:case_id>/advise-slip")
+    @require_api_login("staff", "dean", "student")
+    def leave_case_advise_slip(case_id: int):
+        """The Advise Slip from the Dean for a returnee (Handbook p.45): a page the browser prints, only once approved (I-304)."""
+        account = current_account()
+        case = _leave_case_or_404(case_id)
+        if account.role == "student" and account.student_id != case.student_id:
+            return jsonify({"error": "This account cannot open that slip."}), 403
+        if case.kind != KIND_READMISSION or case.status != "Approved":
+            return jsonify({"error": "The Advise Slip is issued once the Dean approves the readmission."}), 404
+        student = case.student
+        approval = next((e for e in reversed(case.events) if e.action == "approve"), None)
+        e = html.escape
+        values = {
+            "Student": student.name,
+            "Student number": student.student_number,
+            "Program": student.program.name,
+            "Readmitted for": leave_target_label(case) or "Return semester not recorded",
+            "Approved by": f"{approval.actor_name} ({approval.actor_role})" if approval else "The Dean",
+            "Date of approval": case.decided_at.strftime("%B %d, %Y") if case.decided_at else "",
+            "Conditions / remarks": case.dean_remarks or "None",
+        }
+        rows = "".join(f"<tr><th>{e(k)}</th><td>{e(str(v))}</td></tr>" for k, v in values.items())
+        body = f"""<!doctype html><html><head><meta charset='utf-8'><title>Advise Slip - {e(student.name)}</title>
+        <style>body{{font:15px Arial,sans-serif;color:#172033;max-width:760px;margin:40px auto;padding:0 24px}}header{{text-align:center;border-bottom:2px solid #176b55;padding-bottom:12px}}h1{{color:#176b55;margin:4px 0}}h2{{text-align:center;margin:24px 0 8px}}.meta{{color:#526071;margin:0}}table{{width:100%;border-collapse:collapse;margin:20px 0}}th,td{{border:1px solid #d7dee8;padding:11px;text-align:left}}th{{width:32%;background:#f4f7f6}}.sign{{margin-top:56px;width:50%;border-top:1px solid #172033;padding-top:4px}}@media print{{button{{display:none}}}}</style></head>
+        <body><button onclick='window.print()'>Print / Save as PDF</button>
+        <header><h1>University of St. La Salle</h1><p class='meta'>Graduate School</p></header>
+        <h2>Advise Slip</h2><p class='meta' style='text-align:center'>For returnees, Graduate School Handbook 2022-2023, p. 45</p>
+        <table>{rows}</table>
+        <p>The Dean has approved the readmission of the student named above. Present this slip when you enrol.</p>
+        <div class='sign'>{e(approval.actor_name if approval else 'Dean')}<br><span class='meta'>Dean, Graduate School</span></div></body></html>"""
+        return Response(body, mimetype="text/html")
 
     @app.route("/api/leave-cases/<int:case_id>/transition", methods=["POST"])
     @require_api_login("staff", "dean")
