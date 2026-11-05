@@ -224,6 +224,12 @@ export function studentActions(data, { now = new Date(), researchGates = new Set
   return items;
 }
 
+// "Review the alert" -> "The Graduate School is reviewing the alert": the work belongs to the office, not the student (I-385).
+const officeTitle = (title) => {
+  const text = String(title || "").trim();
+  return /^review /i.test(text) ? `The Graduate School is reviewing the ${text.slice(7).replace(/^the /i, "")}` : `The Graduate School is working on: ${text}`;
+};
+
 /**
  * "Waiting on the Graduate School": open tasks held by an office (staff, coordinators, dean, registrar). The student
  * has nothing to do for them, so they never appear under "Needs your action".
@@ -233,9 +239,9 @@ export function studentWaiting(data) {
   return sortedTasks((data.tasks || []).filter((task) => !isOwnTask(task))).map((task) => ({
     key: `waiting-${task.id}`,
     kind: "waiting",
-    title: task.title,
+    title: officeTitle(task.title),
     detail: `With the ${task.owner_role || "Graduate School"}.`,
-    dueAt: task.due_at,
+    dueAt: undefined, // an office's date is not the student's deadline (I-385)
     tone: "neutral",
     target: taskTarget(task),
     status: task.overdue ? "Overdue" : task.status,

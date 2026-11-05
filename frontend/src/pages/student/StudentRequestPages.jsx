@@ -135,9 +135,6 @@ function requestStatus(id, data) {
   }
 }
 
-// The key in lib/formRefs.js for a request page whose id differs from it (the others use their own id).
-const FORMS_KEY = { loa: "leave-of-absence", research: "research-gate", schedule: "defense-scheduling" };
-
 // Requests a student cannot take back from the portal (Leave of Absence and Readmission have their own Withdraw button).
 const CANNOT_WITHDRAW = new Set(["awol", "withdrawal", "practicum", "graduation"]);
 
@@ -171,7 +168,6 @@ export function StudentRequestPage({ id, aside = null }) {
       <PageHeader
         title={page.title}
         description={page.description}
-        forms={FORMS_KEY[id] || id}
         icon={Icon}
         badge={<StatusChip status={id === "research" && defenseToRequest(data) ? "Waiting on you" : requestStateLabel(requestStatus(id, data))} dot={false} />}
         actions={

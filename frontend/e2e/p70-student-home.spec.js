@@ -63,7 +63,7 @@ test.describe("student home, action first (IM19)", () => {
     await expect(mine.getByText(/With the Academic Coordinator/), "no office-held row under Needs your action").toHaveCount(0);
 
     const waiting = sectionOf(page, "Waiting on the Graduate School");
-    await expect(waiting.getByText("Review automatic AWOL policy alert")).toBeVisible();
+    await expect(waiting.getByText("The Graduate School is reviewing the automatic AWOL policy alert")).toBeVisible();
     await expect(waiting.getByText(/With the Academic Coordinator/)).toBeVisible();
     await expect(waiting.getByText("Your record is marked AWOL"), "the banner is not duplicated here").toHaveCount(0);
     await expect(waiting.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/student/requests");

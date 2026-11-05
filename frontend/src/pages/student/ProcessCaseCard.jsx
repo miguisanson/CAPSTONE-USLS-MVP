@@ -13,6 +13,9 @@ import { Fact } from "./shared";
 // (`data.standalone_cases`), exactly like the staff board and the Dean's board.
 
 const RETURNED = ["Returned for Revision", "Returned for Clarification", "Returned"];
+// Office-only facts and placeholders the student does not need (I-386).
+const OFFICE_LABELS = new Set(["Type", "Detection source", "Policy classification", "Residence limits", "Years in the program", "Dean decision", "Dean decided"]);
+const plainWords = (text) => String(text || "").replace(/AWOL \(flagged by the system\)/i, "Absent without leave (AWOL)");
 const ICONS = { AWOL: UserX, RESIDENCY: UserX, WITHDRAWAL: LogOut };
 
 // One stage event of the case as a history entry. The status change is shown only when the status really changed.
@@ -32,7 +35,7 @@ export function ProcessCaseCard({ item, current = true, onChanged }) {
   const returnComment = returned ? returnCommentOf(item) : "";
   const messages = item.messages || [];
   const events = item.events || [];
-  const rows = (item.summary_rows || []).filter((row) => row.label !== "Type");
+  const rows = (item.summary_rows || []).filter((row) => !OFFICE_LABELS.has(row.label) && row.value !== "Not filed yet");
   const facts = rows.filter((row) => !row.full && row.value && row.value !== "None" && row.value !== "Not recorded");
   const texts = rows.filter((row) => row.full && row.value && row.value !== "None");
   return (
@@ -45,7 +48,7 @@ export function ProcessCaseCard({ item, current = true, onChanged }) {
           <div className="min-w-0">
             <h3 className="card-title">{item.kind_label}</h3>
             {(item.card_lines || []).filter(Boolean).map((line, index) => (
-              <p key={index} className={index === 0 ? "mt-0.5 text-sm text-slate-600" : "meta"}>{line}</p>
+              <p key={index} className={index === 0 ? "mt-0.5 text-sm text-slate-600" : "meta"}>{plainWords(line)}</p>
             ))}
           </div>
         </div>

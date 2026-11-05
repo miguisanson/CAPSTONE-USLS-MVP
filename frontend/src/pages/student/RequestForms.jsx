@@ -405,7 +405,6 @@ export function AwolReturnRequestForm({ data, onSaved }) {
 
   return (
     <div className="space-y-4">
-      <ProcessCaseList cases={data.standalone_cases?.awol || []} />
       <LeaveBanner
         banner={data.leave_overview?.banner || ((student.standing === "AWOL" || student.enrollment_tag === "AWOL")
           ? { tone: "bad", title: "Your record is marked AWOL", text: "You cannot enroll until a return request is approved." }
@@ -436,6 +435,8 @@ export function AwolReturnRequestForm({ data, onSaved }) {
         </form>
         </RequestFormCard>
       )}
+      {/* The form comes first; the case facts and timeline follow (I-386). */}
+      <ProcessCaseList cases={data.standalone_cases?.awol || []} />
     </div>
   );
 }
