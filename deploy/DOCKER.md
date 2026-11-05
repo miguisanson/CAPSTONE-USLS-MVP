@@ -76,6 +76,7 @@ Two more buttons (double-click in the `deploy` folder, no typing):
 Reset removes everything testers entered (the app is stopped while the database is rebuilt). Reset on the morning of the meeting.
 Nothing comes back by itself: after a restart of the PC, press **USLS site - Start** again. To also wipe uploads and the session secret: `docker compose --profile tunnel down -v` (deletes the volume).
 The Docker site always uses its own SQLite file inside the `usls_data` volume. A `DATABASE_URL` line in `.env` does not move it (`docker-compose.yml` sets it).
+Each browser that opens the demo site gets its own private copy of the demo database (folder `demo_sandboxes` inside the `usls_data` volume, switch `DEMO_SANDBOX`), so visitors never see each other's changes. Copies unused for 24 hours are deleted, and **Reset the demo data** refreshes the template that new copies start from. Uploaded files are still shared.
 
 ## E. Google Calendar (optional)
 

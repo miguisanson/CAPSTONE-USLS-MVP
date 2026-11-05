@@ -174,5 +174,28 @@ class DemoSandboxTests(unittest.TestCase):
         self.assertFalse(os.path.exists(path))
 
 
+    def test_health_checks_never_make_a_sandbox(self):
+        client = app.test_client()
+        for _ in range(3):
+            client.get("/api/health")
+        self.assertIsNone(client.get_cookie(COOKIE))
+        self.assertEqual([n for n in os.listdir(self.box_dir) if n != "_template.sqlite3"], [])
+
+    def test_a_new_seed_drops_every_old_sandbox(self):
+        """After a reseed (possibly a new schema) no visitor may keep a copy with the old tables."""
+        _a, box_a = self.visitor()
+        app_module.dispose_demo_sandboxes()
+        app_module.refresh_demo_sandbox_template(drop_existing=True)
+        self.assertFalse(os.path.exists(os.path.join(self.box_dir, f"{box_a}.sqlite3")))
+        self.assertTrue(os.path.exists(os.path.join(self.box_dir, "_template.sqlite3")))
+
+    def test_the_number_of_sandboxes_is_capped(self):
+        with patch.dict(os.environ, {"DEMO_SANDBOX_MAX": "2"}):
+            boxes = [self.visitor()[1] for _ in range(4)]
+        left = sorted(n[:-8] for n in os.listdir(self.box_dir) if n != "_template.sqlite3" and n.endswith(".sqlite3"))
+        self.assertLessEqual(len(left), 2)
+        self.assertIn(boxes[-1], left, "the newest visitor keeps a sandbox")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,7 @@ services:
       SECRET_KEY_FILE: /data/secret_key
       RAG_INDEX_DIR: /data/rag_index
       DEMO_MODE: "1"
+      DEMO_SANDBOX_DIR: /data/demo_sandboxes   # one private database copy per visitor
       DEMO_SHOW_ACCOUNTS: "1"   # owner decision IM36: the sign-in page lists the demo accounts
       SESSION_COOKIE_SECURE: "1"
       GOOGLE_CALENDAR_REDIRECT_URI: https://miguisanson.dev/api/integrations/google-calendar/callback

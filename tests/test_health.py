@@ -55,6 +55,7 @@ DEMO_API_ROUTES = {
     ("GET", "/api/auth/demo-accounts"),
     ("POST", "/api/auth/demo-students/<demo_key>/reset"),
     ("POST", "/api/auth/demo-settings"),
+    ("POST", "/api/demo/sandbox/reset"),
 }
 
 

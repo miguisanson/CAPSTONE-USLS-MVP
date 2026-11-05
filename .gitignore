@@ -95,3 +95,6 @@ Documents/Capstone/Meeting_2026-11-04/videos/**/*.mp4
 
 # Playwright output when a spec is started from the repo root
 test-results/
+
+# Per-visitor demo databases
+demo_sandboxes/
