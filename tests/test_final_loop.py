@@ -245,17 +245,35 @@ def test_a_resent_withdrawal_is_judged_from_its_first_submission_date(self):
     self.assertEqual(fresh.status_code, 409, fresh.get_json())
 
 
-# I-297: the Dean cannot approve a readmission before staff confirmed clearance and interview
+# I-297: the Dean cannot approve a readmission before staff confirmed clearance and interview;
+# IM45 (F6-02): staff cannot forward it until both are ticked
+@_test
+def test_staff_cannot_forward_a_readmission_without_the_office_checks(self):
+    case_id = self.make_readmission_submitted()
+    for items in ([], base.CHECKLIST[:1]):
+        forward = self.move("readmission", case_id, "forward", eligibility_result="Eligible", readmission_items=items)
+        self.assertEqual(forward.status_code, 409, forward.get_json())
+        self.assertIn("Tick ", forward.get_json()["error"])
+    with app.app_context():
+        self.assertNotEqual(db.session.get(LeaveCase, case_id).status, "Dean Review")
+
+
 @_test
 def test_the_dean_cannot_approve_a_readmission_without_the_staff_checks(self):
+    # An old record forwarded before IM45 may still carry unticked checks.
     case_id = self.make_readmission_submitted()
-    forward = self.move("readmission", case_id, "forward", eligibility_result="Eligible", readmission_items=[])
+    forward = self.move("readmission", case_id, "forward", eligibility_result="Eligible", readmission_items=base.CHECKLIST)
     self.assertEqual(forward.status_code, 200, forward.get_json())
+    with app.app_context():
+        db.session.get(LeaveCase, case_id).staff_checks_json = "{}"
+        db.session.commit()
     refused = self.move("readmission", case_id, "approve", client=self.dean())
     self.assertEqual(refused.status_code, 409, refused.get_json())
     message = refused.get_json()["error"]
     self.assertIn("Business Office", message)
     self.assertIn("interview", message)
+    self.assertIn("Graduate School staff", message)
+    self.assertNotIn("Return it to staff", message)
     with app.app_context():
         self.assertEqual(db.session.get(LeaveCase, case_id).status, "Dean Review")
 
@@ -292,6 +310,7 @@ def test_the_dean_cannot_approve_a_leave_filed_in_the_last_two_weeks_of_the_seme
     self.assertEqual(refused.status_code, 409, refused.get_json())
     self.assertIn("No leave of absence is granted within", refused.get_json()["error"])
     self.assertIn("p.", refused.get_json()["error"])
+    self.assertIn("Deny it or return it for a later semester", refused.get_json()["error"])  # IM45 (F6-05)
     with app.app_context():
         self.assertEqual(db.session.get(LeaveCase, case_id).status, "Dean Review")
 
@@ -303,6 +322,22 @@ def test_the_demo_skip_date_waits_switch_lets_that_approval_through(self):
     with mock.patch("app.demo_skip_date_waits", return_value=True):
         approved = self.move("leave-of-absence", case_id, "approve", client=self.dean())
     self.assertEqual(approved.status_code, 200, approved.get_json())
+
+
+# IM45 (F6-04): the Dean is told what to do, not sent to a staff page
+@_test
+def test_the_dean_approving_a_withdrawal_for_a_subject_already_dropped_is_told_what_to_do(self):
+    application_id = self.make_withdrawal(status="Dean Review")
+    with app.app_context():
+        application = db.session.get(WithdrawalApplication, application_id)
+        application.subject_enrollment.status = "Dropped"
+        db.session.commit()
+    refused = self.move("withdrawal", application_id, "approve", client=self.dean())
+    self.assertEqual(refused.status_code, 409, refused.get_json())
+    message = refused.get_json()["error"]
+    self.assertIn("already Dropped", message)
+    self.assertIn("Deny the request and tell the student", message)
+    self.assertNotIn("handoff list", message)
 
 
 class FinalLoopSeedTests(unittest.TestCase):
@@ -325,6 +360,18 @@ class FinalLoopSeedTests(unittest.TestCase):
             session["account_id"] = account_id
             session["role"] = role
         return client
+
+    # IM45 (F6-07): a seeded "Passed" comprehensive exam has a history row, so the page does not say "no result recorded"
+    def test_every_seeded_passed_comprehensive_exam_has_a_result_row(self):
+        from app import ComprehensiveExamResult, Student
+        with app.app_context():
+            passed = [s.id for s in Student.query.filter_by(comprehensive_exam_status="Passed").all()]
+            recorded = {row.student_id: row for row in ComprehensiveExamResult.query.all()}
+            self.assertTrue(passed)
+            self.assertEqual([i for i in passed if i not in recorded], [])
+            sample = recorded[passed[0]]
+            self.assertEqual(sample.result, "Passed")
+            self.assertTrue(sample.source and sample.reason and sample.recorded_by)
 
     # F5-13: every seeded leave case has a reason category
     def test_every_seeded_leave_case_has_a_reason_category(self):

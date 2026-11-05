@@ -46,27 +46,48 @@ def _test(function):
     return function
 
 
-# I-273: Return from AWOL checks the same returnee items as readmission
+# I-273: Return from AWOL checks the same returnee items as readmission; IM45 (F6-02): staff cannot forward until both are ticked
 @_test
 def test_awol_forward_records_which_returnee_items_staff_confirmed(self):
     ref = self.make_awol_case()
-    forward = self.move("awol", ref, "forward", confirmed_items=RETURNEE_ITEMS[:1])
+    forward = self.move("awol", ref, "forward", confirmed_items=RETURNEE_ITEMS)
     self.assertEqual(forward.status_code, 200, forward.get_json())
     with app.app_context():
         case = db.session.get(AwolCase, int(ref.split("-")[1]))
-        self.assertEqual(json.loads(case.staff_checks_json), {RETURNEE_ITEMS[0]: True, RETURNEE_ITEMS[1]: False})
+        self.assertEqual(json.loads(case.staff_checks_json), {RETURNEE_ITEMS[0]: True, RETURNEE_ITEMS[1]: True})
     detail = self.staff().get(f"/api/process-cases/awol/{ref}").get_json()["case"]
     rows = {row["item"]: row["confirmed"] for row in detail["staff_checklist"]}
-    self.assertEqual(rows, {RETURNEE_ITEMS[0]: True, RETURNEE_ITEMS[1]: False})
+    self.assertEqual(rows, {RETURNEE_ITEMS[0]: True, RETURNEE_ITEMS[1]: True})
+
+
+@_test
+def test_staff_cannot_forward_an_awol_return_until_both_office_checks_are_ticked(self):
+    ref = self.make_awol_case()
+    for ticked in ([], RETURNEE_ITEMS[:1], RETURNEE_ITEMS[1:]):
+        refused = self.move("awol", ref, "forward", confirmed_items=ticked)
+        self.assertEqual(refused.status_code, 409, refused.get_json())
+        self.assertIn("Tick ", refused.get_json()["error"])
+    self.assertIn("the interview", self.move("awol", ref, "forward", confirmed_items=RETURNEE_ITEMS[:1]).get_json()["error"])
+    self.assertIn("the Business Office clearance", self.move("awol", ref, "forward", confirmed_items=RETURNEE_ITEMS[1:]).get_json()["error"])
+    with app.app_context():
+        self.assertEqual(db.session.get(AwolCase, int(ref.split("-")[1])).status, "Return Submitted")
 
 
 @_test
 def test_the_dean_cannot_approve_an_awol_return_before_the_office_checks_are_confirmed(self):
+    # An old record forwarded before IM45 may still carry an unticked check.
     ref = self.make_awol_case()
-    self.assertEqual(self.move("awol", ref, "forward", confirmed_items=RETURNEE_ITEMS[:1]).status_code, 200)
+    self.assertEqual(self.move("awol", ref, "forward", confirmed_items=RETURNEE_ITEMS).status_code, 200)
+    with app.app_context():
+        case = db.session.get(AwolCase, int(ref.split("-")[1]))
+        case.staff_checks_json = json.dumps({RETURNEE_ITEMS[0]: True, RETURNEE_ITEMS[1]: False})
+        db.session.commit()
     refused = self.move("awol", ref, "approve", client=self.dean())
     self.assertEqual(refused.status_code, 409, refused.get_json())
-    self.assertIn("Business Office clearance and the interview", refused.get_json()["error"])
+    self.assertIn("the interview", refused.get_json()["error"])
+    self.assertNotIn("Business Office", refused.get_json()["error"])
+    self.assertIn("Graduate School staff", refused.get_json()["error"])
+    self.assertNotIn("Return it to staff", refused.get_json()["error"])
     with app.app_context():
         self.assertEqual(db.session.get(AwolCase, int(ref.split("-")[1])).status, "Dean Review")
 
@@ -94,12 +115,12 @@ def test_the_sign_in_label_for_the_research_demo_student_matches_the_seeded_stat
     self.assertEqual(miguel["ready_label"], "At Final Defense - ready to request the date")
 
 
-# Item 11: an exported or sent withdrawal / graduation stays open until the Registrar acknowledged it
+# IM45 (F6-01): a withdrawal / graduation list is closed once it is sent; the acknowledgement is optional
 @_test
-def test_a_withdrawal_is_closed_only_when_the_registrar_acknowledged_it(self):
+def test_a_withdrawal_is_closed_once_it_is_sent_to_the_registrar(self):
     student_id = self.students["withdrawal"]
     application_id = self.make_withdrawal(dean_decision="Approved")
-    for status, closed in (("Exported - Ready to Send", False), ("Sent to Registrar", False),
+    for status, closed in (("Exported - Ready to Send", False), ("Sent to Registrar", True),
                            ("Withdrawn Confirmed", True), ("Denied", True)):
         with app.app_context():
             db.session.get(WithdrawalApplication, application_id).status = status
@@ -108,9 +129,9 @@ def test_a_withdrawal_is_closed_only_when_the_registrar_acknowledged_it(self):
 
 
 @_test
-def test_a_graduation_endorsement_is_closed_only_at_registrar_received(self):
+def test_a_graduation_endorsement_is_closed_once_it_is_sent_to_the_registrar(self):
     student_id = self.students["withdrawal"]
-    for status, closed in (("Dean Approved", False), ("Sent to Registrar", False), ("Registrar Received", True)):
+    for status, closed in (("Dean Approved", False), ("Sent to Registrar", True), ("Registrar Received", True)):
         with app.app_context():
             row = GraduationEndorsement(
                 student_id=student_id, review_window="AY 2026-2027", endorsement_status=status,
@@ -120,6 +141,20 @@ def test_a_graduation_endorsement_is_closed_only_at_registrar_received(self):
             self.assertEqual(workflow_case_is_closed("graduation", student_id), closed, status)
             db.session.delete(row)
             db.session.commit()
+
+
+@_test
+def test_a_sent_withdrawal_is_not_open_work_in_the_queue(self):
+    from app import queue_open_cases
+    student_id = self.students["withdrawal"]
+    application_id = self.make_withdrawal(status="Exported - Ready to Send", dean_decision="Approved")
+    with app.app_context():
+        db.session.get(WithdrawalApplication, application_id).registrar_status = "Exported - Ready to Send"
+        db.session.commit()
+    self.assertEqual(self.move("withdrawal", application_id, "send").status_code, 200)
+    with app.app_context():
+        rows = [row for row in queue_open_cases([student_id]) if row["slug"] == "withdrawal"]
+        self.assertEqual(rows, [])
 
 
 # Item 10: one message about leaving the semester
