@@ -144,8 +144,8 @@ for (const viewport of VIEWPORTS) {
     const current = list.locator('[aria-current="step"]');
     await expect(current, "exactly one step is the current one").toHaveCount(1);
     await expect(current).toContainText("Proposal Defense");
-    await expect(current.locator(".sr-only")).toHaveText(/Current/);
-    await expect(items.nth(0).locator(".sr-only")).toHaveText(/Complete/);
+    await expect(current.locator(".sr-only")).toHaveText(/Now/);
+    await expect(items.nth(0).locator(".sr-only")).toHaveText(/Done/);
     await expect(items.nth(7).locator(".sr-only")).toHaveText(/Upcoming/);
     const i0 = await box(items.nth(0));
     const i1 = await box(items.nth(1));

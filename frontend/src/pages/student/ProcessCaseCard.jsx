@@ -52,7 +52,7 @@ export function ProcessCaseCard({ item, current = true, onChanged }) {
             ))}
           </div>
         </div>
-        {leaveCaseStatusBadge(item)}
+        {leaveCaseStatusBadge({ ...item, status_label: plainWords(item.status_label) })}
       </div>
 
       {open && (
