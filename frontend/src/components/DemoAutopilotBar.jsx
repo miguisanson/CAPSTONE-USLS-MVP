@@ -1,13 +1,15 @@
-// The slideshow bar of the Demo Guide autopilot (.planning/demo-guide/DESIGN.md, "Autopilot"): Back / Next / Take over / Stop,
+// The slideshow bar of the Demo Guide autopilot (.planning/demo-guide/DESIGN.md, "Autopilot"): Start over / Next / Take over / Stop,
 // "Step n of N" with a thin progress bar, and one live region (aria-live="polite") that says what the autopilot is doing.
+// There is no Back: a step cannot be undone on the record, so "Start over" resets the data and plays the demo from step 1 again.
+// The Left arrow key only looks at the previous step, it undoes nothing (DemoGuide.jsx); the Right arrow is Next.
 // It sits above the click-shield (lib/demoGuide/autopilot.js), so Take over and Stop always work. Presentational: the logic is
 // lib/demoGuide/useAutopilot.js and the state is DemoGuide.jsx.
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Hand, Square } from "lucide-react";
+import { ChevronRight, Hand, RotateCcw, Square } from "lucide-react";
 import { Button, InlineNotice, ProgressBar } from "./ui/index.js";
 
-export default function DemoAutopilotBar({ title, index, count, finished, say, status, caption, error, canBack, canNext, onBack, onNext, onTakeOver, onRetry, onStop }) {
+export default function DemoAutopilotBar({ title, index, count, finished, say, status, caption, error, canNext, onStartOver, onNext, onTakeOver, onRetry, onStop }) {
   const running = status === "running";
   const ref = useRef(null);
   // The bar never hides the bottom of the page: the page gets room under it, so a submit button can always scroll above the bar.
@@ -59,7 +61,7 @@ export default function DemoAutopilotBar({ title, index, count, finished, say, s
           </InlineNotice>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" size="sm" icon={ChevronLeft} disabled={!canBack || running} onClick={onBack}>Back</Button>
+          <Button variant="secondary" size="sm" icon={RotateCcw} disabled={running} onClick={onStartOver} aria-label="Start this demo over from the first step">Start over</Button>
           <Button size="sm" icon={ChevronRight} loading={running} disabled={!canNext} onClick={onNext} data-testid="autopilot-next">Next</Button>
           <Button variant="secondary" size="sm" icon={Hand} disabled={!running && status === "paused"} onClick={onTakeOver}>Take over</Button>
           <Button variant="secondary" size="sm" icon={Square} className="ml-auto" onClick={onStop}>Stop</Button>

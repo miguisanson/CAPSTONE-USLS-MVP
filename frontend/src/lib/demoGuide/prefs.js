@@ -28,6 +28,7 @@ export function startGuide(guideId) {
   setGuideEnabled(true);
   try {
     window.sessionStorage.removeItem("usls-demo-autopilot-stamp"); // a new run gets new Student IDs and batch numbers (autopilot.js)
+    window.sessionStorage.removeItem("usls-demo-autopilot-resume"); // and never resumes a step of an earlier run (useAutopilot.js)
   } catch {
     /* none */
   }

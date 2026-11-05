@@ -18,9 +18,31 @@ export function firstStop(guide) {
  */
 export async function startDemoSession(guide, password) {
   const { account, page } = firstStop(guide);
+  await resetSandbox(); // every run starts from the same fresh data
   await api.login({ email: account.email, password });
   startGuide(guide.id);
   return page;
+}
+
+/** A fresh private copy of the demo data. An old server (404) or a network error is ignored: the run just goes on with the data as it is. */
+async function resetSandbox() {
+  try {
+    await api.resetDemoSandbox();
+  } catch {
+    /* old server: continue */
+  }
+}
+
+/**
+ * The one way to start a guide from inside the app (panel pick, "Change demo" then another guide, "Start over"): reset the data,
+ * clear that guide's marks (startGuide), sign out and sign in as the first step's person, who lands on step 1's page. Leaves the page.
+ * (The sign-in page does the same with startDemoSession, because nobody is signed in there.)
+ */
+export async function startFromTop(guide) {
+  const { account, page } = firstStop(guide);
+  await resetSandbox();
+  startGuide(guide.id);
+  await switchToAccount(account.email, page);
 }
 
 /** "Switch to <role>": sign out, then the sign-in page signs in as `email` by itself (go=1) and returns to `to`. Leaves the page. */
