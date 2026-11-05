@@ -58,7 +58,7 @@ export function FacultyClasses({ subjects, terms }) {
       <div className="space-y-4">
         <InlineNotice tone="neutral" icon={Lock}>
           <span className="font-normal">
-            Grades and subject outcomes are encoded and maintained in their authorized source systems. The Monitoring Sheet is a synchronized, read-only view.
+            Grades and subject outcomes are encoded and maintained in the authorized source systems. The Monitoring Sheet is a synchronized, read-only view.
           </span>
         </InlineNotice>
         <div className="grid gap-4 sm:grid-cols-2">

@@ -20,7 +20,7 @@ const STUDENT_LIFECYCLE_DEMOS = [
   {
     workflow: "course-adjustments",
     title: "2 · Course Adjustments",
-    description: "Missing-subject demand scenarios for official course offerings.",
+    description: "Subjects students still need, for the course offering.",
     icon: SlidersHorizontal,
   },
   {
@@ -59,13 +59,13 @@ const STANDALONE_STUDENT_DEMOS = [
   {
     workflow: "readmission",
     title: "Readmission",
-    description: "Approved-LOA personas ready to file return requests.",
+    description: "Students on an approved leave who can ask to come back.",
     icon: UserRound,
   },
   {
     workflow: "awol",
     title: "AWOL & Residency",
-    description: "One automatically flagged AWOL return and one residency-ready persona.",
+    description: "One student flagged AWOL and one ready for residency.",
     icon: UserX,
   },
   {
@@ -344,6 +344,7 @@ export default function Login() {
           {(demoMode || skipDateWaits !== null) && (
             <section aria-labelledby="presenter-settings-title" className="rounded-2xl border border-amber-200 bg-amber-50/60">
               <h2 id="presenter-settings-title" className="eyebrow px-4 pt-3 !text-amber-900">Presenter settings</h2>
+              <p className="px-4 pt-1 text-xs text-amber-900">Each browser has its own copy of the demo data; the Demo Guide switches roles for you.</p>
               <div className="divide-y divide-amber-200">
                 {skipDateWaits !== null && (
                   <PresenterSwitch

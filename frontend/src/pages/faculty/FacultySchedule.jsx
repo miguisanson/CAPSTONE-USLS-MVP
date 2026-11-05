@@ -18,7 +18,7 @@ export function PublishedClasses({ sections = [] }) {
       <p className="font-semibold text-ink">{section.code} · {section.title}{section.section ? ` · Section ${section.section}` : ""}</p>
       {section.faculty_name && <p className="meta mt-1">{section.faculty_name}</p>}
       <ul className="mt-2 space-y-1 text-sm text-slate-700">{(section.meetings || []).map((meeting, index) => <li key={index}>{TEACHING_DAYS[meeting.weekday]} · {formatTimeRange(meeting.start, meeting.end)}</li>)}</ul>
-      {section.meetings?.length === 2 && section.meetings[0].weekday === section.meetings[1].weekday && <p className="meta mt-2">Two sessions with a break between them.</p>}
+      {section.meetings?.length === 2 && section.meetings[0].weekday === section.meetings[1].weekday && <p className="meta mt-2">Two sessions with a break between the two.</p>}
     </li>
   ))}</ul>;
 }

@@ -70,7 +70,7 @@ function CurriculumProgress({ data }) {
                 <h3 className="card-title">{category}</h3>
                 <span className="meta">{rows.length} subject{rows.length === 1 ? "" : "s"}</span>
               </div>
-              <DataTable caption={`${category} subjects and their status`} columns={SUBJECT_COLUMNS} rows={rows} pageSize={0} dense />
+              <DataTable caption={`${category} subjects and status`} columns={SUBJECT_COLUMNS} rows={rows} pageSize={0} dense />
             </section>
           ))}
         </div>

@@ -68,7 +68,7 @@ export function WaitingView({ scope, scopeKey }) {
       <ChartCard
         question="Which decisions have waited the longest?"
         hint="Decide the red and orange bars first: those requests have waited over a week. Select a bar to see the cases."
-        empty={total ? null : { title: "No decisions are waiting", hint: "Requests for the Dean's decision appear here as soon as an office sends them." }}
+        empty={total ? null : { title: "No decisions are waiting", hint: "Requests for the Dean's decision appear here as soon as an office sends a request." }}
         chart={
           <BarsChart
             data={flat}
@@ -78,7 +78,7 @@ export function WaitingView({ scope, scopeKey }) {
               const found = waiting.find((r) => r.label === row.label);
               if (found) show(`Waiting ${band}: ${found.label}`, found.process, band);
             }}
-            ariaLabel="Decisions waiting per process, by how long they have waited"
+            ariaLabel="Decisions waiting per process, by days waited"
           />
         }
         table={table}
@@ -171,7 +171,7 @@ export function OutcomesView({ scope, scopeKey }) {
     <div className="page-stack">
       <ChartCard
         question="What was decided?"
-        hint="Many returns for one process mean its requests reach you incomplete: ask that office to check them before sending. Select a bar to see the cases."
+        hint="Many returns for one process mean its requests reach you incomplete: ask that office to check each request before sending. Select a bar to see the cases."
         empty={rows.length ? null : NO_DECISIONS}
         chart={
           <>
@@ -221,8 +221,8 @@ export function PipelineView({ scope, scopeKey, summary }) {
     <div className="page-stack">
       <ChartCard
         question="How many graduation candidates are at each step?"
-        hint="A step with many students and nothing in the next one is where candidates are stuck: ask that office to move them on."
-        empty={total ? null : { title: "No graduation candidates in this period", hint: "Students appear here once they are ready to graduate or an endorsement is sent to the Dean." }}
+        hint="A step with many students and nothing in the next one is where candidates are stuck: ask that office to move those students on."
+        empty={total ? null : { title: "No graduation candidates in this period", hint: "Students appear here once the student is ready to graduate or an endorsement is sent to the Dean." }}
         chart={
           <>
             <BarsChart data={steps} categoryKey="label" series={[{ key: "count", name: "Students", color: BLUE }]} onSelect={(row) => steps.find((s) => s.label === row.label)?.open()} ariaLabel="Graduation candidates per step" />

@@ -157,7 +157,7 @@ export default function FacultyAssignmentProfile({ faculty, onClose }) {
             <p className="text-sm text-slate-500">
               {faculty.availability_entered
                 ? "No weekly hours entered. Free dates may still be set in the faculty portal."
-                : "Not entered - the faculty member enters it in their portal."}
+                : "Not entered - the faculty member enters it in the Faculty Portal."}
             </p>
           )}
           {hours.length > 0 && <p className="meta mt-2">Philippine time.</p>}

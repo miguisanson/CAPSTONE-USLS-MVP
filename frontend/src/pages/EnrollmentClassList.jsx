@@ -20,7 +20,7 @@ const ROSTER_EMPTY = {
 
 const ROSTER_COLUMNS = [
   { key: "name", header: "Student", cell: (student) => <span className="whitespace-nowrap font-semibold text-ink">{displayStudentName(student)}</span> },
-  { key: "student_number", header: "IDNO", className: "whitespace-nowrap text-slate-600" },
+  { key: "student_number", header: "Student ID", className: "whitespace-nowrap text-slate-600" },
   { key: "program_code", header: "Program", className: "whitespace-nowrap text-slate-600" },
   { key: "status", header: "Enrollment status", cell: (student) => <StatusChip status={student.status} />, className: "whitespace-nowrap" },
   { key: "enrolled_at", header: "Enrolled", cell: (student) => formatDate(student.enrolled_at), className: "whitespace-nowrap text-slate-600" },
@@ -80,7 +80,7 @@ export default function EnrollmentClassList() {
           course_code: data.selected_offering?.course_code || student.course_code,
           faculty_name: data.selected_offering?.faculty_name || "",
         }));
-    const lines = [["Subject", "Faculty", "Student", "IDNO", "Program", "Status", "Enrolled at", "Source"].map(csvCell).join(",")];
+    const lines = [["Subject", "Faculty", "Student", "Student ID", "Program", "Status", "Enrolled at", "Source"].map(csvCell).join(",")];
     rows.forEach((student) => {
       lines.push([
         student.course_code,

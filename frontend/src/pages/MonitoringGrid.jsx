@@ -197,7 +197,7 @@ export default function MonitoringGrid() {
 
   function exportCsv() {
     if (!grid) return;
-    const header = ["Student", "IDNO", "AY Entry", "YR", ...flatCourses.map((c) => c.code), "Completed", "Total", "% Complete"];
+    const header = ["Student", "Student ID", "AY Entry", "YR", ...flatCourses.map((c) => c.code), "Completed", "Total", "% Complete"];
     const lines = [header.map(csvCell).join(",")];
     sortedStudents.forEach((s) => {
       lines.push([
@@ -290,8 +290,8 @@ export default function MonitoringGrid() {
       {grid?.integrity && (
         <InlineNotice tone={grid.integrity.issue_count ? "warning" : "success"} icon={grid.integrity.issue_count ? AlertTriangle : ShieldCheck}>
           {grid.integrity.issue_count
-            ? `${grid.integrity.issue_count} enrollment/profile inconsistency item(s) found`
-            : `Enrollment and student profiles are synchronized (${grid.integrity.checked_enrollments} rows checked)`}
+            ? `${grid.integrity.issue_count} record(s) do not match`
+            : `Records match (${grid.integrity.checked_enrollments} checked)`}
         </InlineNotice>
       )}
 
@@ -439,7 +439,7 @@ export default function MonitoringGrid() {
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-xs font-semibold text-ink sm:text-sm">{displayStudentName(s)}</span>
                             <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                              <span className="micro">IDNO {s.student_number}</span>
+                              <span className="micro">Student ID {s.student_number}</span>
                               {s.enrollment_tag && s.enrollment_tag !== "Enrolled" && (
                                 <StatusChip status={s.enrollment_tag} size="sm" dot={false} />
                               )}

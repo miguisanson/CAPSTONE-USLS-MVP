@@ -26,7 +26,7 @@ test("Academic Coordinator: Academic Semesters is in the sidebar, lists the date
   await expect(page).toHaveURL(/\/term-settings$/);
   const main = page.locator("main");
   await expect(main.getByRole("heading", { level: 1, name: "Academic Semesters" })).toBeVisible();
-  await expect(main.getByText("You can read the semesters and their dates here. Graduate School staff change them.")).toBeVisible();
+  await expect(main.getByText("You can read the semesters and dates here. Only Graduate School staff can change a semester.")).toBeVisible();
   const table = main.locator("table").first();
   expect(await table.locator("thead th").evaluateAll((els) => els.map((e) => e.textContent.trim()))).toEqual(["Semester", "Semester dates"]);
   expect(await table.locator("tbody tr").count(), "at least one semester is listed").toBeGreaterThan(0);

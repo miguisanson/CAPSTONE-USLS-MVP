@@ -65,7 +65,7 @@ export function NotCoveredNotice({ answer }) {
           The USLS policy documents in the library don&apos;t cover this. Ask the Graduate School office.
         </p>
         <p className="meta mt-2">
-          No passages are shown because none of them answers your question. You can rephrase it with the name of a rule,
+          No passages are shown because no passage answers your question. You can rephrase it with the name of a rule,
           stage or form (for example leave of absence, comprehensive exam or Form 1).
         </p>
         {answer && <span className="sr-only">{answer}</span>}

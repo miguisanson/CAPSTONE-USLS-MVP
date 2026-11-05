@@ -94,7 +94,7 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
           {created.account?.must_change_password ? (
             <p className="mt-1">
               Initial password (shown only now): <code className="rounded-md bg-white px-1.5 py-0.5 font-mono font-semibold">{created.account.password}</code>.
-              Give it to the student; they must choose their own password at first sign-in.
+              Give it to the student; the student must choose a new password at first sign-in.
             </p>
           ) : (
             <p className="mt-1">The first-login password is the shared demo password, the same one the sheet import gives new students.</p>

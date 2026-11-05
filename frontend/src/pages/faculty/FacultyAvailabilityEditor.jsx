@@ -317,7 +317,7 @@ function Requests({ data, onSaved }) {
                 {item.requested_by ? ` Asked by ${item.requested_by}.` : ""}
               </p>
               <Button variant="secondary" size="sm" className="mt-3" disabled={busyId === item.id} onClick={() => answer(item.id)}>
-                {busyId === item.id ? "Saving…" : "I already entered my hours - keep them"}
+                {busyId === item.id ? "Saving…" : "I already entered my hours - keep these"}
               </Button>
             </li>
           ))}

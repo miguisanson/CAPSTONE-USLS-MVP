@@ -72,7 +72,7 @@ function ContractBlock({ appointment, onChanged }) {
         <>
           <p className={`mt-2 text-sm font-semibold ${contract.status === "Overdue" ? "text-red-700" : "text-slate-600"}`}>{dueText}</p>
           {contract.status === "Submitted" && (
-            <p className="mt-2 text-sm text-slate-600">You told us you sent the forms{contract.submitted_at ? ` on ${fmtDay(contract.submitted_at)}` : ""}. The Research Coordinator will confirm that they arrived.</p>
+            <p className="mt-2 text-sm text-slate-600">You told us you sent the forms{contract.submitted_at ? ` on ${fmtDay(contract.submitted_at)}` : ""}. The Research Coordinator will confirm that the forms arrived.</p>
           )}
           {canSend && (
             <div className="mt-3 space-y-3">

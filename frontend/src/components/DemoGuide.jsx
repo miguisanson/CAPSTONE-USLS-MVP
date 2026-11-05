@@ -484,7 +484,7 @@ export default function DemoGuide() {
             <>
               <p className="rounded-xl bg-brand-50 px-3 py-2 text-sm text-ink">
                 This demo has {people.length} {people.length === 1 ? "person" : "people"}: {people.join(", ")}.
-                {people.length > 1 && " The guide switches between them for you."}
+                {people.length > 1 && " The guide switches between these roles for you."}
               </p>
               <div className="meta">
                 <span className="font-semibold text-ink">{guide.title}</span>

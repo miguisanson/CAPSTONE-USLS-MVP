@@ -641,7 +641,7 @@ test.describe("the sign-in page: Start a guided demo", () => {
       await expect(step(panel, "Ask to come back")).toBeVisible();
       await expect(panel).toContainText("Step 1 of 5");
       await expect(launcher(page)).toHaveAccessibleName("Demo guide · Readmission 1/5");
-      await expect(panel).toContainText("This demo has 3 people: the student, Graduate School staff, the Dean. The guide switches between them for you.");
+      await expect(panel).toContainText("This demo has 3 people: the student, Graduate School staff, the Dean. The guide switches between these roles for you.");
       expect(await page.evaluate((key) => window.localStorage.getItem(key), GUIDE_ON)).toBe("1");
       await page.screenshot({ path: join(SHOTS, "started-1366.png") });
     } finally {

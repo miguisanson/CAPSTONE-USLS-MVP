@@ -56,7 +56,7 @@ export function StudentDocumentsPage() {
         <AdministrativeDocumentsPanel documentsByGate={data.documents_by_gate} onSaved={refetch} />
       ) : (
         <Card pad="lg">
-          <EmptyState icon={FileUp} title="No administrative documents on file" hint="Admission and general records will appear here when the Graduate School requests or records them." />
+          <EmptyState icon={FileUp} title="No administrative documents on file" hint="Admission and general records will appear here when the Graduate School requests or records a document." />
         </Card>
       )}
     </div>

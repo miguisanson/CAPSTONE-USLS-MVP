@@ -8,9 +8,9 @@ import { Button, Card, InlineNotice, PageHeader } from "../components/ui/index.j
 // What the notice says, in plain words. The full text is GS-P-04 (Data Privacy Notice and Records Retention Schedule,
 // Operations Manual 4.23); GS-F-45 is its paper twin.
 const NOTICE = [
-  ["What the platform keeps", "Your name, student number, program, standing and enrollment, the requests and forms you file with their attachments, messages about your cases, and an activity log of who did what and when."],
-  ["Why", "To run the Graduate School processes you take part in (admission handoff, enrollment, leave, withdrawal, practicum, research defenses, graduation) and to report on them. Nothing here changes official grades or enrollment in AIMS."],
-  ["Who sees it", "Graduate School staff, the coordinators and the Dean see the cases they handle. An adviser or panel member sees only the students assigned to that faculty member. A student sees only the student's own record."],
+  ["What the platform keeps", "Your name, student number, program, standing and enrollment, the requests and forms you file with the attachments, messages about your cases, and an activity log of who did what and when."],
+  ["Why", "To run the Graduate School processes you take part in (admission handoff, enrollment, leave, withdrawal, practicum, research defenses, graduation) and to report on the processes. Nothing here changes official grades or enrollment in AIMS."],
+  ["Who sees it", "Graduate School staff, the coordinators and the Dean see the cases each handles. An adviser or panel member sees only the students assigned to that faculty member. A student sees only the student's own record."],
   ["What leaves the platform", "When the Policy Assistant or panel matching is switched on, the question, the matching policy passages and, for a personal question or panel matching, parts of the related records are sent to Google's service to prepare the answer. Section 5 of GS-P-04 lists each case."],
   ["How long it is kept", "Case files are kept 5 years after graduation or the last enrollment; the graduation list and the Registrar transmittals are kept permanently. GS-P-04 gives the full schedule."],
   ["Your rights", "Under the Data Privacy Act of 2012 (RA 10173) you may be informed, object, see and correct your data, have it blocked or removed, ask for a copy, claim damages, and file a complaint with the National Privacy Commission. Consent may be withdrawn in writing."],

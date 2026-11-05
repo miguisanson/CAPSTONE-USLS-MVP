@@ -13,7 +13,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-export const METRICS = ["arbitraryText", "offScaleText", "rawTable", "rawModal", "rawH1", "localStatusStyle"];
+export const METRICS = ["arbitraryText", "offScaleText", "rawTable", "rawModal", "rawH1", "localStatusStyle", "personPronoun"];
 
 const DESCRIPTIONS = {
   arbitraryText: "text-[13px] style sizes",
@@ -22,6 +22,7 @@ const DESCRIPTIONS = {
   rawModal: "fixed inset-0 overlays",
   rawH1: "<h1> outside PageHeader",
   localStatusStyle: "local status colour maps",
+  personPronoun: "he/she/they/them/their/his/her in screen words (AGENTS Rule 6)",
 };
 
 const ARBITRARY_TEXT = /\btext-\[[0-9.]+(?:px|rem|em)\]/g;
@@ -31,13 +32,24 @@ const RAW_H1 = /<h1\b/g;
 const LOCAL_STATUS = /ring-inset|\bstatusClass\b|\b(?:TONE_CLASSES|STATUS_STYLES|STATUS_CLASSES|CHECK_TONES)\b/g;
 // A string literal (double, single or backtick quoted). Template literals may hold ${...}; that is fine for a word test.
 const STRING_LITERAL = /"[^"\n]*"|'[^'\n]*'|`[^`]*`/g;
-const HAS_FIXED = /(?:^|[\s"'`:])fixed(?![\w.\/-])/;
+// Rule 6: no pronouns for people in user-visible strings or JSX text. Comments are blanked first; strings are kept.
+const COMMENT_OR_STRING = /"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
+const JSX_TEXT = />([^<>{}]+)</g;
+const PRONOUN = /\b(?:he|she|they|them|their|theirs|his|her|hers)\b/gi;
+export function pronounHits(text) {
+  const code = text.replace(COMMENT_OR_STRING, (m) => (m[0] === "/" ? " " : m));
+  const hits = [];
+  for (const s of matches(code, STRING_LITERAL)) if (!/^\s*import\b/.test(s)) hits.push(...matches(s, PRONOUN));
+  for (const m of code.matchAll(JSX_TEXT)) hits.push(...matches(m[1], PRONOUN));
+  return hits;
+}
+const HAS_FIXED =/(?:^|[\s"'`:])fixed(?![\w.\/-])/;
 const HAS_INSET_0 = /(?:^|[\s"'`:])inset-0(?![\w.\/-])/;
 
 /** Files the check does not look at: the new component folder and the status map (they own these patterns). */
 export function isExcluded(path) {
   const p = path.replace(/\\/g, "/").replace(/^\.?\//, "");
-  return p.startsWith("components/ui/") || p === "lib/status.js";
+  return p.startsWith("components/ui/") || p === "lib/status.js" || p.startsWith("pages/UiGallery");
 }
 
 const matches = (text, re) => text.match(re) || [];
@@ -64,6 +76,8 @@ function countFile({ path, text }, allow) {
   out.rawTable = counted("rawTable", RAW_TABLE);
   out.rawH1 = counted("rawH1", RAW_H1);
   out.localStatusStyle = counted("localStatusStyle", LOCAL_STATUS);
+  const pronounAllowed = allowedHits(allow, "personPronoun", path);
+  out.personPronoun = pronounHits(text).filter((hit) => !pronounAllowed.has(hit.toLowerCase())).length;
   out.rawModal = matches(text, STRING_LITERAL).filter((s) => HAS_FIXED.test(s) && HAS_INSET_0.test(s)).length;
   return out;
 }

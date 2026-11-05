@@ -149,7 +149,7 @@ test.describe("Dashboard", () => {
 test.describe("My Advisees", () => {
   test("real data: header, adviser panel, ONE advisee table with every column", async ({ page }) => {
     await openFromSidebar(page, "My Advisees", "My Advisees");
-    await expect(page.getByText("Students you advise, their stage, and the research documents that need your signature.")).toBeVisible();
+    await expect(page.getByText("Students you advise, the stage of each, and the research documents that need your signature.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Signatures", exact: true })).toHaveCount(1); // I-079: one Signatures action, in the page header
     await expect(page.getByRole("link", { name: "Signatures", exact: true })).toHaveAttribute("href", "/faculty-portal/signatures");
     // the adviser panel: meter and the empty inbox note
@@ -297,7 +297,7 @@ test.describe("My Advisees", () => {
     await expect(main(page).getByText("0 of 5 advisees")).toBeVisible();
     await expect(main(page).getByText("5 places left.")).toBeVisible();
     await expect(page.getByText("No appointed advisees yet")).toBeVisible();
-    await expect(page.getByText("Students appear here once you accept their request.")).toBeVisible();
+    await expect(page.getByText("Students appear here once you accept the request.")).toBeVisible();
     await page.getByRole("button", { name: "Agree to release" }).click();
     await expect(page.getByText("No adviser requests are waiting for you.")).toBeVisible();
     expect(calls).toEqual([{ url: "/faculty-portal/adviser-requests/910/consent", body: { consent: "yes" } }]);
@@ -764,7 +764,7 @@ test.describe("My Availability", () => {
     await expect(page.getByRole("listitem").filter({ hasText: "Availability request" })).toContainText("No specific dates given.");
     await expect(page.getByText("Hidden Student")).toHaveCount(0);
     await shots(page, "availability-requests");
-    await open.getByRole("button", { name: "I already entered my hours - keep them" }).click();
+    await open.getByRole("button", { name: "I already entered my hours - keep these" }).click();
     await expect(page.getByRole("listitem").filter({ hasText: "For Mock Student's defense" })).toHaveCount(0);
     expect(calls).toEqual([{ url: "/faculty-portal/availability/requests/55/answer", body: {} }]);
   });
@@ -776,7 +776,7 @@ test.describe("Assigned Classes", () => {
     const firstCount = await rosterRows(page, () => openFromSidebar(page, "Assigned Classes", "Assigned Classes"));
     await expect(page.getByText("Class rosters for your assigned subjects.")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Assigned class rosters" }), "conE: the card title that repeated the page title is gone").toHaveCount(0);
-    await expect(page.getByText("Grades and subject outcomes are encoded and maintained in their authorized source systems. The Monitoring Sheet is a synchronized, read-only view.")).toBeVisible();
+    await expect(page.getByText("Grades and subject outcomes are encoded and maintained in the authorized source systems. The Monitoring Sheet is a synchronized, read-only view.")).toBeVisible();
 
     const term = page.getByLabel("Semester");
     const subject = page.getByLabel("Subject");

@@ -79,7 +79,7 @@ export default function BusinessRules() {
       <PageHeader
         icon={Scale}
         title={PAGE.businessRules}
-        description={`The rules the workflows follow, each with the handbook or protocol page it comes from. The Graduate School Handbook 2022-2023 is in force; where the system and the handbook disagree, the handbook wins. Rules set by the Handbook or the Research Protocol are locked: they change only when the Graduate School issues a new policy (upload it under Policy Documents). ${editNote}`}
+        description={`The rules the workflows follow, each with the handbook or protocol page it comes from. The Graduate School Handbook 2022-2023 is in force; where the system and the handbook disagree, the handbook wins. Rules set by the Handbook or the Research Protocol are locked: those rules change only when the Graduate School issues a new policy (upload it under Policy Documents). ${editNote}`}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

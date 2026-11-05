@@ -130,11 +130,11 @@ export function StagesView({ scope, scopeKey }) {
     <>
       <ChartCard
         question="Where do students wait the longest?"
-        hint="Look for stages with slow or stuck students, open them, and ask the next owner what is blocking each one."
+        hint="Look for stages with slow or stuck students, open each stage, and ask the next owner what is blocking each one."
         empty={rows.length ? null : { title: "No active students for these filters", hint: "Change the program, year started or period to look elsewhere." }}
         chart={
           <>
-            <BarsChart data={rows} categoryKey="stage" series={ZONES.map((z) => ({ key: z.key, name: z.head, color: z.color, text: z.text }))} ariaLabel="Students per stage, split by how long they have been there" />
+            <BarsChart data={rows} categoryKey="stage" series={ZONES.map((z) => ({ key: z.key, name: z.head, color: z.color, text: z.text }))} ariaLabel="Students per stage, split by days in the stage" />
             <p className="meta">On time: under {warn} days in the stage. Slow: {warn} to {high - 1} days. Stuck: {high} days or more. Days in a stage are counted from the day the student entered it.</p>
           </>
         }
@@ -192,9 +192,9 @@ export function SpeedView({ scope, scopeKey }) {
     <>
       <ChartCard
         question="Which offices are slow to close requests?"
-        hint="Offices with a long red bar have requests waiting over 30 days: ask them first. The table gives the days an office takes to close a request."
+        hint="Offices with a long red bar have requests waiting over 30 days: ask those offices first. The table gives the days an office takes to close a request."
         empty={withOpen.length ? null : { title: "No open requests for these filters", hint: "Every request in scope has been closed. Change the program or year started to look elsewhere." }}
-        chart={<BarsChart data={withOpen} categoryKey="process_area" series={AGE_SERIES} ariaLabel="Open requests per office, by how long they have waited" />}
+        chart={<BarsChart data={withOpen} categoryKey="process_area" series={AGE_SERIES} ariaLabel="Open requests per office, by days waited" />}
         table={table}
         tableBelow
       />

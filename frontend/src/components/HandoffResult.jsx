@@ -57,7 +57,7 @@ export default function HandoffResult({ result, isAudit = false, issues = null }
         {accounts.length > 0 && (
           <Section icon={KeyRound} title="New student logins - shown only now" count={accounts.length} tone="amber" defaultOpen>
             <p className="mb-2 text-sm text-amber-900">
-              Each student has their own initial password. Copy this list and give each password to its student; it cannot be shown again, and the student must choose a new password at first sign-in.
+              Each student has a separate initial password. Copy this list and give each password to its student; it cannot be shown again, and the student must choose a new password at first sign-in.
             </p>
             <ul className="max-h-72 space-y-1 overflow-y-auto pr-1 text-sm">
               {result.accounts.map((account) => (

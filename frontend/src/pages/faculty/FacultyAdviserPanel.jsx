@@ -272,13 +272,13 @@ function AdviseeTable({ rows }) {
         <AdviseeCards rows={rows} />
       ) : (
         <DataTable
-          caption="Your advisees, the state of their adviser contract and the research documents that need your signature"
+          caption="Your advisees, the state of the adviser contract and the research documents that need your signature"
           columns={ADVISEE_COLUMNS}
           rows={rows}
           rowKey="key"
           pageSize={0}
           minWidth="md"
-          empty={{ icon: Users, title: "No appointed advisees yet", hint: "Students appear here once you accept their request." }}
+          empty={{ icon: Users, title: "No appointed advisees yet", hint: "Students appear here once you accept the request." }}
         />
       )}
     </Card>
@@ -314,7 +314,7 @@ export function FacultyAdviserPanel({ portalAdvisees = [] }) {
 
       {inbox.length > 0 && (
         <Card>
-          <SectionTitle title="Research adviser requests" subtitle="A student asks you to be their research adviser. Please accept or decline." icon={UserCheck} />
+          <SectionTitle title="Research adviser requests" subtitle="A student asks you to be the research adviser. Please accept or decline." icon={UserCheck} />
           <ul className="space-y-3">
             {inbox.map((item) => (
               <RequestCard

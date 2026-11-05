@@ -27,12 +27,12 @@ export const GUIDES = {
     final: "The leave starts when its first semester begins: the student becomes On Leave, subjects of that semester are closed (marked W if filed in the second half), and a leave record is kept for each semester. When the leave is ending, staff see it as Return due. A leave that ends with no return is only proposed as AWOL; a staff member confirms it.",
   },
   readmission: {
-    purpose: "Brings a student back from an approved leave and restores their record.",
+    purpose: "Brings a student back from an approved leave and restores the student's record.",
     submitter: "The student on leave chooses a return semester and writes the intention to enroll. The leave being ended, the subjects still to take and the adviser come from the records; the student ticks nothing.",
     reviewers: "Graduate School Staff confirm the Business Office clearance and the interview (Handbook p. 45) and forward the request; the Dean decides; the Academic Coordinator plans the subjects after approval.",
     stages: ["Submitted", "Staff review", "With the Dean", "Approved"],
     incomplete: "A request can be returned with a comment. The student corrects it and sends it again. Returning before the leave ends is an early return and is flagged for the Dean.",
-    final: "Approval makes the student Active again at the stage they left, with the tag Not Enrolled until the Academic Coordinator enrolls them. The leave is closed.",
+    final: "Approval makes the student Active again at the stage the student left, with the tag Not Enrolled until the Academic Coordinator enrolls the student. The leave is closed.",
   },
   awol: {
     purpose: "Automatically flags evidence-backed AWOL standing, reviews return declarations, and tracks valid no-subject residency.",

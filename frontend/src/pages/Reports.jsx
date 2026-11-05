@@ -54,7 +54,7 @@ export default function Reports() {
   return (
     <ReportsFrame
       title={PAGE.reportsAnalytics}
-      description="Which students need attention, where they get stuck, how fast offices work, where each year started stands and which records to fix. Filter, then download Excel or PDF."
+      description="Which students need attention, where students get stuck, how fast offices work, where each year started stands and which records to fix. Filter, then download Excel or PDF."
       actions={<Button as={Link} to={homePath(user?.role)} variant="secondary">Back to dashboard</Button>}
       tabs={reportTabs(user?.role)}
     />

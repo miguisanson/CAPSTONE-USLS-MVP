@@ -112,7 +112,7 @@ test.describe("Faculty profiles (GS staff)", () => {
     const heads = await page.locator("main table thead th").evaluateAll((els) => els.map((e) => e.textContent.trim()));
     expect(heads).toEqual(["Faculty", "Department / specialization", "Status", "Availability", "Panel load", "Actions"]);
     await expect(page.getByText(new RegExp(`Showing\\s+${all.length}\\s+of\\s+${all.length}\\s+faculty`))).toBeVisible();
-    await expect(page.getByText("Select a faculty member to open their profile")).toBeVisible();
+    await expect(page.getByText("Select a faculty member to open the profile")).toBeVisible();
 
     // One row, by content.
     const bautista = rows.filter({ hasText: "Dr. Liwayway Bautista" });

@@ -63,7 +63,7 @@ export default function BatchBar({ selectedItems, slug, actions, nameBatches = f
       <div className="flex flex-wrap items-end gap-3">
         {forwarding && (
           <div className="min-w-[14rem] flex-1">
-            <Field label="Batch name" hint="This name is kept on each request so the Dean can see them as one group.">
+            <Field label="Batch name" hint="This name is kept on each request so the Dean can see the requests as one group.">
               <Input
                 value={name}
                 onChange={(event) => {

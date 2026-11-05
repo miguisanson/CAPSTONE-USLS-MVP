@@ -446,7 +446,13 @@ function WithdrawalClosedNotice({ subjects }) {
     <InlineNotice tone="info" role="status" icon={CalendarClock} title="Subject withdrawal is closed right now">
       {subjects.length ? (
         <div className="space-y-2 text-sm">
-          <p>{first?.policy || "You may withdraw a subject until the end of the second week of classes (14 calendar days)."}</p>
+          {first?.deadline && (
+            <p>
+              The window closed on {formatDate(first.deadline)}. To leave the semester, file a{" "}
+              <Link to="/student/requests/leave-of-absence" className="font-semibold underline">Leave of Absence</Link>.
+            </p>
+          )}
+          <p>{first?.policy ||"You may withdraw a subject until the end of the second week of classes (14 calendar days)."}</p>
           <ul className="list-disc space-y-1 pl-5 text-xs">
             {subjects.map((item) => (
               <li key={item.id}>
@@ -462,7 +468,7 @@ function WithdrawalClosedNotice({ subjects }) {
           </p>
         </div>
       ) : (
-        <p className="text-sm">You have no enrolled subject to withdraw from right now.</p>
+        <p className="text-sm">You have no enrolled subject this semester.</p>
       )}
     </InlineNotice>
   );

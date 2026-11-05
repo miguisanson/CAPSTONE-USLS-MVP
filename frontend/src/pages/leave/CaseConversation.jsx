@@ -6,7 +6,7 @@ import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { Block } from "./leaveUi";
 
 const NOTE_RECIPIENTS = [
-  { value: "Student", label: "The student (they can read it)" },
+  { value: "Student", label: "The student (the student can read it)" },
   { value: "Dean", label: "The Dean (staff only)" },
   { value: "Graduate School Staff", label: "Graduate School staff (internal note)" },
 ];
