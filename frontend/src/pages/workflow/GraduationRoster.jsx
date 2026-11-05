@@ -228,8 +228,9 @@ function graduationBoardLockReason(item, accountRole) {
     return "Only Graduate School Staff create a graduation batch.";
   }
   const group = item.group;
-  if (group.boardStatus === "Registrar Received") return "The Registrar acknowledged the list.";
-  if (group.boardStatus === "Sent to Registrar") return accountRole === "staff" ? "Sent. Mark it acknowledged when the Registrar replies." : "Sent to the Registrar.";
+  // closed at Sent to Registrar (IM45); finished cards read like every other board's (F5-07)
+  if (group.boardStatus === "Registrar Received") return "Finished - the Registrar acknowledged the list";
+  if (group.boardStatus === "Sent to Registrar") return accountRole === "staff" ? "Finished - sent to the Registrar (mark it acknowledged when the Registrar replies)" : "Finished - sent to the Registrar";
   if (group.boardStatus === "Dean Approved" && graduationGroupExported(group)) return accountRole === "staff" ? "Exported. Email the list, then mark it as sent." : "Exported. The list is ready to send to the Registrar.";
   if (group.boardStatus === "Dean Approved") return accountRole === "dean" ? "Approved. Export it from this card." : "Waiting for: Dean (export)";
   const owners = (group.nextOwners || []).filter(Boolean);
