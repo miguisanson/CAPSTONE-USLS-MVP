@@ -50,6 +50,9 @@ class PrivateDemoPasswordSeedTests(unittest.TestCase):
                 "USLS_UPLOAD_DIR": str(Path(folder, "up")),
                 "USLS_SKIP_STARTUP_TASKS": "1", "RAG_PREWARM": "0",
                 "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": "",
+                # the probe checks the seeded accounts in its own database; with the sandbox on (no TESTING flag in a
+                # subprocess) the login would read the shared demo_sandboxes/ template of another database instead
+                "DEMO_SANDBOX": "0",
             })
             env.update(extra_env)
             run = subprocess.run([sys.executable, "-c", _SEED_PROBE], cwd=ROOT, env=env,
