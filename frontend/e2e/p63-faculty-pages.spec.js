@@ -110,7 +110,7 @@ test.describe("Faculty profiles (GS staff)", () => {
     const rows = page.locator("main table tbody tr");
     await expect(rows).toHaveCount(all.length);
     const heads = await page.locator("main table thead th").evaluateAll((els) => els.map((e) => e.textContent.trim()));
-    expect(heads).toEqual(["Faculty", "Department / specialization", "Status", "Availability", "Panel load", "Actions"]);
+    expect(heads).toEqual(["Faculty", "Department / specialization", "Status", "Availability", "Student panels", "Actions"]);
     await expect(page.getByText(new RegExp(`Showing\\s+${all.length}\\s+of\\s+${all.length}\\s+faculty`))).toBeVisible();
     await expect(page.getByText("Select a faculty member to open the profile")).toBeVisible();
 
@@ -179,7 +179,7 @@ test.describe("Faculty profiles (GS staff)", () => {
       await expect(dialog.getByRole("heading", { name: heading }), heading).toBeVisible();
     }
     await expect(dialog).toContainText("Education");
-    await expect(dialog).toContainText(/\d+ panel assignments/);
+    await expect(dialog).toContainText(/\d+ student panels?/);
     await expect(dialog).toContainText("Faculty login");
     await expect(dialog.getByRole("link", { name: "liwayway.bautista@usls.edu.ph" })).toHaveAttribute("href", "mailto:liwayway.bautista@usls.edu.ph");
     await expect(dialog.getByRole("link", { name: /View availability feed/ })).toBeVisible();

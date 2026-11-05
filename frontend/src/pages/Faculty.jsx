@@ -102,9 +102,9 @@ export default function Faculty() {
     { key: "availability_status", header: "Availability", hideBelow: "md", cell: (item) => <AvailabilityBadge faculty={item} /> },
     {
       key: "panel_load",
-      header: "Panel load",
+      header: "Student panels",
       align: "right",
-      cell: (item) => <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{item.panel_load}</span>,
+      cell: (item) => <span title="Students whose panel includes this faculty member, at any stage" className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{item.panel_load}</span>,
     },
     canManage && {
       key: "actions",
@@ -325,7 +325,7 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
         badge={
           <>
             <AvailabilityBadge faculty={faculty} />
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">{faculty.panel_load} panel assignments</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">{faculty.panel_load} student panel{faculty.panel_load === 1 ? "" : "s"}</span>
           </>
         }
         size="xl"
