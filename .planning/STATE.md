@@ -20,8 +20,12 @@
   today's rules + known gaps, UAT.md I-334). MERGED d2587b0d `pkt/ux5` (hover lift, phone filter chips, I-091, I-370); its specs
   re-running on merged code -> 14 failed: fixed in bf9ac8a0 (I-087 chip kept, p82/p42 Field helpers; gallery specs need
   `e2e.mjs --build`, a plain `npm run build:web` dist has no /__ui). OPEN: p121 alone fails 2/17, Research Gate shows "0 of 0"
-  intermittently (API 200) -> `pkt/gatedebug` in `wt/gatedebug` (Sonnet, debugging). `pkt/docs5` (c70ebe14) done, merge AFTER
-  pkt/rules5 (it documents P-F rules); .docx/.pdf not rebuilt (throwaway venv E:/Temp/claude/opsman-venv has python-docx; no LibreOffice). Old ux5 note: `pkt/ux5` in `wt/ux5` (motion pass, Research Gate "Still to do" line, I-091, phone filter chips, from 2973d56),
+  intermittently (API 200) -> `pkt/gatedebug` in `wt/gatedebug` (Sonnet, debugging). MERGED f9e105d8 `pkt/rules5` (P-F, 11 items, **RESEED NEEDED**:
+  new columns ResearchEvidenceFile.similarity_percent, AwolCase.staff_checks_json; tests/test_final_loop2.py). MERGED f7a43d8e
+  `pkt/docs5` + 2414cf21 manual .docx/.pdf rebuilt (`E:/Temp/claude/opsman-venv/Scripts/python.exe scripts/docs/build_operations_manual.py --pdf`,
+  LibreOffice at E:/LibreOffice). Running: `pkt/derive5` in `wt/derive5` (P-G: frontend follows P-F — AWOL forward checks,
+  Turnitin %, read-only received date, no enrollment select, no drop exception; UNTIL IT MERGES the AWOL forward and Turnitin upload
+  in the UI are broken on v6.4.1-test). Leftover folder `CAPSTONE-USLS-MVP-wt/rules5` (delete failed, permission; already pruned from git). Old ux5 note: `pkt/ux5` in `wt/ux5` (motion pass, Research Gate "Still to do" line, I-091, phone filter chips, from 2973d56),
   `pkt/logic5` in `wt/logic5` (P-C backend logic, owns app.py), `pkt/boards5` in `wt/boards5` (P-B boards, phone list, deep links).
   Rung note: subagents write the failing tests themselves from the packet brief (brief = contract); main session reviews + gates.
 - Next after these: P-D research gate polish, P-F questions round 2 (app.py, after P-C merges), P-G derived inputs, P-E loading states.
