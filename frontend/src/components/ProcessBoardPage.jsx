@@ -161,6 +161,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
   const [selected, setSelected] = useState(() => new Set());
   const [detailId, setDetailId] = useState(null);
   const [detailVersion, setDetailVersion] = useState(0);
+  const [registrarFocus, setRegistrarFocus] = useState(""); // a student id: the Registrar list scrolls into view with that row ticked
   const [detailFocus, setDetailFocus] = useState(""); // "messages": the Message button opens the window on the note box
   const [dialog, setDialog] = useState(null); // { item, action, detail }
   const boardNotice = useBoardNotice(); // the one place a step says what happened (the board shows it above its columns)
@@ -205,10 +206,13 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
       // ?student_id= (a dashboard task about one student's request) opens that request's window, once (I-348).
       const studentId = urlParams.get("student_id");
       if (active && res && studentId) {
+        const toRegistrar = urlParams.get("section") === "registrar"; // a "send to the Registrar" task: the list, not the case window (I-375)
         const target = openCaseOfStudent(res.cases, studentId);
-        if (target) setDetailId(target.id);
+        if (toRegistrar) setRegistrarFocus(studentId);
+        else if (target) setDetailId(target.id);
         const next = new URLSearchParams(urlParams);
         next.delete("student_id");
+        next.delete("section");
         setUrlParams(next, { replace: true });
       }
       if (active && config.afterOpen) await config.afterOpen({ isStaff, reload: () => load({ quiet: true }) });
@@ -404,6 +408,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
     cases,
     data,
     reload: () => load({ quiet: true }),
+    registrarFocus,
     openDetail: (item) => { setDetailFocus(""); setDetailId(item.id); },
     runAction,
     banner: boardNotice.show,

@@ -8,6 +8,7 @@ import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters"
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
 import { useOpenFilters } from "../leave/useOpenFilter";
 import { formatDate } from "../../lib/format";
+import ListExportButtons from "../../components/ListExportButtons";
 import { CaseCardFacts, CaseCardShell, MessageNote, NextOwner, ProcessScopeNote, ReadyMark } from "../../components/process";
 import { CaseMessageHistory, DemoResetButton, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, uniqueValues, useDemoCaseReset } from "./shared";
 
@@ -266,6 +267,13 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
       <BoardFilterRow toggle={<ViewToggle value={viewMode} onChange={setViewMode} />}>
         <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={filteredRows.length} total={rows.length} noun="students" />
       </BoardFilterRow>
+      <ListExportButtons
+        title="Practicum students"
+        subtitle={`${filteredRows.length} of ${rows.length} students`}
+        filename="practicum-students"
+        columns={["Student ID", "Student name", "Program", "Eligibility", "MOA", "Documents", "Hours", "Coordinator", "Dean report"]}
+        rows={filteredRows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.eligibility?.status, row.moa_status, row.documents_status, row.record ? hoursText(row.record) : "", row.coordinator_review_status, row.dean_report_status])}
+      />
       {viewMode === "board" ? (
         <StageBoard
           ariaLabel="Practicum workflow board"

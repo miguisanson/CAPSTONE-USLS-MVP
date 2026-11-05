@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, FileSpreadsheet, MailCheck, Send } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
@@ -64,13 +64,22 @@ async function advanceAwol(items, status) {
  * The Registrar list: Dean-approved requests, one step at a time
  * (list downloaded -> sent by email -> Registrar acknowledged).
  */
-export default function RegistrarPanel({ slug, cases, onChanged }) {
+export default function RegistrarPanel({ slug, cases, onChanged, focusStudentId = "" }) {
   const rows = useMemo(() => cases.filter((item) => item.registrar?.status && item.registrar.status !== "Not Ready"), [cases]);
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState(null); // { tone, text, skipped }
   const [followUp, setFollowUp] = useState(null); // { filename }
   const [historyKey, setHistoryKey] = useState(0);
+  const sectionRef = useRef(null);
+
+  // A task link names a student: show this list and tick that student's waiting request, ready for "Mark as sent".
+  useEffect(() => {
+    if (!focusStudentId) return;
+    const waiting = rows.filter((item) => String(item.student.id) === String(focusStudentId) && item.registrar.status !== "Acknowledged");
+    setSelected(new Set(waiting.map((item) => item.id)));
+    sectionRef.current?.scrollIntoView({ block: "start" });
+  }, [focusStudentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedRows = rows.filter((item) => selected.has(item.id));
   const allSelected = rows.length > 0 && selectedRows.length === rows.length;
@@ -187,7 +196,7 @@ export default function RegistrarPanel({ slug, cases, onChanged }) {
   ];
 
   return (
-    <section aria-labelledby="registrar-heading" className="rounded-xl border border-slate-200 bg-white p-4">
+    <section ref={sectionRef} aria-labelledby="registrar-heading" className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
           <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />

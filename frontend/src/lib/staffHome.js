@@ -90,8 +90,12 @@ const onOpenRequests = (to) => (OPEN_REQUEST_BOARDS.has(to) ? `${to}?show=open` 
 
 // A task about one student's request on a standalone board opens that request's window (?student_id=, I-348).
 const ONE_REQUEST_BOARDS = new Set(["leave-of-absence", "readmission", "awol", "withdrawal"].map((slug) => `/workflow/${slug}`));
+// "Send the approved ... to the Registrar" lands on the board's Registrar list with the student's row ticked (I-375): the
+// case window cannot send, the list can.
 const onTaskRequest = (to, task) =>
-  ONE_REQUEST_BOARDS.has(to) && task.student_id ? `${to}?show=open&student_id=${encodeURIComponent(task.student_id)}` : onOpenRequests(to);
+  ONE_REQUEST_BOARDS.has(to) && task.student_id
+    ? `${to}?show=open&student_id=${encodeURIComponent(task.student_id)}${/to the Registrar$/i.test(task.title || "") ? "&section=registrar" : ""}`
+    : onOpenRequests(to);
 
 /** The workflow page a task belongs to (its own action_url, else the page its title names), or null; only if the role can open it. */
 function pageTarget(task, role) {

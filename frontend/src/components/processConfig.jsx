@@ -87,7 +87,7 @@ function LeaveAboveBoard({ ctx }) {
 
 function LeaveBelowBoard({ ctx }) {
   if (!ctx.isStaff) return null;
-  return <RegistrarPanel slug={ctx.slug} cases={ctx.cases} onChanged={() => ctx.reload()} />;
+  return <RegistrarPanel slug={ctx.slug} cases={ctx.cases} onChanged={() => ctx.reload()} focusStudentId={ctx.registrarFocus} />;
 }
 
 function AwolHeaderActions({ ctx }) {

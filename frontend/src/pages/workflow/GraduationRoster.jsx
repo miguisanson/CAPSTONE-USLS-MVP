@@ -18,6 +18,7 @@ import { formatDate } from "../../lib/format";
 import { useOpenFilters } from "../leave/useOpenFilter";
 import { Button, DataTable, EmptyState, StatusChip } from "../../components/ui/index.js";
 import WorkflowTimeline, { graduationTimelineSteps } from "../../components/WorkflowTimeline";
+import ListExportButtons from "../../components/ListExportButtons";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
 import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
 import { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
@@ -806,6 +807,13 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           showAdvanced={false}
         />
       </BoardFilterRow>
+      <ListExportButtons
+        title="Graduation candidates"
+        subtitle={`${filteredRows.length} of ${rows.length} records`}
+        filename="graduation-candidates"
+        columns={["Student ID", "Student name", "Program", "Eligible", "Endorsement status", "Batch"]}
+        rows={filteredRows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.eligibility?.eligible ? "Yes" : "No", graduationRowStatus(row), row.endorsement?.batch_name || ""])}
+      />
       {selectedIds.size > 0 && (tickedReady.length > 0 || tickedBatched.length > 0) && (
         <GraduationSelectionBar
           count={tickedReady.length + tickedBatched.length}
