@@ -15891,8 +15891,10 @@ def register_routes(app: Flask) -> None:
         for student in Student.query.filter(active_student_clause()).order_by(Student.last_name, Student.first_name).all():
             if student.id in seen:
                 continue
+            # Merge v6.4 (M6): real research records only. Empty "Missing" rows are made for every student by other
+            # screens, so they would put coursework students who have not started research on the board as Blocked.
             has_research_record = bool(
-                DocumentCheck.query.filter_by(student_id=student.id).first()
+                DocumentCheck.query.filter(DocumentCheck.student_id == student.id, DocumentCheck.status != "Missing").first()
                 or PanelAssignment.query.filter_by(student_id=student.id).first()
                 or ScheduleRequest.query.filter_by(student_id=student.id).first()
             )
@@ -36809,6 +36811,8 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
         missing = [item["label"] for item in pending if item["student_upload"] and item["status"] == "Missing"]
         submitted = next((item for item in pending if item["status"] == "Submitted"), None)
         first = next((item for item in pending if item["source_type"] != "student_upload"), pending[0])
+        if locked and case is None:
+            return None  # merge v6.4 (M6): a student without a research case whose research is still locked is not at the gate yet
         if locked:
             state, owner, reason = "blocked", student_owner, locked["status_label"]
         elif missing:
