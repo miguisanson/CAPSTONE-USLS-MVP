@@ -42,6 +42,7 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
   const [showOthers, setShowOthers] = useState(false);
   const items = (data?.items || []).filter((rule) => !onlyEnforced || rule.enforced);
   if (!items.length) return null;
+  const isStudent = user?.role === "student"; // I-432: a student reads the plain rule, not system-check badges or other programs' rules
   const canOpenPage = user && user.role !== "student" && user.role !== "faculty";
   // "Prototype rule / needs review" is the Graduate School's own to-do (F-11): the Dean, the student and faculty see a plain source.
   // Staff always see the count (even "none need review"), so every board's panel reads the same (I-207).
@@ -58,8 +59,8 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
       </div>
       <p className="meta mt-1 leading-relaxed text-slate-600">{rule.description}</p>
       <p className="meta mt-1.5 font-semibold text-brand-800">Source: {sourceOf(rule)}{rule.source_section ? ` (${rule.source_section})` : ""}</p>
-      <div className="mt-1.5"><RuleBadges rule={rule} showReview={gsStaff} /></div>
-      {!rule.enforced && rule.not_enforced_reason && <p className="micro mt-1">{rule.not_enforced_reason}</p>}
+      {!isStudent && <div className="mt-1.5"><RuleBadges rule={rule} showReview={gsStaff} /></div>}
+      {!isStudent && !rule.enforced && rule.not_enforced_reason && <p className="micro mt-1">{rule.not_enforced_reason}</p>}
     </div>
   );
 
@@ -85,7 +86,7 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
       {open && (
         <div className="space-y-3 border-t border-brand-100 px-4 pb-4 pt-3">
           {mine.map(ruleCard)}
-          {others.length > 0 && (
+          {!isStudent && others.length > 0 && (
             <div>
               <button type="button" onClick={() => setShowOthers((value) => !value)} aria-expanded={showOthers} className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-1 text-left text-sm font-semibold text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
                 Rules for other programs ({others.length})

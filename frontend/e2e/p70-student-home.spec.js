@@ -53,7 +53,8 @@ test.describe("student home, action first (IM19)", () => {
     await openHome(page, context, MAYA);
     const headings = main(page).locator("h2");
     await expect(headings.nth(0), "the first section of the page").toHaveText("Needs your action");
-    await expect(headings.nth(1), "the second section, right under it").toHaveText("Waiting on the Graduate School");
+    // I-432: the return is not sent yet, so the absence check is not listed as the office's work
+    await expect(main(page).getByRole("heading", { name: "Waiting on the Graduate School", exact: true })).toHaveCount(0);
 
     // the AWOL banner is hers to act on: it is in "Needs your action" with a working link
     const mine = sectionOf(page, "Needs your action");
@@ -62,12 +63,6 @@ test.describe("student home, action first (IM19)", () => {
     await expect(mine.getByText("Review automatic AWOL policy alert"), "an office's task is not a student action").toHaveCount(0);
     await expect(mine.getByText(/With the Academic Coordinator/), "no office-held row under Needs your action").toHaveCount(0);
 
-    const waiting = sectionOf(page, "Waiting on the Graduate School");
-    await expect(waiting.getByText("The Graduate School is reviewing the absence check")).toBeVisible();
-    await expect(waiting.getByText(/With the Academic Coordinator/)).toBeVisible();
-    await expect(waiting.getByText("Your record is marked AWOL"), "the banner is not duplicated here").toHaveCount(0);
-    await expect(waiting.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/student/requests");
-
     // the key number counts only her own tasks: the coordinator's alert is not one of them
     const card = main(page).locator('[data-slot="label"]', { hasText: /^Your open tasks$/i }).locator("xpath=..");
     await expect(card.locator('[data-slot="value"]')).toHaveText("0");
@@ -75,7 +70,6 @@ test.describe("student home, action first (IM19)", () => {
     // both rows lead to the student page where the case is handled
     const link = mine.locator('a[href$="/student/requests/awol-return"]').first();
     await expect(link, "a link from the banner to the page where it is handled").toBeVisible();
-    await expect(waiting.locator('a[href$="/student/requests/awol-return"]').first()).toBeVisible();
     await link.click();
     await expect(page).toHaveURL(/\/student\/requests\/awol-return$/);
     await expect(page.locator("main h1")).toBeVisible();

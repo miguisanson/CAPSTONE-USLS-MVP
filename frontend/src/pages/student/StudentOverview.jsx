@@ -3,7 +3,7 @@ import { ArrowRight, Compass, LayoutDashboard, Route } from "lucide-react";
 import { SectionCard, Stepper, StatusChip } from "../../components/ui/index.js";
 import RoleHome from "../../components/RoleHome.jsx";
 import { formatDate, relativeDays } from "../../lib/format";
-import { stageSteps, stageWords } from "../../lib/stages.js";
+import { pausedLine, stageSteps, stageWords } from "../../lib/stages.js";
 import { forStudent } from "../../lib/status.js";
 import { VIEW_LABELS, subjectsLeftText, studentActions, studentActivity, studentTasks, studentWaiting } from "../../lib/studentHome.js";
 import { useStudentPortal } from "./StudentPortalContext";
@@ -123,6 +123,20 @@ function headerDescription(student) {
     .join(" · ");
 }
 
+function LifecycleSteps({ data }) {
+  const { student } = data;
+  const steps = stageSteps(student.current_stage, data.stages, { courseAudit: data.course_audit, comprehensivePassed: student.comprehensive_exam_status === "Passed" });
+  const paused = pausedLine(steps, student.current_stage);
+  if (!paused) return <Stepper steps={steps} />;
+  // the line says it once; the steps keep what is done, without a second "Stopped" chip beside "Now"
+  return (
+    <>
+      <p data-testid="lifecycle-paused" className="mb-3 text-sm font-semibold text-ink">{paused}</p>
+      <Stepper steps={steps.filter((step) => step.state !== "stopped")} />
+    </>
+  );
+}
+
 export default function StudentOverview() {
   const { data } = useStudentPortal();
   const { student, course_audit: audit, research_case: researchCase } = data;
@@ -178,7 +192,7 @@ export default function StudentOverview() {
       extra={
         <>
           <SectionCard as="section" title="Your lifecycle" subtitle={`You are at: ${stageWords(student.current_stage)}`} icon={Route}>
-            <Stepper steps={stageSteps(student.current_stage, data.stages, { courseAudit: data.course_audit, comprehensivePassed: student.comprehensive_exam_status === "Passed" })} />
+            <LifecycleSteps data={data} />
           </SectionCard>
           <PageLinks data={data} />
         </>

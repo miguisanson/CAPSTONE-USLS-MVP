@@ -281,15 +281,18 @@ async function checkRules(page, { staffLink }) {
   await expect(one).toContainText("14 days");
   await expect(one).toContainText("A request is filed within the window.");
   await expect(one).toContainText("Source: Graduate School Handbook p. 12 (Section 4.2)");
-  await expect(one).toContainText("Enforced by the system");
+  // I-432: a student reads the plain rule; the system-check badges are for staff
+  if (staffLink) await expect(one).toContainText("Enforced by the system");
+  else await expect(one).not.toContainText("by the system");
   await expect(one).not.toContainText("Needs review");
   const two = rules.locator("div.ring-1", { hasText: "Spec: counselling note" });
   await expect(two).toContainText("Yes");
   await expect(two).toContainText("Source: Research Protocol");
-  await expect(two).toContainText("Not checked by the system");
+  if (staffLink) await expect(two).toContainText("Not checked by the system");
   if (staffLink) await expect(two).toContainText("Awaiting sign-off");
   else await expect(two).not.toContainText("Awaiting sign-off");
-  await expect(two).toContainText("Spec: the office does this by hand.");
+  if (staffLink) await expect(two).toContainText("Spec: the office does this by hand.");
+  else await expect(two).not.toContainText("by hand");
   const link = rules.getByRole("link", { name: "See every business rule and its history" });
   await expect(link).toHaveCount(staffLink ? 1 : 0);
   if (staffLink) await expect(link).toHaveAttribute("href", "/business-rules");

@@ -328,13 +328,13 @@ test.describe("Dean offering decision context", () => {
     }] }));
     for (const width of [1366, 1920, 390]) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 1080 });
-      await expect(page.getByRole("columnheader", { name: "Delayed if withheld", exact: true })).toBeVisible();
+      if (width !== 390) await expect(page.getByRole("columnheader", { name: "Delayed if withheld", exact: true })).toBeVisible(); // a phone stacks each row (I-433)
       await expect(page.getByText("Dr. Review Faculty", { exact: true })).toBeVisible();
       await expect(page.getByText("Unassigned", { exact: true })).toBeVisible();
       await expect(page.getByText("2 potentially delayed if withheld", { exact: true })).toBeVisible();
-      await expect(page.getByRole("row").filter({ hasText: "CS-703" }).getByRole("cell", { name: "Unavailable", exact: true })).toBeVisible();
+      await expect(page.getByRole("row").filter({ hasText: "CS-703" }).getByRole("cell", { name: /(^|\s)Unavailable$/ })).toBeVisible();
       const noDelayRow = page.getByRole("row").filter({ hasText: "CS-702" });
-      await expect(noDelayRow.getByRole("cell", { name: "—", exact: true })).toBeVisible();
+      await expect(noDelayRow.getByRole("cell", { name: /(^|\s)—$/ })).toBeVisible();
       await expect(page.getByText("9 students need this subject next term", { exact: true })).toHaveCount(0);
       expect(await noOverflow(page)).toBe(true);
       await shot(page, `decision-context-${width}.png`);

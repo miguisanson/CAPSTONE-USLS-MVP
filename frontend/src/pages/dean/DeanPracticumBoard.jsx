@@ -4,7 +4,7 @@ import { Briefcase, CheckCircle2, Eye, HelpCircle, History, RotateCcw } from "lu
 import { Button, DataTable, EmptyState, PageHeader, StatusChip } from "../../components/ui/index.js";
 import StepDialog from "../../components/StepDialog";
 import PolicyRules from "../../components/PolicyRules";
-import StageBoard from "../../components/StageBoard";
+import StageBoard, { BoardSummary } from "../../components/StageBoard";
 import { CaseCardFacts, CaseCardShell, MessageNote, NextOwner, ReadyMark } from "../../components/process";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS, matchesFilters, plural } from "../leave/leaveHelpers";
@@ -236,13 +236,7 @@ export function DeanPracticumBoard() {
 
       <PolicyRules process="practicum" />
 
-      <div className="min-w-0">
-        <p className="text-base font-semibold text-ink" aria-live="polite">{summaryLine}</p>
-        <p className="mt-1 max-w-3xl text-sm text-slate-500">
-          Dragging a card to another column does the same as the buttons on its case page. On a keyboard or phone, use
-          &quot;Move to…&quot; on the card.
-        </p>
-      </div>
+      <BoardSummary line={summaryLine} windowName="case page" />
 
       <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
         <LeaveFilters

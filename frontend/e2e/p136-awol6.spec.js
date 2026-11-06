@@ -43,8 +43,8 @@ test.describe("awol6 student Return from AWOL", () => {
       const panel = page.getByRole("region", { name: "Rules applied on this screen" });
       await expect(panel.getByText(/^Master's: all requirements within 5/)).toBeVisible();
       await expect(panel.getByText(/^Doctorate: /)).toHaveCount(0);
-      await panel.getByRole("button", { name: /^Rules for other programs/ }).click();
-      await expect(panel.getByText(/^Doctorate: all requirements within 7/)).toBeVisible();
+      // I-432: a student is not shown the other programs' rules at all
+      await expect(panel.getByRole("button", { name: /^Rules for other programs/ })).toHaveCount(0);
     } finally { await context.close(); }
   });
 
