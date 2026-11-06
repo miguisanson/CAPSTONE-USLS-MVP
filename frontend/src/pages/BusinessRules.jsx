@@ -7,13 +7,14 @@ import {
 } from "../components/ui/index.js";
 import HistoryDisclosure from "../components/HistoryDisclosure";
 import { RuleBadges, formatRuleValue } from "../components/PolicyRules";
+import { useAuth } from "../auth";
 import { formatDate } from "../lib/format";
 import { PAGE } from "../lib/labels.js";
 
 const FILTERS = [
   { id: "all", label: "All rules" },
   { id: "enforced", label: "Enforced by the system" },
-  { id: "documented", label: "Documented only" },
+  { id: "documented", label: "Not checked by the system" },
   { id: "review", label: "Needs review" },
   { id: "official", label: "Official (locked)" },
   { id: "adjustable", label: "Pending validation" },
@@ -85,7 +86,7 @@ export default function BusinessRules() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard icon={Scale} label="Rules in the register" value={data?.summary?.total ?? 0} />
         <StatCard icon={ShieldCheck} label="Enforced by the system" value={data?.summary?.enforced ?? 0} />
-        <StatCard icon={FileText} label="Documented only" value={data?.summary?.documented_only ?? 0} />
+        <StatCard icon={FileText} label="Not checked by the system" value={data?.summary?.documented_only ?? 0} />
         <StatCard icon={AlertTriangle} label="Needs review" value={data?.summary?.needs_review ?? 0} tone="warning" />
       </div>
 
@@ -137,6 +138,7 @@ export default function BusinessRules() {
 }
 
 function RuleRow({ rule, canEdit, onEdit }) {
+  const showCode = useAuth().user?.role === "admin"; // I-410: the code is for the administrator
   return (
     <div className="py-4 first:pt-0 last:pb-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -157,10 +159,10 @@ function RuleRow({ rule, canEdit, onEdit }) {
           </div>
           {rule.locked && <p className="meta mt-1.5">{rule.lock_message}</p>}
           {!rule.locked && rule.edit_label && <p className="meta mt-1.5 font-semibold text-slate-600">{rule.edit_label}</p>}
-          {!rule.enforced && rule.not_enforced_reason && <p className="meta mt-1.5">Not enforced: {rule.not_enforced_reason}</p>}
+          {!rule.enforced && rule.not_enforced_reason && <p className="meta mt-1.5">Not checked by the system: {rule.not_enforced_reason}</p>}
           {rule.status === "needs_review" && <p className="mt-1.5 text-xs font-semibold text-amber-800">Check this value against the policy, then confirm or adjust it to clear the flag.</p>}
           <p className="micro mt-1.5">
-            {rule.key}{rule.updated_by ? ` · last changed by ${rule.updated_by} on ${formatDate(rule.updated_at)}` : ""}{rule.effective_date ? ` · effective ${formatDate(rule.effective_date)}` : ""}
+            {[showCode && `Rule code ${rule.key}`, rule.updated_by && `last changed by ${rule.updated_by} on ${formatDate(rule.updated_at)}`, rule.effective_date && `effective ${formatDate(rule.effective_date)}`].filter(Boolean).join(" · ")}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-end">

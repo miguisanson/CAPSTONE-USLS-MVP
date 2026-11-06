@@ -286,7 +286,7 @@ async function checkRules(page, { staffLink }) {
   const two = rules.locator("div.ring-1", { hasText: "Spec: counselling note" });
   await expect(two).toContainText("Yes");
   await expect(two).toContainText("Source: Research Protocol");
-  await expect(two).toContainText("Documented only");
+  await expect(two).toContainText("Not checked by the system");
   if (staffLink) await expect(two).toContainText("Awaiting sign-off");
   else await expect(two).not.toContainText("Awaiting sign-off");
   await expect(two).toContainText("Spec: the office does this by hand.");

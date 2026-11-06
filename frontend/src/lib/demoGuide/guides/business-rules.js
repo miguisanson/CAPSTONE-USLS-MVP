@@ -41,12 +41,12 @@ export default {
     },
     {
       id: "br-review", title: "Rules still needing review", role: "staff", route: "/business-rules", page: "Business Rules",
-      do: "Clear the search and select the filter Needs review: the prototype rules that the Graduate School has not yet confirmed. Documented only lists the rules the portal shows but does not enforce.",
+      do: "Clear the search and select the filter Needs review: the prototype rules that the Graduate School has not yet confirmed. Not checked by the system lists the rules the portal shows but does not enforce.",
       actions: [
         { type: SEARCH, text: "" },
         { click: { role: "button", name: "Needs review", in: FILTERS } },
         { pause: 1500 },
-        { click: { role: "button", name: "Documented only", in: FILTERS } },
+        { click: { role: "button", name: "Not checked by the system", in: FILTERS } },
         { pause: 1500 },
       ],
       doneWhen: "manual",

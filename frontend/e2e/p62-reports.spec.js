@@ -230,7 +230,7 @@ test.describe("Business Rules", () => {
     const main = page.locator("main");
     for (const [label, value] of [
       ["Rules in the register", json.summary.total], ["Enforced by the system", json.summary.enforced],
-      ["Documented only", json.summary.documented_only], ["Needs review", json.summary.needs_review],
+      ["Not checked by the system", json.summary.documented_only], ["Needs review", json.summary.needs_review],
     ]) {
       const tile = main.locator("div").filter({ hasText: new RegExp(`^\\s*(${value}\\s*${label}|${label}\\s*${value})\\s*$`) });
       await expect(tile.last(), `${label} shows ${value}`).toBeVisible();
@@ -245,7 +245,7 @@ test.describe("Business Rules", () => {
     const FILTERS = {
       "All rules": () => true,
       "Enforced by the system": (r) => r.enforced,
-      "Documented only": (r) => !r.enforced,
+      "Not checked by the system": (r) => !r.enforced,
       "Needs review": (r) => r.status === "needs_review",
       "Official (locked)": (r) => r.locked,
       "Pending validation": (r) => !r.locked,
@@ -278,7 +278,7 @@ test.describe("Business Rules", () => {
     await expect(row).toContainText(rule.description.slice(0, 40));
     await expect(row).toContainText(`Source: ${rule.citation}`);
     await expect(row).toContainText("Check this value against the policy, then confirm or adjust it to clear the flag.");
-    await expect(row).toContainText(rule.key);
+    await expect(row).not.toContainText(rule.key); // I-410: only the administrator sees the code
     await row.getByRole("button", { name: /change history/i }).click();
     await expect(row.getByText(rule.history.length ? "Reason:" : "No changes yet. This is the value from the policy document.").first()).toBeVisible();
     await shot(page, "rules-1366.png");

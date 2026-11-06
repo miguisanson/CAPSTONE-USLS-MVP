@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, SlidersHorizontal, GitMerge, AlertTriangle, GraduationCap, ShieldCheck } from "lucide-react";
+import { Search, SlidersHorizontal, GitMerge, AlertTriangle, ShieldCheck } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { Button, Card, DataTable, InlineNotice, PageHeader, SearchInput, SectionCard, Select, StatusChip } from "../components/ui/index.js";
@@ -20,7 +20,7 @@ const STANDING_FILTER = [{ value: "Active", label: "Active (not completed or wit
 // category (the units needed differ by program), so no unit total is printed here.
 function compreProgress(compre) {
   const left = compre?.missing_subjects || 0;
-  if (left > 0) return `${left} subject${left === 1 ? "" : "s"} to finish`;
+  if (left > 0) return `Compre: eligible after ${left} more subject${left === 1 ? "" : "s"}`;
   const failed = compre?.failed_subjects || 0;
   return failed > 0 ? `Not eligible: ${failed} failed subject${failed === 1 ? "" : "s"}` : "Not eligible";
 }
@@ -32,11 +32,11 @@ const COLUMNS = [
     header: "Student",
     cell: (s) => (
       <div className="flex items-center gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
+        <span className="hidden h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700 2xl:grid">
           {initials(s.name)}
         </span>
         <div className="min-w-0">
-          <p className="truncate font-semibold text-ink">{s.name}</p>
+          <p className="font-semibold text-ink">{s.name}</p>
           <p className="meta">{s.student_number}</p>
         </div>
       </div>
@@ -52,26 +52,23 @@ const COLUMNS = [
       </>
     ),
   },
-  { key: "current_stage", header: "Stage" },
-  { key: "enrollment_tag", header: "Enrollment", cell: (s) => (s.enrollment_tag ? <StatusChip status={s.enrollment_tag} dot={false} /> : null) },
-  { key: "standing", header: "Standing", cell: (s) => <StatusChip status={s.standing} dot={false} /> },
-  { key: "risk_level", header: "Risk", cell: (s) => <StatusChip status={s.risk_level} /> },
+  { key: "current_stage", header: "Stage", cell: (s) => <span className="block">{s.current_stage}</span> },
+  { key: "enrollment_tag", header: "Enrollment", cell: (s) => (s.enrollment_tag ? <StatusChip status={s.enrollment_tag} size="sm" /> : null) },
+  { key: "standing", header: "Standing", cell: (s) => <StatusChip status={s.standing} size="sm" /> },
+  { key: "risk_level", header: "Risk", cell: (s) => <StatusChip status={s.risk_level} size="sm" /> },
   {
     key: "compre",
     header: "Compre exam",
     cell: (s) =>
       s.compre_eligibility?.passed ? (
-        <span className="inline-flex items-center gap-1.5">
-          <GraduationCap className="h-4 w-4 text-brand-700" aria-hidden="true" />
-          <StatusChip status="Passed" dot={false} />
-        </span>
+        <StatusChip status="Passed" size="sm" />
       ) : s.compre_eligibility?.eligible ? (
-        <StatusChip status="Eligible to take" dot={false} />
+        <StatusChip status="Eligible to take" size="sm" />
       ) : (
-        <span className="meta">{compreProgress(s.compre_eligibility)}</span>
+        <span className="meta block min-w-20">{compreProgress(s.compre_eligibility)}</span>
       ),
   },
-  { key: "adviser_name", header: "Adviser" },
+  { key: "adviser_name", header: "Adviser", cell: (s) => <span className="block min-w-20">{s.adviser_name}</span> },
 ];
 
 export default function Students() {
@@ -208,7 +205,7 @@ export default function Students() {
             <span>
               {data.integrity.issue_count
                 ? `${data.integrity.issue_count} enrollment/profile inconsistency item(s) require review.`
-                : "Students, enrollment, and monitoring records are synchronized."}
+                : "Student, enrollment and monitoring records agree."}
             </span>
             <Button variant="secondary" size="sm" onClick={() => navigate(`/enrollment${programId ? `?program_id=${programId}` : ""}`)}>
               Review enrollment
@@ -233,6 +230,7 @@ export default function Students() {
           </div>
         </InlineNotice>
       ) : (
+        <div className="[&_td]:!px-2 [&_th]:!px-2"> {/* tighter cells so the eight columns fit at 125% zoom (I-406) */}
         <DataTable
           caption="Monitored graduate students"
           columns={COLUMNS}
@@ -244,6 +242,7 @@ export default function Students() {
           empty={{ icon: Search, title: "No students match your filters", hint: "Try clearing a filter or broadening your search." }}
           pagination={{ page: data?.page || page, pageCount: data?.pages || 1, total: data?.total || 0, pageSize: PAGE_SIZE, onPage: setPage }}
         />
+        </div>
       )}
     </div>
   );

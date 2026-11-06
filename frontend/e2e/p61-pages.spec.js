@@ -141,7 +141,7 @@ test.describe("Students page", () => {
     test.skip(!json.integrity, "this build of the list carries no integrity block");
     const note = json.integrity.issue_count
       ? `${json.integrity.issue_count} enrollment/profile inconsistency item(s) require review.`
-      : "Students, enrollment, and monitoring records are synchronized.";
+      : "Student, enrollment and monitoring records agree.";
     await expect(page.getByText(note)).toBeVisible();
     await page.getByRole("button", { name: "Review enrollment" }).click();
     await expect(page).toHaveURL(/\/enrollment(\?|$)/);

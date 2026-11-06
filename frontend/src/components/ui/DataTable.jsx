@@ -17,6 +17,11 @@ const STACK_BY = {
   sm: { table: "max-sm:block max-sm:min-w-0", head: "max-sm:sr-only", body: "max-sm:block", row: "max-sm:block max-sm:px-1 max-sm:py-2", cell: "max-sm:block max-sm:!py-1 max-sm:before:block max-sm:before:text-[11px] max-sm:before:font-semibold max-sm:before:uppercase max-sm:before:tracking-wide max-sm:before:text-slate-500 max-sm:before:content-[attr(data-label)]" },
   md: { table: "max-md:block max-md:min-w-0", head: "max-md:sr-only", body: "max-md:block", row: "max-md:block max-md:px-1 max-md:py-2", cell: "max-md:block max-md:!py-1 max-md:before:block max-md:before:text-[11px] max-md:before:font-semibold max-md:before:uppercase max-md:before:tracking-wide max-md:before:text-slate-500 max-md:before:content-[attr(data-label)]" },
 };
+// A soft edge on the sides that still have more columns, so a cut-off column shows as scrollable (I-406).
+const SCROLL_SHADOW = {
+  background:
+    "linear-gradient(to right, #fff 30%, rgba(255,255,255,0)) left center / 40px 100% no-repeat local, linear-gradient(to left, #fff 30%, rgba(255,255,255,0)) right center / 40px 100% no-repeat local, linear-gradient(to right, rgba(15,23,42,.18), rgba(15,23,42,0)) left center / 12px 100% no-repeat scroll, linear-gradient(to left, rgba(15,23,42,.18), rgba(15,23,42,0)) right center / 12px 100% no-repeat scroll, #fff",
+};
 const HIDE_BELOW = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidden lg:table-cell", xl: "hidden xl:table-cell" };
 const ALIGN = { left: "text-left", right: "text-right", center: "text-center" };
 const JUSTIFY = { left: "justify-start", right: "justify-end", center: "justify-center" };
@@ -280,6 +285,7 @@ export function DataTable({
       <div
         ref={scrollRef}
         data-table-scroll=""
+        style={scrolls ? SCROLL_SHADOW : undefined}
         tabIndex={scrolls ? 0 : undefined}
         role={scrolls ? "region" : undefined}
         aria-label={scrolls ? (caption ? `${caption} (scrolls sideways)` : "Table (scrolls sideways)") : undefined}
