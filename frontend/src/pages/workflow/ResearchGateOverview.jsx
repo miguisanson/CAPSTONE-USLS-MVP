@@ -60,6 +60,9 @@ function progressLine(row) {
   return `${done} of ${total} done · ${row.missing.length ? `Still to do: ${todo}` : "Nothing left"}`;
 }
 
+// The adviser is appointed after the title is approved (Ops Manual 4.12), so Title Defense says nothing about it.
+const adviserFact = (row) => (row.adviser_name ? `Adviser: ${row.adviser_name}` : String(row.column) === "1" ? "" : "No adviser yet");
+
 function GateCard({ row, canAct, onView, onAct }) {
   const ready = row.state === "ready";
   return (
@@ -71,11 +74,14 @@ function GateCard({ row, canAct, onView, onAct }) {
         </div>
         <span title={STATE_HELP[row.state]}><StatusChip status={STATE_LABEL[row.state]} size="sm" dot={false} /></span>
       </div>
+      {(row.state === "blocked" || row.state === "waiting") && row.reason && (
+        <p className="mt-2 truncate text-xs font-medium text-slate-700" title={row.reason} data-testid="gate-reason">{row.reason}</p>
+      )}
       <CaseCardFacts
         facts={[
-          { text: row.adviser_name ? `Adviser: ${row.adviser_name}` : "No adviser yet", wide: true },
+          { text: adviserFact(row), wide: true },
           { text: progressLine(row), wide: true, testId: "gate-progress" },
-        ]}
+        ].filter((fact) => fact.text)}
       />
       <PanelStamp verdict={row.verdict} />
       <NextOwner owner={row.waiting_on || "No one, this stage is complete"} />
@@ -106,7 +112,7 @@ function GateView({ row, onClose, onOpenRecord }) {
       }
     >
       <ul className="space-y-1 text-sm text-slate-700">
-        <li>{row.adviser_name ? `Adviser: ${row.adviser_name}` : "No adviser yet"}</li>
+        {adviserFact(row) && <li>{adviserFact(row)}</li>}
         <li>{row.research_title || "Title not submitted yet"}</li>
         <li>{defenseFact(row)}</li>
         <li className="font-semibold">{progressLine(row)}</li>
@@ -198,7 +204,7 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
         <div className="mt-3 space-y-3">
           {data && <p className="meta" data-testid="research-gate-summary">{allRows.length} students: {summary}.</p>}
           <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
-            <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={rows.length} total={allRows.length} noun="students" />
+            <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={rows.length} total={data ? allRows.length : null} noun="students" />
           </BoardFilterRow>
           <ListExportButtons
             title="Research Gate"

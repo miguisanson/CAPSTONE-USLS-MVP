@@ -60,7 +60,7 @@ export default function LeaveFilters({ filters, setFilters, programs, statusOpti
       </div>
       <div className="meta mt-2 flex flex-wrap items-center justify-between gap-2">
         <span className="inline-flex flex-wrap items-center gap-2">
-          Showing {count} of {total} {noun}
+          {total != null && `Showing ${count} of ${total} ${noun}`}
           {filters.open && (
             <Button variant="secondary" size="sm" icon={X} aria-label="Open requests only: select to show every request" onClick={() => set("open", false)}>
               Open requests only
