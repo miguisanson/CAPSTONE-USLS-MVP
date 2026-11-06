@@ -2,7 +2,7 @@
 // and "Recent activity" list. Run: npm run test:student-home
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isOwnTask, studentActions, studentActivity, studentTasks, studentWaiting } from "../src/lib/studentHome.js";
+import { subjectsLeftText, isOwnTask, studentActions, studentActivity, studentTasks, studentWaiting } from "../src/lib/studentHome.js";
 
 const NOW = new Date("2026-10-17T09:00:00");
 const RESEARCH = new Set(["Form 1 - Title Defense", "Final Defense"]);
@@ -207,4 +207,10 @@ test("defense request: once the request is filed (the office holds the review ta
   const task = { id: 9, title: "Review student Final Defense schedule request", owner_role: "Research Coordinator", status: "Pending" };
   assert.deepEqual(studentActions(atDefense({ tasks: [task] }), opts), []);
   assert.equal(studentWaiting(atDefense({ tasks: [task] })).length, 1);
+});
+
+test("subjectsLeftText: one wording for the subjects a student still has to finish (I-425)", () => {
+  assert.equal(subjectsLeftText(3, 15), "18 subjects left: 3 this semester, 15 still to take");
+  assert.equal(subjectsLeftText(0, 1), "1 subject left: 0 this semester, 1 still to take");
+  assert.equal(subjectsLeftText(0, 0), "No subjects left");
 });

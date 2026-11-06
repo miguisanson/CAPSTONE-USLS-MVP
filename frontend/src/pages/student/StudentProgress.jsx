@@ -6,6 +6,7 @@ import { ProgressBar } from "../../components/ui/ProgressBar.jsx";
 import { useStudentPortal } from "./StudentPortalContext";
 import { ProgressPanel, WorkflowStatusPanel } from "./Panels";
 import { PAGE } from "../../lib/labels.js";
+import { subjectsLeftText } from "../../lib/studentHome.js";
 
 const SUBJECT_COLUMNS = [
   {
@@ -58,8 +59,9 @@ function CurriculumProgress({ data }) {
         </div>
         <div className="grid grid-cols-3 gap-2">
           <StatCard size="sm" tone="success" label="Completed" value={audit.completed.length} />
-          <StatCard size="sm" tone="info" label="Current" value={audit.current.length} />
-          <StatCard size="sm" tone={audit.missing_count ? "warning" : "neutral"} label="Missing" value={audit.missing_count} />
+          <StatCard size="sm" tone="info" label="This semester" value={audit.current.length} />
+          <StatCard size="sm" tone={audit.missing_count ? "warning" : "neutral"} label="Still to take" value={audit.missing_count} />
+          <p className="meta col-span-3">{subjectsLeftText(audit.current.length, audit.missing_count)}.</p>
         </div>
       </div>
       {subjects.length ? (

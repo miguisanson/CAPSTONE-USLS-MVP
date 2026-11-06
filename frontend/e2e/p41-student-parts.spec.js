@@ -265,7 +265,7 @@ test.describe("P4.1 shared student parts", () => {
       }
       await expect(status).toContainText("Coursework completion");
       await expect(status).toContainText("16.7%");
-      await expect(status).toContainText("3 completed, 0 current, 15 missing.");
+      await expect(status).toContainText("3 completed. 15 subjects left: 0 this semester, 15 still to take.");
       await expect(status).toContainText("No research case opened yet");
       await expect(status).toContainText("Adviser: Dr. Liwayway Bautista");
       await expect(status.getByText("Research not started", { exact: true })).toBeVisible();
@@ -689,8 +689,8 @@ test.describe("P4.1 shared student parts", () => {
         ["Staff and Coursework Review", "Locked", "This stage opens after the application is submitted."],
         ["Requirements Validation", "Locked", "Coursework, research, practicum, and completion records are checked here."],
         ["Dean Endorsement", "Locked", "Available after eligibility is confirmed and staff prepares the endorsement."],
-        ["Endorsement Export", "Locked", "Available after Dean approval."],
-        ["Dean Emails List and Waits for Acknowledgement", "Locked", "Available after the endorsed list is exported."],
+        ["The list is saved as a file", "Locked", "Available after Dean approval."],
+        ["The Dean sends the list to the Registrar", "Locked", "Available after the endorsed list is exported."],
       ];
       for (const [i, [title, chip, helper]] of cards.entries()) {
         const s = page.locator("section").filter({ has: page.getByRole("heading", { level: 3, name: title, exact: true }) }).last();

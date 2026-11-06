@@ -7,6 +7,12 @@
 // student path. Dates stay raw (ISO strings); the page formats them.
 import { PAGE } from "./labels.js";
 
+/** The one sentence every student page uses for subjects still to finish (I-425): being taken now + not started yet. */
+export const subjectsLeftText = (current, notStarted) => {
+  const left = current + notStarted;
+  return left ? `${left} subject${left === 1 ? "" : "s"} left: ${current} this semester, ${notStarted} still to take` : "No subjects left";
+};
+
 /** Short names of the request pages, as the sidebar and the Request Center call them. */
 export const VIEW_LABELS = Object.freeze({
   research: PAGE.researchProgress,

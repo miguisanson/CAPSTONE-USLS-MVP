@@ -1042,7 +1042,7 @@ test.describe("P4.2 student request forms", () => {
       await submit.click(); // no PDF yet (P82)
       await expect(page.getByRole("alert").filter({ hasText: "There is a problem" }).getByRole("link", { name: "Upload your signed graduation application as a PDF." })).toBeVisible();
       expect(lastWrite(writes, "requests/graduation")).toBeUndefined();
-      for (const title of ["Staff and Coursework Review", "Requirements Validation", "Dean Endorsement", "Endorsement Export", "Dean Emails List and Waits for Acknowledgement"]) await expect(main.getByRole("heading", { level: 3, name: title })).toBeVisible();
+      for (const title of ["Staff and Coursework Review", "Requirements Validation", "Dean Endorsement", "The list is saved as a file", "The Dean sends the list to the Registrar"]) await expect(main.getByRole("heading", { level: 3, name: title })).toBeVisible();
       await expect(main).toContainText("Monitoring eligibility recommendation");
       await expect(main).toContainText("No missing requirements are currently flagged by the monitoring layer.");
       await snap(page, "graduation-form");
@@ -1075,7 +1075,7 @@ test.describe("P4.2 student request forms", () => {
       await page.goto("/student/graduation");
       const main = page.locator("main");
       await expect(main).toContainText("This step opens only after coursework, research, completion documents, and any required practicum are complete.");
-      await expect(main).toContainText("Complete the requirements listed in Step 3 before submitting a graduation application.");
+      await expect(main).toContainText("Finish what is left (see the list at the top of this page) before you apply for graduation.");
       await expect(main).toContainText("Not eligible");
       for (const line of ["Coursework: Spec course A", "Research: Spec research B", "Practicum: Spec practicum C"]) await expect(main).toContainText(line);
       await expect(page.getByRole("button", { name: /graduation application/ })).toHaveCount(0);
