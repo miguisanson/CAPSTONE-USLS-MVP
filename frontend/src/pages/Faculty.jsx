@@ -336,6 +336,7 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
         <div className="space-y-6 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0" tabIndex={-1} data-autofocus>
           {detailLoading && <p className="meta font-semibold" role="status">Refreshing calendar status and schedule…</p>}
           {detailError && <InlineNotice tone="warning" role="alert">Live calendar details could not be refreshed: {detailError}</InlineNotice>}
+          <WeeklyCalendar faculty={faculty} />
           <div className="grid gap-6 lg:grid-cols-3">
             <ProfileSection icon={BriefcaseBusiness} title="Specialization">
               <p className="text-sm leading-relaxed text-slate-600">{faculty.specialization}</p>
@@ -390,7 +391,6 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
 
           <ExpertiseEditor faculty={faculty} onChanged={onSaved} />
 
-          <WeeklyCalendar faculty={faculty} />
         </div>
       </Modal>
       {showCvAssistant && <FacultyAssignmentProfile faculty={faculty} onClose={() => setShowCvAssistant(false)} />}
