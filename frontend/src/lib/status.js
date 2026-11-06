@@ -17,7 +17,7 @@ export const STATUS_GROUPS = {
     "Published","Sent to Registrar","Entered","Answered","Revisions confirmed","Dean Reviewed",
     "Subject Tagged - Registrar Preparation","Acknowledged","Registrar Received"],
   // Amber: waiting for someone, or being reviewed.
-  warning: ["At Risk of Delay","On Leave","Withdrawal In Progress","LOA","Deferred","Defense Deferred","Under deliberation",
+  warning: ["At Risk of Delay","On Leave","Withdrawal In Progress","LOA","Leave of Absence","Deferred","Defense Deferred","Under deliberation",
     "Not entered","Pending Staff Action","Pending Review","MOA Under Review","Under Review","Dean Review","For Dean Review",
     "Ready for Dean Review","Pending Handoff","Needs Review","Pending","INC","Incomplete","Pending staff verification",
     "Pending panel matching","Pending confirmed schedule","Pending Subject Tag","Pending Excel Export","Sync pending",
@@ -29,7 +29,7 @@ export const STATUS_GROUPS = {
     "Missing Requirements","Additional Certificates Requested","Hours Incomplete","Re-enrollment Required",
     "Requirements Pending","Needs Availability","Awaiting revisions","Waiting on you"],
   // Red: refused, failed, or gone wrong.
-  danger: ["Delayed","AWOL","AWOL Declared","Denied","Return Denied","Declined","Not approved","Not Cleared","Not met","Fail",
+  danger: ["Delayed","AWOL","AWOL (absent without leave)","AWOL Declared","Denied","Return Denied","Declined","Not approved","Not Cleared","Not met","Fail",
     "Failed","Missing","Overdue","Not Enough Evidence","Blocked","Not Accepted - New Organization Required",
     "Re-defense Required","Expired"],
   // Blue: sent in or open, work is under way.

@@ -37,7 +37,7 @@ async function shot(page, name) {
 }
 
 const open = async (page, name) => {
-  const opener = page.getByRole("button", { name: `View details for ${name}`, exact: true });
+  const opener = page.getByRole("button", { name: `View details for ${name}`, exact: true }).first(); // F7-02: the seed has two students named Adrian Lim
   await opener.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toHaveCount(1);
@@ -404,8 +404,9 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       await page.route(/\/api\/process-cases\?slug=withdrawal/, async (route) => {
         const response = await route.fetch();
         const json = await response.json();
+        let tagged = false; // F7-02: two seeded students are named Adrian Lim; tag only the first so the panel counts 1
         json.cases = json.cases.map((item) =>
-          item.student.name === "Adrian Lim"
+          item.student.name === "Adrian Lim" && !tagged && (tagged = true)
             ? {
                 ...item,
                 status: "Subject Tagged - Registrar Preparation",
