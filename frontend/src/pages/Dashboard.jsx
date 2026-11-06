@@ -157,7 +157,7 @@ export default function Dashboard() {
       actionsAll={
         researchReady?.total > readyItems.length
           ? { to: researchReady.view_all, label: `View all ${researchReady.total} ready students` }
-          : actions.total > actions.items.length ? { to: queue, label: `View all ${actions.total}` } : undefined
+          : taskActions.total > taskActions.items.length ? { to: queue, label: `View all ${taskActions.total}` } : undefined
       }
       waiting={{
         title: "Waiting on others",

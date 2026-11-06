@@ -96,6 +96,61 @@ class F7Tests(unittest.TestCase):
                     bad.append((st.name, st.current_stage))
             self.assertEqual(bad, [])
 
+    # ---- F7-04
+    def test_student_policy_answer_names_the_ops_manual_in_plain_words(self):
+        from app import _student_plain_policy
+        text = "Stop coming?\nSource: USLS Graduate School Operations Manual (Proposed › 4.6.6 Exceptions and unusual cases)"
+        out, _ = _student_plain_policy(text, [])
+        self.assertNotIn("Source:", out)
+        self.assertNotIn("Proposed", out)
+        self.assertIn("Answer from the USLS Graduate School Operations Manual, 4.6.6 Exceptions and unusual cases", out)
+        out, _ = _student_plain_policy("x\nSource: Graduate School Handbook (p. 54)", [])
+        self.assertIn("Answer from the Graduate School Handbook, p. 54", out)
+
+    # ---- F7-06
+    def test_withdrawn_student_is_not_stalled_nor_in_the_graduation_loop(self):
+        import app as appmod
+        with app.app_context():
+            rows = appmod.portfolio_recommendations(limit=1000)["items"]
+            stalled = [r for r in rows if r["code"] == "stalled"]
+            self.assertTrue(stalled, "seed has no stalled student to test with")
+            sid = stalled[0]["student_id"]
+            student = db.session.get(Student, sid)
+            old = student.current_stage
+            seen = []
+            real = appmod.graduation_eligibility
+            appmod.graduation_eligibility = lambda st, *a, **k: (seen.append(st.id), real(st, *a, **k))[1]
+            try:
+                student.current_stage = "Withdrawn"
+                db.session.flush()
+                after = appmod.portfolio_recommendations(limit=1000)["items"]
+                appmod._graduation_forecast_report()
+            finally:
+                appmod.graduation_eligibility = real
+                student.current_stage = old
+                db.session.flush()
+            self.assertFalse([r for r in after if r["student_id"] == sid and r["code"] == "stalled"])
+            self.assertNotIn(sid, seen)
+
+    # ---- F7-08
+    def test_declined_panelist_cannot_accept_again(self):
+        with app.app_context():
+            inv = PanelInvitation.query.first()
+            inv_id, fid = inv.id, inv.faculty_id
+            inv.status = "Declined"
+            db.session.commit()
+            fac_account = UserAccount.query.filter_by(role="faculty", faculty_id=fid).first()
+        self.assertIsNotNone(fac_account)
+        client = app.test_client()
+        with client.session_transaction() as session:
+            session["account_id"] = fac_account.id
+            session["role"] = "faculty"
+        resp = client.post(f"/api/faculty-portal/panel-invitations/{inv_id}/respond", json={"response": "accept"})
+        self.assertEqual(resp.status_code, 409, resp.get_data(as_text=True))
+        self.assertIn("send the invitation again", resp.get_json()["error"])
+        with app.app_context():
+            self.assertEqual(db.session.get(PanelInvitation, inv_id).status, "Declined")
+
 
 if __name__ == "__main__":
     unittest.main()

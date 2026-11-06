@@ -9,6 +9,7 @@ import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters"
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
 import { CaseCardFacts, CaseCardShell, NextOwner, PanelStamp, StageColumnHeader } from "../../components/process";
 import { formatClock, formatDate } from "../../lib/format";
+import ListExportButtons from "../../components/ListExportButtons";
 import RecordForPanelDialog from "./RecordForPanelDialog";
 
 // The Research Gate as a board (I-205, I-362): three numbered columns, one card per student. A student sits in the column of the
@@ -199,6 +200,13 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
           <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
             <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={rows.length} total={allRows.length} noun="students" />
           </BoardFilterRow>
+          <ListExportButtons
+            title="Research Gate"
+            subtitle={`${rows.length} of ${allRows.length} students`}
+            filename="research-gate"
+            columns={["Student ID", "Student name", "Program", "Stage", "Status", "Waiting on", "Why"]}
+            rows={rows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.stage || "", STATE_LABEL[row.state] || "", row.waiting_on || "", row.reason || ""])}
+          />
           {view === "board" ? (
             loading && !data ? <SkeletonBoard columns={COLUMNS.length} label="Loading the Research Gate board" /> : <StageBoard
               ariaLabel="Research Gate board"

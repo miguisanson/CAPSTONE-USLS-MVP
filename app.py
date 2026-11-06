@@ -6423,7 +6423,7 @@ def portfolio_recommendations(limit: int = 150) -> dict:
     entered = stage_entered_map()
     stalled = [
         (stage_days(s, entered), s)
-        for s in Student.query.filter(Student.standing == "Active", Student.current_stage != "Completed").all()
+        for s in Student.query.filter(active_student_clause()).all()
     ]
     for d, s in sorted((item for item in stalled if item[0] >= STALL_WARN_DAYS), key=lambda item: -item[0]):
         owner = "Research Coordinator" if s.current_stage in (
@@ -13099,7 +13099,7 @@ def _graduation_forecast_report() -> dict:
         )
     students = (
         Student.query
-        .filter(Student.standing == "Active", Student.current_stage != "Completed")
+        .filter(active_student_clause())
         .order_by(Student.last_name.asc(), Student.first_name.asc())
         .all()
     )
@@ -13233,8 +13233,9 @@ ASSISTANT_OFFLINE_MODES = {
 def _student_plain_policy(answer: str, citations: list[dict]) -> tuple[str, list[dict]]:
     """A student reads "Answer from the Graduate School Handbook, p. 54" and "Graduate School practice (being finalised)",
     never the office wording about draft validation or a "Source:" line (I-392)."""
-    answer = re.sub(r"Source: (Graduate School Handbook[^(\n]*?) \(p\. (\d+)[^)\n]*\)", r"Answer from the \1, p. \2", answer)
     answer = answer.replace(POLICY_DRAFT_WARNING, "Graduate School practice (being finalised)").replace(" (draft for validation)", "")
+    answer = re.sub(r"Source: (Graduate School Handbook[^(\n]*?) \(p\. (\d+)[^)\n]*\)", r"Answer from the \1, p. \2", answer)
+    answer = re.sub(r"Source: ([^(\n]+?) \((?:(?:Proposed|Official) › )?([^)\n]+)\)", r"Answer from the \1, \2", answer)  # Operations Manual and any other title (F7-04)
     plain = []
     for citation in citations:
         citation = dict(citation)
@@ -22558,6 +22559,8 @@ def register_routes(app: Flask) -> None:
         reason = re.sub(r"\s+", " ", str(data.get("reason") or "")).strip()[:500]
         student = row.student
         defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(row.gate, "defense")
+        if response == "accept" and row.status == "Declined":
+            return jsonify({"error": "This invitation was declined. Ask the Research Coordinator to send the invitation again."}), 409
         if response == "accept":
             row.status, row.reason, row.responded_at = "Accepted", None, now_utc()
             close_research_tasks(row.student_id, prefix=f"Replace declined panelist: {faculty.name}")
@@ -28025,7 +28028,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
         if slug == "research-gate":
             context["research_prerequisite"] = comprehensive_exam_eligibility(selected_student)
             research_case, progress = sync_research_progress(selected_student)
-            context["research_case"] = research_case_dict(research_case)
+            context["research_case"] = research_case_dict(research_case, progress)
             context["research_progress"] = progress
             context["research_vocabulary"] = RESEARCH_VOCABULARY
             context["current_milestone"] = progress["milestone"]
