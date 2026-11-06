@@ -1,5 +1,26 @@
 # State
 
+## PAUSED 2026-11-06 ~14:10 by the owner (playing a game) — resume here
+
+- Branch `v6.4.1-test` @ 405c0064, pushed. Today merged: f7, r5ui, audit5, srv6, lists5, ux6, srv7, awol6, stu6, gate6, f8,
+  a11y6, lists6, rep6 + inline fixes (I-402, I-422, p85/p101/p126 specs, calendar test, e2e server temp folders).
+  Details `.planning/CHANGELOG-2026-11-06.md`. Persona rounds 5-6 done (all 9 cards once more) -> I-396..I-431.
+- In flight when paused: `pkt/alumni` (worktree `CAPSTONE-USLS-MVP-wt/alumni`, WIP commit pushed as branch `pkt/alumni`):
+  seeds ~6 past graduates (Completed) to carry the seeded graduation history (fixes 3 red tests: test_process_logic
+  two_earlier_terms, test_seedfix x2), I-421 (P1: Title Defense card said "Panel is in place" with 0 of 3 panelists ->
+  panel-first state/next_step), and p62 "daily changes" (fresh seed has 0 Registrar changes dated today). Its targeted
+  Python run was 180 OK; e2e not run; not reviewed. Resume: review the WIP diff, run its e2e list (p77, p119, p73,
+  p134-srv6, p133-rc5, p121, p62, p85 + graduation/research-gate guide specs) with `USLS_E2E_TMP=... E2E_PORT=...`, merge.
+- Then: next app.py packet = I-427 (student assistant offline answer: short answer first, one Sources line, no
+  "(Proposed)"/"see 4.8"/"being finalised", a "What you can do" link; hide "Gemini"/"keyword match" from students),
+  I-418 ("Year 1" from `student_brief` course_year_label), I-423 (confirmed defenses 6 vs calendar 3, availability words,
+  Overloaded suggested chair, rank vs score), server texts left by stu6 (research_lock_status, withdrawal fee text).
+- Then full gates: Python in `wt/gate` (detach to the final commit), full e2e `cd frontend && node scripts/e2e.mjs test
+  --build` then `--project=autopilot --no-deps`; push. Last full Python gate: 751a6599, 1,276 tests, 3 fail (alumni fixes)
+  + 1 error (fixed 484b2ac8).
+- Rules learned today: every e2e run sets its own `USLS_E2E_TMP` and `E2E_PORT`; run `npm run check:ui` after ANY inline
+  frontend text edit (the pronoun check blocks "them"); stop finished helpers with TaskStop (their sleep timers keep firing).
+
 ## 2026-11-06 - loop resumed (session "v6.4.1 polish loop, day 2")
 
 - Branch `v6.4.1-test` @ 056e5cf0 pushed. Today merged: f7 (Fable 3 fixes), r5ui, audit5 (Course Audit page), srv6
