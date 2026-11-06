@@ -24,6 +24,12 @@ Plain list of what landed today. Rows are in `.planning/ISSUES.md`.
 - Targeted e2e on cf15996e: 86 passed, 1 failed (p126-follow5: two seeded students named Adrian Lim since F7-02) -> spec
   fixed 26369af2, 12/12.
 
+- MERGED 042fe179 `pkt/srv6`: the homes' "At risk or delayed" counts active students, like Reports (I-403); plain words in
+  the graduation report and class list (I-404); Panel Matching and Defense Scheduling list who is waiting (I-064).
+- MERGED 056e5cf0 `pkt/lists5`: Students list fits at 125% zoom, wide tables show a scroll edge, compre hint in its column,
+  Business Rules says "Not checked by the system" and shows rule codes to the admin only (I-406, I-410, I-411).
+- Persona round 6 (thesis student): I-412..I-415.
+
 ## In progress
 
-- `pkt/lists5` (I-406, I-410, I-411), `pkt/srv6` (I-403, I-404, I-064). Full Python gate on 751a6599 in `wt/gate`.
+- `pkt/ux6` (I-415, I-398, I-399, I-405), `pkt/srv7` (I-412, I-413, I-414), Fable review 4. Full Python gate on 751a6599.

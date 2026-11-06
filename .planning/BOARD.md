@@ -1,5 +1,13 @@
 # USLS GS Platform — board
 
+## Final polish loop day 2 (2026-11-06, branch `v6.4.1-test`)
+
+**Done so far today:** Fable review 3 fixes merged (research status shown live everywhere, graduation history only on
+finished students, export/print on every board). Six persona tests found 20 rough spots; most are fixed: Course Audit now
+shows the subject roster and who is missing subjects; Panel Matching and Defense Scheduling list who is waiting; one
+"at risk" number everywhere; plainer words on reports, calendar, advisee list and Business Rules. Details:
+`.planning/CHANGELOG-2026-11-06.md`. **Running:** two more fix packets and Fable review 4.
+
 ## Final polish loop (2026-11-05, branch `v6.4.1-test`) — submission 2026-11-07
 
 **Done today:** a Fable review of the whole app, then 11 packets merged. Wording is plain everywhere and an automatic check

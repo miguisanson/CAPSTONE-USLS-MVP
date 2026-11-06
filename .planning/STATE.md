@@ -2,11 +2,14 @@
 
 ## 2026-11-06 - loop resumed (session "v6.4.1 polish loop, day 2")
 
-- Branch `v6.4.1-test`. Stale merged worktrees removed (16); left: `wt/f7`, `wt/gate`.
-- Running: `pkt/f7` in `wt/f7` (Sonnet: F7-01..09 from `.planning/research/FABLE-REVIEW3-2026-11-05.md`, on top of WIP 1e06453a);
-  persona round 5 (dean-phone, faculty-rare) on the persona server :5440 (reports `E:/Temp/claude/persona-uat/r5-*`).
-- Next: review + gate f7, merge; full Python gate (Lenovo via `run-job.sh --worker lenovo`, or `wt/gate`); full e2e `--build` +
-  autopilot; push; file persona rows; ISSUES triage of stale `confirmed` rows (I-040, I-091, I-129 look fixed).
+- Branch `v6.4.1-test` @ 056e5cf0 pushed. Today merged: f7 (Fable 3 fixes), r5ui, audit5 (Course Audit page), srv6
+  (I-403/I-404/I-064), lists5 (I-406/I-410/I-411) + small fixes. Details `.planning/CHANGELOG-2026-11-06.md`.
+- Persona rounds 5-6 (dean-phone, faculty-rare, staff-rushed, coordinator-academic, student-thesis) -> I-396..I-415.
+- Running: `pkt/ux6` in `wt/ux6` (I-415 focus, I-398, I-399, I-405; frontend), `pkt/srv7` in `wt/srv7` (I-412 "Ready to
+  Schedule", I-413, I-414; owns app.py), Fable review 4 (read-only -> `E:/Temp/claude/fable4/`, copy into `.planning/research/`).
+  Full Python gate on 751a6599 in `wt/gate` -> `E:/Temp/claude/pygate-751a.log`. Persona server :5440 may still run.
+- e2e: always set `USLS_E2E_TMP=<own folder>` and `E2E_PORT=<free port>` per worktree (server.mjs now keeps fresh folders).
+- Next: merge ux6/srv7, Fable 4 fixes, full e2e `--build` + autopilot, final Python gate, push; more persona rounds.
 
 ## PAUSED 2026-11-05 night by the owner (to play a game) — resume here
 
