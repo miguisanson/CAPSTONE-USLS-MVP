@@ -1,13 +1,13 @@
 // One report (IM20): its filters, a sortable and paged table of the rows the API gives, and the two downloads.
 // The columns come from the API, so the screen, the Excel file and the PDF always show the same fields. The downloads
 // are plain links to the same address with the same filters plus `format`, so they hold exactly the rows on screen.
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, FileSpreadsheet, FileText } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
 import { Button, DataTable, EmptyState, SectionCard, SkeletonTable, StatusChip } from "../../components/ui/index.js";
-import { formatDate } from "../../lib/format";
+import { formatDate, todayISO } from "../../lib/format";
 import ReportFilters from "./ReportFilters.jsx";
 
 const STATUS_COLUMNS = new Set(["risk", "level", "eligibility", "when", "batch_status", "kind"]);
@@ -61,6 +61,14 @@ export default function ReportPanel({ report, params, setParam, clearFilters }) 
   }, [report, params]);
   const queryKey = JSON.stringify(query);
   const { data, loading, error } = useApi(() => api.report(report.id, query), [report.id, queryKey]);
+  // I-407: the same Downloaded line the other lists show; the server names the file usls-gs-report-ID-DATE.EXT
+  const [done, setDone] = useState("");
+  useEffect(() => {
+    if (!done) return undefined;
+    const timer = setTimeout(() => setDone(""), 5000);
+    return () => clearTimeout(timer);
+  }, [done]);
+  const announce = (ext) => () => setDone(`Downloaded usls-gs-report-${report.id}-${todayISO()}.${ext}`);
 
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load this report" hint={error} />;
   if (!data) return <SkeletonTable />;
@@ -69,8 +77,9 @@ export default function ReportPanel({ report, params, setParam, clearFilters }) 
   const filtered = Object.keys(query).length > 0;
   const downloads = count > 0 ? (
     <div className="flex flex-wrap gap-2">
-      <Button as="a" href={api.reportDownloadUrl(report.id, query, "xlsx")} download variant="secondary" icon={FileSpreadsheet}>Download Excel</Button>
-      <Button as="a" href={api.reportDownloadUrl(report.id, query, "pdf")} download variant="secondary" icon={FileText}>Download PDF</Button>
+      <Button as="a" href={api.reportDownloadUrl(report.id, query, "xlsx")} download onClick={announce("xlsx")} variant="secondary" icon={FileSpreadsheet}>Download Excel</Button>
+      <Button as="a" href={api.reportDownloadUrl(report.id, query, "pdf")} download onClick={announce("pdf")} variant="secondary" icon={FileText}>Download PDF</Button>
+      <span role="status" className="self-center text-xs font-semibold text-emerald-700">{done}</span>
     </div>
   ) : (
     <div className="flex flex-wrap gap-2">
