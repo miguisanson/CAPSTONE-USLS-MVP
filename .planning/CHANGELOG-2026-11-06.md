@@ -39,6 +39,12 @@ Plain list of what landed today. Rows are in `.planning/ISSUES.md`.
 - Full Python gate on 751a6599: 1,276 tests, 3 failed (seeded graduation history empty since F7-02 -> F8-04 in f8) + 1
   error (calendar test date-dependent on Fridays -> fixed 484b2ac8).
 
+- MERGED 1d7f2b0d `pkt/alumni` (**RESEED NEEDED**): six past graduates carry the seeded graduation history; a defense
+  without a matched panel waits for Panel Matching (I-421, P1); the Registrar's daily list has today's changes.
+- MERGED a1770666 a11y6 (I-429, I-431), b8cc4e38 lists6 (I-430, F8-06), f49d1216 rep6 (I-407: Graduation tab, download line).
+- Full e2e on bc28e87f: 1,082 passed, 14 failed (specs following today's changes, being fixed in `pkt/fix8`), 34 did
+  not run; autopilot project 34/34 passed.
+
 ## In progress
 
 - `pkt/ux6` (I-415, I-398, I-399, I-405), `pkt/srv7` (I-412, I-413, I-414), Fable review 4. Full Python gate on 751a6599.
