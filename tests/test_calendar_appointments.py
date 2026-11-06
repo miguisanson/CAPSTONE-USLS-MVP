@@ -910,7 +910,7 @@ class CalendarEventTests(CalendarDataBase):
         day = future_weekday(14)
         client = self.faculty_client("Chair Person")
         client.post("/api/faculty-portal/availability/exceptions", json={"kind": "unavailable", "start_date": day.isoformat(), "note": "Travel"})
-        body = self.calendar(client, **self.window(day, 2, 2), layers="availability")
+        body = self.calendar(client, **self.window(day, 2, 4), layers="availability")  # +4: after a Friday the next weekday is 3 days on
         layer = {entry["date"]: entry for entry in body["availability"]}
         self.assertEqual(layer[day.isoformat()]["windows"], [])
         self.assertEqual(layer[day.isoformat()]["blocked"][0]["note"], "Travel")
