@@ -252,6 +252,14 @@ export default function Layout({ children }) {
   const current = findNavItem(PORTAL_NAV[user?.role] || NAV_GROUPS, location.pathname);
   const pageTitle = current ? withoutStep(current.item.label) : FALLBACK_LABELS[location.pathname] || null;
 
+  // I-415: after a route change the focus moves to the page (not the sidebar link). Not on first load, and not when only the query string changes.
+  const firstPath = useRef(location.pathname);
+  useEffect(() => {
+    if (firstPath.current === location.pathname) return;
+    firstPath.current = location.pathname;
+    document.getElementById("main-content")?.focus({ preventScroll: true });
+  }, [location.pathname]);
+
   // The menu is a small-screen control: if the window grows to desktop width while it is open, close it
   // (the old drawer was lg:hidden).
   useEffect(() => {

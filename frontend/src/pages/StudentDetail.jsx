@@ -76,19 +76,17 @@ function CourseAuditTiles({ audit }) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {AUDIT_TILES.map((tile) => {
           const count = audit[tile.key].length;
-          const card = <StatCard size="sm" label={tile.label} value={count} tone={tile.tone} sub={count ? (openKey === tile.key ? "Hide subjects" : "Show subjects") : undefined} />;
-          return count ? (
-            <button
-              key={tile.key}
-              type="button"
-              aria-expanded={openKey === tile.key}
-              aria-controls="course-audit-subjects"
-              onClick={() => setOpenKey(openKey === tile.key ? "" : tile.key)}
-              className="block h-full w-full cursor-pointer rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-            >
-              {card}
-            </button>
-          ) : <div key={tile.key}>{card}</div>;
+          const open = openKey === tile.key;
+          return (
+            <div key={tile.key} className="flex h-full flex-col gap-2">
+              <div className="flex-1"><StatCard size="sm" label={tile.label} value={count} tone={tile.tone} /></div>
+              {count > 0 && (
+                <Button variant="secondary" aria-expanded={open} aria-controls="course-audit-subjects" onClick={() => setOpenKey(open ? "" : tile.key)}>
+                  {open ? "Hide subjects" : "Show subjects"}
+                </Button>
+              )}
+            </div>
+          );
         })}
       </div>
       {chosen && (
@@ -168,7 +166,7 @@ export default function StudentDetail() {
 
       <Card>
         <div className="flex flex-wrap items-center gap-2">
-          {student.monitoring_new_student && (
+          {student.monitoring_new_student && ["Admission", "Coursework"].includes(student.current_stage) && !course_audit.completed_units && (
             <StatusChip status="New Student" tone="success" dot={false} label={<><UserPlus className="h-3.5 w-3.5" aria-hidden="true" /> New Student</>} />
           )}
           {student.current_stage && <StatusChip status={student.current_stage} tone="neutral" dot={false} />}
