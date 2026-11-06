@@ -58,7 +58,7 @@ class Srv6Tests(unittest.TestCase):
         self.assertTrue(rows)
         for row in rows:
             self.assertNotIn("workflow", row["missing"].lower(), row["student"])
-            self.assertNotIn("record on file", row["missing"], row["student"])
+            # F8-05: "(no ... record on file)" is kept on a line whose record does not exist, so it is never read as a failed defense
         with app.app_context():
             from app import Student, program_allows_practicum
             no_practicum = {s.name for s in Student.query.all() if not program_allows_practicum(s.program)}

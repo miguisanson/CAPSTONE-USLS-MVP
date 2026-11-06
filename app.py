@@ -8034,6 +8034,7 @@ def leave_declare_awol(case: LeaveCase, account: UserAccount | None, comment: st
         account=account,
     )
     ensure_task(student.id, "Review automatic AWOL policy alert", "Academic Coordinator", ph_today(), 85)
+    tell_student_marked_awol(student, awol)
     add_log(
         "awol", student.id, leave_actor(account)["log_actor"], f"Leave case #{case.id}",
         "Student marked AWOL after a leave that ended with no return", "Academic Coordinator",
@@ -9360,6 +9361,7 @@ def sync_automatic_awol_statuses(*, commit: bool = False) -> int:
                 ph_today(),
                 85,
             )
+            tell_student_marked_awol(student, latest)
             workflow_message_record(
                 "awol",
                 student,
@@ -19930,6 +19932,41 @@ def register_routes(app: Flask) -> None:
             "students": students,
         })
 
+    @app.route("/api/course-audit/missing")
+    @require_api_login("staff", "academic_coordinator")
+    def course_audit_missing():
+        """F8-02: per active student of one program, the subjects the real course audit still counts as missing
+        (never taken or failed; subjects being taken now are not missing), in curriculum order. Read-only."""
+        programs = Program.query.order_by(Program.code).all()
+        program_id = request.args.get("program_id", type=int)
+        program = next((p for p in programs if p.id == program_id), None) or (programs[0] if programs else None)
+        term = get_active_term()
+        if not program:
+            return jsonify({"programs": [], "program_id": None, "term_label": term.label if term else "", "items": []})
+        required = monitoring_curriculum_courses(program)
+        records: dict[int, dict] = {}
+        for rec in CourseRecord.query.filter(CourseRecord.course_id.in_([c.id for c in required])).all():
+            records.setdefault(rec.student_id, {})[rec.course_id] = rec
+        items = []
+        for student in Student.query.filter(Student.program_id == program.id, active_student_clause()).order_by(
+            Student.last_name, Student.first_name,
+        ).all():
+            audit = compute_course_audit(student, records=records.get(student.id, {}), required_courses=required)
+            if not audit["missing_count"]:
+                continue
+            owed = {row["course"].id for row in audit["missing"] + audit["incomplete"]}
+            codes = [c.code for c in required if c.id in owed]  # curriculum order
+            items.append({
+                "id": student.id, "name": student.name, "student_number": student.student_number,
+                "program_code": program.code, "missing_count": audit["missing_count"],
+                "missing_codes": codes, "next_codes": codes[:2],
+            })
+        items.sort(key=lambda row: (-row["missing_count"], row["name"]))
+        return jsonify({
+            "programs": [{"id": p.id, "code": p.code, "name": p.name} for p in programs],
+            "program_id": program.id, "term_label": term.label if term else "", "items": items,
+        })
+
     @app.route("/api/monitoring/class-list")
     @require_api_login("staff", "academic_coordinator")
     def monitoring_class_list():
@@ -27011,11 +27048,12 @@ def graduation_research_next_action(checklist: list[dict]) -> str:
 def graduation_missing_text(item: dict) -> str:
     """One unmet checklist line in the words of the Graduation candidates report (I-404)."""
     label = item["label"]
+    no_record = f" ({GRADUATION_NO_RECORD_TEXT.get(item['key'], 'no research record on file')})" if item["passed"] is None else ""
     if item["key"].startswith("research_"):
-        return f"{label.removesuffix(' workflow')} not passed yet"
+        return f"{label.removesuffix(' workflow')} not passed yet{no_record}"  # F8-05: no record is not a failed defense
     if item["key"] == "practicum":
-        return "Practicum not completed yet"
-    return label + (f" ({GRADUATION_NO_RECORD_TEXT.get(item['key'], 'no research record on file')})" if item["passed"] is None else "")
+        return f"Practicum not completed yet{no_record}"
+    return label + no_record
 
 
 def report_graduation(args) -> dict:
@@ -32001,6 +32039,30 @@ def accounts_for_student(student_id: int | None) -> list[UserAccount]:
     if not student_id:
         return []
     return UserAccount.query.filter_by(student_id=student_id, role="student", active=True).all()
+
+
+AWOL_FLAG_RESULT = "The Graduate School marked you absent without leave"
+AWOL_FLAG_BODY = (
+    "The Graduate School has no enrollment for you this semester and has marked you as absent without leave. "
+    "You are still a student. Open Return from AWOL to tell the Graduate School you are coming back."
+)
+
+
+def tell_student_marked_awol(student: Student, awol: AwolCase | None) -> None:
+    """I-417: the flagged student gets one bell notice and one Activity Log line in calm words (no e-mail).
+    Idempotent per AWOL case, so the repeated automatic checks never add a second one."""
+    db.session.flush()
+    key = f"awol-flag:{student.id}:{awol.id if awol else 0}"
+    notify_many(
+        accounts_for_student(student.id), "awol_flag", AWOL_FLAG_RESULT, AWOL_FLAG_BODY,
+        link=STUDENT_PAGE_FOR_WORKFLOW["awol-return"], related_type="awol", related_id=student.id, dedupe_key=key,
+    )
+    source = f"AWOL case #{awol.id}" if awol else "AWOL check"
+    if not TransactionLog.query.filter_by(student_id=student.id, transaction_slug="awol", source_reference=source, result=AWOL_FLAG_RESULT).first():
+        add_log(
+            "awol", student.id, "Workflow System", source, AWOL_FLAG_RESULT, "Student", AWOL_FLAG_BODY,
+            new_status="AWOL Declared", visibility="student_visible",
+        )
 
 
 def accounts_for_faculty(faculty_id: int | None) -> list[UserAccount]:
@@ -37466,7 +37528,7 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
     student_owner, academic, research = ROLE_LABELS["student"], ROLE_LABELS["academic_coordinator"], ROLE_LABELS["research_coordinator"]
     pending = [item for item in milestone["requirements"] if item["status"] != "Complete"]
     state, owner, reason = "done", None, "Every requirement for this stage is complete."
-    first_type = ""
+    next_step = None  # F8-08: only the two branches that mean "panel" / "schedule" set it
     by_status = {
         "Revisions Pending": ("blocked", student_owner, "Revisions requested after the defense; the student has to submit the revised paper."),
         "Revisions Submitted - Awaiting Confirmation": ("waiting", "Panel chair", "Revised paper submitted; the panel chair has to confirm it."),
@@ -37481,7 +37543,6 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
         missing = [item["label"] for item in pending if item["student_upload"] and item["status"] == "Missing"]
         submitted = next((item for item in pending if item["status"] == "Submitted"), None)
         first = next((item for item in pending if item["source_type"] != "student_upload"), pending[0])
-        first_type = first["source_type"]
         if locked and case is None:
             return None  # merge v6.4 (M6): a student without a research case whose research is still locked is not at the gate yet
         if locked:
@@ -37498,8 +37559,10 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
             state, owner, reason = "waiting", academic, "Form 1 is waiting for the Academic Coordinator's endorsement."
         elif first["source_type"] == "system_panel":
             state, owner, reason = "ready", research, "Documents are in; the panel has not been matched yet."
+            next_step = "panel"
         elif first["source_type"].endswith("_schedule"):
             state, owner, reason = "ready", research, "Panel is in place; the defense has not been scheduled yet."
+            next_step = "schedule"
         elif first["source_type"] == "system_defense_result":
             state, owner, reason = "waiting", PANEL_VERDICT_WAITING_ON, "Defense is scheduled; the panel chair or Graduate School staff has not recorded the verdict yet."
         elif first["source_type"] == "ethics_clearance_record":
@@ -37512,7 +37575,7 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
         "gate": gate, "status": status,
         "state": state, "waiting_on": owner if state != "done" else None, "reason": reason,
         # I-064: the Research Coordinator's next move, so Panel Matching and Defense Scheduling can list who is waiting.
-        "next_step": ("panel" if first_type == "system_panel" else "schedule" if first_type.endswith("_schedule") else None) if state == "ready" else None,
+        "next_step": next_step,
         "research_title": case.title if case else None, "adviser_name": student.adviser_name,
         "column": 1 if gate == RESEARCH_GATE_TITLE else 2 if gate == RESEARCH_GATE_PROPOSAL else 3,
         "requirements": [{"label": item["label"], "met": item["status"] == "Complete"} for item in milestone["requirements"]],
@@ -41951,6 +42014,11 @@ def seed_report_history(today: date | None = None) -> int:
     for model in (LeaveCase, AwolCase, WithdrawalApplication, GraduationEndorsement, PracticumRecord, AdviserAppointment,
                   ScheduleRequest, DefenseVerdict, Task, TransactionLog, ResearchCase, WorkflowMessage):
         busy |= {sid for (sid,) in db.session.query(model.student_id).distinct().all() if sid}
+    # F8-04: a Completed student's own research rows are the story that made them Completed, so they do not rule the
+    # student out of a graduation history; any other row (leave, task, log, message, endorsement ...) still does.
+    busy_other: set[int] = set()
+    for model in (LeaveCase, AwolCase, WithdrawalApplication, GraduationEndorsement, Task, TransactionLog, WorkflowMessage):
+        busy_other |= {sid for (sid,) in db.session.query(model.student_id).distinct().all() if sid}
     pool = [
         s for s in Student.query.order_by(Student.id).all()
         if s.id not in busy and s.standing == "Active" and s.enrollment_tag == "Enrolled"
@@ -41958,8 +42026,8 @@ def seed_report_history(today: date | None = None) -> int:
     ]
     graduation_pool = [  # a graduation list only ever holds students who finished everything (F7-02)
         s for s in Student.query.order_by(Student.id).all()
-        if s.id not in busy and s.standing == "Active" and s.current_stage == "Completed"
-    ]
+        if s.id not in busy_other and s.standing == "Active" and s.current_stage == "Completed"
+    ][1:]  # the first Completed student stays clean: it is the "graduation-bianca" demo account (the Graduation demo applies from scratch)
     practicum_pool = [s for s in pool if program_allows_practicum(s.program)]
     pool = [s for s in pool if s not in practicum_pool]  # kept for the practicum reports
     faculty_ids = [f.id for f in Faculty.query.filter_by(active=True).order_by(Faculty.id).all()]
@@ -42993,6 +43061,7 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
             item.detection_source = "Demo imported AWOL standing"
             item.automatically_flagged_at = item.automatically_flagged_at or now_utc()
             item.updated_at = now_utc()
+            tell_student_marked_awol(student, item)
         return
 
     # Research starts at Title Defense with only its prerequisites complete.

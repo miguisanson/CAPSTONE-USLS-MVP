@@ -142,6 +142,12 @@ export function DataTable({
   const [innerSort, setInnerSort] = useState(null);
   const [innerSearch, setInnerSearch] = useState("");
   const [innerPage, setInnerPage] = useState(1);
+  const [downloaded, setDownloaded] = useState("");  // F8-07: same "Downloaded <file>" line as ListExportButtons (I-401)
+  useEffect(() => {
+    if (!downloaded) return undefined;
+    const timer = setTimeout(() => setDownloaded(""), 5000);
+    return () => clearTimeout(timer);
+  }, [downloaded]);
 
   const sortState = (sort !== undefined ? sort : innerSort) || null;
   const search = searchControlled ? searchable.value || "" : innerSearch;
@@ -211,7 +217,9 @@ export function DataTable({
     const lines = [fields.map((f) => csvCell(f.header)).join(",")];
     for (const row of processed) lines.push(fields.map((f) => csvCell(f.value(row))).join(","));
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
-    downloadBlob(blob, spec.filename || "export.csv");
+    const name = spec.filename || "export.csv";
+    downloadBlob(blob, name);
+    setDownloaded(`Downloaded ${name}`);
   }
 
   const showToolbar = Boolean(searchable || csv || toolbar);
@@ -279,6 +287,7 @@ export function DataTable({
               Export CSV
             </Button>
           )}
+          {csv && <span role="status" className="text-xs font-semibold text-emerald-700">{downloaded}</span>}
         </div>
       )}
 

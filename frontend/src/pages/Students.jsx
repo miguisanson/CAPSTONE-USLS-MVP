@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, SlidersHorizontal, GitMerge, AlertTriangle, ShieldCheck } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
+import { stageWords } from "../lib/stages";
 import { Button, Card, DataTable, InlineNotice, PageHeader, SearchInput, SectionCard, Select, StatusChip } from "../components/ui/index.js";
 import { initials } from "../lib/format";
 import { PAGE } from "../lib/labels.js";
@@ -52,7 +53,7 @@ const COLUMNS = [
       </>
     ),
   },
-  { key: "current_stage", header: "Stage", cell: (s) => <span className="block">{s.current_stage}</span> },
+  { key: "current_stage", header: "Stage", cell: (s) => <span className="block">{stageWords(s.current_stage)}</span> },
   { key: "enrollment_tag", header: "Enrollment", cell: (s) => (s.enrollment_tag ? <StatusChip status={s.enrollment_tag} size="sm" /> : null) },
   { key: "standing", header: "Standing", cell: (s) => <StatusChip status={s.standing} size="sm" /> },
   { key: "risk_level", header: "Risk", cell: (s) => <StatusChip status={s.risk_level} size="sm" /> },

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
+import { stageWords } from "../lib/stages";
 import { Button, Card, DataTable, EmptyState, HistoryPanel, PageHeader, SectionCard, Skeleton, StatCard, StatusChip, Stepper } from "../components/ui/index.js";
 import { ProgressBar } from "../components/ui/ProgressBar.jsx";
 import { formatDate, relativeDays, SEVERITY } from "../lib/format";
@@ -169,7 +170,7 @@ export default function StudentDetail() {
           {student.monitoring_new_student && ["Admission", "Coursework"].includes(student.current_stage) && !course_audit.completed_units && (
             <StatusChip status="New Student" tone="success" dot={false} label={<><UserPlus className="h-3.5 w-3.5" aria-hidden="true" /> New Student</>} />
           )}
-          {student.current_stage && <StatusChip status={student.current_stage} tone="neutral" dot={false} />}
+          {student.current_stage && <StatusChip status={student.current_stage} tone="neutral" dot={false} label={stageWords(student.current_stage)} />}
           {student.enrollment_tag && <StatusChip status={student.enrollment_tag} dot={false} />}
           {data.approved_leave && <StatusChip status="Leave" tone="info" dot={false} label={`${data.approved_leave.kind}: ${data.approved_leave.status}, ${data.approved_leave.period}`} />}
           <StatusChip status={student.standing} dot={false} />

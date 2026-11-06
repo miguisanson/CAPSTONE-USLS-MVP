@@ -50,7 +50,7 @@ test.describe("persona7", () => {
     });
     try {
       const main = page.locator("main");
-      await expect(main.getByText("The Graduate School is reviewing the automatic AWOL policy alert")).toBeVisible();
+      await expect(main.getByText("The Graduate School is reviewing the absence check")).toBeVisible();
       await expect(main.getByText("Review automatic AWOL policy alert", { exact: true })).toHaveCount(0);
       await expect(main).not.toContainText(/Due\s+Nov(ember)?\s+17/);
     } finally { await context.close(); }

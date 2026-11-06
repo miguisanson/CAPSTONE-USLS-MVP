@@ -66,7 +66,8 @@ for (const [role, path] of [["staff", "/workflow/graduation"], ["dean", "/dean/a
       const overview = page.getByRole("region", { name: "Created graduation batches" });
       await expect(overview).toBeVisible();
       await expect(overview).toContainText(/\d+ batches/);
-      await overview.getByRole("button", { name: /^Show all/ }).click(); // the overview lists four batches until asked for the rest
+      const showAll = overview.getByRole("button", { name: /^Show all/ });
+      if (await showAll.count()) await showAll.click(); // the overview lists four batches until asked for the rest (the seed's history may hold fewer)
       for (const [label, step] of [[BATCH, "Step 3"], [OTHER, "Step 5"]]) {
         const row = overview.getByRole("listitem").filter({ hasText: label });
         await expect(row, label).toHaveCount(1);
