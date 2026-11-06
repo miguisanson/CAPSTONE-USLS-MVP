@@ -57,6 +57,9 @@ async function api(context, path, params = PERIOD) {
   expect(res.status(), `GET /api/reports/${path}`).toBe(200);
   return res.json();
 }
+// The tile shows the all-offices count as "All offices: requests waiting ..." (I-400, ReportsFrame.jsx).
+const shownLabel = (tile) => (tile.key === "waiting" ? `All offices: ${tile.label.charAt(0).toLowerCase()}${tile.label.slice(1)}` : tile.label);
+
 async function open(page, path) {
   await page.goto(path);
   await expect(page.getByRole("heading", { level: 1, name: "Reports & Analytics" })).toBeVisible();
@@ -75,7 +78,7 @@ test.describe("staff Reports frame", () => {
     for (let i = 0; i < 6; i++) {
       const tile = summary.tiles[i];
       const button = buttons.nth(i);
-      await expect(button, tile.label).toContainText(tile.label);
+      await expect(button, tile.label).toContainText(shownLabel(tile));
       await expect(button, `${tile.label}: the value`).toContainText(tile.value == null ? "-" : String(tile.value));
       // The comparison is words (and an arrow icon), so it does not depend on colour.
       await expect(button.locator("[data-comparison]"), `${tile.label}: comparison`).toHaveText(/\S/);
@@ -91,7 +94,7 @@ test.describe("staff Reports frame", () => {
     const summary = await api(context, "summary");
     for (const key of ["active", "behind", "waiting"]) {
       const tile = summary.tiles.find((t) => t.key === key);
-      await strip(page).getByRole("button", { name: new RegExp(`^${tile.label}`) }).click();
+      await strip(page).getByRole("button", { name: new RegExp(`^${shownLabel(tile)}`) }).click();
       const dialog = page.getByRole("dialog", { name: tile.label });
       await expect(dialog).toBeVisible();
       const expected = tile.count ?? tile.value;
