@@ -368,6 +368,7 @@ export const api = {
     request("/course-adjustments/plan", { method: "POST", body: JSON.stringify(payload) }),
   facultyCvRag: (facultyId, question) =>
     request(`/faculty/${facultyId}/cv-rag`, { method: "POST", body: JSON.stringify({ question }) }),
+  courseAuditSubjects: () => request("/course-audit/subjects"),
   courseAuditRoster: (courseId, term = "") =>
     request(`/course-audit/roster?course_id=${courseId}${term ? `&term=${encodeURIComponent(term)}` : ""}`),
   flagMonitoringIssue: (studentId, payload = {}) =>

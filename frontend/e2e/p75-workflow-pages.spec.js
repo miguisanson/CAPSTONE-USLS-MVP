@@ -208,8 +208,8 @@ test.describe("Course Audit (staff)", () => {
     // There is no sidebar entry for this page (see the packet report); it is reached by its address.
     await page.goto("/workflow/course-audit");
     await expect(main(page).getByRole("heading", { level: 1, name: "Course Audit" })).toBeVisible();
-    await expect(main(page).getByRole("heading", { level: 2, name: "Course records are read-only" })).toBeVisible();
-    await expect(main(page).getByText("USLS grades remain in AIMS and are not encoded again in this portal.")).toBeVisible();
+    await expect(main(page).getByRole("heading", { level: 2, name: "Students with missing subjects" })).toBeVisible();
+    await expect(main(page).getByText("Completion comes from the AIMS export.")).toBeVisible();
     await expect(main(page).getByRole("link", { name: /Open Monitoring Sheet/ })).toHaveAttribute("href", "/monitoring-sheet");
     await expect(main(page).getByRole("link", { name: /Open Enrollment/ })).toHaveAttribute("href", "/enrollment");
     await shotsAt(page, "course-audit");

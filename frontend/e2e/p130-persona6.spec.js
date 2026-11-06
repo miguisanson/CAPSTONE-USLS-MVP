@@ -103,9 +103,8 @@ test.describe("academic coordinator", () => {
   test("Course Audit page names where the coordinator acts", async ({ page }) => {
     await page.goto("/workflow/course-audit");
     const main = page.locator("main");
-    await expect(main).toContainText("Course records are read-only");
-    await expect(main.getByRole("link", { name: "Course Adjustments" })).toHaveAttribute("href", /course-adjustments/);
-    await expect(main.getByRole("link", { name: "Students", exact: true })).toHaveAttribute("href", "/students");
+    await expect(main).toContainText("Students with missing subjects");
+    await expect(main.getByRole("link", { name: "Course Adjustments" }).first()).toHaveAttribute("href", /course-adjustments/);
   });
 
   test("Practicum card names do not break mid-word", async ({ page }) => {
