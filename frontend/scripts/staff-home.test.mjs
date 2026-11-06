@@ -135,7 +135,7 @@ test("key numbers, staff: own open tasks, students monitored, at risk or delayed
   assert.match(stats[1].sub, /100 active students/);
   assert.equal(stats[1].to, "/students");
   assert.equal(stats[2].value, 14);
-  assert.match(stats[2].sub, /3 delayed/);
+  assert.match(stats[2].sub, /3 of them delayed/);
   assert.match(stats[2].to, /^\/students\?risk=/);
   assert.equal(stats[3].value, 5);
   assert.match(stats[3].sub, /2 awaiting availability/);

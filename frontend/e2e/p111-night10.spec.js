@@ -48,6 +48,6 @@ test.describe("night10", () => {
     const tile = main(page).locator('[data-slot="label"]', { hasText: /^Your open tasks$/i }).locator("xpath=..");
     await expect(tile.locator('[data-slot="sub"]')).toHaveText(/\d+ tasks? past the due date/);
     const risk = main(page).locator('[data-slot="label"]', { hasText: /^Active students at risk or delayed$/i }).locator("xpath=..");
-    await expect(risk.locator('[data-slot="sub"]')).toHaveText(/delayed, active students$/);
+    await expect(risk.locator('[data-slot="sub"]')).toHaveText(/of them delayed$/);
   });
 });
