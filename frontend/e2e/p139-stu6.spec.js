@@ -37,7 +37,8 @@ test.describe("stu6 student wording", () => {
   });
 
   test("I-426 Subject Withdrawal says what happens after sending (nothing is submitted)", async ({ browser }) => {
-    const { context, page } = await open(browser, "/student/requests/withdrawal");
+    // p116 files a withdrawal for this student, which turns the form read-only; show the form as it is before any request.
+    const { context, page } = await open(browser, "/student/requests/withdrawal", (d) => { d.withdrawal_application = null; });
     const note = page.getByTestId("withdrawal-next");
     await expect(note).toContainText("Graduate School staff check the request");
     await expect(note).toContainText("Dean");

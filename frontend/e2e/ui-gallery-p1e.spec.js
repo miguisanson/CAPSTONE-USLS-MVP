@@ -188,7 +188,7 @@ for (const viewport of VIEWPORTS) {
     await expect(stopped, "an off-track stage shows one stopped step").toHaveCount(1);
     await expect(stopped.locator(".sr-only")).toHaveText(/Stopped/);
     const chip = stopped.locator("[data-status-tone]");
-    await expect(chip).toHaveText("LOA");
+    await expect(chip).toHaveText("Leave of Absence"); // lists6 (I-397, F8-06): the stopped step reads stageWords
     await expect(chip).toHaveAttribute("data-status-tone", "warning"); // lib/status.js: LOA = warning
     const sb = await box(stopped);
     expect(sb.x + sb.width, "the stopped chip stays inside the viewport").toBeLessThanOrEqual(viewport.width);

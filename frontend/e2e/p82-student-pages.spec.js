@@ -110,6 +110,12 @@ const THREAD = [
   { id: 8102, transaction_slug: "leave-of-absence", request_id: 41, thread_key: "loa:41", action_type: "response", status: "Answered", recipient_role: "Graduate School Staff", sender_role: "Student", sender_name: "Miguel Yu", comment: "Spec: it is attached now.", created_at: "2026-10-03T09:00:00", is_unread: false, stage: "Staff Review", reply_to_message_id: 8101 },
 ];
 
+// pkt/stu6 (I-425): one "subjects left" sentence on every student page (lib/studentHome.js subjectsLeftText).
+const subjectsLeft = (audit) => {
+  const left = audit.current.length + audit.missing_count;
+  return left ? `${left} subject${left === 1 ? "" : "s"} left: ${audit.current.length} this semester, ${audit.missing_count} still to take` : "No subjects left";
+};
+
 test.describe("P82 student pages (pinned)", () => {
   test("Home: header, four key numbers with their links, lifecycle and the one-line links", async ({ browser }) => {
     const { page, portal, finish } = await studentPage(browser);
@@ -125,7 +131,7 @@ test.describe("P82 student pages (pinned)", () => {
       expect([...labels].sort()).toEqual(["coursework", "research", "unread messages", "your open tasks"]);
       const audit = data.course_audit;
       await expect(stat(page, "Coursework").locator('[data-slot="value"]')).toHaveText(`${audit.completion_rate}%`);
-      await expect(stat(page, "Coursework").locator('[data-slot="sub"]')).toHaveText(`${audit.completed.length} completed, ${audit.missing_count} missing`);
+      await expect(stat(page, "Coursework").locator('[data-slot="sub"]')).toHaveText(`${audit.completed.length} completed. ${subjectsLeft(audit)}`);
       const own = (data.tasks || []).filter((t) => t.owner_role === "Student");
       await expect(stat(page, "Your open tasks").locator('[data-slot="value"]')).toHaveText(String(own.length));
       await expect(stat(page, "Your open tasks").locator('[data-slot="sub"]')).toHaveText(`${own.filter((t) => t.overdue).length} overdue`);
@@ -167,7 +173,7 @@ test.describe("P82 student pages (pinned)", () => {
       await expect(status.locator('ol [aria-current="step"]')).toContainText(data.student.current_stage);
       await expect(status).toContainText("Coursework completion");
       await expect(status).toContainText(`${data.course_audit.completion_rate}%`);
-      await expect(status).toContainText(`${data.course_audit.completed.length} completed, ${data.course_audit.current.length} current, ${data.course_audit.missing_count} missing.`);
+      await expect(status).toContainText(`${data.course_audit.completed.length} completed. ${subjectsLeft(data.course_audit)}.`);
       await expect(status).toContainText(data.research_case?.title || "No research case opened yet");
 
       const workflow = cardOf(page, "Workflow Status");
@@ -176,7 +182,8 @@ test.describe("P82 student pages (pinned)", () => {
       const curriculum = cardOf(page, "Curriculum progress");
       const audit = data.course_audit;
       await expect(curriculum).toContainText(`${audit.completed_units} / ${audit.total_units}`);
-      for (const [label, value] of [["Completed", audit.completed.length], ["Current", audit.current.length], ["Missing", audit.missing_count]]) {
+      // pkt/stu6 (I-425): the count labels are Completed, This semester, Still to take.
+      for (const [label, value] of [["Completed", audit.completed.length], ["This semester", audit.current.length], ["Still to take", audit.missing_count]]) {
         await expect(curriculum.getByText(label, { exact: true }).first().locator("xpath=..")).toContainText(String(value));
       }
       await expect(curriculum.getByRole("link", { name: "Enroll in subjects" })).toHaveAttribute("href", "/student/enrollment");

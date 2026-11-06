@@ -208,7 +208,8 @@ test.describe("I-204: an AWOL student reads where she stands", () => {
       await expect(main).toContainText("master's student you have until");
       await expect(main).not.toContainText("octorate");
       await expect(main.getByText("You cannot cancel this request yourself")).toHaveCount(0);
-      await expect(page.getByRole("alert").filter({ hasText: "Your record is marked AWOL" })).toHaveCount(1);
+      // awol6 (I-418): the AWOL notice is amber (warning), which is role="status"; only the danger tone is role="alert".
+      await expect(page.getByRole("status").filter({ hasText: "Your record is marked AWOL" })).toHaveCount(1);
       await expect(main.getByText("Not calculated")).toHaveCount(0);
       await page.screenshot({ path: join(SHOTS, "awol-return-1366.png"), fullPage: true });
       await page.setViewportSize({ width: 390, height: 844 });
@@ -223,7 +224,7 @@ test.describe("I-204: an AWOL student reads where she stands", () => {
     try {
       await ready(page, "/student/requests/leave-of-absence");
       const main = page.locator("main");
-      await expect(page.getByRole("alert").filter({ hasText: "Your record is marked AWOL" })).toHaveCount(1);
+      await expect(page.getByRole("status").filter({ hasText: "Your record is marked AWOL" })).toHaveCount(1);
       const link = main.getByRole("link", { name: /Open Return from AWOL/ });
       await expect(link).toHaveCount(1);
       await link.click();

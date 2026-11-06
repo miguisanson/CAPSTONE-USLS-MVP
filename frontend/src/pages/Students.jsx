@@ -229,7 +229,7 @@ export default function Students() {
           </div>
         </InlineNotice>
       ) : (
-        <div className="[&_td]:!px-2 [&_th]:!px-2"> {/* tighter cells so the eight columns fit at 125% zoom (I-406) */}
+        <div className="[&_td]:!px-1.5 [&_th]:!px-1.5"> {/* tighter cells so the eight columns fit at 125% zoom (I-406) */}
         <DataTable
           caption="Monitored graduate students"
           columns={COLUMNS}

@@ -214,7 +214,7 @@ test.describe("P4.1 shared student parts", () => {
       // the key numbers: label and value together (Coursework and Research; Stage moved into the lifecycle card)
       await expect(stat(page, "Coursework")).toContainText("16.7%");
       await expect(stat(page, "Research")).toContainText("Not started");
-      await expect(sectionOf(page, "Your lifecycle")).toContainText("You are at: LOA");
+      await expect(sectionOf(page, "Your lifecycle")).toContainText("You are at: Leave of Absence") // lists6 (I-430, F8-06): stage words on student pages;
 
       // the leave notice (tone warn) is now an action row, not a banner region
       const mine = sectionOf(page, "Needs your action");
@@ -585,7 +585,7 @@ test.describe("P4.1 shared student parts", () => {
       await expect(c.locator('[aria-current="step"]')).toContainText("AWOL flagged");
       await expect(c.getByRole("button", { name: /View messages/ })).toHaveCount(0);
       const history = c.getByRole("button", { name: /View stage history/ });
-      await expect(history).toContainText("1");
+      await expect(history).toContainText("2"); // pkt/f8 (I-417): a second, student-visible line says the student was flagged
       await history.click();
       await expect(c.getByText("Student automatically flagged AWOL", { exact: true })).toBeVisible();
       await expect(c).toContainText(/AWOL\W*AWOL Declared/);
