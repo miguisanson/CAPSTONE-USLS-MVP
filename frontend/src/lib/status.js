@@ -37,7 +37,7 @@ export const STATUS_GROUPS = {
     "MOA Submitted","MOA Received","Report Sent to Dean","Applied","Noted by AC","Uploaded","Invited","Rescheduled","Enrolled",
     "Current","Planned","Upcoming","Suggested","Practicum In Progress","Waiting for student submission","Requirements Verified",
     "Exported - Ready to Send","Approved - Follow-through","Approved - Registrar Preparation","Sent - Awaiting Receipt",
-    "Leave Scheduled","Residency","Eligible to take","Revisions submitted","Waiting"],
+    "Leave Scheduled","Residency","Eligible to take","Revisions submitted","Waiting","Ready to Schedule"],
   // Grey: closed, stopped, or not started.
   neutral: ["Not Yet Assessed","Withdrawn","Held","Ended","Closed","Archived","Not set","Waiting for student files",
     "Not taken","Not Taken","Not Started","Not Enrolled","Draft","Not Offered","No decision","Not Required","Not Eligible",

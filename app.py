@@ -24447,7 +24447,7 @@ def graduation_eligibility(student: Student) -> dict:
         next_action = "Verify the graduation research source data"
     elif research_missing:
         next_owner = "Research Coordinator"
-        next_action = "Resolve graduation missing research requirements"
+        next_action = graduation_research_next_action(checklist)
     elif practicum_required and not practicum_known:
         next_owner = "Academic Coordinator"
         next_action = "Verify practicum completion for graduation"
@@ -26995,6 +26995,17 @@ def report_defenses(args) -> dict:
         "defenses", "Defenses held and upcoming", columns, rows, filters, options,
         "No defense is held or scheduled for these filters.",
     )
+
+
+def graduation_research_next_action(checklist: list[dict]) -> str:
+    """I-413: name what is still open in plain words, from the same checklist the eligibility uses."""
+    names = [
+        item["label"].removesuffix(" workflow") for item in checklist
+        if item["key"].startswith("research_") and item["passed"] is not True
+    ]
+    if len(names) == 1:
+        return f"Pass the {names[0]} first"
+    return "Finish: " + ", ".join(names) if names else "Finish the research stages"
 
 
 def graduation_missing_text(item: dict) -> str:
@@ -32549,7 +32560,7 @@ def adviser_tracker_payload(student: Student) -> dict:
     elif len(change_rows) >= adviser_change_limit():
         blocked = "A change of research adviser is allowed only once (protocol)."
     elif student_past_proposal_defense(student):
-        blocked = "A change of research adviser must be done before the proposal defense (protocol)."
+        blocked = "The proposal defense is done, so a change of adviser is no longer possible (Research Protocol, Request for Change of Research Adviser)."
     return {
         "current": adviser_appointment_dict(active[0], "student") if active else None,
         "open": adviser_appointment_dict(open_row, "student") if open_row else None,
@@ -35954,6 +35965,8 @@ CALENDAR_STATUS_OPTIONS = (
     CANCELLED_DEFENSE_STATUS, RESCHEDULED_DEFENSE_STATUS,
 )
 
+READY_TO_SCHEDULE_STATUS = "Ready to Schedule"  # I-412: papers are in; the student requests the defense date next
+
 RESEARCH_VOCABULARY = {
     "verdicts": [{"value": key, **{k: v for k, v in value.items() if k != "gates"}} for key, value in RESEARCH_VERDICTS.items()],
     "schedule_statuses": [
@@ -35962,7 +35975,7 @@ RESEARCH_VOCABULARY = {
     ],
     "revision_statuses": [REVISION_AWAITING, REVISION_SUBMITTED, REVISION_CONFIRMED],
     "stage_statuses": [
-        "Missing Requirements", "Awaiting Review", "Pending Staff Action", "Revisions Pending",
+        "Missing Requirements", "Awaiting Review", READY_TO_SCHEDULE_STATUS, "Pending Staff Action", "Revisions Pending",
         "Revisions Submitted - Awaiting Confirmation", "Re-defense Required", "Resubmission Required",
         "Defense Deferred", "Complete",
     ],
@@ -37339,6 +37352,18 @@ def research_milestone_payload(student: Student, gate: str) -> dict:
         "student_uploads_ready": all(item["status"] != "Missing" for item in upload_requirements),
         "student_missing_count": sum(item["status"] == "Missing" for item in upload_requirements),
         "overall_complete": all(item["status"] == "Complete" for item in requirements),
+        # I-412: has the student already sent a defense-date request for this gate (waiting or booked)?
+        "schedule_requested": bool(
+            RESEARCH_GATE_DEFENSE_TYPES.get(gate)
+            and (
+                DefenseScheduleAsk.query.filter_by(student_id=student.id, defense_type=RESEARCH_GATE_DEFENSE_TYPES[gate]).first()
+                or ScheduleRequest.query.filter(
+                    ScheduleRequest.student_id == student.id,
+                    ScheduleRequest.defense_type == RESEARCH_GATE_DEFENSE_TYPES[gate],
+                    ScheduleRequest.status.notin_([CANCELLED_DEFENSE_STATUS, RESCHEDULED_DEFENSE_STATUS]),
+                ).first()
+            )
+        ),
     }
 
 
@@ -37372,6 +37397,14 @@ def research_stage_status(milestone: dict) -> str:
         return "Missing Requirements"
     if any(item["status"] == "Submitted" for item in requirements):
         return "Awaiting Review"
+    # I-412: the student asks for the defense date on Defense Schedule, so before that request the next step is the student's.
+    open_items = [i for i in requirements if i["status"] != "Complete" and i["source_type"] != "system_defense_result"]
+    if (
+        open_items
+        and all(i["source_type"].endswith("_schedule") for i in open_items)
+        and not milestone.get("schedule_requested")
+    ):
+        return READY_TO_SCHEDULE_STATUS
     return "Pending Staff Action"
 
 
@@ -41723,25 +41756,33 @@ SEED_HISTORY_TABLES = (
 
 
 def align_adviser_dates() -> int:
-    """Move a seeded adviser date that falls after the student's first defense to 30 days before it (I-383 leftover)."""
+    """Move a seeded adviser date that falls after the student's first defense to 30 days before it (I-383, I-414)."""
     moved = 0
     for student in Student.query.all():
         dates = [day for (day,) in db.session.query(ScheduleRequest.preferred_date).filter_by(student_id=student.id).all() if day]
         if not dates:
             continue
         first = min(dates)
-        # the seed keeps every appointment inside its last 12 weeks (test_seed_quality), so a defense older than that stays as it is
-        appointed = datetime.combine(max(first - timedelta(days=30), ph_today() - timedelta(weeks=12)), time(9, 0))
-        if appointed.date() >= first:
-            continue
-        for item in AdviserAppointment.query.filter_by(student_id=student.id, source="Migrated from the existing adviser record").all():
-            if item.applied_at and item.applied_at > appointed:
-                item.applied_at = item.created_at = item.updated_at = appointed
+        appointed = datetime.combine(first - timedelta(days=30), time(9, 0))
+        # the seed keeps every application inside its last 12 weeks (test_seed_quality), so applied_at stops there;
+        # the date the student sees ("Appointed") is not limited that way
+        applied = max(appointed, datetime.combine(ph_today() - timedelta(weeks=12) + timedelta(days=2), time(9, 0)))
+        for item in AdviserAppointment.query.filter(
+            AdviserAppointment.student_id == student.id, AdviserAppointment.kind.in_(["Initial", "Recorded"]),
+        ).all():
+            shown = item.form31_issued_on or (item.adviser_responded_at.date() if item.adviser_responded_at else None)
+            late = bool(shown and shown >= first)
+            if item.applied_at and item.applied_at.date() >= first:
+                item.applied_at = item.created_at = item.updated_at = applied
+                late = True
+            if late:
                 if item.adviser_responded_at:
                     item.adviser_responded_at = appointed + timedelta(hours=8)
+                if item.form31_issued_on:
+                    item.form31_issued_on = appointed.date()
                 moved += 1
         for item in AdviserAssignment.query.filter_by(student_id=student.id).all():
-            if item.assigned_at and item.assigned_at > appointed:
+            if item.assigned_at and item.assigned_at.date() >= first:
                 item.assigned_at = appointed
     db.session.commit()
     return moved
