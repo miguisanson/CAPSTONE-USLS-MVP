@@ -9,6 +9,7 @@ import { useApi } from "../../hooks";
 import { Button, DataTable, EmptyState, SectionCard, SkeletonTable, StatusChip } from "../../components/ui/index.js";
 import { formatDate, todayISO } from "../../lib/format";
 import ReportFilters from "./ReportFilters.jsx";
+import { useAuth } from "../../auth";
 
 const STATUS_COLUMNS = new Set(["risk", "level", "eligibility", "when", "batch_status", "kind"]);
 const ZONE_WORDS = { green: "On time", yellow: "Slow", red: "Stuck" };
@@ -18,6 +19,14 @@ const WIDE_TEXT = new Set(["reason", "missing", "panel", "item", "detail"]);
 
 const isCount = (key) => NUMBER_COLUMNS.has(key) || key.startsWith("s_");
 
+// The Dean has no student record page (the Dean portal has none), so a name is a link only for the roles that have one.
+function StudentName({ id, name }) {
+  const { user } = useAuth();
+  return id && user?.role !== "dean"
+    ? <Link to={`/students/${id}`} className="font-semibold text-brand-700 hover:underline">{name}</Link>
+    : <span className="font-semibold text-ink">{name}</span>;
+}
+
 /** The cell for one column of one row. */
 function cellFor(key, row) {
   const value = row[key];
@@ -25,7 +34,7 @@ function cellFor(key, row) {
     // A course plan or a report belongs to a program, not a student: no record to link to.
     return (
       <>
-        {row.student_id ? <Link to={`/students/${row.student_id}`} className="font-semibold text-brand-700 hover:underline">{row.student}</Link> : <span className="font-semibold text-ink">{row.student}</span>}
+        <StudentName id={row.student_id} name={row.student} />
         {row.student_number && <p className="meta">{row.student_number}</p>}
       </>
     );
