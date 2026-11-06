@@ -13245,6 +13245,15 @@ _STUDENT_PAGE_HINTS = (
     (re.compile(r"\breadmi|\bcome back\b", re.I), "Open Readmission to ask to come back after a leave."),
     (re.compile(r"\bgraduat", re.I), "Open Graduation Endorsement to see what is left before you graduate."),
 )
+_STUDENT_SHORT_ANSWERS = {  # Operations Manual 4.8: AWOL status, registration privileges curtailed, return by written intent
+    _STUDENT_PAGE_HINTS[0][1]: "If you stop attending without a leave of absence, the Graduate School may mark you absent without leave. "
+                               "You are still a student and can ask to come back.",
+}
+_STUDENT_FILLER = {"that", "this", "with", "from", "have", "been", "which", "their", "there", "when", "then", "also", "student", "students"}
+_STUDENT_PLAIN_WORDS = (  # office wording -> plain words, applied to the chosen passages only
+    (r"\bAWOL evidence\b", "a sign of absence without leave"),
+    (r"\bmay be treated as absent without leave\b", "may be marked absent without leave"),
+)
 _STUDENT_SOURCE_LINE = re.compile(
     r"^Source: (?P<title>[^(\n]+?) \((?:p\. (?P<page>\d+)[^)\n]*|(?:(?:Proposed|Official) › )?(?P<section>[^)\n]+))\)[ \t]*$", re.M,
 )
@@ -13285,14 +13294,31 @@ def _student_plain_policy(answer: str, citations: list[dict], question: str = ""
         answer = re.sub(r"\s*\(see \d+(?:\.\d+)*\)", "", answer)
         answer = re.sub(r"\bsee \d+(?:\.\d+)*,\s*", "", answer)
         answer = re.sub(r"\bthe platform treats (.+?) as\b", r"\1 counts as", answer)
+        norm = lambda text: re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()  # noqa: E731
+        words = lambda text: {w for w in norm(text).split() if len(w) > 3 and w not in _STUDENT_FILLER}  # noqa: E731
         passages: list[str] = []
         for passage in re.split(r"\n\s*\n", answer):
             passage = passage.strip()
-            norm = lambda text: re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()  # noqa: E731
-            if passage and not any(norm(passage) in norm(other) for other in passages):  # a repeated passage is dropped
-                passages = [other for other in passages if norm(other) not in norm(passage)] + [passage]
+            if not passage:
+                continue
+            same = [o for o in passages if norm(passage) in norm(o) or norm(o) in norm(passage)
+                    or len(words(o) & words(passage)) >= 0.5 * max(1, len(words(o) | words(passage)))]
+            # a passage that repeats another keeps the shorter, clearer one (I-432)
+            if same and all(len(passage) >= len(o) for o in same):
+                continue
+            passages = [o for o in passages if o not in same] + [passage]
+        passages = passages[:2]
+        for old, new in _STUDENT_PLAIN_WORDS:
+            passages = [re.sub(old, new, p) for p in passages]
+        spelled = False
+        for i, p in enumerate(passages):  # "AWOL" is spelled out the first time it shows
+            if not spelled and re.search(r"\bAWOL\b", p):
+                passages[i], spelled = re.sub(r"\bAWOL\b", "absence without leave (AWOL)", p, count=1), True
         parts = list(passages)
         hint = next((text for pattern, text in _STUDENT_PAGE_HINTS if pattern.search(question or "")), "")
+        short = _STUDENT_SHORT_ANSWERS.get(hint)
+        if short:
+            parts.insert(0, short)
         if hint:
             parts.append(f"What you can do: {hint}")
         if draft:
@@ -13365,7 +13391,7 @@ def _assistant_source(mode: str, intent_ai_used: bool = False, role: str = "") -
         if role == "admin":  # only the administrator can add the key (I-179)
             note = "No AI key is set, so answers are quoted straight from the documents. Add a Gemini key for fuller, reworded answers."
         else:
-            note = "The assistant is answering from the policy documents without AI right now."
+            note = None if role == "student" else "The assistant is answering from the policy documents without AI right now."
             detail = detail.replace("; add a Gemini key for fuller, reworded answers.", ".")
     offline = mode in ASSISTANT_OFFLINE_MODES
     return {
