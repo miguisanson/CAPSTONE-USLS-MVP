@@ -162,7 +162,7 @@ test.describe("Dashboard page", () => {
     // tile links (by href: the tiles change layout, not where they lead)
     const link = (href) => page.locator(`main a[href="${href}"]`);
     await expect(link("/students").first()).toContainText(String(k.total_students));
-    await expect(link("/students?risk=At Risk of Delay/Delayed").or(link("/students?risk=At%20Risk%20of%20Delay/Delayed")).first()).toBeVisible();
+    await expect(link("/students?risk=At Risk of Delay/Delayed&standing=Active").or(link("/students?risk=At%20Risk%20of%20Delay/Delayed&standing=Active")).first()).toBeVisible();
     await expect(link("/work-queue?owner=Graduate%20School%20Staff").or(link("/work-queue?owner=Graduate School Staff")).first()).toBeVisible();
     await expect(link("/workflow/defense-scheduling").first()).toBeVisible();
     await expect(link("/reports").first()).toBeVisible();

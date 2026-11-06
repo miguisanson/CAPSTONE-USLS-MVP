@@ -235,7 +235,7 @@ test("key numbers, a coordinator WITH the coordinator dashboard payload: own tas
   assert.deepEqual(ac.map((s) => s.value), [5, 12, 4, 2]);
   assert.equal(ac[1].label, "Students with open work");
   assert.equal(ac[1].to, "/work-queue?owner=Academic%20Coordinator", "the caseload links to the office's work queue (I-339)");
-  assert.equal(ac[2].to, "/students?risk=At Risk of Delay/Delayed");
+  assert.equal(ac[2].to, "/students?risk=At Risk of Delay/Delayed&standing=Active");
   const rc = officeStats({ role: "research_coordinator", own, waiting: { total: 9 }, kpis });
   assert.deepEqual(rc.map((s) => s.key), ["tasks", "students", "defenses", "soon"]);
   assert.deepEqual(rc.map((s) => s.value), [5, 12, 3, 2]);
