@@ -3043,6 +3043,10 @@ def monitoring_research_milestones(student: Student) -> dict:
 def research_lock_status(prerequisite: dict) -> str:
     """Why research is locked, from the same record My Profile shows: the exam status and the subjects still owed (I-206)."""
     if not prerequisite["eligible"]:
+        current, not_started = prerequisite.get("current_count", 0), prerequisite.get("missing_count", 0)
+        if current + not_started:  # the one sentence every student page uses (I-425)
+            left = current + not_started
+            return f"Locked - {left} subject{'s' if left != 1 else ''} left: {current} this semester, {not_started} still to take, before research"
         left = prerequisite["missing_subjects"]
         return f"Locked - {left} required subject{'s' if left != 1 else ''} still to complete before research"
     return "Locked - comprehensive exam not passed"
@@ -4326,7 +4330,7 @@ def withdrawal_policy_statement() -> str:
     return (
         f"Subject withdrawal is allowed until {_withdrawal_window_phrase(days)}, whether or "
         f"not classes were attended ({rule_citation('withdrawal.window_days')}). It is not free: "
-        f"{rule_value('withdrawal.fee_percent_first_week', 10)}% of the term's total due is charged "
+        f"{rule_value('withdrawal.fee_percent_first_week', 10)}% of your total fees for this semester is charged "
         f"in the first week and {rule_value('withdrawal.fee_percent_second_week', 20)}% in the second. "
         "After the second week a single subject cannot be withdrawn."
         " To leave the semester, file a Leave of Absence (full fees apply, Handbook p.51)."
@@ -4339,8 +4343,8 @@ WITHDRAWAL_RECORD_EFFECT = (
 )
 
 FEE_INFORMATION_ONLY = (
-    "Shown for information only: the portal does not compute or collect payments; "
-    "the Business Office settles the fees."
+    "Shown for information only: the portal does not compute or collect payments. "
+    "Pay or settle it at the Business Office."
 )
 
 
@@ -4405,7 +4409,7 @@ def subject_withdrawal_window(
         )
     if consequence is None:
         consequence = (
-            f"A charge of {fee}% of the term's total due applies "
+            f"A charge of {fee}% of your total fees for this semester applies "
             f"({rule_citation('withdrawal.fee_percent_first_week')}). " + FEE_INFORMATION_ONLY
         )
     return {
@@ -13232,21 +13236,69 @@ ASSISTANT_OFFLINE_MODES = {
 }
 
 
-def _student_plain_policy(answer: str, citations: list[dict]) -> tuple[str, list[dict]]:
-    """A student reads "Answer from the Graduate School Handbook, p. 54" and "Graduate School practice (being finalised)",
-    never the office wording about draft validation or a "Source:" line (I-392)."""
+# A student question that matches a process with its own page gets one sentence naming the page (I-427).
+_STUDENT_PAGE_HINTS = (
+    (re.compile(r"\b(?:stop(?:s|ped)?\s+(?:coming|attending|going|showing up|enrolling)|not (?:attending|enrolled)|awol|absent without leave)\b", re.I),
+     "Open Return from AWOL to tell the Graduate School you are coming back."),
+    (re.compile(r"\bleave of absence\b|\bloa\b|\bleave\b", re.I), "Open Leave of Absence to ask for a leave."),
+    (re.compile(r"\bwithdraw", re.I), "Open Subject Withdrawal to ask to drop a subject."),
+    (re.compile(r"\breadmi|\bcome back\b", re.I), "Open Readmission to ask to come back after a leave."),
+    (re.compile(r"\bgraduat", re.I), "Open Graduation Endorsement to see what is left before you graduate."),
+)
+_STUDENT_SOURCE_LINE = re.compile(
+    r"^Source: (?P<title>[^(\n]+?) \((?:p\. (?P<page>\d+)[^)\n]*|(?:(?:Proposed|Official) › )?(?P<section>[^)\n]+))\)[ \t]*$", re.M,
+)
+
+
+def _student_plain_policy(answer: str, citations: list[dict], question: str = "") -> tuple[str, list[dict]]:
+    """A student reads the passages, what to do next, and one "Sources:" line (I-392, I-427); never "(Proposed)", "see 4.8",
+    the office wording about draft validation or a "Source:" line after every passage."""
     answer = answer.replace(POLICY_DRAFT_WARNING, "Graduate School practice (being finalised)").replace(" (draft for validation)", "")
-    answer = re.sub(r"Source: (Graduate School Handbook[^(\n]*?) \(p\. (\d+)[^)\n]*\)", r"Answer from the \1, p. \2", answer)
-    answer = re.sub(r"Source: ([^(\n]+?) \((?:(?:Proposed|Official) › )?([^)\n]+)\)", r"Answer from the \1, \2", answer)  # Operations Manual and any other title (F7-04)
+    refs: dict[str, list[str]] = {}
+
+    def note_source(match) -> str:
+        title = re.sub(r"^USLS ", "", match["title"].strip()).replace("Graduate School Operations Manual", "Operations Manual")
+        section = (match["section"] or "").strip()
+        ref = f"p. {match['page']}" if match["page"] else (re.match(r"\d+(?:\.\d+)*", section) or [section])[0]
+        if ref not in refs.setdefault(title, []):
+            refs[title].append(ref)
+        return ""
+
+    # an answer already worded "Answer from the X, 4.6.6 ..." is read back into the same "Source:" form
+    answer = re.sub(r"^Answer from the (.+?), (p\. \d+|[^\n]+)$", r"Source: \1 (\2)", answer, flags=re.M)
+    answer = _STUDENT_SOURCE_LINE.sub(note_source, answer)
     plain = []
+    draft = False
     for citation in citations:
         citation = dict(citation)
         if citation.get("warning"):
             citation["warning"] = "Graduate School practice (being finalised)"
+            draft = True
         for key in ("title", "source"):
             if citation.get(key):
                 citation[key] = citation[key].replace(" (draft for validation)", "")
         plain.append(citation)
+    if refs:
+        draft = draft or "(being finalised)" in answer
+        answer = re.sub(r"\n*Graduate School practice \(being finalised\)[^\n]*", "", answer)
+        answer = re.sub(r"\s*\((?:Proposed|Official)\)", "", answer)
+        answer = re.sub(r"\s*\(see \d+(?:\.\d+)*\)", "", answer)
+        answer = re.sub(r"\bsee \d+(?:\.\d+)*,\s*", "", answer)
+        answer = re.sub(r"\bthe platform treats (.+?) as\b", r"\1 counts as", answer)
+        passages: list[str] = []
+        for passage in re.split(r"\n\s*\n", answer):
+            passage = passage.strip()
+            norm = lambda text: re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()  # noqa: E731
+            if passage and not any(norm(passage) in norm(other) for other in passages):  # a repeated passage is dropped
+                passages = [other for other in passages if norm(other) not in norm(passage)] + [passage]
+        parts = list(passages)
+        hint = next((text for pattern, text in _STUDENT_PAGE_HINTS if pattern.search(question or "")), "")
+        if hint:
+            parts.append(f"What you can do: {hint}")
+        if draft:
+            parts.append("Some of this is Graduate School practice that is still being finalised.")
+        parts.append("Sources: " + "; ".join(f"{title} {', '.join(items)}" for title, items in refs.items()))
+        answer = "\n\n".join(parts)
     return answer, plain
 
 
@@ -13304,6 +13356,9 @@ def _assistant_source(mode: str, intent_ai_used: bool = False, role: str = "") -
         label = "Live record · Gemini interpreted"
         detail = "Gemini classified the question only; verified database rules produced the answer."
         ai_used = True
+    if role == "student" and mode == "document-rag-local":  # a student reads no model or search names (I-427)
+        label = "From the policy documents"
+        detail = "Answers come from the Graduate School Handbook, the Research Protocol and the Operations Manual."
     ai_configured = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY"))
     note = None
     if not ai_configured and mode in {"document-rag-local", "policy-not-found", "student-document-rag-local"}:
@@ -13891,7 +13946,7 @@ def generate_student_answer(question: str, student: Student) -> dict:
                 mode = "student-policy-fallback"
     else:
         answer = local_grounded_answer(question, student, payload, snippets)
-    answer, rag_citations = _student_plain_policy(answer, rag_citations)
+    answer, rag_citations = _student_plain_policy(answer, rag_citations, question)
     return {
         "answer": answer,
         "mode": mode,
@@ -15664,8 +15719,8 @@ def register_routes(app: Flask) -> None:
                 f"Submitted within the withdrawal window ({withdrawal_window['status'].lower()}). "
                 "Graduate School staff will record and forward your subject request to the Dean. "
                 + (
-                    f"A charge of {withdrawal_window['fee_percent']}% of the term's total due applies "
-                    f"({withdrawal_window['rule_source']}); the Business Office settles it."
+                    f"A charge of {withdrawal_window['fee_percent']}% of your total fees for this semester applies "
+                    f"({withdrawal_window['rule_source']}). Pay or settle it at the Business Office."
                     if withdrawal_window.get("fee_percent") is not None
                     else "The Business Office confirms any charge."
                 )
@@ -23389,7 +23444,12 @@ def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
     pending_tasks = task_query.count()
     overdue_tasks = task_query.filter(Task.due_at < ph_today(), Task.status != "Done").count()
     wide_schedules = ScheduleRequest.query.filter(ScheduleRequest.student_id.in_(wide_ids)) if wide_ids else ScheduleRequest.query.filter(False)
-    confirmed_schedules = wide_schedules.filter(ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES)).count()
+    # The defenses the calendar shows for the next 30 days, not every booking ever made (I-423).
+    confirmed_schedules = wide_schedules.filter(
+        ScheduleRequest.status.in_(ACTIVE_DEFENSE_STATUSES),
+        ScheduleRequest.preferred_date >= ph_today(),
+        ScheduleRequest.preferred_date <= ph_today() + timedelta(days=30),
+    ).count()
     needs_availability = wide_schedules.filter(ScheduleRequest.status.in_(PENDING_DEFENSE_STATUSES)).count()
     practicum_records = (
         scoped_practicum_records_query()
@@ -39135,6 +39195,8 @@ def student_advisers(student: Student) -> dict[int, dict]:
 
 def suggest_panel_roles(rows: list[dict], roles: list[str]) -> list[dict]:
     """Seat the top-ranked candidates: the best methods profile takes the Method seat, the rest follow by score."""
+    # An overloaded faculty member takes a seat only when nobody else fits (I-423); the ranking itself is unchanged.
+    rows = sorted(rows, key=lambda row: any(flag["type"] == "overload" for flag in row.get("flags", [])))
     method_role = next((role for role in roles if "Method" in role), None)
     method_pick = None
     pool = rows[: len(roles)]
@@ -39359,8 +39421,6 @@ def panel_matching_result(student: Student, profile: dict | None = None) -> dict
             else "No Google Calendar availability"
             if calendar_connected
             else "Available"
-            if availability_count >= 3
-            else "Limited availability"
             if availability_count or recurring_days
             else "No availability recorded"
         )
@@ -39375,7 +39435,7 @@ def panel_matching_result(student: Student, profile: dict | None = None) -> dict
         elif calendar_connected and calendar_error:
             flags.append({"type": "unavailable", "severity": "warning", "message": "Google Calendar could not be read."})
         if not topics:
-            flags.append({"type": "no_overlap", "severity": "info", "message": "No expertise record shares a distinctive topic with the paper; listed after the candidates that do."})
+            flags.append({"type": "no_overlap", "severity": "info", "message": "No expertise record shares a distinctive topic with the paper, so this faculty member is ranked after those that do, whatever the score."})
         if len(item["evidence"]) < 3:
             flags.append({"type": "thin_records", "severity": "info", "message": "Few expertise records on file; add more in Faculty Profiles."})
         reason = _panel_reason(faculty.name, topics, evidence, availability_count, workload, method, relative)
@@ -42830,9 +42890,11 @@ def ensure_workflow_demo_student_baseline(student: Student, workflow: str) -> No
         )
     )
     student.program_id = program.id
-    student.entry_year = student.entry_year if is_research_demo else 2026 if (is_withdrawal_demo or is_new_demo) else 2024
-    student.academic_year_entry = student.academic_year_entry if is_research_demo else "26-27" if (is_withdrawal_demo or is_new_demo) else "24-25"
-    student.year_level = "Year 1" if (is_withdrawal_demo or is_new_demo) else "Completed Coursework"
+    # A student who stopped coming was enrolled before, so the AWOL return demo entered a year earlier: Year 2 (I-418).
+    is_second_year_demo = is_awol_demo and demo_config.get("scenario") == "return"
+    student.entry_year = student.entry_year if is_research_demo else 2025 if is_second_year_demo else 2026 if (is_withdrawal_demo or is_new_demo) else 2024
+    student.academic_year_entry = student.academic_year_entry if is_research_demo else "25-26" if is_second_year_demo else "26-27" if (is_withdrawal_demo or is_new_demo) else "24-25"
+    student.year_level = "Year 2" if is_second_year_demo else "Year 1" if (is_withdrawal_demo or is_new_demo) else "Completed Coursework"
     leave_snapshot = (student.standing, student.enrollment_tag, student.current_stage, student.risk_level)
     student.standing = "Active"
     student.enrollment_tag = (

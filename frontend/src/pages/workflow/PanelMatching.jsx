@@ -252,7 +252,7 @@ export function PanelMatchingForm({ context, studentId, submit, submitting, refe
         <Field label="Specialization"><Input value={filters.specialization} onChange={setFilter("specialization")} placeholder="e.g. analytics" /></Field>
         <Field label="Department / program"><Select value={filters.college} onChange={setFilter("college")} placeholder="All departments" options={[...new Set(recs.map((item) => item.college).filter(Boolean))].sort()} /></Field>
         <Field label="Availability">
-          <Select value={filters.availability} onChange={setFilter("availability")} placeholder="All availability" options={["Available", "Limited availability", "No availability recorded"]} />
+          <Select value={filters.availability} onChange={setFilter("availability")} placeholder="All availability" options={["Available", "No availability recorded"]} />
         </Field>
       </Card>
 
