@@ -183,7 +183,7 @@ test.describe("conD: student pages that are alike behave alike", () => {
       await expect(main(student.page).getByText("Private and read-only")).toHaveCount(1);
       await expect(main(student.page).getByRole("status").filter({ hasText: "Private and read-only" })).toHaveCount(0);
       await expect(main(student.page).getByRole("listitem").filter({ hasText: "Private and read-only" })).toHaveCount(1);
-      await expect(main(student.page).getByRole("listitem").filter({ hasText: "Offline answer" })).toHaveCount(1);
+      await expect(main(student.page).getByRole("listitem").filter({ hasText: "Answers come from the Graduate School Handbook" })).toHaveCount(1);
     } finally {
       await student.context.close();
       await dean.context.close();

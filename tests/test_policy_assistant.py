@@ -603,8 +603,7 @@ class PlainOfflineAnswerTests(AssistantBase):
 
     def test_a_student_handbook_answer_says_which_page(self):
         data = self.ask(STUDENT_A_EMAIL, COVERED_QUESTION)
-        self.assertIn("Answer from the Graduate School Handbook", data["answer"])
-        self.assertRegex(data["answer"], r"Handbook[^\n]*, p\. \d+")
+        self.assertRegex(data["answer"], r"Sources: [^\n]*Handbook[^\n]* p\. \d+")
         self.assertNotIn("Source:", data["answer"])
 
     def test_staff_keep_the_draft_wording(self):

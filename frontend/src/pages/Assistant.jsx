@@ -77,7 +77,11 @@ export default function Assistant({ policyOnly: policyOnlyProp = false, student 
               <li>Every answer lists its sources. Open one to see the document, page, section and exact passage.</li>
               <li>If the documents do not cover a question, it says so instead of guessing.</li>
               <li>Questions like &ldquo;what is my next step?&rdquo; use only your own record or queue.</li>
-              <li>An &ldquo;Offline answer&rdquo; label means Gemini was not used and the answer is a keyword match.</li>
+              {student ? (
+                <li>Answers come from the Graduate School Handbook, the Research Protocol and the Operations Manual.</li>
+              ) : (
+                <li>An &ldquo;Offline answer&rdquo; label means Gemini was not used and the answer is a keyword match.</li>
+              )}
               {student && (
                 <li>
                   Private and read-only: the assistant uses the record connected to your signed-in account. It cannot see other students

@@ -105,9 +105,9 @@ class F7Tests(unittest.TestCase):
         out, _ = _student_plain_policy(text, [])
         self.assertNotIn("Source:", out)
         self.assertNotIn("Proposed", out)
-        self.assertIn("Answer from the USLS Graduate School Operations Manual, 4.6.6 Exceptions and unusual cases", out)
+        self.assertIn("Sources: Operations Manual 4.6.6", out)  # one Sources line (I-427)
         out, _ = _student_plain_policy("x\nSource: Graduate School Handbook (p. 54)", [])
-        self.assertIn("Answer from the Graduate School Handbook, p. 54", out)
+        self.assertIn("Sources: Graduate School Handbook p. 54", out)
 
     # ---- F7-06
     def test_withdrawn_student_is_not_stalled_nor_in_the_graduation_loop(self):
