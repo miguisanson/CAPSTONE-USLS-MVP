@@ -1,5 +1,21 @@
 # State
 
+## PAUSED 2026-11-06 ~16:30 by the owner (playing a game) — resume here
+
+- Branch `v6.4.1-test` @ 103cbd93 pushed (+ this STATE commit). Since the 14:10 pause merged: alumni (**RESEED NEEDED**),
+  srv8, fix8 (14 full-e2e failures fixed), ux9, srv9, I-433 Dean report names. Open rows: I-364 (TEST), I-407 rest
+  (Practicum report), I-409/I-410 (class size rule), I-410 part.
+- Stopped when paused (re-run all): full e2e on 103cbd93 (was ~started), Fable review 5 (just started; brief = review
+  `git diff 056e5cf0..HEAD`, report to `E:/Temp/claude/fable5/`, focus on demo-breaking issues: Ready to Schedule /
+  next_step vs scheduling pages, past graduates never active, student assistant faithfulness, Course Audit missing API,
+  RC 30-day defense count, tell_student_marked_awol idempotence, stage/status word maps, focus-to-main with dialogs),
+  `pkt/srv10` (worktree `wt/srv10`, branch pushed: only `tests/test_srv10.py` written: Practicum report on Reports for
+  I-407 + class-size rule or known gap for I-409/I-410; implement, run p145/p142/p101/p93), Python gate on bc28e87f (was
+  clean at ~1/3; re-run on the final commit in `wt/gate`).
+- Last full results: e2e on bc28e87f 1,082 passed / 14 failed (fixed in fix8, 111/111 targeted) / 34 autopilot skipped
+  by dependency; autopilot project alone 34/34. Python full gate last finished on 751a6599 (3 seed fails fixed by alumni).
+- Next after resume: Fable 5 + srv10 + full e2e (`USLS_E2E_TMP`/`E2E_PORT` set) + autopilot + final Python gate; push.
+
 ## 2026-11-06 15:20 - resumed after the owner's pause
 
 - `pkt/alumni` merged 1d7f2b0d (e2e 128/128) — **RESEED NEEDED** (six past graduates). Running: full Python gate on
