@@ -7,7 +7,7 @@ import { formatDate } from "../../lib/format";
 export const EMPTY_FILTERS = { query: "", program: "", status: "", reason: "", kind: "", open: false };
 
 // "Open requests only" (the board's ?show=open link, I-196): every status that ends a request leaves the board.
-const ENDED_STATUSES = new Set(["Closed", "Approved", "Expired", "Completed", "Denied", "Withdrawn", "Cancelled"]);
+const ENDED_STATUSES = new Set(["Closed", "Approved", "Expired", "Completed", "Denied", "Withdrawn", "Cancelled", "Sent to Registrar", "Withdrawn Confirmed"]);
 
 // The Dean's "approve" lands on a different status depending on the kind of request.
 const APPROVED_STATUSES = ["Leave Scheduled", "Approved"];

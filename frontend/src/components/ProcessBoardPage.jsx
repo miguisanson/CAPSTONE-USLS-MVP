@@ -4,6 +4,7 @@ import { HelpCircle, History, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { formatDateTime } from "../lib/format";
+import ListExportButtons from "./ListExportButtons";
 import { Button, EmptyState, InlineNotice, Modal, PageHeader, SkeletonBoard } from "./ui/index.js";
 import PolicyRules from "./PolicyRules";
 import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "./StageBoard";
@@ -483,6 +484,13 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
               noun={config.noun}
             />
           </BoardFilterRow>
+          <ListExportButtons
+            title={config.title}
+            subtitle={`${filtered.length} of ${cases.length} ${config.noun}`}
+            filename={slug}
+            columns={["Student ID", "Student name", "Program", "Type", "Status", "Next", "Updated"]}
+            rows={filtered.map((item) => [item.student.student_number, item.student.name, item.student.program_code, item.kind_label || "", item.status || "", item.owner || "", formatDateTime(item.last_activity_at || item.updated_at)])}
+          />
 
           {selectedItems.length > 0 && (
             <BatchBar

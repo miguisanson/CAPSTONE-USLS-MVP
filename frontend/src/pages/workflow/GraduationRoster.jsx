@@ -470,7 +470,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || row.student.program_code === filters.program)
       && (!filters.status || graduationRowStatus(row) === filters.status)
-      && (!filters.open || graduationRowStatus(row) !== "Not Eligible") // open: every candidate still on the way to the Dean
+      && (!filters.open || !["Not Eligible", "Sent to Registrar", "Registrar Received"].includes(graduationRowStatus(row))) // open: every candidate still on the way to the Dean
       && (!filters.secondary || (row.eligibility?.completed_courses || []).some((course) => course.code === filters.secondary));
   }).sort((left, right) => left.student.name.localeCompare(right.student.name)), [rows, filters]);
   const visibleRows = useMemo(

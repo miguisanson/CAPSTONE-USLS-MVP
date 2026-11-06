@@ -248,7 +248,7 @@ export function studentWaiting(data) {
     dueAt: undefined, // an office's date is not the student's deadline (I-385)
     tone: "neutral",
     target: taskTarget(task),
-    status: task.overdue ? "Overdue" : task.status,
+    status: task.overdue || task.status === "Overdue" ? "In progress" : task.status, // no "Overdue" chip without the date (F7-03)
   }));
 }
 

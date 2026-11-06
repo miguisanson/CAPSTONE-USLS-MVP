@@ -78,7 +78,7 @@ test("waiting on the Graduate School: tasks held by any office, neutral, overdue
   assert.deepEqual(waiting.map((i) => i.title), ["T4", "T2", "T3", "T5", "T6"].map((t) => `The Graduate School is working on: ${t}`));
   assert.ok(waiting.every((i) => i.tone === "neutral" && i.kind === "waiting"));
   assert.match(waiting[0].detail, /With the Dean/);
-  assert.equal(waiting[0].status, "Overdue");
+  assert.equal(waiting[0].status, "In progress");
   assert.deepEqual(waiting[2].target, { view: "awol" });
   assert.deepEqual(waiting[1].target, { to: "/student/requests" });
   assert.deepEqual(studentWaiting(base()), []);

@@ -3116,17 +3116,22 @@ def course_record_dict(record: CourseRecord) -> dict:
     }
 
 
-def research_case_dict(case: ResearchCase | None) -> dict | None:
+def research_case_dict(case: ResearchCase | None, progress: dict | None = None) -> dict | None:
+    """`progress` (what a GET computed without saving, I-373) wins over the stored gate and status, so a page never shows two."""
     if not case:
         return None
-    milestone = RESEARCH_MILESTONES.get(case.current_gate, {})
+    gate, status = case.current_gate, case.status
+    if progress:
+        gate = progress["gate"]
+        status = "Verified Complete" if gate == "Completion Evidence" and progress["status"] == "Complete" else progress["status"]
+    milestone = RESEARCH_MILESTONES.get(gate, {})
     return {
         "id": case.id,
         "case_type": case.case_type,
         "title": case.title,
-        "current_gate": case.current_gate,
-        "current_gate_label": milestone.get("label", case.current_gate),
-        "status": case.status,
+        "current_gate": gate,
+        "current_gate_label": milestone.get("label", gate),
+        "status": status,
         "adviser_name": case.adviser_name,
         "opened_at": iso(case.opened_at),
     }
@@ -6418,7 +6423,7 @@ def portfolio_recommendations(limit: int = 150) -> dict:
     entered = stage_entered_map()
     stalled = [
         (stage_days(s, entered), s)
-        for s in Student.query.filter(Student.standing == "Active", Student.current_stage != "Completed").all()
+        for s in Student.query.filter(active_student_clause()).all()
     ]
     for d, s in sorted((item for item in stalled if item[0] >= STALL_WARN_DAYS), key=lambda item: -item[0]):
         owner = "Research Coordinator" if s.current_stage in (
@@ -13094,7 +13099,7 @@ def _graduation_forecast_report() -> dict:
         )
     students = (
         Student.query
-        .filter(Student.standing == "Active", Student.current_stage != "Completed")
+        .filter(active_student_clause())
         .order_by(Student.last_name.asc(), Student.first_name.asc())
         .all()
     )
@@ -13228,8 +13233,9 @@ ASSISTANT_OFFLINE_MODES = {
 def _student_plain_policy(answer: str, citations: list[dict]) -> tuple[str, list[dict]]:
     """A student reads "Answer from the Graduate School Handbook, p. 54" and "Graduate School practice (being finalised)",
     never the office wording about draft validation or a "Source:" line (I-392)."""
-    answer = re.sub(r"Source: (Graduate School Handbook[^(\n]*?) \(p\. (\d+)[^)\n]*\)", r"Answer from the \1, p. \2", answer)
     answer = answer.replace(POLICY_DRAFT_WARNING, "Graduate School practice (being finalised)").replace(" (draft for validation)", "")
+    answer = re.sub(r"Source: (Graduate School Handbook[^(\n]*?) \(p\. (\d+)[^)\n]*\)", r"Answer from the \1, p. \2", answer)
+    answer = re.sub(r"Source: ([^(\n]+?) \((?:(?:Proposed|Official) › )?([^)\n]+)\)", r"Answer from the \1, \2", answer)  # Operations Manual and any other title (F7-04)
     plain = []
     for citation in citations:
         citation = dict(citation)
@@ -14616,7 +14622,7 @@ def register_routes(app: Flask) -> None:
                 "curriculum_subjects": subject_enrollment["curriculum_subjects"],
                 "progress_status": student_priority(student),
                 "course_records": [course_record_dict(record) for record in course_records],
-                "research_case": research_case_dict(research_case),
+                "research_case": research_case_dict(research_case, research_progress),
                 "research_progress": research_progress,
                 "defense_follow_up": student_defense_follow_up(student, research_progress["gate"]),
                 "research_vocabulary": RESEARCH_VOCABULARY,
@@ -14770,7 +14776,7 @@ def register_routes(app: Flask) -> None:
                 "curriculum_subjects": subject_enrollment["curriculum_subjects"],
                 "progress_status": student_priority(student),
                 "course_records": [course_record_dict(record) for record in course_records],
-                "research_case": research_case_dict(research_case),
+                "research_case": research_case_dict(research_case, research_progress),
                 "research_progress": research_progress,
                 "defense_earliest": student_defense_earliest(student, research_progress["gate"]),
                 "defense_follow_up": student_defense_follow_up(student, research_progress["gate"]),
@@ -21799,6 +21805,8 @@ def register_routes(app: Flask) -> None:
         schedule.panel_snapshot = json.dumps(panel_snapshot_for(panel))
         schedule.conflict_reason = None
         close_research_tasks(student.id, f"Re-confirm {schedule.defense_type} schedule after panel change")
+        db.session.flush()
+        sync_research_progress(student)
         add_log(
             "defense-scheduling", student.id, workflow_actor_label(account), schedule.defense_type or "",
             f"{schedule.defense_type} schedule #{schedule.id} re-confirmed with the new panel", "Panel Chair",
@@ -22551,6 +22559,8 @@ def register_routes(app: Flask) -> None:
         reason = re.sub(r"\s+", " ", str(data.get("reason") or "")).strip()[:500]
         student = row.student
         defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(row.gate, "defense")
+        if response == "accept" and row.status == "Declined":
+            return jsonify({"error": "This invitation was declined. Ask the Research Coordinator to send the invitation again."}), 409
         if response == "accept":
             row.status, row.reason, row.responded_at = "Accepted", None, now_utc()
             close_research_tasks(row.student_id, prefix=f"Replace declined panelist: {faculty.name}")
@@ -28018,7 +28028,7 @@ def serialize_transaction_context(slug: str, selected_student_id: int | None, sp
         if slug == "research-gate":
             context["research_prerequisite"] = comprehensive_exam_eligibility(selected_student)
             research_case, progress = sync_research_progress(selected_student)
-            context["research_case"] = research_case_dict(research_case)
+            context["research_case"] = research_case_dict(research_case, progress)
             context["research_progress"] = progress
             context["research_vocabulary"] = RESEARCH_VOCABULARY
             context["current_milestone"] = progress["milestone"]
@@ -31918,6 +31928,8 @@ def cancel_defense_schedule(schedule: ScheduleRequest, account: UserAccount, rea
     schedule.requested_by = requested_by or schedule.requested_by
     schedule.conflict_reason = f"Cancelled on {ph_today().isoformat()}: {reason}"
     ensure_open_task(student.id, f"Reschedule cancelled {schedule.defense_type}", "Research Coordinator", 3, 50)
+    db.session.flush()
+    sync_research_progress(student)  # the stored gate and status follow the cancelled booking (this runs in a POST)
     add_log(
         "defense-scheduling", student.id, workflow_actor_label(account), schedule.defense_type or "",
         f"{schedule.defense_type} schedule #{schedule.id} cancelled", "Research Coordinator",
@@ -41892,13 +41904,17 @@ def seed_report_history(today: date | None = None) -> int:
         if s.id not in busy and s.standing == "Active" and s.enrollment_tag == "Enrolled"
         and s.current_stage in ("Coursework", "Admission")
     ]
+    graduation_pool = [  # a graduation list only ever holds students who finished everything (F7-02)
+        s for s in Student.query.order_by(Student.id).all()
+        if s.id not in busy and s.standing == "Active" and s.current_stage == "Completed"
+    ]
     practicum_pool = [s for s in pool if program_allows_practicum(s.program)]
     pool = [s for s in pool if s not in practicum_pool]  # kept for the practicum reports
     faculty_ids = [f.id for f in Faculty.query.filter_by(active=True).order_by(Faculty.id).all()]
     taken: set[int] = set()
 
-    def next_student(practicum: bool = False):
-        for student in (practicum_pool if practicum else pool):
+    def next_student(practicum: bool = False, graduation: bool = False):
+        for student in (graduation_pool if graduation else practicum_pool if practicum else pool):
             if student.id not in taken:
                 taken.add(student.id)
                 return student
@@ -41937,7 +41953,7 @@ def seed_report_history(today: date | None = None) -> int:
         for process, outcomes in plan:
             for outcome in outcomes:
                 index += 1
-                student = next_student(practicum=process == "practicum")
+                student = next_student(practicum=process == "practicum", graduation=process == "graduation")
                 if student is None:
                     continue
                 decided, forwarded = spread(kind, term, index, turnarounds[index % len(turnarounds)])
