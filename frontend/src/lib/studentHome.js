@@ -247,7 +247,9 @@ const officeTitle = (title) => {
  * @returns [{ key, kind, title, detail, dueAt, tone, target, status }] - overdue first, then by date
  */
 export function studentWaiting(data) {
-  return sortedTasks((data.tasks || []).filter((task) => !isOwnTask(task))).map((task) => ({
+  // I-432: until the student sends the return, the absence check is not the office's work yet (Return from AWOL says "Waiting for: you").
+  const returnDue = data.awol_case?.status === "AWOL Declared";
+  return sortedTasks((data.tasks || []).filter((task) => !isOwnTask(task) && !(returnDue && task.action_url === "/workflow/awol"))).map((task) => ({
     key: `waiting-${task.id}`,
     kind: "waiting",
     title: officeTitle(task.title),

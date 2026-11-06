@@ -263,6 +263,7 @@ function PlanCards() {
                   rows={plan.offerings}
                   rowKey="id"
                   pageSize={0}
+                  stackOnPhone
                   empty={{ icon: Inbox, title: "No subjects in this plan" }}
                 />
                 {/* The same decision panel as every other Dean decision: a return needs a note, both ask first. */}

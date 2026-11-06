@@ -214,3 +214,10 @@ test("subjectsLeftText: one wording for the subjects a student still has to fini
   assert.equal(subjectsLeftText(0, 1), "1 subject left: 0 this semester, 1 still to take");
   assert.equal(subjectsLeftText(0, 0), "No subjects left");
 });
+
+test("I-432: before the student sends the return, the absence check is not listed as the office's work", () => {
+  const check = { id: 9, title: "Review automatic AWOL policy alert", owner_role: "Academic Coordinator", due_at: "2026-10-20", status: "Pending", overdue: false, action_url: "/workflow/awol" };
+  const other = { id: 10, title: "Review something else", owner_role: "Dean", due_at: "2026-10-21", status: "Pending", overdue: false };
+  assert.equal(studentWaiting(base({ tasks: [check, other], awol_case: { status: "AWOL Declared" } })).length, 1, "only the unrelated office task stays");
+  assert.equal(studentWaiting(base({ tasks: [check, other], awol_case: { status: "Return Submitted" } })).length, 2, "once the return is sent the office is working on it");
+});

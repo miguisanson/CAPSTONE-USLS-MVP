@@ -78,3 +78,12 @@ export function stageSteps(stage, stages = DEFAULT_STAGES, record = null) {
 
 /** A stage as people read it: "LOA" and "AWOL" spelled out (I-397); every other stage is already plain. */
 export const stageWords = (stage) => ({ LOA: "Leave of Absence", AWOL: "AWOL (absent without leave)" })[stage] || stage;
+
+const PAUSE_WHY = { LOA: "on leave of absence", AWOL: "absence without leave" };
+/** I-432: one line for a student who is off the path ("Paused at Coursework: absence without leave"), else "". */
+export function pausedLine(steps, stage) {
+  const stopped = steps.find((s) => s.state === "stopped");
+  if (!stopped) return "";
+  const at = steps.find((s) => s.state === "current");
+  return `Paused${at ? ` at ${at.label}` : ""}: ${PAUSE_WHY[stage] || stopped.label.toLowerCase()}`;
+}
