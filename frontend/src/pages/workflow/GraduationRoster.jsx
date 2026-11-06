@@ -784,7 +784,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {/* No card title and no loose line under the header: the page header says it all, with who does what in its description (finding 11, I-157). */}
       <BoardSummary line={summaryLine} windowName="details window" />
       {accountRole === "dean" && (
@@ -838,6 +838,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
       />
       {view !== "board" && <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />}
       {view === "board" ? (
+        <div className="max-sm:-order-1">{/* I-399: on a phone the board and its Needs my action chips come first, like the other process boards */}
         <StageBoard
           boardNotice={boardNotice}
           ariaLabel="Graduation workflow Kanban board"
@@ -859,6 +860,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           columnClassName="w-[320px]"
           emptyText="No candidates here"
         />
+        </div>
       ) : tableRows.length ? (
         <DataTable
           caption="Graduation candidates, one row per student"

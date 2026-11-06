@@ -287,18 +287,20 @@ test.describe("Student record Course audit (I-192)", () => {
     const audit = student.course_audit;
     expect(audit.completed.length, "student 1 has completed subjects").toBeGreaterThan(0);
     await page.goto("/students/1");
-    const tile = page.getByRole("button", { name: new RegExp(`^Completed ${audit.completed.length}`) });
+    // I-405: the tile is a number; "Show subjects" is a real button under it (Completed is the first tile)
+    const tile = page.getByRole("button", { name: "Show subjects" }).first();
+    await expect(page.getByRole("button", { name: new RegExp(`^Completed ${audit.completed.length}`) })).toHaveCount(0);
     await expect(tile).toBeVisible();
     await expect(tile).toHaveAttribute("aria-expanded", "false");
     await tile.click();
-    await expect(tile).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("button", { name: "Hide subjects" }).first()).toHaveAttribute("aria-expanded", "true");
     const list = page.getByRole("region", { name: `Completed subjects (${audit.completed.length})` });
     await expect(list).toBeVisible();
     await expect(list.getByRole("listitem")).toHaveCount(audit.completed.length);
     await expect(list).toContainText(audit.completed[0].code);
     await expect(list).toContainText(audit.completed[0].title);
     await shot(page, "student-course-audit-1366.png");
-    await tile.click();
+    await page.getByRole("button", { name: "Hide subjects" }).first().click();
     await expect(list).toHaveCount(0);
   });
 

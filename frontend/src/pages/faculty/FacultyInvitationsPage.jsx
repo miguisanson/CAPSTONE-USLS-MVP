@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CalendarClock, CalendarDays, MailCheck, UserX, Users } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, EApprovalNote, EmptyState, Field, InlineNotice, PageHeader, SectionTitle, Skeleton, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Card, EmptyState, Field, InlineNotice, PageHeader, SectionTitle, Skeleton, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatDateTime } from "../../lib/format";
 import { formatDay, formatTimeRange, useFaculty } from "./FacultyContext";
 
@@ -141,7 +141,11 @@ function InvitationCard({ invitation, onChanged }) {
       ) : (
         <>
           <ErrorLine message={error} />
-          <EApprovalNote />
+          <p className="meta">
+            {invitation.status === "Accepted"
+              ? "Your consent to sit on this panel is recorded (form GS-P-03). It is not your verdict. If you withdraw, the Research Coordinator finds a replacement."
+              : "Accept records your consent to sit on this panel (form GS-P-03). It is not your verdict. You can still withdraw later; the Research Coordinator then finds a replacement."}
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             {invitation.status !== "Accepted" && (
               <Button onClick={accept} disabled={busy}>
