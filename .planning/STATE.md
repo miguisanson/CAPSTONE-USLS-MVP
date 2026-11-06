@@ -1,5 +1,13 @@
 # State
 
+## 2026-11-06 - loop resumed (session "v6.4.1 polish loop, day 2")
+
+- Branch `v6.4.1-test`. Stale merged worktrees removed (16); left: `wt/f7`, `wt/gate`.
+- Running: `pkt/f7` in `wt/f7` (Sonnet: F7-01..09 from `.planning/research/FABLE-REVIEW3-2026-11-05.md`, on top of WIP 1e06453a);
+  persona round 5 (dean-phone, faculty-rare) on the persona server :5440 (reports `E:/Temp/claude/persona-uat/r5-*`).
+- Next: review + gate f7, merge; full Python gate (Lenovo via `run-job.sh --worker lenovo`, or `wt/gate`); full e2e `--build` +
+  autopilot; push; file persona rows; ISSUES triage of stale `confirmed` rows (I-040, I-091, I-129 look fixed).
+
 ## PAUSED 2026-11-05 night by the owner (to play a game) — resume here
 
 - Branch `v6.4.1-test` @ the commit after 97045aec (all merged work pushed). Owner's loop instructions: Desktop
