@@ -59,7 +59,7 @@ test.describe("staff Withdrawal board", () => {
       await route.fulfill({ response, json });
     });
     await page.goto("/workflow/withdrawal");
-    await page.getByRole("button", { name: "View details for Adrian Lim" }).click();
+    await page.getByRole("button", { name: "View details for Adrian Lim" }).first().click(); // the seed has two students named Adrian Lim; both cards are made "exported" above
     await expect(page.getByRole("dialog").getByRole("button", { name: "Mark as sent to the Registrar" })).toBeVisible();
   });
 });
