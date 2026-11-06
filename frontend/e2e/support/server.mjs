@@ -3,7 +3,7 @@
 // `e2e` npm script builds first. Nothing here touches the developer's own database, uploads or .env:
 // every path is passed explicitly through the environment.
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync, readdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { PORT, REPO_ROOT, FRONTEND_DIR, STATE_FILE, FINDINGS_DIR, SCREENS_DIR, SIGNIN_DIR, resolvePython } from "./paths.mjs";
@@ -20,8 +20,16 @@ if (process.env.E2E_NEGATIVE !== "1") rmSync(SCREENS_DIR, { recursive: true, for
 
 const base = process.env.USLS_E2E_TMP || tmpdir();
 mkdirSync(base, { recursive: true }); // a USLS_E2E_TMP folder that does not exist yet is made, not a crash
+// Old runs' folders only: a folder younger than 6 hours may belong to a run in another worktree (deleting it broke that run).
+const STALE_MS = 6 * 3600 * 1000;
 for (const name of readdirSync(base)) {
-  if (name.startsWith("usls-e2e-")) rmSync(join(base, name), { recursive: true, force: true, maxRetries: 3, retryDelay: 300 });
+  if (!name.startsWith("usls-e2e-")) continue;
+  try {
+    if (Date.now() - statSync(join(base, name)).mtimeMs < STALE_MS) continue;
+    rmSync(join(base, name), { recursive: true, force: true, maxRetries: 3, retryDelay: 300 });
+  } catch {
+    // still in use by another run: leave it
+  }
 }
 
 const python = resolvePython();
