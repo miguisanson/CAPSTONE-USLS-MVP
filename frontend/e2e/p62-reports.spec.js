@@ -148,9 +148,9 @@ test.describe("Activity Log", () => {
     await expect(page.getByRole("button", { name: /Clear filters/ })).toHaveCount(0);
 
     // the controls
-    const search = page.getByLabel("Search activity", { exact: true });
-    const workflow = page.getByLabel("Filter activity by workflow");
-    const owner = page.getByLabel("Filter activity by next owner");
+    const search = page.getByLabel("Search", { exact: true });
+    const workflow = page.getByLabel("Workflow");
+    const owner = page.getByLabel("Next owner");
     await expect(search).toHaveAttribute("placeholder", "Search activity or student…");
     await expect(workflow.locator("option").first()).toHaveText("All workflows");
     await expect(owner.locator("option").first()).toHaveText("All next owners");

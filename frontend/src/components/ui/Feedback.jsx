@@ -151,14 +151,17 @@ export function InlineNotice({ tone = "info", title, onDismiss, icon, children, 
 /**
  * A search field: magnifier on the left, a clear button once there is text, Escape clears.
  * `onChange` receives the new TEXT (not the event): `<SearchInput value={q} onChange={setQ} />`.
- * @param label  accessible name (visually hidden); default "Search"
+ * @param label  accessible name (visually hidden unless `showLabel`); default "Search"
+ * @param showLabel  show the label above the box, like a Field label (filter bars)
  */
-export function SearchInput({ value, onChange, placeholder = "Search…", label = "Search", className = "", inputClassName = "", ...rest }) {
+export function SearchInput({ value, onChange, placeholder = "Search…", label = "Search", showLabel = false, className = "", inputClassName = "", ...rest }) {
   const id = useId();
   const text = value ?? "";
   return (
-    <div className={cx("relative", className)}>
-      <label htmlFor={id} className="sr-only">{label}</label>
+    <div className={showLabel ? className : undefined}>
+    {showLabel && <label htmlFor={id} className="field-label">{label}</label>}
+    <div className={cx("relative", !showLabel && className)}>
+      {!showLabel && <label htmlFor={id} className="sr-only">{label}</label>}
       <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
       <input
         {...rest}
@@ -186,6 +189,7 @@ export function SearchInput({ value, onChange, placeholder = "Search…", label 
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       )}
+    </div>
     </div>
   );
 }

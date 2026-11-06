@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Activity, AlertTriangle, SlidersHorizontal } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Card, EmptyState, PageHeader, SearchInput, Select, Spinner } from "../components/ui/index.js";
+import { Card, EmptyState, Field, PageHeader, SearchInput, Select, Spinner } from "../components/ui/index.js";
 import { PAGE } from "../lib/labels.js";
 import { formatDateTime } from "../lib/format";
 
@@ -61,22 +61,25 @@ export default function ActivityLog() {
             value={filters.query}
             onChange={setFilter("query")}
             placeholder="Search activity or student…"
-            label="Search activity"
+            label="Search"
+            showLabel
           />
-          <Select
-            aria-label="Filter activity by workflow"
-            placeholder="All workflows"
-            value={filters.workflow}
-            onChange={(event) => setFilter("workflow")(event.target.value)}
-            options={workflows.map((workflow) => ({ value: workflow, label: workflowLabel(workflow) }))}
-          />
-          <Select
-            aria-label="Filter activity by next owner"
-            placeholder="All next owners"
-            value={filters.owner}
-            onChange={(event) => setFilter("owner")(event.target.value)}
-            options={owners}
-          />
+          <Field label="Workflow">
+            <Select
+              placeholder="All workflows"
+              value={filters.workflow}
+              onChange={(event) => setFilter("workflow")(event.target.value)}
+              options={workflows.map((workflow) => ({ value: workflow, label: workflowLabel(workflow) }))}
+            />
+          </Field>
+          <Field label="Next owner">
+            <Select
+              placeholder="All next owners"
+              value={filters.owner}
+              onChange={(event) => setFilter("owner")(event.target.value)}
+              options={owners}
+            />
+          </Field>
         </div>
         <div className="meta mt-2 flex flex-wrap items-center justify-between gap-2">
           <span>Showing {filtered.length} of {items.length} activities</span>
