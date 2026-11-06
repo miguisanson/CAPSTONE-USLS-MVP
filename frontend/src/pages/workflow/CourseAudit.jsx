@@ -12,25 +12,10 @@ const ROSTER_COLUMNS = [
 
 const MISSING_COLUMNS = [
   { key: "name", header: "Student", cell: (s) => <span className="font-semibold">{s.name}</span> },
-  { key: "count", header: "Missing", align: "right" },
-  { key: "next", header: "Next subject", cell: (s) => <span>Take next: {s.next}</span> },
+  { key: "missing_count", header: "Missing", align: "right" },
+  { key: "next", header: "Next subject", sortable: false, cell: (s) => <span>Take next: {s.next_codes.join(", ")}</span> },
   { key: "open", header: "", sortable: false, cell: (s) => <Link to={`/students/${s.id}`} className="font-semibold text-brand-700 underline">Open record</Link>, className: "whitespace-nowrap" },
 ];
-
-// Invert the demand list (subject -> affected students) into one row per student, subjects in code order.
-function missingByStudent(demand = []) {
-  const byId = new Map();
-  for (const row of demand) {
-    for (const st of row.affected_students || []) {
-      const entry = byId.get(st.id) || { id: st.id, name: st.name, subjects: [] };
-      entry.subjects.push(row.course.code);
-      byId.set(st.id, entry);
-    }
-  }
-  return [...byId.values()]
-    .map((e) => { const subjects = e.subjects.sort(); return { ...e, subjects, count: subjects.length, next: subjects.slice(0, 2).join(", ") }; })
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-}
 
 // ---------------------------------------------------------------------------
 // Course Audit: read-only end-of-term view (Ops Manual 4.3.8 / 4.18.4 step 3). The page card is drawn by WorkflowPage.
@@ -40,26 +25,40 @@ export function CourseAuditPanel() {
   const [courseId, setCourseId] = useState("");
   const [roster, setRoster] = useState(null);
   const [needs, setNeeds] = useState(null);
+  const [programId, setProgramId] = useState("");
+  const [termLabel, setTermLabel] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([api.courseAuditSubjects(), api.courseAdjustments()])
-      .then(([subs, adj]) => { setSubjects(subs.items || []); setNeeds(missingByStudent(adj.demand)); })
-      .catch((e) => setError(e.message));
+    api.courseAuditSubjects().then((subs) => setSubjects(subs.items || [])).catch((e) => setError(e.message));
   }, []);
 
+  // F8-02: the students with missing subjects come from the real course audit, one program at a time.
   useEffect(() => {
-    if (!courseId) { setRoster(null); return; }
+    let live = true;
+    setNeeds((old) => (old ? { ...old, items: null } : old));
+    api.courseAuditMissing(programId).then((r) => {
+      if (!live) return;
+      setNeeds(r);
+      setTermLabel(r.term_label || "");
+      if (!programId) setProgramId(String(r.program_id || ""));
+    }).catch((e) => live && setError(e.message));
+    return () => { live = false; };
+  }, [programId]);
+
+  // F8-03: the roster is for the active term, and only students in the class (not "Missing" rows) are counted.
+  useEffect(() => {
+    if (!courseId || termLabel === null) { setRoster(null); return; }
     let live = true;
     setRoster(null);
-    api.courseAuditRoster(courseId).then((r) => live && setRoster(r)).catch((e) => live && setError(e.message));
+    api.courseAuditRoster(courseId, termLabel).then((r) => live && setRoster(r)).catch((e) => live && setError(e.message));
     return () => { live = false; };
-  }, [courseId]);
+  }, [courseId, termLabel]);
 
   const counts = useMemo(() => {
-    const all = roster?.students || [];
-    const done = all.filter((s) => s.completed).length;
-    return `${all.length} enrolled · ${done} completed · ${all.length - done} not yet completed`;
+    const inClass = (roster?.students || []).filter((s) => s.status !== "Missing");
+    const done = inClass.filter((s) => s.completed).length;
+    return `${inClass.length} in the class · ${done} completed · ${inClass.length - done} not completed yet`;
   }, [roster]);
 
   if (error) return <EmptyState icon={AlertTriangle} title="Could not load the course audit" hint={error} />;
@@ -88,8 +87,18 @@ export function CourseAuditPanel() {
       </section>
 
       <section>
-        <SectionTitle title="Students with missing subjects" subtitle="Subjects each student still has to take, in code order." icon={UserX} />
-        <DataTable caption="Students with missing subjects" columns={MISSING_COLUMNS} rows={needs || []} rowKey="id" loading={!needs} minWidth="md" pageSize={10} empty={{ title: "No student has missing subjects" }} />
+        <SectionTitle title="Students with missing subjects" subtitle="From each student's course audit: subjects not taken yet or failed, in curriculum order. Subjects being taken now are not missing." icon={UserX} />
+        <div className="mb-3 max-w-md">
+          <Field label="Program">
+            <Select
+              value={programId}
+              onChange={(e) => setProgramId(e.target.value)}
+              aria-label="Program"
+              options={(needs?.programs || []).map((p) => ({ value: p.id, label: `${p.code} - ${p.name}` }))}
+            />
+          </Field>
+        </div>
+        <DataTable caption="Students with missing subjects" columns={MISSING_COLUMNS} rows={needs?.items || []} rowKey="id" loading={!needs?.items} minWidth="md" pageSize={10} empty={{ title: "No student of this program has missing subjects" }} />
         <p className="meta mt-2">Decide which subjects are offered on <Link to="/course-adjustments?view=adjustments" className="font-semibold text-brand-700 underline">Course Adjustments</Link>.</p>
       </section>
 

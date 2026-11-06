@@ -231,7 +231,8 @@ export function studentActions(data, { now = new Date(), researchGates = new Set
 // "Review the alert" -> "The Graduate School is reviewing the alert": the work belongs to the office, not the student (I-385).
 const officeTitle = (title) => {
   const text = String(title || "").trim();
-  return /^review /i.test(text) ? `The Graduate School is reviewing the ${text.slice(7).replace(/^the /i, "")}` : `The Graduate School is working on: ${text}`;
+  // I-417: the student reads "absence check", not "automatic AWOL policy alert" (a machine judging the student).
+  return /^review /i.test(text) ? `The Graduate School is reviewing the ${text.slice(7).replace(/^the /i, "").replace(/automatic AWOL policy alert/i, "absence check")}` : `The Graduate School is working on: ${text}`;
 };
 
 /**

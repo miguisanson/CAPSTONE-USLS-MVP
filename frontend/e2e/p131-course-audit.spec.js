@@ -16,8 +16,9 @@ test.describe("academic coordinator", () => {
     const subject = main(page).getByRole("combobox", { name: "Subject" });
     await expect(subject.locator("option").nth(1)).toBeAttached();
     await subject.selectOption({ index: 1 });
-    await expect(main(page).getByText(/^\d+ enrolled · \d+ completed · \d+ not yet completed$/)).toBeVisible();
+    await expect(main(page).getByText(/^\d+ in the class · \d+ completed · \d+ not completed yet$/)).toBeVisible();
     await expect(main(page).getByRole("heading", { level: 2, name: "Students with missing subjects" })).toBeVisible();
+    await expect(main(page).getByRole("combobox", { name: "Program" })).toBeVisible();
     await expect(main(page).getByText(/^Take next: /).first()).toBeVisible();
     await expect(main(page).getByRole("link", { name: "Open record" }).first()).toHaveAttribute("href", /^\/students\/\d+/);
     await expect(main(page).getByText("Completion comes from the AIMS export.")).toBeVisible();

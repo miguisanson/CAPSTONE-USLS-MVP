@@ -90,7 +90,9 @@ class F7Tests(unittest.TestCase):
     def test_graduation_history_only_on_eligible_students(self):
         with app.app_context():
             bad = []
-            for e in GraduationEndorsement.query.filter_by(endorsement_status="Registrar Received").all():
+            received = GraduationEndorsement.query.filter_by(endorsement_status="Registrar Received").all()
+            self.assertTrue(received, "F8-04: the seed has no Registrar Received history")
+            for e in received:
                 st = db.session.get(Student, e.student_id)
                 if st.current_stage != "Completed":
                     bad.append((st.name, st.current_stage))
