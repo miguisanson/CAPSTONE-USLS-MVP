@@ -106,7 +106,7 @@ test.describe("P7.6 one name per page: sidebar, breadcrumb and title agree", () 
       await expect(page.getByText(/Showing \d+ of \d+ activities/)).toBeVisible();
       await expect(page.locator("main ol > li").first(), "log entries are on the page without a click").toBeVisible();
       await expect(page.getByRole("button", { name: /View logs|Hide logs/ })).toHaveCount(0);
-      await expect(page.getByLabel("Search activity")).toBeVisible(); // filters stay
+      await expect(page.getByLabel("Search", { exact: true })).toBeVisible(); // filters stay
     });
   });
 

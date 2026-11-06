@@ -203,7 +203,7 @@ export default function PolicyDocuments() {
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${item.file_type === "DOCX" ? "bg-blue-50 text-blue-700" : "bg-red-50 text-red-700"}`}><FileText className="h-5 w-5" aria-hidden="true" /></span>
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0"><h3 className="card-title break-words sm:truncate" title={item.title}>{item.title}</h3><p className="meta mt-0.5 truncate">{item.original_name}</p></div>
+              <div className="min-w-0"><h3 className="card-title line-clamp-2 break-words" title={item.title}>{item.title}</h3><p className="meta mt-0.5 truncate">{item.original_name}</p></div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <StatusPill status={item.status} />
                 {(item.url || item.can_edit || item.can_delete) && <div className="relative" onClick={(event) => event.stopPropagation()}>

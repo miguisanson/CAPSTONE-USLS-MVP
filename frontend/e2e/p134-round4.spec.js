@@ -41,7 +41,7 @@ test.describe("admin", () => {
   test("I-395: the Activity Log workflow filter writes AWOL in capitals", async ({ page }) => {
     await page.goto("/activity");
     await expect(page.getByText(/Showing \d+ of \d+ activities/)).toBeVisible();
-    const options = await page.getByRole("combobox", { name: "Filter activity by workflow" }).locator("option").allTextContents();
+    const options = await page.getByRole("combobox", { name: "Workflow" }).locator("option").allTextContents();
     expect(options.filter((text) => /^awol$/i.test(text.trim())), options.join("|")).toEqual([]);
   });
 
