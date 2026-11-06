@@ -30,6 +30,15 @@ Plain list of what landed today. Rows are in `.planning/ISSUES.md`.
   Business Rules says "Not checked by the system" and shows rule codes to the admin only (I-406, I-410, I-411).
 - Persona round 6 (thesis student): I-412..I-415.
 
+- MERGED 3a9e2f4e ux6 (I-415 focus, I-398, I-399, I-405), 258b7634 srv7 (I-412 "Ready to Schedule", I-413, I-414),
+  f93425ba awol6 (I-416, I-418 tone, I-419), 23eba331 stu6 (I-425, I-426, I-428), 1c454420 gate6 (I-424).
+- I-422 fixed inline: the RC home said "undefined tasks past the due date" when Ready students were listed.
+- Fable review 4 (`.planning/research/FABLE-REVIEW4-2026-11-06.md`): no P1; F8-01 spec fixed; F8-02..09 -> `pkt/f8`.
+- Persona round 6 (thesis student, AWOL student, Research Coordinator, new student, admin): I-412..I-431. I-421 (P1:
+  Title Defense "Panel is in place" with no panel) diagnosed, fix queued after f8.
+- Full Python gate on 751a6599: 1,276 tests, 3 failed (seeded graduation history empty since F7-02 -> F8-04 in f8) + 1
+  error (calendar test date-dependent on Fridays -> fixed 484b2ac8).
+
 ## In progress
 
 - `pkt/ux6` (I-415, I-398, I-399, I-405), `pkt/srv7` (I-412, I-413, I-414), Fable review 4. Full Python gate on 751a6599.
