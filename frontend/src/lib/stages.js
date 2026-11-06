@@ -75,3 +75,6 @@ export function stageSteps(stage, stages = DEFAULT_STAGES, record = null) {
   }
   return steps;
 }
+
+/** A stage as people read it: "LOA" and "AWOL" spelled out (I-397); every other stage is already plain. */
+export const stageWords = (stage) => ({ LOA: "Leave of Absence", AWOL: "AWOL (absent without leave)" })[stage] || stage;

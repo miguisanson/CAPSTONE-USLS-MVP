@@ -77,7 +77,7 @@ for (const view of VIEWS) {
     test("numbers that measure different things say so in their labels (I-193)", async ({ page }) => {
       await page.goto("/dean/analytics");
       const strip = page.getByRole("group", { name: "Summary numbers" });
-      await expect(strip.getByRole("button", { name: /Requests waiting more than 7 days \(all offices\)/ })).toBeVisible();
+      await expect(strip.getByRole("button", { name: /All offices: requests waiting more than 7 days/ })).toBeVisible();
       await expect(strip.getByRole("button", { name: /Active students/ })).toContainText("Standing Active, not completed or withdrawn");
       await page.goto("/dean");
       await expect(page.getByText("Waiting on you over 7 days", { exact: true })).toBeVisible();

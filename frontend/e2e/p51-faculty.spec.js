@@ -170,8 +170,8 @@ test.describe("My Advisees", () => {
 
     // I-079: ONE table, every student once, all the columns.
     await expect(main(page).locator("table")).toHaveCount(1);
-    const table = tableWith(page, "Needs signature");
-    expect(await headerNames(table)).toEqual(["Student", "Program", "Stage", "Adviser contract", "Documents", "Needs signature"]);
+    const table = tableWith(page, "Documents to sign");
+    expect(await headerNames(table)).toEqual(["Student", "Program", "Stage", "Adviser contract", "Documents", "Documents to sign"]);
     const names = await table.locator("tbody tr td:first-child p.font-semibold").allTextContents();
     expect(new Set(names).size, "no student listed twice").toBe(names.length);
     // every advisee the API knows is one row with that student's own program, stage, documents and signatures
@@ -183,10 +183,10 @@ test.describe("My Advisees", () => {
       await expect(row, entry.student.name).toHaveCount(1);
       await expect(row).toContainText(entry.student.name);
       await expect(row).toContainText(entry.student.program_code);
-      await expect(row).toContainText(entry.student.current_stage || "Not set");
+      await expect(row).toContainText(({ LOA: "Leave of Absence", AWOL: "AWOL (absent without leave)" }[entry.student.current_stage] || entry.student.current_stage || "Not set"));
       await expect(row.locator("td").nth(4)).toHaveText(String(entry.documents.length));
       if (entry.pending_count) await expect(row.locator("td").nth(5)).toContainText(`${entry.pending_count} pending`);
-      else await expect(row.locator("td").nth(5)).toHaveText("No signature needed");
+      else await expect(row.locator("td").nth(5)).toHaveText("None");
     }
     await shots(page, "advisees");
   });

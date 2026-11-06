@@ -16,11 +16,14 @@ import { DEFAULT_PERIOD, FRAME_KEYS, PERIODS, apiScope, scopeKey } from "./scope
 const LOWER_IS_BETTER = new Set(["behind", "waiting", "decide_days"]);
 const UNIT_TEXT = { "%": "%", days: " days" };
 
+// "0 waiting", "at most 10%": the goal itself, so a tile never says "misses target" without naming it.
+const targetGoal = (tile, target) => `${target ? "at most " : ""}${target}${tile.key === "waiting" ? " waiting" : UNIT_TEXT[tile.unit] || ""}`;
+
 /** The words, arrow and tone of one tile's comparison. The words carry the meaning; the colour only backs them up. */
 export function describeComparison(tile) {
   const c = tile.comparison;
   if (c.kind === "target") {
-    return { trend: c.met ? "target-met" : "target-missed", Icon: c.met ? Minus : ArrowUp, tone: c.met ? "text-emerald-700" : "text-red-700", words: `${c.met ? "Meets" : "Misses"} ${c.text}` };
+    return { trend: c.met ? "target-met" : "target-missed", Icon: c.met ? Minus : ArrowUp, tone: c.met ? "text-emerald-700" : "text-red-700", words: `Target: ${targetGoal(tile, c.target)} · ${c.met ? "met" : "missed"}` };
   }
   if (c.kind === "previous_term") {
     const unit = UNIT_TEXT[tile.unit] || "";
@@ -56,7 +59,7 @@ function Tile({ tile, onOpen }) {
       onClick={() => onOpen(tile)}
       className="card flex h-full w-full cursor-pointer flex-col gap-1 p-3 text-left sm:p-4 transition-colors hover:border-brand-200 hover:bg-brand-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     >
-      <span className="text-xs font-semibold text-slate-600">{tile.key === "waiting" ? `${tile.label} (all offices)` : tile.label}</span>
+      <span className="text-xs font-semibold text-slate-600">{tile.key === "waiting" ? `All offices: ${tile.label.charAt(0).toLowerCase()}${tile.label.slice(1)}` : tile.label}</span>
       <span className="page-title">
         {tile.value == null ? "-" : tile.value}
         {tile.value != null && <span className="ml-1 text-sm font-medium text-slate-500">{unit}</span>}

@@ -83,7 +83,7 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
 
   return (
     <section ref={sectionRef} className="card p-3" aria-label="Google Calendar connection">
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
           <CalendarCheck2 className="h-4 w-4" aria-hidden="true" />
         </span>
@@ -104,15 +104,22 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
             </p>
           )}
         </div>
+        {!connected && (
+          <Button data-connect="" size="sm" icon={CalendarCheck2} loading={operation === "connect"} onClick={connectCalendar} className="shrink-0">
+            Connect Google Calendar
+          </Button>
+        )}
       </div>
-      <p className="mt-3 text-xs leading-relaxed text-slate-600">
+      <p className={`${connected ? "mt-3" : "mt-1"} text-xs leading-relaxed text-slate-600`}>
         {connected
           ? "Busy times prevent scheduling conflicts. New defense schedules are added to this calendar automatically."
-          : "Connect once to check busy times and add new defense schedules automatically."}
+          : "Connect once to check busy times (your main Google calendar only) and add new defense schedules automatically."}
       </p>
-      <p className="mt-1 text-xs leading-relaxed text-slate-600">
-        Only events on your main Google calendar (the one with your name) count as busy.
-      </p>
+      {connected && (
+        <p className="mt-1 text-xs leading-relaxed text-slate-600">
+          Only events on your main Google calendar (the one with your name) count as busy.
+        </p>
+      )}
       {connected ? (
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
           <Button data-connect="" variant="secondary" size="sm" icon={CalendarCheck2} loading={operation === "connect"} disabled={Boolean(operation)} onClick={connectCalendar}>
@@ -125,11 +132,7 @@ export function FacultyCalendarConnection({ calendar, onChanged }) {
             Disconnect calendar
           </Button>
         </div>
-      ) : (
-        <Button data-connect="" size="sm" icon={CalendarCheck2} loading={operation === "connect"} onClick={connectCalendar} className="mt-3 w-full">
-          Connect Google Calendar
-        </Button>
-      )}
+      ) : null}
       {needsReconnect && (
         <InlineNotice tone="warning" className="mt-2">
           Google no longer accepts the saved permission, so busy times cannot be checked and no defenses are added. Select Reconnect calendar to allow it again.

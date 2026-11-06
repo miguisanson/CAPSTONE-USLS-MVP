@@ -211,7 +211,7 @@ function SidebarContent({ onNavigate, onClose, user, identity, onSignOut }) {
         </p>
       )}
 
-      <nav ref={navRef} style={NAV_SCROLL_SHADOW} className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 pb-6">
+      <nav ref={navRef} style={NAV_SCROLL_SHADOW} className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 pb-9">
         {groups.map((group) => (
           <div key={group.label}>
             <p className="eyebrow px-3 pb-2">{group.label}</p>
