@@ -45,7 +45,7 @@ const REPORTS = [
   { id: "overdue", tab: "Overdue and pending", inTab: "Overdue and pending" },
   { id: "defenses", tab: "Defenses", inTab: "By year started" },
 ];
-const TABS_AFTER_NEW = ["By year started", "Overdue and pending", "Registrar changes"];
+const TABS_AFTER_NEW = ["By year started", "Graduation", "Overdue and pending", "Registrar changes"];
 const OLD_TABS = [
   "Dashboard summary", "Daily changes", "Missing requirements", "Practicum monitoring", "Withdrawal requests",
   "LOA/readmission", "At-risk", "Open/overdue tasks", "Research completion", "Queue aging & backlog",

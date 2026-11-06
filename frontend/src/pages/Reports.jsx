@@ -2,7 +2,7 @@
 // shared frame (reports/ReportsFrame.jsx). Staff and the Academic Coordinator get the office views and the older
 // reports the redesign keeps; the Research Coordinator gets the three views the research flow needs.
 import { Link } from "react-router-dom";
-import { AlertOctagon, BarChart3, ClipboardCheck, Clock, ListTodo, RefreshCw, Timer } from "lucide-react";
+import { AlertOctagon, BarChart3, ClipboardCheck, Clock, GraduationCap, ListTodo, RefreshCw, Timer } from "lucide-react";
 import { useAuth } from "../auth";
 import { Button } from "../components/ui/index.js";
 import { PAGE } from "../lib/labels.js";
@@ -14,7 +14,7 @@ import { REPORTS } from "./reports/reportConfig.js";
 import YearStartedView from "./reports/YearStartedView.jsx";
 import { AttentionView, RecordsView, SpeedView, StagesView } from "./reports/StaffViews.jsx";
 
-const ICONS = { overdue: ListTodo };
+const ICONS = { overdue: ListTodo, graduation: GraduationCap };
 
 const NEW_TABS = {
   attention: { id: "attention", label: "Needs attention", icon: AlertOctagon, filters: ["cause"], render: (c) => <AttentionView {...c} /> },
@@ -42,11 +42,13 @@ const YEAR_STARTED = {
   filters: [...new Set(YEAR_REPORTS.flatMap((report) => report.filters.map((spec) => spec.key)).concat("view"))],
   render: (c) => <YearStartedView {...c} />,
 };
+// I-407: the Dean-ready list is its own tab (id differs so the old ?report=graduation address still opens By year started).
+const GRADUATION = { ...olderTab(REPORTS.find((r) => r.id === "graduation")), id: "graduation-list", label: "Graduation" };
 const DAILY = { id: "daily-changes", label: "Registrar changes", icon: RefreshCw, bare: true, render: () => <DailyChanges /> };
 
 export function reportTabs(role) {
   if (role === "research_coordinator") return [NEW_TABS.attention, NEW_TABS.stages, NEW_TABS.fix];
-  return [NEW_TABS.attention, NEW_TABS.stages, NEW_TABS.speed, NEW_TABS.fix, YEAR_STARTED, olderTab(REPORTS.find((r) => r.id === "overdue")), DAILY];
+  return [NEW_TABS.attention, NEW_TABS.stages, NEW_TABS.speed, NEW_TABS.fix, YEAR_STARTED, GRADUATION, olderTab(REPORTS.find((r) => r.id === "overdue")), DAILY];
 }
 
 export default function Reports() {
