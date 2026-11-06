@@ -3,7 +3,7 @@ import { ArrowRight, Compass, LayoutDashboard, Route } from "lucide-react";
 import { SectionCard, Stepper, StatusChip } from "../../components/ui/index.js";
 import RoleHome from "../../components/RoleHome.jsx";
 import { formatDate, relativeDays } from "../../lib/format";
-import { stageSteps } from "../../lib/stages.js";
+import { stageSteps, stageWords } from "../../lib/stages.js";
 import { forStudent } from "../../lib/status.js";
 import { VIEW_LABELS, subjectsLeftText, studentActions, studentActivity, studentTasks, studentWaiting } from "../../lib/studentHome.js";
 import { useStudentPortal } from "./StudentPortalContext";
@@ -177,7 +177,7 @@ export default function StudentOverview() {
       activityEmpty={{ title: "No activity yet", hint: "Submissions, decisions and replies will appear here." }}
       extra={
         <>
-          <SectionCard as="section" title="Your lifecycle" subtitle={`You are at: ${student.current_stage}`} icon={Route}>
+          <SectionCard as="section" title="Your lifecycle" subtitle={`You are at: ${stageWords(student.current_stage)}`} icon={Route}>
             <Stepper steps={stageSteps(student.current_stage, data.stages, { courseAudit: data.course_audit, comprehensivePassed: student.comprehensive_exam_status === "Passed" })} />
           </SectionCard>
           <PageLinks data={data} />

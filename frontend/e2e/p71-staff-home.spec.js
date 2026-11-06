@@ -102,11 +102,11 @@ test.describe("staff home", () => {
     expect(await main(page).locator(".recharts-wrapper, svg.recharts-surface").count(), "charts left the home (IM20)").toBe(0);
 
     const labels = (await main(page).locator('[data-slot="label"]').allTextContents()).map((t) => t.trim().toLowerCase());
-    expect([...labels].sort(), "the key-number labels").toEqual(["at risk or delayed", "confirmed defenses", "students monitored", "your open tasks"]);
+    expect([...labels].sort(), "the key-number labels").toEqual(["active students at risk or delayed", "confirmed defenses", "students monitored", "your open tasks"]);
     const kpis = (await (await context.request.get("/api/dashboard")).json()).kpis;
     const value = (name) => main(page).locator('[data-slot="label"]', { hasText: new RegExp(`^${name}$`, "i") }).locator("xpath=..").locator('[data-slot="value"]');
     await expect(value("Students monitored")).toHaveText(String(kpis.total_students));
-    await expect(value("At risk or delayed")).toHaveText(String(kpis.at_risk));
+    await expect(value("Active students at risk or delayed")).toHaveText(String(kpis.at_risk));
     await expect(value("Confirmed defenses")).toHaveText(String(kpis.confirmed_schedules));
     // every figure is on the page once: the old second strip (Active / On leave / Completed / Overdue tasks) is gone
     for (const gone of ["Active", "On leave", "Completed", "Overdue tasks"]) {
