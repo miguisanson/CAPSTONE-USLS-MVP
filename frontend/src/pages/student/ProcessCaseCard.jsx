@@ -5,6 +5,7 @@ import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { LeaveTimeline, leaveCaseStatusBadge } from "../../components/leaveStatus";
 import { returnCommentOf } from "./LeaveCaseCards";
 import { Fact } from "./shared";
+import { forStudent } from "../../lib/status.js";
 
 // The student's view of one AWOL / residency or withdrawal case. It is the same card the
 // student sees for a Leave of Absence or a Readmission (LeaveCaseCard): title and summary,
@@ -37,14 +38,16 @@ const eventEntry = (entry) => ({
   note: entry.comment,
 });
 
-export function ProcessCaseCard({ item, current = true, onChanged }) {
+export function ProcessCaseCard({ item, current = true, onChanged, returning = "" }) {
   const Icon = ICONS[item.kind] || LogOut;
   const open = Boolean(item.owner) && item.timeline?.some((step) => step.state === "current");
   const returned = RETURNED.includes(item.status);
   const returnComment = returned ? returnCommentOf(item) : "";
   const messages = item.messages || [];
   const events = item.events || [];
-  const rows = (item.summary_rows || []).filter((row) => !OFFICE_LABELS.has(row.label) && row.value !== "Not filed yet");
+  // The form on the same page decides the semester, so the card shows what the form says right now (I-419).
+  const live = (row) => (returning && row.label === "Returning in" ? { ...row, value: returning } : row);
+  const rows = (item.summary_rows || []).map(live).filter((row) => !OFFICE_LABELS.has(row.label) && row.value !== "Not filed yet");
   const facts = rows.filter((row) => !row.full && row.value && row.value !== "None" && row.value !== "Not recorded");
   const texts = rows.filter((row) => row.full && row.value && row.value !== "None");
   return (
@@ -57,11 +60,11 @@ export function ProcessCaseCard({ item, current = true, onChanged }) {
           <div className="min-w-0">
             <h3 className="card-title">{item.kind_label}</h3>
             {(item.card_lines || []).filter(Boolean).map((line, index) => (
-              <p key={index} className={index === 0 ? "mt-0.5 text-sm text-slate-600" : "meta"}>{plainWords(line)}</p>
+              <p key={index} className={index === 0 ? "mt-0.5 text-sm text-slate-600" : "meta"}>{returning && /^Returning in:/i.test(line) ? `Returning in: ${returning}` : plainWords(line)}</p>
             ))}
           </div>
         </div>
-        {leaveCaseStatusBadge({ ...item, status_label: plainWords(item.status_label) })}
+        {leaveCaseStatusBadge({ ...item, status: forStudent(item.status), status_label: forStudent(plainWords(item.status_label)) })}
       </div>
 
       {open && (
@@ -117,12 +120,12 @@ export function ProcessCaseCard({ item, current = true, onChanged }) {
 }
 
 /** The current case in full and every earlier one collapsed, like the Leave and Readmission pages. */
-export function ProcessCaseList({ cases = [] }) {
+export function ProcessCaseList({ cases = [], returning = "" }) {
   if (!cases.length) return null;
   const [current, ...earlier] = cases;
   return (
     <div className="space-y-3">
-      <ProcessCaseCard item={current} />
+      <ProcessCaseCard item={current} returning={returning} />
       {earlier.length > 0 && (
         <HistoryPanel label="Earlier requests" hideLabel="Hide earlier requests" count={earlier.length}>
           <div className="space-y-3">

@@ -20,6 +20,8 @@ import { useStudentPortal } from "./StudentPortalContext";
 import { RequestSentContext, STUDENT_MESSAGE_SLUG_BY_VIEW, StudentClarificationPanel, StudentSchedulePanel, isLiveSchedule } from "./shared";
 import { BOOKABLE_DEFENSES, ResearchRequestForm, ScheduleRequestForm } from "./ResearchForms";
 import PolicyRules from "../../components/PolicyRules";
+import { programLevelOf } from "../../lib/programRules.js";
+import { forStudent } from "../../lib/status.js";
 import AdviserPanelCard from "./AdviserPanelCard";
 
 // Which business-rules process each request page applies (shown as "Rules applied").
@@ -169,7 +171,7 @@ export function StudentRequestPage({ id, aside = null }) {
         title={page.title}
         description={page.description}
         icon={Icon}
-        badge={<StatusChip status={id === "research" && defenseToRequest(data) ? "Waiting on you" : requestStateLabel(requestStatus(id, data))} dot={false} />}
+        badge={<StatusChip status={id === "research" && defenseToRequest(data) ? "Waiting on you" : forStudent(requestStateLabel(requestStatus(id, data)))} dot={false} />}
         actions={
           <Button as={Link} to="/student/requests" variant="secondary" icon={ArrowLeft}>
             All requests
@@ -186,7 +188,7 @@ export function StudentRequestPage({ id, aside = null }) {
           </InlineNotice>
         )}
         {messageSlug && <StudentClarificationPanel slug={messageSlug} data={data} onSaved={refetch} />}
-        {STUDENT_RULE_PROCESS_BY_VIEW[id] && <PolicyRules process={STUDENT_RULE_PROCESS_BY_VIEW[id]} className="mb-4" />}
+        {STUDENT_RULE_PROCESS_BY_VIEW[id] && <PolicyRules process={STUDENT_RULE_PROCESS_BY_VIEW[id]} programLevel={programLevelOf(data.student)} className="mb-4" />}
         {locked ? (
           <InlineNotice tone="neutral" icon={Lock}>{lockedReasonFor(item, data)}</InlineNotice>
         ) : (

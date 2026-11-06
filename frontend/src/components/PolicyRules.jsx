@@ -5,6 +5,7 @@ import { api } from "../api";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth";
 import { StatusChip } from "./ui/index.js";
+import { splitRulesByProgram } from "../lib/programRules.js";
 
 // "14 days", "Yes", "1.75 grade" — one place so the page and the workflow
 // screens always show a rule value the same way.
@@ -34,10 +35,11 @@ export function RuleBadges({ rule, showReview = true }) {
 // (handbook page, protocol section). Pass the process key from the register:
 // enrollment, course_adjustment, withdrawal, dropping, loa, readmission,
 // awol_residency, research, defense, practicum, graduation, faculty.
-export default function PolicyRules({ process, title = "Rules applied on this screen", className = "", defaultOpen = false, onlyEnforced = false }) {
+export default function PolicyRules({ process, title = "Rules applied on this screen", className = "", defaultOpen = false, onlyEnforced = false, programLevel = "" }) {
   const { user } = useAuth();
   const { data } = useApi(() => (process ? api.businessRules({ process }) : Promise.resolve({ items: [] })), [process]);
   const [open, setOpen] = useState(defaultOpen);
+  const [showOthers, setShowOthers] = useState(false);
   const items = (data?.items || []).filter((rule) => !onlyEnforced || rule.enforced);
   if (!items.length) return null;
   const canOpenPage = user && user.role !== "student" && user.role !== "faculty";
@@ -46,6 +48,20 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
   const gsStaff = canOpenPage && user.role !== "dean";
   const needsReview = gsStaff ? items.filter((rule) => rule.status === "needs_review").length : 0;
   const sourceOf = (rule) => (!gsStaff && /^(Prototype|Proposed) rule/i.test(rule.citation || "") ? "Graduate School policy" : rule.citation);
+
+  const { mine, others } = splitRulesByProgram(items, programLevel);
+  const ruleCard = (rule) => (
+    <div key={rule.key} className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <p className="min-w-0 flex-1 text-sm font-semibold text-ink">{rule.title}</p>
+        <span className="shrink-0 rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white">{formatRuleValue(rule)}</span>
+      </div>
+      <p className="meta mt-1 leading-relaxed text-slate-600">{rule.description}</p>
+      <p className="meta mt-1.5 font-semibold text-brand-800">Source: {sourceOf(rule)}{rule.source_section ? ` (${rule.source_section})` : ""}</p>
+      <div className="mt-1.5"><RuleBadges rule={rule} showReview={gsStaff} /></div>
+      {!rule.enforced && rule.not_enforced_reason && <p className="micro mt-1">{rule.not_enforced_reason}</p>}
+    </div>
+  );
 
   return (
     <section className={`rounded-2xl border border-brand-100 bg-brand-50/40 ${className}`} aria-label={title}>
@@ -60,7 +76,7 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-ink">{title}</span>
             <span className="meta block break-words">
-              {items.length} rule{items.length === 1 ? "" : "s"} from the Graduate School policies{gsStaff ? ` · ${needsReview || "none"} awaiting sign-off` : ""}
+              {mine.length} rule{mine.length === 1 ? "" : "s"} from the Graduate School policies{gsStaff ? ` · ${needsReview || "none"} awaiting sign-off` : ""}
             </span>
           </span>
         </span>
@@ -68,18 +84,16 @@ export default function PolicyRules({ process, title = "Rules applied on this sc
       </button>
       {open && (
         <div className="space-y-3 border-t border-brand-100 px-4 pb-4 pt-3">
-          {items.map((rule) => (
-            <div key={rule.key} className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <p className="min-w-0 flex-1 text-sm font-semibold text-ink">{rule.title}</p>
-                <span className="shrink-0 rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white">{formatRuleValue(rule)}</span>
-              </div>
-              <p className="meta mt-1 leading-relaxed text-slate-600">{rule.description}</p>
-              <p className="meta mt-1.5 font-semibold text-brand-800">Source: {sourceOf(rule)}{rule.source_section ? ` (${rule.source_section})` : ""}</p>
-              <div className="mt-1.5"><RuleBadges rule={rule} showReview={gsStaff} /></div>
-              {!rule.enforced && rule.not_enforced_reason && <p className="micro mt-1">{rule.not_enforced_reason}</p>}
+          {mine.map(ruleCard)}
+          {others.length > 0 && (
+            <div>
+              <button type="button" onClick={() => setShowOthers((value) => !value)} aria-expanded={showOthers} className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-1 text-left text-sm font-semibold text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+                Rules for other programs ({others.length})
+                <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${showOthers ? "rotate-180" : ""}`} aria-hidden="true" />
+              </button>
+              {showOthers && <div className="mt-2 space-y-3">{others.map(ruleCard)}</div>}
             </div>
-          ))}
+          )}
           {canOpenPage && (
             <p className="meta text-right"><Link to="/business-rules" className="font-semibold text-brand-700 underline-offset-2 hover:underline">See every business rule and its history</Link></p>
           )}

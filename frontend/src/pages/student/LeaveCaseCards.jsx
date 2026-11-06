@@ -75,7 +75,7 @@ export function LeaveBanner({ banner, linkTo = "", linkLabel = "", className = "
     linkLabel = `Open ${PAGE.returnFromAwol}`;
   }
   return (
-    <InlineNotice tone={banner.tone || "info"} title={banner.title} icon className={className}>
+    <InlineNotice tone={banner.tone === "bad" && /AWOL/.test(banner.title || "") ? "warning" : banner.tone || "info"} title={banner.title} icon className={className}>
       {banner.text && <p>{banner.text}</p>}
       {linkTo && (
         <Link to={linkTo} className="mt-2 inline-flex items-center gap-1 font-semibold underline">

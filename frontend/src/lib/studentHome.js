@@ -143,7 +143,7 @@ export function studentActions(data, { now = new Date(), researchGates = new Set
       kind: "banner",
       title: banner.title,
       detail: banner.text || "",
-      tone: banner.tone === "bad" ? "danger" : "warning",
+      tone: "warning", // never red: the student is being told, not blamed
       target: bannerTarget(data),
     });
   }

@@ -278,8 +278,9 @@ test.describe("conD: student pages that are alike behave alike", () => {
       try {
         await page.goto(spec.path);
         if (name === "awol") {
-          await page.getByLabel(/Intended return semester/).selectOption({ index: 1 });
           await page.getByLabel(/Written intention to resume enrollment/).fill("Spec: I will return.");
+          // I-419: with one allowed semester the form shows it as text, not a select
+          if (await page.getByLabel(/Intended return semester/).count()) await page.getByLabel(/Intended return semester/).selectOption({ index: 1 });
           await page.getByLabel(/Reason for returning and readiness/).fill("Spec: ready.");
         } else {
           await page.getByLabel(/Reason for withdrawing from this subject/).fill("Spec: schedule clash.");

@@ -22,7 +22,7 @@ export const STATUS_GROUPS = {
     "Ready for Dean Review","Pending Handoff","Needs Review","Pending","INC","Incomplete","Pending staff verification",
     "Pending panel matching","Pending confirmed schedule","Pending Subject Tag","Pending Excel Export","Sync pending",
     "Needs generation","Needs verification","Awaiting Implementation","Approved - Awaiting Subject Tag","Pending scheduling",
-    "Revisions Submitted - Awaiting Confirmation","Staff Review","Awaiting Review","For Review"],
+    "Revisions Submitted - Awaiting Confirmation","Staff Review","Awaiting Review","For Review","Absent without leave","Behind schedule"],
   // Orange: sent back, or something is missing - a person must act (AD2: never red).
   attention: ["Returned","Returned for Revision","Returned for Clarification","Returned to student","Needs Revision",
     "Revisions Required","Revisions Pending","Resubmission Required","Needs Re-confirmation","Return Due","Upload required",
@@ -51,6 +51,10 @@ export const STATUS_TONE = Object.fromEntries(
 
 /** Server status words that are jargon, shown in words (the tone still follows the original). */
 const STATUS_LABEL = { "noted by ac": "Noted by Academic Coordinator" };
+/** On a student's own pages the red words read as blame: say them plainly and in amber. */
+const STUDENT_WORDS = { "awol declared": "Absent without leave", awol: "Absent without leave", delayed: "Behind schedule" };
+export const forStudent = (status) => STUDENT_WORDS[String(status || "").trim().toLowerCase()] || status;
+
 export const statusLabel = (status) => STATUS_LABEL[String(status || "").trim().toLowerCase()] || status;
 
 /** The server's `status_tone` words -> tone names. */
