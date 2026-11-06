@@ -33,7 +33,7 @@ function AdviseeMeter({ meter }) {
           })}
         </div>
         {full ? (
-          <p className="meta font-semibold text-amber-800">You are at the limit. The Dean can appoint a sixth adviser only as a recorded exception.</p>
+          <p className="meta font-semibold text-amber-800">You are at the limit. The Dean can assign a sixth advisee only as a recorded exception.</p>
         ) : (
           <p className="meta">{max - active} place{max - active === 1 ? "" : "s"} left.</p>
         )}

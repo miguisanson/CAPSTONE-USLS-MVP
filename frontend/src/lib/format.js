@@ -90,13 +90,12 @@ export function relativeDays(value) {
   return `${Math.abs(diff)}d ago`;
 }
 
+// First and last name; a title ("Dr.", "Prof.") or a role in brackets is not part of the name.
+const NAME_TITLES = /^(dr|prof|atty|engr|mr|mrs|ms|fr|sr|sis|rev)\.?$/i;
 export function initials(name = "") {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
+  const parts = String(name || "").replace(/\(.*?\)/g, " ").split(/\s+/).filter((part) => part && !NAME_TITLES.test(part));
+  const picked = parts.length > 1 ? [parts[0], parts[parts.length - 1]] : parts;
+  return picked.map((part) => part[0].toUpperCase()).join("");
 }
 
 // Brand-aligned chart palette.

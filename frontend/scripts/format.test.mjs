@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatClock, formatDate, formatDateTime, formatDay, formatTimeRange, todayISO } from "../src/lib/format.js";
+import { formatClock, formatDate, formatDateTime, formatDay, formatTimeRange, initials, todayISO } from "../src/lib/format.js";
 
 // I-200: "today" is the Philippine day, like the server's ph_today(), whatever zone the browser runs in.
 test("todayISO is the Manila date, not the UTC date", () => {
@@ -39,4 +39,13 @@ test("formatTimeRange writes the half of the day once when both ends share it", 
   assert.equal(formatTimeRange("2026-11-17T18:00", "2026-11-17T20:00"), "6:00 – 8:00 PM");
   assert.equal(formatTimeRange("18:00", ""), "6:00 PM");
   assert.equal(formatTimeRange("", ""), "");
+});
+
+// Persona round 5 (faculty-rare): the avatar read "DL" for "Dr. Liwayway Bautista" while the page greeted "Liwayway".
+test("initials skip a title and a role suffix and use the first and last name", () => {
+  assert.equal(initials("Dr. Liwayway Bautista"), "LB");
+  assert.equal(initials("Prof. Ana Maria Cruz (Faculty)"), "AC");
+  assert.equal(initials("Juan dela Cruz"), "JC");
+  assert.equal(initials("Registrar"), "R");
+  assert.equal(initials(""), "");
 });

@@ -36,6 +36,7 @@ import { PORTAL_NAV, PORTAL_FOOTERS, findNavItem, usePortalNav } from "./portalN
 import NotificationBell from "./NotificationBell";
 import DemoGuide from "./DemoGuide";
 import { PAGE, PORTAL_NAMES, RECORD_LABELS, stepLabel, withoutStep } from "../lib/labels.js";
+import { initials } from "../lib/format.js";
 import { RecordTitleProvider } from "./recordTitle.jsx";
 
 // Ordered top-to-bottom to follow the graduate lifecycle, so a new staff user
@@ -276,13 +277,7 @@ export default function Layout({ children }) {
   const roleLabel = user?.program || ROLE_LABELS[user?.role] || "Staff";
   const identity = `${nameWithoutRole(user?.full_name, roleLabel, user?.role) || "Graduate School Staff"} · ${roleLabel}`;
 
-  const initials = (user?.full_name || "GS")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
+  const avatarInitials = initials(user?.full_name) || "GS";
 
   return (
     <div className="min-h-screen lg:flex">
@@ -319,7 +314,7 @@ export default function Layout({ children }) {
             <NotificationBell />
             <Button variant="icon" icon={LogOut} aria-label="Sign out" onClick={logout} />
             <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-600 text-sm font-semibold text-white" aria-hidden="true">
-              {initials}
+              {avatarInitials}
             </span>
           </div>
         </header>
