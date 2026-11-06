@@ -100,7 +100,7 @@ export default function Dashboard() {
     target: { to: entry.to || researchReady.view_all, label: "Open the Research Gate" },
   }));
   const actions = readyItems.length
-    ? { items: [...readyItems, ...taskActions.items], total: taskActions.total + researchReady.total }
+    ? { ...taskActions, items: [...readyItems, ...taskActions.items], total: taskActions.total + researchReady.total } // keeps overdue and dueSoon for the tiles
     : taskActions;
   const waiting = officeWaiting(data.all.items, role);
   // F5-14: the Research Coordinator's "Waiting on others" lists the students waiting on a panel verdict (max 3), not tasks.

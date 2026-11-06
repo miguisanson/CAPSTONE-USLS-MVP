@@ -30,6 +30,9 @@ test("I-388: the Research Coordinator home lists Ready students under Needs your
   await expect(main(page).getByText("Nothing is waiting on you")).toHaveCount(0);
   await expect(main(page).getByRole("link", { name: `View all ${ready.length} ready students` })).toHaveAttribute("href", "/workflow/research-gate");
   await expect(main(page).getByText("Ready", { exact: true }).first()).toBeVisible();
+  // persona round 6 (coordinator-research): the open-tasks tile read "undefined tasks past the due date" when Ready students were listed
+  await expect(main(page).getByText(/undefined|NaN/)).toHaveCount(0);
+  await expect(main(page).getByText(/\d+ tasks? past the due date/)).toBeVisible();
 });
 
 test("I-387: the student search says Ready for a Ready student", async ({ page }) => {
