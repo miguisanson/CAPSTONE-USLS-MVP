@@ -17,6 +17,7 @@ import { NOT_SUBMITTED, requestStateLabel } from "./requestMeta";
 import { stageSteps } from "../../lib/stages";
 import { RESEARCH_GATE_KEYS } from "./shared";
 import { PAGE } from "../../lib/labels.js";
+import { subjectsLeftText } from "../../lib/studentHome.js";
 
 export function ProgressPanel({ data }) {
   const { stages, student, course_audit, research_case } = data;
@@ -37,7 +38,7 @@ export function ProgressPanel({ data }) {
           </div>
           <ProgressBar value={course_audit.completion_rate} />
           <p className="meta mt-2">
-            {course_audit.completed.length} completed, {course_audit.current.length} current, {course_audit.missing_count} missing.
+            {course_audit.completed.length} completed. {subjectsLeftText(course_audit.current.length, course_audit.missing_count)}.
           </p>
         </div>
         <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">

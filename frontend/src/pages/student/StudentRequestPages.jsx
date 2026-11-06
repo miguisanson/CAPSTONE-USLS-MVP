@@ -40,7 +40,7 @@ import { GraduationRequestForm, PracticumRequestForm } from "./CompletionForms";
 import { NOT_SUBMITTED, REQUEST_GROUPS, STUDENT_REQUEST_PATHS, findRequestItem, lockedReasonFor, requestStateLabel } from "./requestMeta";
 import { leaveRequestStatus } from "./LeaveCaseCards";
 import { PAGE } from "../../lib/labels.js";
-import { defenseToRequest } from "../../lib/studentHome.js";
+import { defenseToRequest, subjectsLeftText } from "../../lib/studentHome.js";
 
 const REQUEST_PAGES = {
   research: {
@@ -108,12 +108,20 @@ function scheduleStatus(data) {
   return schedules[0] ? stateOf(schedules[0]) : NOT_SUBMITTED;
 }
 
+// The server words the research lock with its own subject count; show the one wording every student page uses (I-425).
+function researchStatus(data) {
+  const status = data.research_progress?.status || data.research_case?.status || "Not started";
+  const pre = data.research_progress?.prerequisite;
+  if (!pre || pre.eligible || !((pre.current_count || 0) + (pre.missing_count || 0)) || !/^Locked - .*still to complete/.test(status)) return status;
+  return `Locked - ${subjectsLeftText(pre.current_count || 0, pre.missing_count || 0)}, before research`;
+}
+
 // Human-readable current status of each request, shown in the Request Center.
 function requestStatus(id, data) {
   const latestLog = (slug) => (data.logs || []).find((item) => item.transaction_slug === slug);
   switch (id) {
     case "research":
-      return data.research_progress?.status || data.research_case?.status || "Not started";
+      return researchStatus(data);
     case "schedule":
       return scheduleStatus(data);
     case "loa":

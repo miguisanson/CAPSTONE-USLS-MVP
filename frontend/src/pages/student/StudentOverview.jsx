@@ -5,7 +5,7 @@ import RoleHome from "../../components/RoleHome.jsx";
 import { formatDate, relativeDays } from "../../lib/format";
 import { stageSteps } from "../../lib/stages.js";
 import { forStudent } from "../../lib/status.js";
-import { VIEW_LABELS, studentActions, studentActivity, studentTasks, studentWaiting } from "../../lib/studentHome.js";
+import { VIEW_LABELS, subjectsLeftText, studentActions, studentActivity, studentTasks, studentWaiting } from "../../lib/studentHome.js";
 import { useStudentPortal } from "./StudentPortalContext";
 import { STUDENT_REQUEST_PATHS } from "./requestMeta";
 import { leaveRequestStatus } from "./LeaveCaseCards";
@@ -159,7 +159,7 @@ export default function StudentOverview() {
         all: { to: "/student/requests", label: "View all" },
       }}
       stats={[
-        { key: "coursework", label: "Coursework", value: `${audit.completion_rate}%`, sub: `${audit.completed.length} completed, ${audit.missing_count} missing`, to: "/student/progress" },
+        { key: "coursework", label: "Coursework", value: `${audit.completion_rate}%`, sub: `${audit.completed.length} completed. ${subjectsLeftText(audit.current.length, audit.missing_count)}`, to: "/student/progress" },
         {
           key: "research",
           label: "Research",

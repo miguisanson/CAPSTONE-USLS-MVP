@@ -33,6 +33,9 @@ function withCurrentValue(options, value) {
   return [...options, { value, label: `${value} (your earlier choice)` }];
 }
 
+// The server words the fee as "the term's total due"; the student reads "your total fees for this semester" (I-426).
+const plainFees = (text) => text && text.replace(/the term's total due/g, "your total fees for this semester");
+
 export function LoaRequestForm({ data, onSaved }) {
   const submitState = useSubmitRequest("leave-of-absence", onSaved);
   const overview = data.leave_overview;
@@ -542,7 +545,7 @@ export function WithdrawalRequestForm({ data, onSaved }) {
       <ErrorSummary errors={errors} />
       <ProcessCaseList cases={data.standalone_cases?.withdrawal || []} />
       <InlineNotice tone="warning" title="When you can withdraw a subject">
-        <p className="text-xs leading-relaxed">{(selectedSubject || activeSubjects[0])?.withdrawal_window?.policy || "You may withdraw a subject until the end of the second week of classes (14 calendar days). 10% of the term's total is charged in the first week and 20% in the second; afterwards you may withdraw from all subjects at full fees or file a Leave of Absence."}</p>
+        <p className="text-xs leading-relaxed">{plainFees((selectedSubject || activeSubjects[0])?.withdrawal_window?.policy) || "You may withdraw a subject until the end of the second week of classes (14 calendar days). 10% of your total fees for this semester is charged in the first week and 20% in the second; afterwards you may withdraw from all subjects at full fees or file a Leave of Absence."}</p>
       </InlineNotice>
       <RequestFormCard
         title={applicationEditable ? "Ask to withdraw from a subject" : "Your withdrawal request"}
@@ -581,7 +584,7 @@ export function WithdrawalRequestForm({ data, onSaved }) {
                       ? ` · Classes begin ${formatDate(selectedSubject.withdrawal_window.term_start_date)}`
                       : ""}
                   </p>
-                  {selectedSubject.withdrawal_window.fee_consequence && <p className="mt-2 text-xs font-semibold">Fee: {selectedSubject.withdrawal_window.fee_consequence}</p>}
+                  {selectedSubject.withdrawal_window.fee_consequence && <p className="mt-2 text-xs font-semibold">Fee: {plainFees(selectedSubject.withdrawal_window.fee_consequence)}</p>}
                   {selectedSubject.withdrawal_window.rule_source && <p className="micro mt-1 text-current opacity-80">Rule: {selectedSubject.withdrawal_window.rule_source}</p>}
                 </InlineNotice>
               )}
@@ -598,6 +601,7 @@ export function WithdrawalRequestForm({ data, onSaved }) {
               disabledHint={blockedHint}
               label={returned ? "Resubmit withdrawal request" : "Submit withdrawal request"}
             />
+            <p className="meta" data-testid="withdrawal-next">After you send it: Graduate School staff check the request and pass it to the Dean. The Dean says yes or no. You can follow it on this page, in the Request Center, and in the bell. If the Dean says yes, pay or settle any fee at the Business Office.</p>
           </div>
         ) : (
           <div className="mt-4 space-y-3">
@@ -607,7 +611,7 @@ export function WithdrawalRequestForm({ data, onSaved }) {
               <p className="eyebrow text-current">Eligibility recorded at submission</p>
               <p className="card-title mt-1 text-current">Eligible until {formatDate(existing?.withdrawal_window?.deadline)}</p>
               <p className="mt-1 text-xs font-semibold">{existing?.withdrawal_window?.status || "Eligibility recorded"}</p>
-              {existing?.withdrawal_window?.fee_consequence && <p className="mt-1 text-xs font-normal">Fee: {existing.withdrawal_window.fee_consequence}</p>}
+              {existing?.withdrawal_window?.fee_consequence && <p className="mt-1 text-xs font-normal">Fee: {plainFees(existing.withdrawal_window.fee_consequence)}</p>}
             </InlineNotice>
             <p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>
           </div>
