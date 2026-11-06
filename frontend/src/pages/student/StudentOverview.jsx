@@ -4,6 +4,7 @@ import { SectionCard, Stepper, StatusChip } from "../../components/ui/index.js";
 import RoleHome from "../../components/RoleHome.jsx";
 import { formatDate, relativeDays } from "../../lib/format";
 import { stageSteps } from "../../lib/stages.js";
+import { forStudent } from "../../lib/status.js";
 import { VIEW_LABELS, studentActions, studentActivity, studentTasks, studentWaiting } from "../../lib/studentHome.js";
 import { useStudentPortal } from "./StudentPortalContext";
 import { STUDENT_REQUEST_PATHS } from "./requestMeta";
@@ -147,7 +148,7 @@ export default function StudentOverview() {
         title: `Welcome, ${firstName}`,
         description: headerDescription(student),
         icon: LayoutDashboard,
-        badge: data.progress_status?.level ? <StatusChip status={data.progress_status.level} /> : null,
+        badge: data.progress_status?.level ? <StatusChip status={forStudent(data.progress_status.level)} /> : null,
       }}
       actions={actions}
       actionsSubtitle="What is waiting on you now, most pressing first"

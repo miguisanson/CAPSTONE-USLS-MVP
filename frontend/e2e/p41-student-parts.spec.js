@@ -575,7 +575,7 @@ test.describe("P4.1 shared student parts", () => {
       for (const [label, value] of [
         ["AWOL effective date", /^AWOL effective date\s*[A-Z][a-z]{2} \d{1,2}, \d{4}$/i],
         ["Last enrolled semester", /AY 2025-2026 2nd Semester/],
-        ["Returning in", /Not chosen yet/],
+        ["Returning in", /Returning in\s*AY \d{4}-\d{4} (1st|2nd) Semester/], // I-419: the card shows the semester the form is set to
       ]) await expect(fact(c, label), label).toHaveText(value);
       // I-386: office-only facts are hidden from the student
       await expect(c.locator("dt").filter({ hasText: /^(Type|Reason for return|Dean decided|Detection source|Policy classification|Residence limits|Years in the program|Dean decision)$/i })).toHaveCount(0);

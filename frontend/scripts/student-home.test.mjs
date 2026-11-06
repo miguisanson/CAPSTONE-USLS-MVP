@@ -88,7 +88,7 @@ test("the leave / AWOL banner is an action only when it is a warning or an alert
   const withBanner = (tone, extra = {}) => base({ student: { current_stage: "AWOL", enrollment_tag: "AWOL", standing: "AWOL" }, leave_overview: { banner: { tone, title: "Your record is marked AWOL", text: "Open Return from AWOL to start." }, can_file: {}, ...extra } });
   const [item] = studentActions(withBanner("bad"), opts);
   assert.equal(item.title, "Your record is marked AWOL");
-  assert.equal(item.tone, "danger");
+  assert.equal(item.tone, "warning", "a record marked AWOL is told calmly, not in red");
   assert.deepEqual(item.target, { view: "awol" });
   assert.equal(studentActions(withBanner("info"), opts).length, 0);
   assert.equal(studentActions(withBanner("good"), opts).length, 0);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { CalendarClock } from "lucide-react";
-import { Field, InlineNotice, Select, Textarea } from "../../components/ui/index.js";
+import { Button, Field, InlineNotice, Select, Textarea } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import { ProcessCaseList } from "./ProcessCaseCard";
 import { ErrorSummary, LoadError, RequestFormCard, useFormErrors, useSubmitRequest, SavedWorkflowFiles, SubmitState } from "./shared";
@@ -405,6 +405,8 @@ export function AwolReturnRequestForm({ data, onSaved }) {
 
   return (
     <div className="space-y-4">
+      {/* On a phone the long notice and the rules come first; this takes the student straight to the form. */}
+      {!locked && <Button type="button" variant="secondary" className="w-full sm:hidden" onClick={() => document.getElementById("awol-return-form")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Fill in your return</Button>}
       <LeaveBanner
         banner={data.leave_overview?.banner || ((student.standing === "AWOL" || student.enrollment_tag === "AWOL")
           ? { tone: "bad", title: "Your record is marked AWOL", text: "You cannot enroll until a return request is approved." }
@@ -419,24 +421,24 @@ export function AwolReturnRequestForm({ data, onSaved }) {
       {locked ? (
         <InlineNotice tone="warning">Your return declaration has already been routed for review. Watch the Inbox for the Dean's decision or a revision request.</InlineNotice>
       ) : (
-        <RequestFormCard title="Tell us you are coming back" description="Choose the semester you want to return in and tell us why you are ready. The request goes to the Graduate School Dean.">
+        <div id="awol-return-form" className="scroll-mt-24"><RequestFormCard title="Tell us you are coming back" description="Choose the semester you want to return in and tell us why you are ready. The request goes to the Graduate School Dean.">
         <form noValidate onSubmit={onSubmit} className="mt-4 space-y-4">
           <ErrorSummary errors={errors} />
           <InlineNotice tone="info">
             The handbook requires a written intention to enroll routed through the Graduate School Dean. Complete the form below; no file needs to be uploaded.
           </InlineNotice>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Intended return semester" required error={messageFor("awol-term")}><Select id="awol-term" value={form.target_return_term} onChange={(event) => setForm((current) => ({ ...current, target_return_term: event.target.value }))} placeholder="Select semester" options={semesters} /></Field>
+            <Field label="Intended return semester" required error={messageFor("awol-term")}>{semesters.length === 1 && semesters[0] === form.target_return_term ? <p className="text-sm font-medium text-ink" data-testid="awol-term-fixed">{semesters[0]}</p> : <Select id="awol-term" value={form.target_return_term} onChange={(event) => setForm((current) => ({ ...current, target_return_term: event.target.value }))} placeholder="Select semester" options={semesters} />}</Field>
             <Field label="Last enrolled semester" hint="Taken from your enrollment records."><p className="text-sm font-medium text-ink" data-testid="awol-last-enrolled">{awolReturn.last_enrolled_term || "Not on record"}</p></Field>
           </div>
           <Field label="Written intention to resume enrollment" required error={messageFor("awol-intent")}><Textarea id="awol-intent" value={form.return_intent} onChange={(event) => setForm((current) => ({ ...current, return_intent: event.target.value }))} placeholder="I intend to resume enrollment in the selected semester…" /></Field>
           <Field label="Reason for returning and readiness to continue" required error={messageFor("awol-reason")}><Textarea id="awol-reason" value={form.return_reason} onChange={(event) => setForm((current) => ({ ...current, return_reason: event.target.value }))} /></Field>
           <SubmitState busy={busy} error={error} message={message} label={existing?.status === "Returned for Revision" ? "Resubmit return declaration" : "Submit return declaration"} />
         </form>
-        </RequestFormCard>
+        </RequestFormCard></div>
       )}
       {/* The form comes first; the case facts and timeline follow (I-386). */}
-      <ProcessCaseList cases={data.standalone_cases?.awol || []} />
+      <ProcessCaseList cases={data.standalone_cases?.awol || []} returning={locked ? "" : form.target_return_term} />
     </div>
   );
 }
