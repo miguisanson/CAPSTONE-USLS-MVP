@@ -71,7 +71,7 @@ export function stageSteps(stage, stages = DEFAULT_STAGES, record = null) {
         else if (step.label === "Comprehensive Exam" && coursework && record.comprehensivePassed) step.state = "complete";
       }
     }
-    steps.push({ key: stage, label: stage, state: "stopped" });
+    steps.push({ key: stage, label: stageWords(stage), state: "stopped" });
   }
   return steps;
 }

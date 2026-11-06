@@ -167,7 +167,7 @@ test.describe("Dashboard page", () => {
     await expect(link("/workflow/defense-scheduling").first()).toBeVisible();
     await expect(link("/reports").first()).toBeVisible();
     // the KPI labels and sublines are still on the page
-    for (const t of ["Students monitored", "At risk or delayed", "Your open tasks", "Confirmed defenses"]) {
+    for (const t of ["Students monitored", "Active students at risk or delayed", "Your open tasks", "Confirmed defenses"]) {
       await expect(page.locator("main a", { hasText: t }).first(), t).toBeVisible();
     }
     await expect(page.getByText(`${k.active_students} active students`)).toBeVisible(); // I-193: the dashboard and Reports count the same active students

@@ -37,7 +37,7 @@ test("an off-track stage gives a stopped step with that stage's name", () => {
     const steps = stageSteps(stage, API_STAGES);
     const stopped = steps.filter((s) => s.state === "stopped");
     assert.equal(stopped.length, 1, stage);
-    assert.equal(stopped[0].label, stage);
+    assert.equal(stopped[0].label, stageWords(stage));
     assert.equal(steps.some((s) => s.state === "current"), false, `${stage} has no current step`);
   }
 });

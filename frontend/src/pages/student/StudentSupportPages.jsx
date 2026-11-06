@@ -9,6 +9,7 @@ import Assistant from "../Assistant";
 import { StudentInbox } from "./StudentInbox";
 import { STUDENT_REQUEST_PATHS } from "./requestMeta";
 import { PAGE } from "../../lib/labels.js";
+import { stageWords } from "../../lib/stages.js";
 
 export function StudentEnrollmentPage() {
   const { data, refetch } = useStudentPortal();
@@ -107,7 +108,7 @@ export function StudentProfilePage() {
           <ProfileRow label="College">{student.college || "Not recorded"}</ProfileRow>
           <ProfileRow label="Academic year of entry">{student.academic_year_entry || "Not recorded"}</ProfileRow>
           <ProfileRow label="Course year">{student.course_year_label || "Not available"}</ProfileRow>
-          <ProfileRow label="Lifecycle stage">{student.current_stage}</ProfileRow>
+          <ProfileRow label="Lifecycle stage">{stageWords(student.current_stage)}</ProfileRow>
           <ProfileRow label="Standing"><StatusChip status={student.standing} dot={false} /></ProfileRow>
           <ProfileRow label="Enrollment tag">{student.enrollment_tag || "None"}</ProfileRow>
           <ProfileRow label="Adviser">{student.adviser_name || data.research_case?.adviser_name || "Not assigned"}</ProfileRow>

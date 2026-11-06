@@ -10,12 +10,10 @@ import { PAGE } from "../lib/labels.js";
 
 const PAGE_SIZE = 25;
 const STATUS_FILTER = [
-  { value: "compre-eligible", label: "Compre exam eligible" },
-  { value: "awol", label: "AWOL" },
-  { value: "loa", label: "LOA" },
+  { value: "compre-eligible", label: "Compre exam eligible" }, // leave and AWOL are the Standing and Stage filters, not a third copy (I-430)
 ];
 const RISK_FILTER = ["On Track", "At Risk of Delay", "Delayed", "Not Yet Assessed", "At Risk of Delay/Delayed"];
-const STANDING_FILTER = [{ value: "Active", label: "Active (not completed or withdrawn)" }, "On Leave", "AWOL", "Withdrawn"];
+const STANDING_FILTER = ["Active", { value: "On Leave", label: "On leave" }, "AWOL", "Withdrawn"];
 
 // I-075: what stands between a student and the Compre exam, in the API's own words. The eligibility rule is by
 // category (the units needed differ by program), so no unit total is printed here.
@@ -141,7 +139,7 @@ export default function Students() {
 
   const filterControls = [
     { label: "Student status", value: studentStatus, onChange: setStudentStatus, options: STATUS_FILTER },
-    { label: "Stage", value: stage, onChange: setStage, options: meta?.stages || [] },
+    { label: "Stage", value: stage, onChange: setStage, options: (meta?.stages || []).map((v) => ({ value: v, label: stageWords(v) })) },
     { label: "Risk", value: risk, onChange: setRisk, options: RISK_FILTER },
     { label: "Standing", value: standing, onChange: setStanding, options: STANDING_FILTER },
     { label: "Program", value: programId, onChange: setProgramId, options: (meta?.programs || []).map((p) => ({ value: String(p.id), label: p.code })) },
@@ -159,11 +157,11 @@ export default function Students() {
           <SearchInput
             value={q}
             onChange={setQ}
-            placeholder="Search by name, student number, email, or program…"
+            placeholder="Search name, number, or program…"
             label="Search students"
             className="flex-1 2xl:min-w-64"
           />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-5 2xl:flex-[2]">
             {filterControls.map((f) => (
               <Select
                 key={f.label}
@@ -239,6 +237,7 @@ export default function Students() {
           rowKey="id"
           rowHref={(s) => `/students/${s.id}`}
           minWidth="md"
+          stackOnPhone="md"
           loading={loading}
           empty={{ icon: Search, title: "No students match your filters", hint: "Try clearing a filter or broadening your search." }}
           pagination={{ page: data?.page || page, pageCount: data?.pages || 1, total: data?.total || 0, pageSize: PAGE_SIZE, onPage: setPage }}
