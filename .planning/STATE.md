@@ -1,5 +1,12 @@
 # State
 
+## 2026-11-06 15:20 - resumed after the owner's pause
+
+- `pkt/alumni` merged 1d7f2b0d (e2e 128/128) — **RESEED NEEDED** (six past graduates). Running: full Python gate on
+  bc28e87f in `wt/gate` -> `E:/Temp/claude/pygate-bc28.log`; full e2e on bc28e87f in the main checkout -> 
+  `E:/Temp/claude/e2e-full-bc28.log` (do not rebuild dist in the main checkout until it ends); `pkt/srv8` in `wt/srv8`
+  (I-427 assistant, I-418 year, I-423 RC counts/words, server texts; owns app.py). check:ui --strict 0.
+
 ## PAUSED 2026-11-06 ~14:10 by the owner (playing a game) — resume here
 
 - Branch `v6.4.1-test` @ 405c0064, pushed. Today merged: f7, r5ui, audit5, srv6, lists5, ux6, srv7, awol6, stu6, gate6, f8,
