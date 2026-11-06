@@ -36,6 +36,7 @@ import { PracticumRoster } from "./Practicum";
 import { ResearchGateForm } from "./ResearchGate";
 import ResearchGateOverview from "./ResearchGateOverview";
 import { WorkflowSupportModal } from "./shared";
+import WaitingList from "./WaitingList";
 
 // Which business-rules process each workflow screen applies.
 const RULE_PROCESS_BY_SLUG = {
@@ -57,6 +58,7 @@ const ICONS = {
 };
 
 // Pages that are a staged board: they report what happened in the board notice (not a banner) and load as a skeleton board.
+const WAITING_STEP = { "panel-matching": "panel", "defense-scheduling": "schedule" }; // I-064
 const BOARD_SLUGS = new Set(["practicum", "graduation"]);
 
 // One more sentence for the page description (it used to be a loose line under the header).
@@ -271,9 +273,20 @@ function SingleWorkflowPage() {
         )}
 
         {subview ? null : needsStudent && !studentId ? (slug === "research-gate" ? null : (
-          <Card pad="lg">
-            <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
-          </Card>
+          WAITING_STEP[slug] ? (
+            <WaitingList
+              step={WAITING_STEP[slug]}
+              onPick={(student) => {
+                setStudentId(student.id);
+                setStudentLabel("");
+                setResult(null);
+              }}
+            />
+          ) : (
+            <Card pad="lg">
+              <EmptyState icon={Info} title="Select a student to begin" hint="Search above to load this student's current monitoring data." />
+            </Card>
+          )
         )) : loading && !context ? (
           BOARD_SLUGS.has(slug) ? (
             <SkeletonBoard columns={4} label="Loading board" />

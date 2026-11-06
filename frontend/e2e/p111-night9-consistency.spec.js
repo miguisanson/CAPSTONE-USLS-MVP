@@ -24,10 +24,10 @@ test.describe("(a) the chosen student does not carry over by itself", () => {
     await expect(main(page).getByRole("heading", { level: 1, name: "Research Gate" })).toBeVisible();
     await expect(main(page).getByText("Select a student to begin")).toHaveCount(0);
 
-    for (const [slug, title] of [["panel-matching", "Panel Matching"], ["defense-scheduling", "Defense Scheduling"]]) {
+    for (const [slug, title, waiting] of [["panel-matching", "Panel Matching", "Waiting for a panel"], ["defense-scheduling", "Defense Scheduling", "Waiting for a defense date"]]) {
       await page.goto(`/workflow/${slug}`);
       await expect(main(page).getByRole("heading", { level: 1, name: title })).toBeVisible();
-      await expect(main(page).getByText("Select a student to begin"), `${title} opened without a link asks for a student`).toBeVisible();
+      await expect(main(page).getByRole("heading", { name: waiting }), `${title} opened without a link lists who is waiting (I-064)`).toBeVisible();
       expect(new URL(page.url()).searchParams.has("student_id"), `${title} URL has no student_id`).toBe(false);
     }
 

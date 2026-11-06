@@ -23345,8 +23345,9 @@ def dashboard_stats(filters=None, locked_owner: str | None = None) -> dict:
         wide_filters.pop("owner", None)
         wide_ids = [sid for (sid,) in filtered_students_query(wide_filters).with_entities(Student.id).all()]
     wide = Student.query.filter(Student.id.in_(wide_ids)) if wide_ids else Student.query.filter(False)
-    at_risk = wide.filter(at_risk_clause()).count()
-    high_risk = wide.filter(Student.risk_level == "Delayed").count()
+    # Active students only, like Reports' "Behind schedule" and the Students list the tile links to (I-403).
+    at_risk = wide.filter(active_student_clause(), at_risk_clause()).count()
+    high_risk = wide.filter(active_student_clause(), Student.risk_level == "Delayed").count()
     withdrawn = students_scope().filter(Student.standing == "Withdrawn").count()
     pending_tasks = task_query.count()
     overdue_tasks = task_query.filter(Task.due_at < ph_today(), Task.status != "Done").count()
@@ -26996,6 +26997,16 @@ def report_defenses(args) -> dict:
     )
 
 
+def graduation_missing_text(item: dict) -> str:
+    """One unmet checklist line in the words of the Graduation candidates report (I-404)."""
+    label = item["label"]
+    if item["key"].startswith("research_"):
+        return f"{label.removesuffix(' workflow')} not passed yet"
+    if item["key"] == "practicum":
+        return "Practicum not completed yet"
+    return label + (f" ({GRADUATION_NO_RECORD_TEXT.get(item['key'], 'no research record on file')})" if item["passed"] is None else "")
+
+
 def report_graduation(args) -> dict:
     eligibility_filter, batch_filter = _filter_value(args, "eligibility"), _filter_value(args, "batch_status")
     filters = {
@@ -27027,11 +27038,7 @@ def report_graduation(args) -> dict:
         batch_statuses.add(status)
         if (eligibility_filter and eligibility["status"] != eligibility_filter) or (batch_filter and status != batch_filter):
             continue
-        missing = [
-            item["label"] + (f" ({GRADUATION_NO_RECORD_TEXT.get(item['key'], 'no research record on file')})" if item["passed"] is None else "")
-            for item in eligibility["checklist"]
-            if item["passed"] is not True
-        ]
+        missing = [graduation_missing_text(item) for item in eligibility["checklist"] if item["passed"] is not True]
         rows.append({
             "student_id": student.id,
             "student": student.name,
@@ -37426,6 +37433,7 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
     student_owner, academic, research = ROLE_LABELS["student"], ROLE_LABELS["academic_coordinator"], ROLE_LABELS["research_coordinator"]
     pending = [item for item in milestone["requirements"] if item["status"] != "Complete"]
     state, owner, reason = "done", None, "Every requirement for this stage is complete."
+    first_type = ""
     by_status = {
         "Revisions Pending": ("blocked", student_owner, "Revisions requested after the defense; the student has to submit the revised paper."),
         "Revisions Submitted - Awaiting Confirmation": ("waiting", "Panel chair", "Revised paper submitted; the panel chair has to confirm it."),
@@ -37440,6 +37448,7 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
         missing = [item["label"] for item in pending if item["student_upload"] and item["status"] == "Missing"]
         submitted = next((item for item in pending if item["status"] == "Submitted"), None)
         first = next((item for item in pending if item["source_type"] != "student_upload"), pending[0])
+        first_type = first["source_type"]
         if locked and case is None:
             return None  # merge v6.4 (M6): a student without a research case whose research is still locked is not at the gate yet
         if locked:
@@ -37469,6 +37478,8 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
         "board_stage": "Completion" if stage in {"Final Defense", "Completion"} else stage,
         "gate": gate, "status": status,
         "state": state, "waiting_on": owner if state != "done" else None, "reason": reason,
+        # I-064: the Research Coordinator's next move, so Panel Matching and Defense Scheduling can list who is waiting.
+        "next_step": ("panel" if first_type == "system_panel" else "schedule" if first_type.endswith("_schedule") else None) if state == "ready" else None,
         "research_title": case.title if case else None, "adviser_name": student.adviser_name,
         "column": 1 if gate == RESEARCH_GATE_TITLE else 2 if gate == RESEARCH_GATE_PROPOSAL else 3,
         "requirements": [{"label": item["label"], "met": item["status"] == "Complete"} for item in milestone["requirements"]],
@@ -42149,7 +42160,7 @@ def seed_bianca_mendoza_enrollment() -> None:
     student.current_stage = "Coursework"
     student.updated_at = now_utc()
 
-    source_reference = "Seeded current DBA enrollment"
+    source_reference = "Enrollment record (demo data)"
     for code in ("DBA-MAJ3", "DBA-MAJ4", "DBA-MAJ5"):
         course = Course.query.filter_by(
             program_id=program.id,

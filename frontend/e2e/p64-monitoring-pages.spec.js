@@ -443,7 +443,7 @@ test.describe("Enrollment Class List (GS staff)", () => {
     await expect(mendoza).toContainText("2560052");
     await expect(mendoza).toContainText("DBA");
     await expect(mendoza).toContainText("Enrolled");
-    await expect(mendoza).toContainText("Seeded current DBA enrollment");
+    await expect(mendoza).toContainText("Enrollment record (demo data)");
     await shotAll(page, "class-list-single");
 
     // another class

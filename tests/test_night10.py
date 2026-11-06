@@ -56,13 +56,13 @@ class Night10Tests(unittest.TestCase):
         rows = self._client("staff").get("/api/reports/graduation").get_json()["rows"]
         self.assertEqual([], [r["student"] for r in rows if "(to verify)" in r["missing"]])
         practicum = next(r for r in rows if r["student"] == "Andrea Villanueva")
-        self.assertIn("Practicum completed (no practicum record on file)", practicum["missing"])
+        self.assertIn("Practicum not completed yet", practicum["missing"])
 
     # ------------------------------------------------------------------ I-239b
     def test_dashboard_at_risk_tile_is_the_list_its_link_opens(self):
         staff = self._client("staff")
         kpis = staff.get("/api/dashboard").get_json()["kpis"]
-        listed = staff.get("/api/students?risk=At Risk of Delay,Delayed&page_size=5").get_json()["total"]
+        listed = staff.get("/api/students?risk=At Risk of Delay,Delayed&standing=Active&page_size=5").get_json()["total"]
         self.assertEqual(listed, kpis["at_risk"])
 
 
