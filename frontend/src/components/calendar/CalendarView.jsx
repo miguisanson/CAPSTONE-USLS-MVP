@@ -395,7 +395,7 @@ function AgendaView({ anchor, events, deadlines, onSelectEvent, onSelectDeadline
   }, [events, deadlines, startKey]);
   if (!rows.length) {
     return (
-      <EmptyState icon={CalendarClock} title="Nothing on the calendar in this period." />
+      <EmptyState icon={CalendarClock} title="Nothing on the calendar in this period." hint="Booked defenses, classes and deadlines appear here once a date is set." />
     );
   }
   return (

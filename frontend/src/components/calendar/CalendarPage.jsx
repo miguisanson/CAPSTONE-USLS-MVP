@@ -184,7 +184,7 @@ function DetailPanel({ selected, scope, onClose, onChanged }) {
 }
 
 // `embedded` drops the big page header (used as a tab inside Defense Scheduling).
-export default function CalendarPage({ scope = "staff", title, description, embedded = false, connectionPanel = null }) {
+export default function CalendarPage({ scope = "staff", title, description, embedded = false, connectionPanel = null, panelCount = 0 }) {
   const isFaculty = scope === "faculty";
   const [anchor, setAnchor] = useState(() => new Date());
   const [view, setView] = useState(isFaculty ? "week" : "month");
@@ -244,6 +244,13 @@ export default function CalendarPage({ scope = "staff", title, description, embe
             {isFaculty && <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={showBusy} onChange={(e) => setShowBusy(e.target.checked)} />Google busy times</label>}
             {payload?.busy_status && <span className="font-normal text-slate-500">{payload.busy_status}</span>}
           </div>
+          {!loading && !error && view !== "agenda" && !events.length && !deadlines.length && (
+            <p className="text-xs text-slate-600" role="status">
+              {isFaculty && panelCount > 0
+                ? "No defense date is booked yet for the panels you sit on. Booked defenses and your advisees' deadlines appear here once a date is set."
+                : "Nothing is booked in this period. Booked defenses and deadlines appear here once a date is set."}
+            </p>
+          )}
           <CalendarLegend showAvailability={isFaculty && showAvailability} showBusy={isFaculty && showBusy} />
           <CalendarView
             events={events}

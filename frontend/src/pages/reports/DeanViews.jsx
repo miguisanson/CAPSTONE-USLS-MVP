@@ -258,7 +258,7 @@ export function StagesView({ scope, scopeKey }) {
     caption: "How many active students are at each stage? (table)",
     rowKey: "stage",
     columns: [
-      { key: "stage", header: "Stage" },
+      { key: "stage", header: "Stage", cell: (s) => (s.count ? <button type="button" onClick={() => setOpen(s)} className="cursor-pointer rounded-md px-1 text-left font-semibold text-brand-700 underline decoration-brand-300 underline-offset-2 hover:bg-brand-50 max-sm:min-h-11">{s.stage}</button> : s.stage) },
       { key: "count", header: "Students", align: "right", cell: (s) => <CountButton count={s.count} label={ask(s)} onClick={() => setOpen(s)} /> },
     ],
     rows: stages,

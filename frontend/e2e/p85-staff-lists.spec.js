@@ -6,7 +6,7 @@
 //   - I-083  the staff home groups identical "Waiting on others" system alerts into one row with a count;
 //   - I-098  the Program select on the Monitoring Sheet and the Class list is wide enough for the longest program
 //            name at 1366;
-//   - I-104  at 390 px every advisee shows its "Needs signature" state without scrolling sideways;
+//   - I-104  at 390 px every advisee shows its "Documents to sign" state without scrolling sideways;
 //   - I-109  the Academic Coordinator's home never links to a page that role cannot open.
 // Every expected value is read from the API at test time (specs share one database, e2e/README.md).
 import { test, expect } from "@playwright/test";
@@ -163,7 +163,7 @@ test.describe("program selects", () => {
 test.describe("faculty advisees on a phone", () => {
   test.use({ storageState: join(AUTH_DIR, "faculty.json"), viewport: { width: 390, height: 844 } });
 
-  test("I-104: at 390 px every advisee shows 'Needs signature' on screen, with no sideways scrolling", async ({ page, context }) => {
+  test("I-104: at 390 px every advisee shows 'Documents to sign' on screen, with no sideways scrolling", async ({ page, context }) => {
     tracker.where = { role: "faculty", page: "advisees 390", viewport: 390 };
     const portal = await (await context.request.get("/api/faculty-portal/context")).json();
     expect(portal.advisees.length, "the faculty login has advisees").toBeGreaterThan(0);
@@ -171,18 +171,18 @@ test.describe("faculty advisees on a phone", () => {
     await expect(page.getByRole("heading", { name: "Contracts and signatures" })).toBeVisible();
     await page.waitForLoadState("networkidle");
     for (const entry of portal.advisees) {
-      const card = main(page).locator("li", { hasText: entry.student.student_number }).filter({ hasText: "Needs signature" });
-      await expect(card, `${entry.student.name} has a card with a Needs signature line`).toHaveCount(1);
+      const card = main(page).locator("li", { hasText: entry.student.student_number }).filter({ hasText: "Documents to sign" });
+      await expect(card, `${entry.student.name} has a card with a Documents to sign line`).toHaveCount(1);
       const box = await card.boundingBox();
       expect(box.x, `${entry.student.name}: card starts on screen`).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width, `${entry.student.name}: card ends on screen`).toBeLessThanOrEqual(391);
       await expect(card).toContainText(entry.student.name);
       await expect(card).toContainText(entry.student.program_code);
-      await expect(card).toContainText(entry.student.current_stage || "Not set");
-      await expect(card).toContainText(entry.pending_count ? `${entry.pending_count} pending` : "No signature needed");
-      const signText = card.getByText("Needs signature");
+      await expect(card).toContainText(({ LOA: "Leave of Absence", AWOL: "AWOL (absent without leave)" }[entry.student.current_stage] || entry.student.current_stage || "Not set"));
+      await expect(card).toContainText(entry.pending_count ? `${entry.pending_count} pending` : "None");
+      const signText = card.getByText("Documents to sign");
       const sb = await signText.boundingBox();
-      expect(sb.x + sb.width, `${entry.student.name}: the Needs signature label is on screen`).toBeLessThanOrEqual(391);
+      expect(sb.x + sb.width, `${entry.student.name}: the Documents to sign label is on screen`).toBeLessThanOrEqual(391);
     }
     await shot(page, "advisees-390.png");
   });

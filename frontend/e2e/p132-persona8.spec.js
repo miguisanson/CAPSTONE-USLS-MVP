@@ -59,7 +59,7 @@ test("I-391: advisee rows show no 'None' / 'Not applicable'", async ({ page }) =
   await page.goto("/faculty-portal/advisees");
   await page.waitForLoadState("networkidle");
   const main = page.locator("main");
-  await expect(main).not.toContainText(/Needs signature\s*None/i);
+  await expect(main).not.toContainText("Needs signature"); // I-397: the label is "Documents to sign", "None" when empty
   await expect(main).not.toContainText("Not applicable");
 });
 

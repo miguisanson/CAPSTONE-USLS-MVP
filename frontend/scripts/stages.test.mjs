@@ -4,7 +4,7 @@
 // (LOA, AWOL, Withdrawal In Progress, Withdrawn, Completed) are off the normal path.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_STAGES, OFF_TRACK_STAGES, isOffTrack, lifecycleStages, stageSteps } from "../src/lib/stages.js";
+import { DEFAULT_STAGES, OFF_TRACK_STAGES, isOffTrack, lifecycleStages, stageSteps, stageWords } from "../src/lib/stages.js";
 
 const API_STAGES = [
   "Admission", "Coursework", "Comprehensive Exam", "Proposal Development", "Proposal Defense", "Data Collection",
@@ -77,4 +77,11 @@ test("the record changes nothing on the path or when completed", () => {
   const rec = { courseAudit: { completed: [1], missing_count: 0 }, comprehensivePassed: true };
   assert.deepEqual(stageSteps("Writing", API_STAGES, rec), stageSteps("Writing", API_STAGES));
   assert.deepEqual(stageSteps("Completed", API_STAGES, rec), stageSteps("Completed", API_STAGES));
+});
+
+test("I-397: stageWords spells out LOA and AWOL and leaves other stages alone", () => {
+  assert.equal(stageWords("LOA"), "Leave of Absence");
+  assert.equal(stageWords("AWOL"), "AWOL (absent without leave)");
+  assert.equal(stageWords("Writing"), "Writing");
+  assert.equal(stageWords(""), "");
 });

@@ -5,6 +5,7 @@ import { api } from "../../api";
 import { useApi } from "../../hooks";
 import { Button, Card, DataTable, EApprovalNote, Field, InlineNotice, SectionTitle, Skeleton, StatusChip, Textarea } from "../../components/ui/index.js";
 import { formatDay, useFaculty } from "./FacultyContext";
+import { stageWords } from "../../lib/stages";
 
 const MIN_REASON = 3;
 
@@ -184,7 +185,7 @@ function SignatureCell({ row }) {
       </Link>
     </>
   ) : (
-    <span className="meta">No signature needed</span>
+    <span className="meta">None</span>
   );
 }
 
@@ -202,7 +203,7 @@ const ADVISEE_COLUMNS = [
     sortValue: (row) => row.name,
   },
   { key: "program", header: "Program", cell: (row) => row.program, sortable: true, sortValue: (row) => row.program },
-  { key: "stage", header: "Stage", cell: (row) => row.stage || "Not set", sortable: true, sortValue: (row) => row.stage },
+  { key: "stage", header: "Stage", cell: (row) => stageWords(row.stage) || "Not set", sortable: true, sortValue: (row) => row.stage },
   {
     key: "contract",
     header: "Adviser contract",
@@ -213,14 +214,14 @@ const ADVISEE_COLUMNS = [
   { key: "documents", header: "Documents", cell: (row) => row.documents, align: "right", sortable: true, sortValue: (row) => row.documents },
   {
     key: "pending",
-    header: "Needs signature",
+    header: "Documents to sign",
     cell: (row) => <SignatureCell row={row} />,
     sortable: true,
     sortValue: (row) => row.pending,
   },
 ];
 
-// I-104: below 768 px the table would scroll sideways and hide "Needs signature", so each advisee is a card with
+// I-104: below 768 px the table would scroll sideways and hide "Documents to sign", so each advisee is a card with
 // the action first. One of the two is rendered, never both.
 const PHONE = "(max-width: 767px)";
 const subscribePhone = (notify) => {
@@ -241,12 +242,12 @@ function AdviseeCards({ rows }) {
           </div>
           <dl className="grid grid-cols-2 gap-x-3 gap-y-3 text-sm">
             <div className="col-span-2">
-              <dt className="eyebrow">Needs signature</dt>
+              <dt className="eyebrow">Documents to sign</dt>
               <dd className="mt-1"><SignatureCell row={row} /></dd>
             </div>
             <div>
               <dt className="eyebrow">Stage</dt>
-              <dd className="mt-1">{row.stage || "Not set"}</dd>
+              <dd className="mt-1">{stageWords(row.stage) || "Not set"}</dd>
             </div>
             <div>
               <dt className="eyebrow">Documents</dt>
