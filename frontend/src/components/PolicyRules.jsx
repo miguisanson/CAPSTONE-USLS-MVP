@@ -23,7 +23,7 @@ export function RuleBadges({ rule, showReview = true }) {
       {rule.enforced ? (
         <StatusChip status="Enforced by the system" tone="good" size="sm" dot={false} />
       ) : (
-        <StatusChip status="Documented only" tone="muted" size="sm" dot={false} />
+        <StatusChip status="Not checked by the system" tone="muted" size="sm" dot={false} />
       )}
       {showReview && rule.status === "needs_review" && <StatusChip status="Needs review" label="Awaiting sign-off" size="sm" dot={false} />}
     </span>
