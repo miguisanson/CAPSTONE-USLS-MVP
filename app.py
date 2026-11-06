@@ -37429,7 +37429,12 @@ def research_milestone_payload(student: Student, gate: str) -> dict:
     }
 
 
-def research_stage_status(milestone: dict) -> str:
+def panel_not_matched(student: Student, gate: str) -> bool:
+    """I-421: a defense gate whose panel is short of its roles is still the Research Coordinator's (Panel Matching)."""
+    return gate in RESEARCH_GATE_DEFENSE_TYPES and len(active_panel_assignments(student, gate)) < len(panel_roles_for_student(student, gate))
+
+
+def research_stage_status(milestone: dict, student: Student | None = None, gate: str | None = None) -> str:
     requirements = milestone["requirements"]
     if milestone["overall_complete"]:
         return "Complete"
@@ -37465,6 +37470,7 @@ def research_stage_status(milestone: dict) -> str:
         open_items
         and all(i["source_type"].endswith("_schedule") for i in open_items)
         and not milestone.get("schedule_requested")
+        and not (student and gate and panel_not_matched(student, gate))
     ):
         return READY_TO_SCHEDULE_STATUS
     return "Pending Staff Action"
@@ -37524,7 +37530,7 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
     gate = progress["gate"]
     milestone = progress["milestone"]
     stage = progress["stage"]
-    status = research_stage_status(milestone)
+    status = research_stage_status(milestone, student, gate)
     student_owner, academic, research = ROLE_LABELS["student"], ROLE_LABELS["academic_coordinator"], ROLE_LABELS["research_coordinator"]
     pending = [item for item in milestone["requirements"] if item["status"] != "Complete"]
     state, owner, reason = "done", None, "Every requirement for this stage is complete."
@@ -37559,6 +37565,9 @@ def research_gate_overview_row(student: Student, case: ResearchCase | None) -> d
             state, owner, reason = "waiting", academic, "Form 1 is waiting for the Academic Coordinator's endorsement."
         elif first["source_type"] == "system_panel":
             state, owner, reason = "ready", research, "Documents are in; the panel has not been matched yet."
+            next_step = "panel"
+        elif first["source_type"].endswith("_schedule") and panel_not_matched(student, gate):
+            state, owner, reason = "ready", research, "Documents are in; the panel has not been matched yet."  # I-421
             next_step = "panel"
         elif first["source_type"].endswith("_schedule"):
             state, owner, reason = "ready", research, "Panel is in place; the defense has not been scheduled yet."
@@ -37683,7 +37692,7 @@ def detected_research_progress(student: Student, *, ensure_checks: bool = True) 
             "name": stage_name,
             "gate": gate,
             "complete": milestone["overall_complete"],
-            "status": research_stage_status(milestone),
+            "status": research_stage_status(milestone, student, gate),
         }
         stages.append(stage)
         if not milestone["overall_complete"]:
@@ -41988,9 +41997,52 @@ HISTORY_PLAN = {
     "older": [("leave", "AADA"), ("readmission", "AA"), ("awol", "A"), ("withdrawal", "AADAA"), ("practicum", "AA"),
               ("graduation", "AA"), ("adviser", "AADA")],
     "recent": [("leave", "AAADA"), ("readmission", "AAD"), ("awol", "AA"), ("withdrawal", "AAAADA"), ("practicum", "AAA"),
-               ("graduation", "AAR"), ("adviser", "AAADA")],
+               ("graduation", "AAA"), ("adviser", "AAADA")],
     "current": [("leave", "A"), ("withdrawal", "AD"), ("practicum", "A"), ("adviser", "AA")],
 }
+
+
+# F8-04: past graduates, so the graduation history in the earlier terms holds only students who finished everything.
+PAST_GRADUATES = (  # (student number, first name, last name, program code)
+    ("2260901", "Ramon", "Villareal", "MSCS"),
+    ("2260902", "Maricel", "Dizon", "MIT"),
+    ("2260903", "Joselito", "Bernardo", "MBA"),
+    ("2260904", "Angelica", "Pascual", "MAED"),
+    ("2260905", "Liza", "Magbanua", "MSN"),
+    ("2260906", "Rodrigo", "Alcantara", "EDD"),
+)
+
+
+def seed_past_graduates() -> int:
+    """Six alumni: Completed, every subject Completed, the research case verified complete, not enrolled this term, so
+    not counted as active. They are the pool of the graduation history. Returns the students made."""
+    made = 0
+    for number, first, last, code in PAST_GRADUATES:
+        program = Program.query.filter_by(code=code).first()
+        if not program or Student.query.filter_by(student_number=number).first():
+            continue
+        adviser = db.session.query(Student.adviser_name).filter(
+            Student.program_id == program.id, Student.adviser_name.isnot(None)).order_by(Student.id).first()
+        student = Student(
+            student_number=number, first_name=first, last_name=last, program_id=program.id,
+            email=f"{first}.{last}@student.usls.edu.ph".lower(), entry_year=2022, academic_year_entry="22-23",
+            year_level="Completed", current_stage="Completed", standing="Active", enrollment_tag="Completed",
+            comprehensive_exam_status="Passed", risk_level="On Track", adviser_name=adviser[0] if adviser else None,
+        )
+        db.session.add(student)
+        db.session.flush()
+        for course in monitoring_curriculum_courses(program):
+            db.session.add(CourseRecord(
+                student_id=student.id, course_id=course.id, status="Completed", term_label="AY 2025-2026 2nd Semester",
+                grade_status="Passed", grade_value="1.50", evidence_reference="Seeded history (AIMS grades)",
+            ))
+        db.session.add(ResearchCase(
+            student_id=student.id, case_type=research_case_type(student), title=f"Completed research of {student.name}",
+            current_gate="Completion Evidence", status="Verified Complete", adviser_name=student.adviser_name,
+        ))
+        made += 1
+    db.session.flush()
+    return made
 
 
 def seed_report_history(today: date | None = None) -> int:
@@ -42024,10 +42076,12 @@ def seed_report_history(today: date | None = None) -> int:
         if s.id not in busy and s.standing == "Active" and s.enrollment_tag == "Enrolled"
         and s.current_stage in ("Coursework", "Admission")
     ]
-    graduation_pool = [  # a graduation list only ever holds students who finished everything (F7-02)
+    graduation_demo_numbers = {DEMO_STUDENT_NUMBERS["GRAD-01"], DEMO_STUDENT_NUMBERS["GRAD-02"]}  # these two apply from scratch
+    graduation_pool = [  # a graduation list only ever holds students who finished everything (F7-02): the past graduates
         s for s in Student.query.order_by(Student.id).all()
         if s.id not in busy_other and s.standing == "Active" and s.current_stage == "Completed"
-    ][1:]  # the first Completed student stays clean: it is the "graduation-bianca" demo account (the Graduation demo applies from scratch)
+        and s.student_number not in graduation_demo_numbers
+    ]
     practicum_pool = [s for s in pool if program_allows_practicum(s.program)]
     pool = [s for s in pool if s not in practicum_pool]  # kept for the practicum reports
     faculty_ids = [f.id for f in Faculty.query.filter_by(active=True).order_by(Faculty.id).all()]
@@ -42165,6 +42219,15 @@ def seed_report_history(today: date | None = None) -> int:
                     continue
                 if process in HISTORY_LOG_SLUGS and kind != "current":
                     history_log(HISTORY_LOG_SLUGS[process], student, submitted, decided, outcome)
+                elif process in ("leave", "withdrawal"):
+                    # the Registrar's daily list has changes dated today: this term's newest decisions, not yet sent
+                    verdict = "Approved" if approved else "Denied"
+                    db.session.add(TransactionLog(
+                        transaction_slug=HISTORY_LOG_SLUGS[process], student_id=student.id, actor_role="Dean",
+                        action_type="status", source_reference=SEEDED_HISTORY_SOURCE, result=f"{verdict} by the Dean",
+                        next_owner="None", notes="Seeded history.", previous_status="Dean Review", new_status=verdict,
+                        created_at=datetime.combine(today, time(8 + index % 3, 15)), reflected_in_aims=False,
+                    ))
                 made += 1
 
     # Held defenses with a verdict in the two earlier terms, so "defenses held" compares with the previous term.
@@ -43648,6 +43711,7 @@ def build_demo_database() -> dict:
         spread_seed_history()  # history over the previous weeks
         align_adviser_dates()  # an adviser is appointed before the first defense, not after it
         seed_practicum_waiting_for_hours()  # the Academic Coordinator's "Verify the hours" step shows in the demo (I-383)
+        seed_past_graduates()  # alumni for the graduation history (F8-04)
         seed_report_history()  # two earlier terms of decided cases for the Reports (I-181)
         keep_endorsed_candidates_out_of_completed()  # not Completed while the Dean has not approved (F-25)
         seed_stage_events()  # last: the stage clock, and the risk levels that read it

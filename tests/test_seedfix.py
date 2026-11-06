@@ -13,7 +13,7 @@ os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="pol
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 os.environ.setdefault("USLS_UPLOAD_DIR", tempfile.mkdtemp(prefix="uploads-"))
 
-from app import GraduationEndorsement, UserAccount, app, build_demo_database, db, graduation_eligibility  # noqa: E402
+from app import GraduationEndorsement, Student, UserAccount, app, build_demo_database, db, graduation_eligibility  # noqa: E402
 
 
 class SeedFixTests(unittest.TestCase):
@@ -68,20 +68,24 @@ class SeedFixTests(unittest.TestCase):
             self.assertNotIn("No longer eligible", response.get_data(as_text=True))
 
     def test_ineligible_dean_approved_row_says_why_on_the_roster(self):
+        # the row is built here: a Dean-approved endorsement of a student who has not finished (not the seed history)
         with app.app_context():
-            item = GraduationEndorsement.query.filter_by(dean_remarks="Seeded history.", endorsement_status="Registrar Received").first()
-            self.assertIsNotNone(item)
-            student_id, before = item.student_id, (item.endorsement_status, item.registrar_status)
-            item.endorsement_status, item.registrar_status = "Dean Approved", "Pending Handoff"
+            student = Student.query.filter_by(current_stage="Coursework", standing="Active").order_by(Student.id).first()
+            student_id = student.id
+            item = GraduationEndorsement(
+                student_id=student_id, review_window="this term", batch_name="Batch test", coursework_status="Incomplete",
+                research_status="Incomplete", practicum_status="Not Required", endorsement_status="Dean Approved",
+                registrar_status="Pending Handoff", dean_remarks="Test row.")
+            db.session.add(item)
             db.session.commit()
-            eligible = graduation_eligibility(item.student)["eligible"]
+            item_id = item.id
+            eligible = graduation_eligibility(student)["eligible"]
         self.assertFalse(eligible)
         rows = self.client("dean").get("/api/transactions/graduation/context").get_json()["roster"]
         row = next(r for r in rows if r["student"]["id"] == student_id)
         self.assertTrue(row.get("export_blocked_reason"))
         with app.app_context():
-            item = GraduationEndorsement.query.filter_by(student_id=student_id).first()
-            item.endorsement_status, item.registrar_status = before
+            db.session.delete(db.session.get(GraduationEndorsement, item_id))
             db.session.commit()
 
     # ---- I-378
