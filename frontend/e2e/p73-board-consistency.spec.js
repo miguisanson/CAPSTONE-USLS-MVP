@@ -134,7 +134,7 @@ test.describe("P7.3 boards of the same kind behave the same", () => {
         if (hasReason) {
           expect(hasMenu, `card ${i}: a locked card has no Move to`).toBe(false);
           expect(draggable, `card ${i}: a locked card is not draggable`).toBe(false);
-          await expect(card.getByText(/^(Waiting for|Only|Open the case|Use)/).first(), `card ${i}: the reason is text`).toBeVisible();
+          await expect(card.getByText(/^(Waiting for|Only|Open the case|Use|Exported)/).first(), `card ${i}: the reason is text`).toBeVisible();
         } else {
           expect(hasMenu, `card ${i}: a card without a reason offers Move to`).toBe(true);
           expect(draggable, `card ${i}: and is draggable`).toBe(true);

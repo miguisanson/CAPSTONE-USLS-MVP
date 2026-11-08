@@ -404,6 +404,8 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
       await page.route(/\/api\/process-cases\?slug=withdrawal/, async (route) => {
         const response = await route.fetch();
         const json = await response.json();
+        // only Adrian's request is tagged here (the seed also has a stage-ready tagged one)
+        json.cases = json.cases.filter((item) => item.student.name === "Adrian Lim" || item.status !== "Subject Tagged - Registrar Preparation");
         json.cases = json.cases.map((item) =>
           item.student.name === "Adrian Lim"
             ? {

@@ -1,5 +1,5 @@
 import { isLiveSchedule } from "../../lib/studentHome.js";
-import { Component, createContext, useContext, useEffect, useId, useState } from "react";
+import { Component, createContext, useCallback, useContext, useEffect, useId, useState } from "react";
 import {
   CalendarClock,
   CalendarPlus,
@@ -227,7 +227,24 @@ export function ErrorSummary({ errors }) {
 export const RequestSentContext = createContext(null);
 
 /**
- * Sends one student request. `submit(payload, { lines })` first asks "Send this request?" (the lines are the short summary
+ * The PDFs a form uploaded in this visit, so the "Send this request?" window can list them with a View link.
+ * `remember(attachment)` from a RequestPdfUpload's onUploaded; `fileFor(id, ...saved)` finds the file for an id among the
+ * uploaded ones and the attachments already saved on the request.
+ */
+export function useUploadedFiles() {
+  const [uploaded, setUploaded] = useState({});
+  const remember = useCallback((attachment) => {
+    if (attachment?.id) setUploaded((all) => ({ ...all, [attachment.id]: attachment }));
+  }, []);
+  const fileFor = useCallback(
+    (id, ...saved) => (id ? uploaded[id] || saved.find((file) => file?.id === id) || null : null),
+    [uploaded],
+  );
+  return { remember, fileFor };
+}
+
+/**
+ * Sends one student request. `submit(payload, { lines, files })` first asks "Send this request?" (the lines are the short summary
  * shown in the dialog, I-150), so no student form can forget to confirm. Under a StudentRequestPage the success message goes
  * to the page; elsewhere it comes back as `message`.
  */
@@ -243,6 +260,7 @@ export function useSubmitRequest(type, onSaved) {
     const sure = await confirm({
       title: "Send this request?",
       message: [...lines, "Check these details before you send."].join("\n"),
+      files: summary.files || [], // the documents sent with the request, each with a View link
       confirmLabel: "Send request",
     });
     if (!sure) return;
@@ -328,7 +346,8 @@ export function SavedWorkflowFiles({ files = [], empty = "No files submitted yet
 }
 
 // `id` is the id of the file input (a summary link focuses it); `invalid` is the message shown when nothing was uploaded.
-export function RequestPdfUpload({ requestType, label, onUploaded, initialAttachment = null, id, invalid }) {
+// `viewLabel` names the link to the uploaded file ("View uploaded certificate"); other forms keep "View uploaded application".
+export function RequestPdfUpload({ requestType, label, onUploaded, initialAttachment = null, id, invalid, viewLabel = "View uploaded application" }) {
   const [attachment, setAttachment] = useState(initialAttachment);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -373,7 +392,7 @@ export function RequestPdfUpload({ requestType, label, onUploaded, initialAttach
           onChange={(e) => upload(e.target.files?.[0])}
         />
       </label>
-      {attachment && attachment.file_exists !== false && <a href={attachment.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"><Eye className="h-3.5 w-3.5" /> View uploaded application</a>}
+      {attachment && attachment.file_exists !== false && <a href={attachment.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"><Eye className="h-3.5 w-3.5" /> {viewLabel}</a>}
       {attachment?.file_exists === false && <p className="mt-2 text-xs font-semibold text-red-700">The saved file is unavailable. Upload the PDF again before submitting.</p>}
     </Field>
   );

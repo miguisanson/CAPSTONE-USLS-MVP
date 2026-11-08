@@ -92,6 +92,7 @@ test.describe("I-328 practicum: one column for waiting-for-staff documents", () 
         row.history = [];
       }
       body.__names = [first.student.name, second.student.name];
+      body.roster = [first, second]; // the seed also has stage-ready practicum cases (PANEL_DEMO_CHECKLIST.md); count only these two
       await route.fulfill({ response, json: body });
     });
     await page.goto("/workflow/practicum");

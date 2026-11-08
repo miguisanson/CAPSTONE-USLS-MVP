@@ -190,8 +190,32 @@ const GRADUATION_BATCH_STAGES = [
     currentStatuses: ["Dean Approved"],
     completeStatuses: [],
     attentionStatuses: ["Returned for Revision", "Not Eligible"],
+    registrarStep: "export", // complete once the list is exported
+  },
+  {
+    // Owner 2026-11-08: recorded by hand (drag to "Acknowledged by Registrar"), never automatic.
+    label: "Registrar acknowledged",
+    detail: "Staff or the Dean record that the Registrar confirmed receipt of the emailed list.",
+    currentStatuses: [],
+    completeStatuses: [],
+    attentionStatuses: [],
+    registrarStep: "acknowledged",
   },
 ];
+
+const REGISTRAR_EXPORTED = ["Exported - Ready to Send", "Acknowledged by Registrar"];
+
+// The two Registrar steps read the Registrar status (the endorsement itself stays "Dean Approved").
+function graduationRegistrarStepState(step, group) {
+  const registrar = group.rows.map((row) => row.endorsement?.registrar_status || "");
+  const approved = group.rows.length > 0 && group.rows.every((row) => graduationRowStatus(row) === "Dean Approved");
+  if (step === "export") {
+    if (approved && registrar.every((status) => REGISTRAR_EXPORTED.includes(status))) return "Complete";
+    return group.rows.some((row) => graduationRowStatus(row) === "Dean Approved") ? "Current" : "Pending";
+  }
+  if (approved && registrar.every((status) => status === "Acknowledged by Registrar")) return "Complete";
+  return approved && registrar.every((status) => REGISTRAR_EXPORTED.includes(status)) ? "Current" : "Pending";
+}
 
 export function graduationRowStatus(row) {
   return row.endorsement?.endorsement_status || "Not Prepared";
@@ -304,6 +328,9 @@ export function graduationBatchGroups(rows, selectedIds = new Set()) {
 }
 
 function graduationBatchStageState(stage, group) {
+  if (stage.registrarStep && !group.rows.some((row) => stage.attentionStatuses?.includes(graduationRowStatus(row)))) {
+    return graduationRegistrarStepState(stage.registrarStep, group);
+  }
   const statuses = group.rows.map(graduationRowStatus);
   const hasAttention = statuses.some((status) => stage.attentionStatuses?.includes(status));
   const allComplete = statuses.length > 0 && statuses.every((status) => stage.completeStatuses?.includes(status));
@@ -344,8 +371,8 @@ export function GraduationBatchStageCheck({ group }) {
   );
 }
 
-// The practicum counts as met when it is not required or already completed.
-const PRACTICUM_MET = ["Not Required", "Completed", "Report Sent to Dean", "Dean Reviewed"];
+// Owner 2026-11-08: a practicum counts for graduation only once the Dean has approved (reviewed) it.
+const PRACTICUM_MET = ["Not Required", "Dean Reviewed"];
 
 export function graduationRequirementItems(row) {
   const eligibility = row.eligibility || {};

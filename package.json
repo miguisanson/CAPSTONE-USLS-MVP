@@ -10,6 +10,7 @@
     "build:web": "npm --prefix frontend run build",
     "build": "npm run build:web",
     "seed": "node scripts/run-python.cjs app.py --seed",
+    "reset:panel": "node scripts/run-python.cjs app.py --reset-panel-workflows",
     "dev": "node scripts/run-python.cjs app.py",
     "start": "npm run dev",
     "uat": "node scripts/run-python.cjs scripts/serve_uat.py",

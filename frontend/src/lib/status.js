@@ -15,7 +15,7 @@ export const STATUS_GROUPS = {
   done: ["Passed","Pass","Present","Provided","Complete","Completed","Graduated","Verified","Verified Complete","Verified by staff","Done","Cleared",
     "Compliant","Taken","Received","Record Updated","Withdrawn Confirmed","Re-enrollment Completed","Generated","Synced",
     "Published","Sent to Registrar","Entered","Answered","Revisions confirmed","Dean Reviewed",
-    "Subject Tagged - Registrar Preparation","Acknowledged"],
+    "Subject Tagged - Registrar Preparation","Acknowledged","Acknowledged by Registrar"],
   // Amber: waiting for someone, or being reviewed.
   warning: ["At Risk of Delay","On Leave","Withdrawal In Progress","LOA","Deferred","Defense Deferred","Under deliberation",
     "Not entered","Pending Staff Action","Pending Review","MOA Under Review","Under Review","Dean Review","For Dean Review",

@@ -176,7 +176,7 @@ test.describe("P99 student requests behave alike", () => {
       await page.goto("/student/practicum");
       await ctl(page, "Practicum site / company").fill("Spec Clinic");
       await page.locator("main").locator('input[type="file"]').setInputFiles(PDF);
-      await expect(page.locator("main").getByText("View uploaded application")).toBeVisible();
+      await expect(page.locator("main").getByText("View uploaded MOA")).toBeVisible();
       await submitButton(page, "Submit MOA stage").click();
       await expect(dialog(page)).toBeVisible();
       await expect(dialog(page)).toContainText("Spec Clinic");

@@ -1,3 +1,4 @@
+import { refusalMessage } from "../lib/refusal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { HelpCircle, History, RefreshCw } from "lucide-react";
@@ -332,7 +333,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
       setDetailVersion((value) => value + 1);
       if (onChanged) await onChanged();
     } catch (error) {
-      setBatchResult({ updated: [], skipped: [], message: error.message || "The group step was refused." });
+      setBatchResult({ updated: [], skipped: [], message: refusalMessage(error.message, "The group step was refused.") });
     }
   }
 

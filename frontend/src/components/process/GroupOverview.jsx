@@ -20,7 +20,7 @@ export function GroupOverview({ title, hint, ariaLabel = title, noun = "batch", 
       <ul className="space-y-2">
         {shown.map((group) => (
           <li key={group.id} className={`rounded-xl border px-3 py-2 ${group.ready ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50/60"}`}>
-            <div className="grid gap-2 lg:grid-cols-[minmax(200px,1fr)_minmax(220px,1fr)_minmax(260px,1.2fr)] lg:items-center">
+            <div className="grid gap-2 xl:grid-cols-[minmax(200px,1fr)_minmax(220px,1fr)_minmax(260px,1.2fr)] xl:items-center">
               <div className="min-w-0">
                 <p className="break-words text-sm font-semibold text-ink">{group.label}</p>
                 <p className="meta">{group.count}{group.updated ? ` · Updated ${group.updated}` : ""}</p>

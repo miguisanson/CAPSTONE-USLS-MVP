@@ -3,7 +3,7 @@
 // Pins the structure of Khloe's Graduation Endorsement and Practicum screens (branch v4.1-khloe, WorkflowPage.jsx), now on today's
 // API and actions. Written BEFORE the port; red on the code that replaced her screens (commit c7e60a5).
 //   Graduation, staff and Dean (the same roster component serves both):
-//     - a "Created graduation batches" overview: one row per batch with its stage check (Step n, done/8) and an eye button;
+//     - a "Created graduation batches" overview: one row per batch with its stage check (Step n, done/9) and an eye button;
 //     - the two candidate columns are numbered (1, 2) and say what they hold;
 //     - a candidate card shows the four requirement boxes and the completed-courses line;
 //     - a batch card shows Students:, Next:, the stage-check strip, "View students", "Select batch" and the step button;

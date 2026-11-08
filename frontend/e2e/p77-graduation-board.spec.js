@@ -54,6 +54,9 @@ function setBatchStatus(roster, status, registrar = "Pending") {
 
 /** Staff scenario: Bianca and Hector wait for the application, Carlo has submitted it, Isabel's batch was just created. */
 function staffScenario(roster) {
+  // only Carlo waits in "Application submitted" here (the seed's stage-ready candidate is left out)
+  const marco = roster.findIndex((row) => row.student.name === "Marco Lacuesta");
+  if (marco >= 0) roster.splice(marco, 1);
   const carlo = byName(roster, "Carlo Mendoza");
   Object.assign(carlo, { has_submitted_documents: true, application_submitted: true, application_status: "Application Submitted", next_action_owner: "Graduate School Staff", endorsement: null });
   setBatchStatus(roster, "For Review");
@@ -217,15 +220,21 @@ test.describe("P7.7 Graduation actions as staff", () => {
     await page.getByRole("button", { name: "Create graduation batch" }).click();
     let dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading").first()).toContainText("Create batch");
-    await expect(dialog.getByLabel("Batch No.")).toBeVisible();
-    // I-258: the batch number is one more than the highest batch on the board; the single open school year is text, not a select
-    const highest = await page.evaluate(async () => {
+    // Owner 2026-11-08 (replaces I-258 / B-33): the batch name is given by the system, never typed. It is the next free
+    // number in the current month ("Batch 2 November 2026"), shown as text; there is no Batch No. box and no month/year pick.
+    await expect(dialog.getByLabel("Batch No.")).toHaveCount(0);
+    const expectedName = await page.evaluate(async () => {
       const json = await (await fetch("/api/transactions/graduation/context")).json();
-      return Math.max(0, ...json.roster.map((r) => Number(/^Batch(?:\s+No\.)?\s+(\d+)/.exec(r.endorsement?.batch_name || "")?.[1]) || 0));
+      const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const now = new Date();
+      const month = months[now.getMonth()];
+      const year = now.getFullYear();
+      const pattern = new RegExp(`^Batch\\s+(\\d+)\\s+${month}\\s+${year}$`, "i");
+      const used = json.roster.map((r) => Number(pattern.exec((r.endorsement?.batch_name || "").trim())?.[1]) || 0);
+      return `Batch ${1 + Math.max(0, ...used)} ${month} ${year}`;
     });
-    expect(highest).toBeGreaterThanOrEqual(1);
-    await expect(dialog.getByLabel("Batch No.")).toHaveValue(String(highest + 1));
-    await expect(dialog.locator("select")).toHaveCount(2); // the month and the year (B-33: the year is a pick of the graduation school year)
+    await expect(dialog.getByLabel("Batch name")).toHaveText(expectedName);
+    await expect(dialog.locator("select")).toHaveCount(0); // the single open school year is text too
     await expect(dialog.getByText("Completed subjects:")).toBeVisible(); // the cohort list lives here
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click(); // CHANGED BY p98 (I-152): the step dialog closes with Cancel, not "Close details"
     await expect(page.getByRole("dialog")).toHaveCount(0);

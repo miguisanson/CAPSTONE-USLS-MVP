@@ -28,7 +28,8 @@ const DESCRIPTION = "Practicum completion reports sent to the Dean for final rev
 
 const COLUMNS = [
   { key: "waiting", label: "With the Dean", description: "Reports the Academic Coordinator sent to you.", statuses: ["Report Sent to Dean"] },
-  { key: "returned", label: "Returned", description: "Sent back to the Academic Coordinator.", statuses: ["Additional Certificates Requested"] },
+  // A report the Dean sends back goes to the Coordinator as "Completed" (the list only carries a "Completed" record for that case).
+  { key: "returned", label: "Returned", description: "Sent back to the Academic Coordinator.", statuses: ["Additional Certificates Requested", "Completed"] },
   { key: "reviewed", label: "Reviewed", description: "Marked reviewed by the Dean.", statuses: ["Dean Reviewed"] },
 ];
 
@@ -63,8 +64,9 @@ function PracticumCard({ item }) {
   const updated = item.last_activity_at || item.submitted_at;
   return (
     <CaseCardShell ready={isWaiting(item)}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+      {/* The mark sits under the name: beside it the name was squeezed to a few letters per line. */}
+      <div className="flex flex-col items-start gap-1.5">
+        <div className="min-w-0 max-w-full">
           <p className="break-words text-sm font-semibold text-ink">{item.student.name}</p>
           <p className="meta">{item.student.student_number} · {item.student.program_code}</p>
         </div>

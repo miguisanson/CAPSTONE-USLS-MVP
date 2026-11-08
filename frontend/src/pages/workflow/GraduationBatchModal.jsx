@@ -1,40 +1,26 @@
 import { useState } from "react";
 import { FileCheck, Briefcase, CheckSquare, BookOpenCheck } from "lucide-react";
 import { api } from "../../api";
-import { Field, Input, Select } from "../../components/ui/index.js";
+import { Field, Select } from "../../components/ui/index.js";
 import StepDialog from "../../components/StepDialog";
 import HistoryDisclosure from "../../components/HistoryDisclosure";
 import { GRADUATION_STAGE_ACTIONS, GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchGroups, graduationStageSelection } from "./graduationShared";
+import { refusalMessage, exportCountText } from "../../lib/refusal";
 
 const GRADUATION_BATCH_MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
 
-function defaultGraduationBatchForm(rows = [], allRows = rows) {
-  const existingName = rows.find((row) => row.endorsement?.batch_name)?.endorsement?.batch_name || "";
-  const match = existingName.match(/^Batch(?:\s+No\.)?\s+(\d+)\s+([A-Za-z]+)\s+(\d{4})$/);
-  if (match) {
-    return { batch_no: match[1], batch_month: match[2], batch_year: match[3] };
-  }
+// The name the server will give (owner 2026-11-08: batch names are assigned, never typed): the next free number for
+// this month, "Batch 2 November 2026". The server decides; this is only the preview shown in the dialog.
+function nextGraduationBatchName(allRows = []) {
   const now = new Date();
-  return {
-    // one more than the highest batch number on the board (1 when there is no batch yet)
-    batch_no: String(1 + Math.max(0, ...allRows.map((row) => Number(/^Batch(?:\s+No\.)?\s+(\d+)/.exec(row.endorsement?.batch_name || "")?.[1]) || 0))),
-    batch_month: GRADUATION_BATCH_MONTHS[now.getMonth()],
-    batch_year: String(now.getFullYear()),
-  };
-}
-
-// The batch year is one of the two calendar years of the graduation school year ("AY 2026-2027"); a year already saved stays offered.
-function batchYears(schoolYear, current) {
-  const match = /(\d{4})\s*-\s*(\d{4})/.exec(schoolYear || "");
-  const years = match ? [match[1], match[2]] : [String(new Date().getFullYear())];
-  return current && !years.includes(String(current)) ? [String(current), ...years] : years;
-}
-
-function graduationBatchName(form) {
-  return `Batch ${form.batch_no || "1"} ${form.batch_month || GRADUATION_BATCH_MONTHS[new Date().getMonth()]} ${form.batch_year || new Date().getFullYear()}`;
+  const month = GRADUATION_BATCH_MONTHS[now.getMonth()];
+  const year = now.getFullYear();
+  const pattern = new RegExp(`^Batch\\s+(\\d+)\\s+${month}\\s+${year}$`, "i");
+  const used = allRows.map((row) => Number(pattern.exec((row.endorsement?.batch_name || "").trim())?.[1]) || 0);
+  return `Batch ${1 + Math.max(0, ...used)} ${month} ${year}`;
 }
 
 const completedCourses = (row) => row.eligibility?.completed_courses || [];
@@ -47,7 +33,6 @@ function graduationSelectedActionLabel(action) {
 export function GraduationBatchModal({ rows, allRows, accountRole, reviewWindows, defaultReviewWindow, onClose, onSaved }) {
   const selection = graduationStageSelection(rows, accountRole);
   const stageAction = selection.action;
-  const defaultBatch = defaultGraduationBatchForm(rows, allRows);
   const activeReviewWindow = defaultReviewWindow || reviewWindows[0] || "";
   const selectedReviewWindow = activeReviewWindow;
   const reviewWindowOptions = reviewWindows.map((schoolYear) => ({
@@ -57,13 +42,13 @@ export function GraduationBatchModal({ rows, allRows, accountRole, reviewWindows
   }));
   const [form, setForm] = useState({
     review_window: selectedReviewWindow,
-    ...defaultBatch,
   });
   const action = stageAction;
   const deanDecides = accountRole === "dean" && stageAction?.id === "approve"; // approve or return, chosen by the button
   const [expandedDetailKeys, setExpandedDetailKeys] = useState(() => new Set());
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
-  const batchName = graduationBatchName(form);
+  const existingBatchName = selection.processableRows.find((row) => row.endorsement?.batch_name)?.endorsement?.batch_name || "";
+  const batchName = action?.batchRequired ? nextGraduationBatchName(allRows) : existingBatchName || nextGraduationBatchName(allRows);
   const showBatchFields = action?.batchRequired || (action?.id === "send_to_dean" && selection.processableRows.some((row) => !row.endorsement?.batch_name));
   const selectedGroups = graduationBatchGroups(selection.processableRows.length ? selection.processableRows : rows);
   const modalActionLabel = action
@@ -89,28 +74,26 @@ export function GraduationBatchModal({ rows, allRows, accountRole, reviewWindows
 
   // Batch number and year used to be native `required`; now the dialog says what is missing.
   function problemWith() {
-    if (!showBatchFields) return "";
-    if (!String(form.batch_no).trim() || !String(form.batch_year).trim()) return "Enter the batch number and the year.";
     return "";
   }
 
   // `key` is the button pressed: the step itself, or approve / return for the Dean.
   async function confirm(key, comment) {
     const chosen = deanDecides ? GRADUATION_STAGE_ACTIONS[key] : action;
-    const { batch_no, batch_month, batch_year, ...baseForm } = form;
+    const baseForm = form;
     const payload = {
       ...baseForm,
       comment,
       stage_action: chosen.id,
       action: chosen.id,
-      ...(showBatchFields ? { batch_no, batch_month, batch_year, batch_name: batchName } : {}),
+
     };
     try {
       const result = await api.graduationBatchAction({ student_ids: selection.processableRows.map((row) => row.student.id), ...payload });
       await onSaved(result);
       onClose();
     } catch (err) {
-      throw new Error(err.message || "Could not apply the graduation group action.");
+      throw new Error(refusalMessage(err.message, "Could not apply the graduation group action."));
     }
   }
 
@@ -149,17 +132,14 @@ export function GraduationBatchModal({ rows, allRows, accountRole, reviewWindows
         </div>
         {showBatchFields && (
           <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50/40 p-4">
-            <div className="grid gap-3 sm:grid-cols-4">
-              <Field label="Batch No."><Input value={form.batch_no} onChange={update("batch_no")} inputMode="numeric" /></Field>
-              <Field label="Month"><select value={form.batch_month} onChange={update("batch_month")} className="field-input cursor-pointer">{GRADUATION_BATCH_MONTHS.map((month) => <option key={month}>{month}</option>)}</select></Field>
-              <Field label="Year"><Select value={form.batch_year} onChange={update("batch_year")} options={batchYears(activeReviewWindow, form.batch_year)} placeholder="" /></Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Batch name" hint="Given automatically: the next free number this month, so no two batches share a name."><p aria-label="Batch name" className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-ink ring-1 ring-brand-100">{batchName}</p></Field>
               {activeReviewWindow ? (
                 <Field label="Graduation school year" hint="Only the current school year can be used."><p aria-label="Graduation school year" className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">{activeReviewWindow}</p></Field>
               ) : (
                 <Field label="Graduation school year"><Select value={form.review_window} onChange={update("review_window")} options={reviewWindowOptions} placeholder="" /></Field>
               )}
             </div>
-            <p className="text-sm font-semibold text-brand-800">Batch label: {batchName}</p>
           </div>
         )}
         {!showBatchFields && selectedGroups.length > 0 && (

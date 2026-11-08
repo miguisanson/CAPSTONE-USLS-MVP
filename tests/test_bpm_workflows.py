@@ -5619,6 +5619,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             )
             self.assertTrue(roster_item["application_submitted"])
             self.assertEqual(roster_item["application_status"], "Application Submitted")
+            # Owner 2026-11-08: the batch name is assigned by the system (next free number this month); a typed one is ignored.
+            from app import default_graduation_batch_name
+            expected_batch = default_graduation_batch_name()
 
             response = self._staff_client().post("/api/graduation/batch-actions", json={
                 "student_ids": [student.id],
@@ -5630,10 +5633,10 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             })
             self.assertEqual(response.status_code, 200, response.get_json())
             self.assertEqual(len(response.get_json()["updated"]), 1)
-            self.assertEqual(response.get_json()["batch_name"], "Batch 2 July 2026")
+            self.assertEqual(response.get_json()["batch_name"], expected_batch)
             endorsement = GraduationEndorsement.query.filter_by(student_id=student.id).first()
             self.assertEqual(endorsement.endorsement_status, "For Review")
-            self.assertEqual(endorsement.batch_name, "Batch 2 July 2026")
+            self.assertEqual(endorsement.batch_name, expected_batch)
 
             response = self._staff_client().post("/api/graduation/batch-actions", json={
                 "student_ids": [student.id],
@@ -5644,7 +5647,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(len(response.get_json()["updated"]), 1)
             db.session.refresh(endorsement)
             self.assertEqual(endorsement.endorsement_status, "Coursework Review")
-            self.assertEqual(endorsement.batch_name, "Batch 2 July 2026")
+            self.assertEqual(endorsement.batch_name, expected_batch)
 
             response = self._academic_client().post("/api/graduation/batch-actions", json={
                 "student_ids": [student.id],
@@ -5682,8 +5685,8 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 item for item in dean_payload["pending"]
                 if item["type"] == "graduation" and item["student"]["id"] == student.id
             )
-            self.assertEqual(dean_item["batch_name"], "Batch 2 July 2026")
-            self.assertEqual(dean_item["record"]["batch_name"], "Batch 2 July 2026")
+            self.assertEqual(dean_item["batch_name"], expected_batch)
+            self.assertEqual(dean_item["record"]["batch_name"], expected_batch)
 
             blocked_student = Student(
                 student_number="9900106",
@@ -5719,7 +5722,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             export = self._dean_client().post("/api/graduation/endorsed.csv", json={"endorsement_ids": [endorsement.id]})
             self.assertEqual(export.status_code, 200, export.data.decode())
             self.assertIn("Batch,Student ID,Student Name", export.data.decode())
-            self.assertIn("Batch 2 July 2026", export.data.decode())
+            self.assertIn(expected_batch, export.data.decode())
             db.session.refresh(endorsement)
             self.assertEqual(endorsement.endorsement_status, "Dean Approved")
             self.assertEqual(endorsement.registrar_status, "Exported - Ready to Send")

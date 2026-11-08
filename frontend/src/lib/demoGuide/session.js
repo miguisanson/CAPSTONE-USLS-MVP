@@ -18,16 +18,22 @@ export function firstStop(guide) {
  */
 export async function startDemoSession(guide, password) {
   const { account, page } = firstStop(guide);
-  await resetSandbox(); // every run starts from the same fresh data
+  await resetSandbox(guide); // every run starts from the same fresh data
   await api.login({ email: account.email, password });
   startGuide(guide.id);
   return page;
 }
 
-/** A fresh private copy of the demo data. An old server (404) or a network error is ignored: the run just goes on with the data as it is. */
-async function resetSandbox() {
+// Owner 2026-11-08: these guides reset only their own demo student, so starting one never wipes another guide's case
+// or work done by hand in the demo accounts. Every other guide still starts from a whole fresh copy of the demo data.
+const OWN_CASE_RESET = new Set(["withdrawal", "practicum", "graduation"]);
+
+/** A fresh private copy of the demo data (or of this guide's own case). An old server (404) or a network error is ignored: the run just goes on with the data as it is. */
+async function resetSandbox(guide) {
   try {
-    await api.resetDemoSandbox();
+    await api.resetDemoSandbox(
+      guide && OWN_CASE_RESET.has(guide.process) && guide.studentNumber ? { process: guide.process, student_number: guide.studentNumber } : {},
+    );
   } catch {
     /* old server: continue */
   }
@@ -40,7 +46,7 @@ async function resetSandbox() {
  */
 export async function startFromTop(guide) {
   const { account, page } = firstStop(guide);
-  await resetSandbox();
+  await resetSandbox(guide);
   startGuide(guide.id);
   await switchToAccount(account.email, page);
 }

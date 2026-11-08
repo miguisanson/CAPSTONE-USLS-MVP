@@ -92,3 +92,12 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Demo Guide autopilot bar (DemoAutopilotBar.jsx sets data-guide-bar and --guide-bar-room while it is on screen):
+   an open dialog leaves room under itself, so its footer buttons are never under the bar. No effect without the bar. */
+html[data-guide-bar] [data-modal-backdrop] {
+  padding-bottom: var(--guide-bar-room, 1.5rem);
+}
+html[data-guide-bar] [data-modal-backdrop] > [role="dialog"] {
+  max-height: 100%;
+}

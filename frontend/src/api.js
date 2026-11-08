@@ -91,7 +91,7 @@ export const api = {
   setDemoSettings: (payload) => request("/auth/demo-settings", { method: "POST", body: JSON.stringify(payload) }),
   demoStudents: () => request("/auth/demo-students"),
   // The Demo Guide starts every run from a fresh private copy of the data. An old server has no such route (404): callers ignore that.
-  resetDemoSandbox: () => request("/demo/sandbox/reset", { method: "POST", body: JSON.stringify({}) }),
+  resetDemoSandbox: (scope = {}) => request("/demo/sandbox/reset", { method: "POST", body: JSON.stringify(scope) }),
   demoGuideState: (params = {}) => request(`/demo/guide-state?${queryString(params)}`),
   resetDemoStudent: (demoKey) =>
     request(`/auth/demo-students/${encodeURIComponent(demoKey)}/reset`, {
@@ -186,6 +186,9 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ reflected }),
     }),
+  // Staff or the Dean record by hand that the Registrar acknowledged an exported list (owner 2026-11-08).
+  graduationRegistrarAcknowledged: (endorsementIds) =>
+    request("/graduation/registrar-acknowledged", { method: "POST", body: JSON.stringify({ endorsement_ids: endorsementIds }) }),
   exportGraduationCsv: async (reviewWindow = "", endorsementIds = []) => {
     const res = await announced(`${BASE}/graduation/endorsed.csv`, {
       method: "POST",
@@ -206,7 +209,7 @@ export const api = {
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
-    return { count: Number(res.headers.get("X-Exported-Count") || 0), filename };
+    return { count: Number(res.headers.get("X-Exported-Count") || 0), filename, registrarEmail: res.headers.get("X-Registrar-Email") || "" };
   },
   exportWithdrawalXlsx: async (applicationIds = []) => {
     const res = await announced(`${BASE}/withdrawal/approved.xlsx`, {
@@ -228,8 +231,12 @@ export const api = {
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
-    return { count: Number(res.headers.get("X-Exported-Count") || 0), filename };
+    return { count: Number(res.headers.get("X-Exported-Count") || 0), filename, registrarEmail: res.headers.get("X-Registrar-Email") || "" };
   },
+  // Staff record when an exported withdrawal list was sent to the Registrar and when the Registrar acknowledged it ("sent" | "acknowledged").
+  // The case does not move; only the dates are saved.
+  recordWithdrawalRegistrarFollowup: (applicationId, step, note = "") =>
+    request(`/withdrawal/${applicationId}/registrar-followup`, { method: "POST", body: JSON.stringify({ step, note }) }),
   transactionContext: (slug, params = {}) => {
     const qs = queryString(params);
     return request(`/transactions/${slug}/context${qs ? `?${qs}` : ""}`);
@@ -417,6 +424,8 @@ export const api = {
   awolPolicyReview: (payload) =>
     request("/awol/policy-review", { method: "POST", body: JSON.stringify(payload) }),
   studentPortalContext: () => request("/student-portal/context"),
+  // What the system read from an uploaded practicum certificate: { hours: number | null, message }.
+  practicumCertificateHours: (attachmentId) => request(`/student-portal/practicum/certificate-hours/${attachmentId}`),
   // The server always enrolls into the current semester, so no term is sent.
   saveStudentEnrollment: (courseIds) =>
     request("/student-portal/enrollment", {
@@ -525,7 +534,7 @@ export const api = {
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
-    return { count: Number(res.headers.get("X-Exported-Count") || 0), filename };
+    return { count: Number(res.headers.get("X-Exported-Count") || 0), filename, registrarEmail: res.headers.get("X-Registrar-Email") || "" };
   },
   uploadResearchEvidence: async (gate, itemName, file) => {
     const form = new FormData();

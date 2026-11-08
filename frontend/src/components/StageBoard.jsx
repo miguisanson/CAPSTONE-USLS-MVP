@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Inbox, Loader2, Lock, Move } from "lucide-react";
 import { useIsPhone } from "../hooks";
 import { EmptyState, InlineNotice, StatusLegend } from "./ui/index.js";
+import { refusalMessage } from "../lib/refusal";
+import { useAuth } from "../auth";
+import { useSeenMarks } from "../lib/seenMarks";
 
 /**
  * A staged board with real drag and drop (native HTML5, no dependency).
@@ -87,6 +90,39 @@ export default function StageBoard({
 
   const columnByKey = useMemo(() => Object.fromEntries(columns.map((column) => [column.key, column])), [columns]);
   const itemById = useMemo(() => new Map(items.map((item) => [String(getItemId(item)), item])), [items, getItemId]);
+
+  // Owner 2026-11-08: a card that moved by itself (someone else's step, a student submission, an export) is green in its
+  // new column until this person opens or touches it. This browser remembers, per account, the column each card was
+  // last seen in (per copy of the demo data). The first visit only records where everything is; moves this person makes never turn green.
+  const { user } = useAuth();
+  // The data id changes on a reseed or a demo reset, so cards a reset put back are not counted as moved.
+  const seen = useSeenMarks(`board:${ariaLabel}:${user?.id || "guest"}:${user?.data_id || ""}`);
+  const touchedRef = useRef(new Set()); // cards this person clicked or moved in this page view
+  const hasMarks = Object.keys(seen.marks).length > 0;
+  const freshIds = useMemo(() => {
+    const fresh = new Set();
+    if (!hasMarks || readOnly) return fresh;
+    for (const item of items) {
+      const id = String(getItemId(item));
+      if (seen.marks[id] !== getColumnKey(item) && !touchedRef.current.has(id)) fresh.add(id);
+    }
+    return fresh;
+  }, [items, getItemId, getColumnKey, seen.marks, hasMarks, readOnly]);
+  const { markMany: markSeenMany, mark: markSeen } = seen;
+  useEffect(() => {
+    const pairs = [];
+    for (const item of items) {
+      const id = String(getItemId(item));
+      const key = getColumnKey(item);
+      if ((!hasMarks || touchedRef.current.has(id)) && seen.marks[id] !== key) pairs.push([id, key]);
+    }
+    if (pairs.length) markSeenMany(pairs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+  const touchCard = useCallback((id, key) => {
+    touchedRef.current.add(id);
+    markSeen(id, key);
+  }, [markSeen]);
 
   useEffect(
     () => () => {
@@ -202,15 +238,16 @@ export default function StageBoard({
       const target = columnByKey[toKey];
       if (!target || fromKey === toKey) return;
       if (!readOnly && !canDrag(item)) {
-        show("error", `${lockText(item).replace(/\.$/, "")}. This card cannot be moved right now.`);
+        show("error", refusalMessage(`${lockText(item).replace(/\.$/, "")}. This card cannot be moved right now.`));
         return;
       }
       const check = verdict(item, toKey);
       if (!check.allowed) {
-        show("error", check.reason || `This item cannot move to "${target.label}".`);
+        show("error", refusalMessage(check.reason || `This item cannot move to "${target.label}".`));
         return;
       }
       const id = String(getItemId(item));
+      touchedRef.current.add(id); // this person's own move: the card is not "moved by itself"
       setBusyId(id);
       setPending({ id, label: target.label });
       moveRef.current = { id, toKey, at: Date.now() };
@@ -220,7 +257,7 @@ export default function StageBoard({
         if (result && result.message) show("success", result.message);
       } catch (error) {
         failed = true;
-        show("error", error?.message || "That move was refused.");
+        show("error", refusalMessage(error?.message, "That move was refused."));
       } finally {
         setBusyId(null);
         if (failed) {
@@ -270,19 +307,29 @@ export default function StageBoard({
     const id = String(getItemId(item));
     const movable = !readOnly && canDrag(item);
     const draggable = movable && !phone; // a phone moves a card with "Move to...", never by dragging
+    const fresh = freshIds.has(id);
     return (
       <div
         key={id}
         draggable={draggable}
+        data-fresh={fresh ? "true" : undefined}
+        onClickCapture={() => touchCard(id, column.key)}
         onDragStart={draggable ? (event) => onDragStart(event, item) : undefined}
         onDragEnd={onDragEnd}
         data-card-id={id}
         aria-busy={busyId === id}
         data-locked={!readOnly && !movable ? "true" : undefined}
-        className={`rounded-xl transition-[opacity,transform] duration-150 ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
+        // A long chip on a card (e.g. "Registrar: Exported - Ready to Send" in a 248px column) wraps inside the card instead of
+        // sticking out; chips elsewhere (tables, headers) keep their one-line look.
+        className={`rounded-xl transition-[opacity,transform] duration-150 [&_[data-status-tone]]:max-w-full [&_[data-status-tone]]:!whitespace-normal [&_[data-status-tone]]:break-words ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
           dragging?.id === id ? "scale-95 opacity-60" : busyId === id ? "opacity-60" : ""
-        } ${pending?.id === id ? "ring-2 ring-brand-400" : ""} ${settledId === id ? "animate-card-settle" : ""}`}
+        } ${pending?.id === id ? "ring-2 ring-brand-400" : fresh ? "bg-emerald-50 p-1.5 ring-2 ring-emerald-400" : ""} ${settledId === id ? "animate-card-settle" : ""}`}
       >
+        {fresh && (
+          <p className="mb-1.5 inline-flex items-center rounded-full bg-emerald-800 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+            Moved here · new
+          </p>
+        )}
         {renderCard(item)}
         {pending?.id === id && (
           <p data-testid="card-moving" className="mt-1.5 flex items-center justify-end gap-1.5 px-2 text-xs font-semibold text-brand-700">
@@ -373,7 +420,12 @@ export default function StageBoard({
                 key={column.key}
                 aria-label={column.label}
                 onDragOver={readOnly ? undefined : (event) => onDragOver(event, column)}
-                onDragLeave={readOnly ? undefined : () => hoverColumn === column.key && setHoverColumn(null)}
+                onDragLeave={readOnly ? undefined : (event) => {
+                  // Moving between the column's own cards and notice fires dragleave too; only a real exit clears the hover,
+                  // or the red "Nothing was changed" notice blinks out mid-drag.
+                  if (event.relatedTarget && event.currentTarget.contains(event.relatedTarget)) return;
+                  if (hoverColumn === column.key) setHoverColumn(null);
+                }}
                 onDrop={readOnly ? undefined : (event) => onDrop(event, column)}
                 className={`${columnClassName} ${fitColumns ? "min-w-64 flex-1 basis-0" : "min-h-[14rem] shrink-0"} flex flex-col rounded-2xl border bg-slate-50/70 p-3 transition-colors duration-150 ${
                   allowedHere
@@ -396,7 +448,7 @@ export default function StageBoard({
                 )}
                 {refusedHere && (
                   <InlineNotice tone="danger" role="status" className="mb-2 px-2.5 py-2 text-xs">
-                    {hoverVerdict.reason || "That move is not allowed."}
+                    {refusalMessage(hoverVerdict.reason, "That move is not allowed.")}
                   </InlineNotice>
                 )}
                 <div data-testid="stage-scroll" className={columnBodyClassName ? `flex-1 space-y-2 ${columnBodyClassName}` : "space-y-3"}>
@@ -536,8 +588,41 @@ function MoveMenu({ item, columns, fromKey, verdict, onPick, busy }) {
   const wrapRef = useRef(null);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
+  const [place, setPlace] = useState(null); // { left, top, width, maxHeight }: where the open menu sits on the screen
 
   const menuItems = () => Array.from(menuRef.current?.querySelectorAll('[role="menuitem"]') || []);
+
+  // The menu is placed on the screen (position: fixed), not inside the column: a card in the first column used to open it
+  // past the left edge, and the board's scroller cut it off. It keeps an 8px gap from every edge and opens above the
+  // button when there is no room below.
+  useLayoutEffect(() => {
+    if (!open) {
+      setPlace(null);
+      return undefined;
+    }
+    function measure() {
+      const button = buttonRef.current?.getBoundingClientRect();
+      if (!button) return;
+      const gap = 8;
+      const vw = document.documentElement.clientWidth;
+      const vh = window.innerHeight;
+      const width = Math.min(288, vw - gap * 2);
+      const left = Math.min(Math.max(gap, button.right - width), vw - width - gap);
+      const height = menuRef.current?.scrollHeight || 0;
+      const below = vh - button.bottom - gap - 4;
+      const above = button.top - gap - 4;
+      const up = height > below && above > below;
+      const room = Math.max(120, up ? above : below);
+      setPlace({ left, width, maxHeight: room, top: up ? Math.max(gap, button.top - 4 - Math.min(height, room)) : button.bottom + 4 });
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -598,7 +683,8 @@ function MoveMenu({ item, columns, fromKey, verdict, onPick, busy }) {
           id={menuId}
           role="menu"
           onKeyDown={onMenuKeyDown}
-          className="absolute right-0 top-full z-header mt-1 w-72 max-w-[85vw] animate-notice-in rounded-xl border border-slate-200 bg-white p-1 shadow-lift"
+          style={place ? { left: place.left, top: place.top, width: place.width, maxHeight: place.maxHeight } : { opacity: 0, left: 0, top: 0 }}
+          className="fixed z-header overflow-y-auto animate-notice-in rounded-xl border border-slate-200 bg-white p-1 shadow-lift"
         >
           {columns
             .filter((column) => column.key !== fromKey)
@@ -621,7 +707,7 @@ function MoveMenu({ item, columns, fromKey, verdict, onPick, busy }) {
                     }`}
                   >
                     <span className="font-semibold">{column.label}</span>
-                    {!check.allowed && check.reason && <span className="text-xs font-normal text-red-700">{check.reason}</span>}
+                    {!check.allowed && check.reason && <span className="text-xs font-normal text-red-700 break-words">{refusalMessage(check.reason)}</span>}
                   </button>
                 </li>
               );

@@ -908,8 +908,9 @@ test.describe("P4.2 student request forms", () => {
       await expect(main).toContainText("Based on the encoded course audit and research milestone records.");
       await expect(main).toContainText("MAPSY - Spec");
       await expect(main).toContainText("9 / 6");
-      await expect(main).toContainText("Source: course_audit.by_category");
-      await expect(main).toContainText("Source: Not recorded");
+      // each row says where its value comes from in plain words, not as a field name
+      await expect(main).toContainText("From your course record");
+      await expect(main).toContainText("From your student record");
       await expect(main).toContainText("No source data");
       await expect(main.getByText("Verified", { exact: true }).first()).toBeVisible();
       await expect(main.getByText("Needs verification", { exact: true })).toHaveCount(1);
@@ -933,7 +934,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(fieldOf(page, "Practicum MOA PDF").getByRole("alert")).toHaveText("Please choose a PDF file.");
       expect(writes.filter((w) => w.path === "request-attachments/upload")).toHaveLength(0);
       await main.locator('input[type="file"]').setInputFiles(PDF);
-      await expect(main.getByText("View uploaded application")).toHaveAttribute("href", "/spec/spec.pdf");
+      await expect(main.getByText("View uploaded MOA")).toHaveAttribute("href", "/spec/spec.pdf");
       const upload = lastWrite(writes, "request-attachments/upload");
       expect(upload.raw).toContain('name="request_type"');
       expect(upload.raw).toContain("practicum");
@@ -947,7 +948,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/practicum").body).toEqual({
         attachment_id: 7001, certificate_attachment_id: null, practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec",
-        completed_hours: 0, remarks: "Spec remarks.", // no student_id, no required_hours: the server knows both
+        remarks: "Spec remarks.", // no student_id, no required_hours: the server knows both
       });
       await snap(page, "practicum-moa-sent");
     } finally {
@@ -974,13 +975,13 @@ test.describe("P4.2 student request forms", () => {
       await expect(main).toContainText("moa-spec.pdf");
       await expect(main.getByRole("link", { name: "View file" })).toHaveAttribute("href", "/spec/moa.pdf");
       // the completion step
-      await expect(main).toContainText("What you need to submit now: completed hours and one PDF containing the required completion documents.");
-      await expectRequired(page, "Completed hours", true);
+      await expect(main).toContainText("What you need to submit now: one PDF containing the required completion documents. The completed hours are read from the certificate.");
       await expect(main.getByText("Required hours", { exact: true })).toBeVisible(); // text, not an input
       await expect(main.getByText("Required hours", { exact: true }).locator("xpath=following-sibling::p[1]")).toHaveText("200");
       await expect(page.getByLabel("Required hours")).toHaveCount(0);
-      await expect(ctl(page, "Completed hours")).toHaveAttribute("min", "0");
-      await expect(ctl(page, "Completed hours")).toHaveValue("50");
+      // owner 2026-11-08: the completed hours are read from the uploaded certificate, shown as text, never typed
+      await expect(page.getByLabel("Completed hours")).toHaveCount(0);
+      await expect(main.getByText("Completed hours", { exact: true }).locator("xpath=following-sibling::p[1]")).toHaveText("Read from the certificate after you upload it");
       await expect(main).toContainText("Certificates are counted automatically");
       await expect(main).toContainText("The system currently detects 1 submitted certificate file. Uploading an additional file updates this count.");
       await expect(fieldOf(page, "Completion certificates / forms / hours proof PDF")).toBeVisible();
@@ -992,13 +993,12 @@ test.describe("P4.2 student request forms", () => {
       await snap(page, "practicum-completion");
       await main.locator('input[type="file"]').setInputFiles(PDF);
       await expect(submit).toBeEnabled();
-      await ctl(page, "Completed hours").fill("200");
       await submit.click();
       await page.getByRole("dialog", { name: "Send this request?" }).getByRole("button", { name: "Send request" }).click();
       await expect(page.getByText("Spec: request saved.")).toBeVisible();
       expect(lastWrite(writes, "requests/practicum").body).toEqual({
         attachment_id: 6001, certificate_attachment_id: 7001, practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec",
-        completed_hours: "200", remarks: "",
+        remarks: "",
       });
     } finally {
       await context.close();
