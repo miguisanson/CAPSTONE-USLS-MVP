@@ -78,7 +78,9 @@ export default function MonitoringGrid() {
   const selectedEnrollment = searchParams.get("enrollment") || "";
   const selectedTermId = searchParams.get("term_id") || "";
   const sortBy = searchParams.get("sort") || "name";
-  const filtered = Boolean(selectedProgress || selectedRisk || selectedEnrollment);
+  // Stakeholder UAT (B14): look at one cohort - the students admitted in one academic year - of the program.
+  const selectedEntry = searchParams.get("entry") || "";
+  const filtered = Boolean(selectedProgress || selectedRisk || selectedEnrollment || searchParams.get("entry"));
   const { data: meta } = useApi(() => api.meta(), []);
   const [programId, setProgramId] = useState("");
   const [grid, setGrid] = useState(null);
@@ -123,8 +125,13 @@ export default function MonitoringGrid() {
     () => (grid ? grid.categories.flatMap((c) => c.courses) : []),
     [grid]
   );
+  const entryOptions = useMemo(() => {
+    const years = [...new Set((grid?.students || []).map((s) => s.academic_year_entry).filter(Boolean))];
+    years.sort((a, b) => String(b).localeCompare(String(a)));
+    return years.map((year) => ({ value: year, label: `Admitted AY ${year}` }));
+  }, [grid?.students]);
   const sortedStudents = useMemo(() => {
-    const rows = [...(grid?.students || [])];
+    const rows = (grid?.students || []).filter((s) => !selectedEntry || s.academic_year_entry === selectedEntry);
     const riskRank = { Delayed: 0, "At Risk of Delay": 1, "On Track": 2, "Not Yet Assessed": 3 };
     const nameKey = (student) => `${student.last_name || ""}, ${student.first_name || ""}`.toLowerCase();
     rows.sort((a, b) => {
@@ -137,7 +144,7 @@ export default function MonitoringGrid() {
       return nameKey(a).localeCompare(nameKey(b));
     });
     return rows;
-  }, [grid?.students, sortBy]);
+  }, [grid?.students, sortBy, selectedEntry]);
 
   function openFlagDialog(student) {
     setFlagStudent(student);
@@ -197,11 +204,11 @@ export default function MonitoringGrid() {
 
   function exportCsv() {
     if (!grid) return;
-    const header = ["Student", "IDNO", "AY Entry", "YR", ...flatCourses.map((c) => c.code), "Completed", "Total", "% Complete"];
+    const header = ["Student", "IDNO", "AY Entry", "YR", "Lifecycle stage", ...flatCourses.map((c) => c.code), "Completed", "Total", "% Complete"];
     const lines = [header.map(csvCell).join(",")];
     sortedStudents.forEach((s) => {
       lines.push([
-        displayStudentName(s), s.student_number, s.academic_year_entry, s.year_level,
+        displayStudentName(s), s.student_number, s.academic_year_entry, s.year_level, s.stage || "",
         ...flatCourses.map((c) => s.cells[c.id] || "Missing"),
         s.completed, s.total, s.rate,
       ].map(csvCell).join(","));
@@ -218,6 +225,8 @@ export default function MonitoringGrid() {
       enrollment: next.enrollment ?? selectedEnrollment,
       sort: next.sort ?? sortBy,
       term_id: next.term_id ?? selectedTermId,
+      // another program has other admission years, so a program change clears the year
+      entry: next.entry ?? (next.program_id !== undefined && next.program_id !== programId ? "" : selectedEntry),
     };
     const params = {};
     if (merged.program_id) params.program_id = merged.program_id;
@@ -226,6 +235,7 @@ export default function MonitoringGrid() {
     if (merged.enrollment) params.enrollment = merged.enrollment;
     if (merged.sort && merged.sort !== "name") params.sort = merged.sort;
     if (merged.term_id) params.term_id = merged.term_id;
+    if (merged.entry) params.entry = merged.entry;
     setSearchParams(params, { replace: true });
   }
 
@@ -260,6 +270,9 @@ export default function MonitoringGrid() {
           </div>
           <div className="w-full sm:w-[19rem]">
             <Select aria-label="Semester" placeholder="" value={selectedTermId || String(grid?.selected_term?.id || "")} options={termOptions} onChange={(e) => updateFilters({ term_id: e.target.value })} />
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-44 sm:flex-1">
+            <Select aria-label="Year admitted" placeholder="All years admitted" value={selectedEntry} options={entryOptions} onChange={(e) => updateFilters({ entry: e.target.value })} />
           </div>
           <div className="w-full sm:w-auto sm:min-w-40 sm:flex-1">
             <Select aria-label="Progress" placeholder="All progress" value={selectedProgress} options={PROGRESS_OPTIONS} onChange={(e) => updateFilters({ progress: e.target.value })} />
@@ -310,14 +323,14 @@ export default function MonitoringGrid() {
         <Spinner label="Loading monitoring sheet…" />
       ) : error ? (
         <EmptyState icon={AlertTriangle} title="Could not load the sheet" hint={error} />
-      ) : !grid || grid.students.length === 0 ? (
+      ) : !grid || sortedStudents.length === 0 ? (
         <Card>
           {filtered ? (
             <EmptyState
               icon={Table2}
               title="No students match these filters"
               hint="Clear a filter to see the other students of this program."
-              action={<Button variant="secondary" onClick={() => updateFilters({ progress: "", risk: "", enrollment: "" })}>Clear filters</Button>}
+              action={<Button variant="secondary" onClick={() => updateFilters({ progress: "", risk: "", enrollment: "", entry: "" })}>Clear filters</Button>}
             />
           ) : (
             <EmptyState
@@ -448,6 +461,8 @@ export default function MonitoringGrid() {
                               )}
                               <StatusChip status={s.risk} size="sm" dot={false} />
                             </span>
+                            {/* Stakeholder UAT: the cohort's research milestone sits beside its coursework, in one sheet. */}
+                            {s.stage && <span className="mt-0.5 block truncate text-2xs font-semibold text-brand-800" title={`Lifecycle stage: ${s.stage}`}>Stage: {s.stage}</span>}
                           </span>
                         </button>
                       </div>

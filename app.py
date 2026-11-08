@@ -14733,6 +14733,16 @@ def register_routes(app: Flask) -> None:
         return jsonify(
             {
                 "student": student_brief(student),
+                # Stakeholder UAT (Section C): staff and the Academic Coordinator can review the student's earlier leaves
+                # here, read-only (the Dean sees the same list in the leave window). Filing and deciding are unchanged.
+                "leave_history": {
+                    "cases": [
+                        leave_case_brief(item)
+                        for item in LeaveCase.query.filter_by(student_id=student.id).order_by(LeaveCase.id.desc()).limit(20).all()
+                    ],
+                    "approved_leave_semesters": leave_approved_semesters(student),
+                    "max_leave_semesters": rule_value("loa.max_total_semesters", 4),
+                },
                 "stages": STAGES,
                 "stage_index": STAGES.index(student.current_stage) if student.current_stage in STAGES else 0,
                 "course_audit": course_audit_dict(audit),

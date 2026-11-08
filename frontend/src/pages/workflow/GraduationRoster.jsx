@@ -179,7 +179,7 @@ const GRADUATION_BOARD_COLUMNS = [
     // Owner 2026-11-08: an exported batch is moved here BY HAND (drag or Move to) by staff or the Dean once the Registrar
     // confirms receipt of the emailed list. Nothing moves here by itself.
     label: "Acknowledged by Registrar",
-    description: "Staff or the Dean move an exported batch here once the Registrar confirms receipt.",
+    description: "Moved here by hand once the Registrar confirms.",
     statuses: [],
     acknowledged: true,
   },

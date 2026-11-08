@@ -249,6 +249,21 @@ class PanelDemoSeedTests(unittest.TestCase):
                        if not row.request_attachment_id]
         self.assertEqual(missing, [], "a batch without the signed application shows 'Application document issue'")
 
+    # -- stakeholder UAT (Section C): staff and the Academic Coordinator review earlier leaves, read-only
+    def test_student_record_lists_earlier_leaves_for_staff_and_the_academic_coordinator(self):
+        with app.app_context():
+            case = app_module.LeaveCase.query.order_by(app_module.LeaveCase.id).first()
+            student_id = case.student_id
+            expected = app_module.LeaveCase.query.filter_by(student_id=student_id).count()
+        for email in ("staff@usls.edu.ph", "academic@usls.edu.ph"):
+            body = self.signed_in(email).get(f"/api/students/{student_id}").get_json()
+            history = body["leave_history"]
+            self.assertEqual(len(history["cases"]), expected, email)
+            self.assertIn("kind_label", history["cases"][0])
+            self.assertEqual(history["max_leave_semesters"], 4)
+        self.assertEqual(self.signed_in("academic@usls.edu.ph").get("/api/leave-cases").status_code, 403,
+                         "viewing the history gives no access to the leave process itself")
+
     def test_batch_names_are_never_shared(self):
         with app.app_context():
             batches = {}

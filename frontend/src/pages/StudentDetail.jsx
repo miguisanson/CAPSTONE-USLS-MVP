@@ -18,6 +18,7 @@ import {
   BookPlus,
   UserPlus,
   UserRound,
+  CalendarOff,
 } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
@@ -103,6 +104,42 @@ function CourseAuditTiles({ audit }) {
         </section>
       )}
     </>
+  );
+}
+
+// The student's leave and readmission cases, newest first, and how many leave semesters are already approved against
+// the limit (Handbook p. 53: a leave of one year, renewable for at most one more). Read-only: leaves are filed by the
+// student, reviewed by staff and decided by the Dean in the Leave of Absence process.
+function LeaveHistoryCard({ history }) {
+  if (!history) return null;
+  const cases = history.cases || [];
+  const used = history.approved_leave_semesters || 0;
+  const max = history.max_leave_semesters || 0;
+  return (
+    <SectionCard title="Leave history" subtitle="Earlier leave of absence and readmission cases (view only)" icon={CalendarOff}>
+      {max > 0 && (
+        <div className="mb-3">
+          <p className="text-sm font-semibold text-ink">{used} of {max} leave semesters already approved</p>
+          <p className="meta">Earlier leaves count toward the total limit.</p>
+          <ProgressBar className="mt-2" value={max ? (used / max) * 100 : 0} />
+        </div>
+      )}
+      {cases.length ? (
+        <ul className="space-y-2">
+          {cases.map((row) => (
+            <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink">{row.kind_label}{row.period_text ? ` · ${row.period_text}` : ""}</p>
+                <p className="meta">{row.decided_at ? `Decided ${formatDate(row.decided_at)}` : `Filed ${formatDate(row.created_at)}`}</p>
+              </div>
+              <StatusChip status={row.status_label || row.status} dot={false} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState size="sm" title="No earlier leave" hint="This student has no leave of absence or readmission case." />
+      )}
+    </SectionCard>
   );
 }
 
@@ -319,6 +356,9 @@ export default function StudentDetail() {
               <EmptyState size="sm" title="No document checks recorded" />
             )}
           </SectionCard>
+
+          {/* Stakeholder UAT (Section C): earlier leaves, read-only, for staff and the Academic Coordinator. */}
+          <LeaveHistoryCard history={data.leave_history} />
 
           {/* Timeline */}
           <SectionCard title="Activity timeline" subtitle="What happened, by whom, and when" icon={Clock}>

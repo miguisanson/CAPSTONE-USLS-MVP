@@ -4,7 +4,7 @@ import { api } from "../../api";
 import StageBoard, { BoardNotice, useBoardNotice } from "../../components/StageBoard";
 import { useApi } from "../../hooks";
 import { useAuth } from "../../auth";
-import { Button, Card, DataTable, InlineNotice, SectionTitle, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, DataTable, InlineNotice, SectionTitle, Select, StatusChip } from "../../components/ui/index.js";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
 import { CaseCardFacts, CaseCardShell, NextOwner, PanelStamp, RequirementBoxes, StageColumnHeader } from "../../components/process";
@@ -29,6 +29,16 @@ const COLUMNS = [
   { key: "3", label: "Final Defense", description: "Final defense requirements and panel decision, then completion evidence." },
 ];
 const STATUS_OPTIONS = Object.entries(STATE_LABEL).map(([value, label]) => ({ value, label }));
+
+// Stakeholder UAT (D10): the table shows every milestone of a student at once. A stage before the student's current one is
+// done (the next stage opens only after a passing verdict); the current one shows its status; later ones are not started.
+function milestoneState(row, stageNumber) {
+  const at = Number(row.column);
+  if (stageNumber < at) return "Done";
+  if (stageNumber > at) return "Not started";
+  return STATE_LABEL[row.state] === "Done" ? "Done" : "In progress";
+}
+const MILESTONE_TONE = { Done: "Completed", "In progress": "In Progress", "Not started": "Not Started" };
 
 function defenseFact(row) {
   const defense = row.next_defense;
@@ -75,6 +85,7 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
   const { data, loading, error, refetch } = useApi(() => api.researchGateOverview(), []);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [view, setView] = useState("board");
+  const [entry, setEntry] = useState(""); // a cohort: the students admitted in one academic year
   const [dialog, setDialog] = useState(null); // { mode, row }
   const boardNotice = useBoardNotice();
   const allRows = data?.items || [];
@@ -83,12 +94,19 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
     () => STATUS_OPTIONS.map((option) => ({ ...option, label: `${option.label} (${data?.counts?.[option.value] ?? 0})` })),
     [data],
   );
+  const entryOptions = useMemo(
+    () => [...new Set(allRows.map((row) => row.student.academic_year_entry).filter(Boolean))]
+      .sort((a, b) => String(b).localeCompare(String(a)))
+      .map((year) => ({ value: year, label: `Admitted AY ${year}` })),
+    [allRows],
+  );
   const rows = useMemo(() => allRows.filter((row) => {
     const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.research_title || ""}`.toLowerCase();
     return (!filters.query || haystack.includes(filters.query.toLowerCase()))
       && (!filters.program || row.student.program_code === filters.program)
-      && (!filters.status || row.state === filters.status);
-  }), [allRows, filters]);
+      && (!filters.status || row.state === filters.status)
+      && (!entry || row.student.academic_year_entry === entry);
+  }), [allRows, filters, entry]);
 
   const totalOf = (key) => allRows.filter((row) => String(row.column) === key).length;
   const shownOf = (key) => rows.filter((row) => String(row.column) === key).length;
@@ -110,7 +128,16 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
         </button>
       ),
     },
-    { key: "stage", header: "Stage", hideBelow: "sm" },
+    { key: "entry", header: "Year admitted", hideBelow: "sm", sortValue: (row) => row.student.academic_year_entry || "", cell: (row) => row.student.academic_year_entry || "—" },
+    ...COLUMNS.map((column) => ({
+      key: `milestone-${column.key}`,
+      header: column.label,
+      sortValue: (row) => ["Not started", "In progress", "Done"].indexOf(milestoneState(row, Number(column.key))),
+      cell: (row) => {
+        const state = milestoneState(row, Number(column.key));
+        return <StatusChip status={MILESTONE_TONE[state]} label={state} dot={false} />;
+      },
+    })),
     { key: "state", header: "Status", sortValue: (row) => STATE_LABEL[row.state], cell: (row) => <span title={STATE_HELP[row.state]}><StatusChip status={STATE_LABEL[row.state]} dot={false} /></span> },
     { key: "waiting_on", header: "Waiting on", hideBelow: "md", cell: (row) => row.waiting_on || "—" },
     { key: "reason", header: "Why", hideBelow: "md", cell: (row) => <span className="text-sm text-slate-700">{row.reason}</span> },
@@ -140,6 +167,9 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
           {data && <p className="meta" data-testid="research-gate-summary">{allRows.length} students: {summary}.</p>}
           <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
             <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={rows.length} total={allRows.length} noun="students" />
+            <div className="w-full sm:w-56">
+              <Select aria-label="Year admitted" placeholder="All years admitted" value={entry} options={entryOptions} onChange={(e) => setEntry(e.target.value)} />
+            </div>
           </BoardFilterRow>
           {view === "board" ? (
             <StageBoard
@@ -162,7 +192,7 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
             <>
               <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />
               <DataTable
-                caption="Students at each Research Gate stage, with their status and what they are waiting for"
+                caption="Students at each Research Gate stage: every milestone, the status, and what they are waiting for"
                 columns={tableColumns}
                 rows={rows}
                 rowKey={(row) => row.student.id}
