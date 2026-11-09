@@ -248,7 +248,7 @@ class HonestAnswerTests(AssistantBase):
                     generate.assert_called_once()
                     prompt = generate.call_args.args[0]
                     self.assertIn(question, prompt)
-                    self.assertIn("University of St. La Salle", prompt)
+                    self.assertIn("University of St. La Salle", generate.call_args.kwargs["system"])
                     self.assertFalse(payload["not_covered"], payload)
                     self.assertEqual(payload["mode"], "general-knowledge")
                     self.assertTrue(payload["answer"].startswith(appmod.GENERAL_ANSWER_PREFIX), payload["answer"])
@@ -301,7 +301,8 @@ class GeminiRequestTests(AssistantBase):
     def generate(self, side_effect):
         urlopen = MagicMock(side_effect=side_effect)
         sleeper = MagicMock()
-        with self.with_key(), patch.object(appmod, "urlopen", urlopen), patch.object(appmod, "_gemini_sleep", sleeper):
+        no_backup = patch.dict(os.environ, {"GEMINI_FALLBACK_MODELS": ""})  # one model only, whatever .env says
+        with self.with_key(), no_backup, patch.object(appmod, "urlopen", urlopen), patch.object(appmod, "_gemini_sleep", sleeper):
             try:
                 result = appmod._gemini_generate("Question: test")
             except RuntimeError as exc:
