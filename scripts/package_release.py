@@ -73,7 +73,7 @@ def tracked() -> list[str]:
 
 
 def seed() -> None:
-    subprocess.run("npm run seed", cwd=ROOT, shell=True, check=True)
+    subprocess.run([sys.executable, "app.py", "--seed"], cwd=ROOT, check=True)  # same as `npm run seed`
     db = ROOT / DB
     if db.exists():  # fold the -wal into the main file so zipping the .sqlite3 alone is complete
         with sqlite3.connect(db) as con:

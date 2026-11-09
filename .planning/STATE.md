@@ -1,5 +1,20 @@
 # State
 
+## 2026-11-09 ~11:00 — v6.7-fixed: final submission branch (deadline 11:30)
+
+- Branch **`v6.7-fixed`** (worktree `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/v67`) = `v6.4.1-test` + Khloe's
+  `v6.6-khloewuatcomments` via `v6.7-clean66` (v6.6 minus 35 screenshots under Windows-invalid paths
+  `frontend/E:/Temp/...`, which broke Windows clones; guard `tests/test_repo_paths.py` + `*:*` gitignore; the 4 e2e
+  specs that defaulted screenshots to `E:/Temp` now use the OS temp folder). Conflicts: Khloe wins ties.
+- Landed: merge review fixes (graduation export/acknowledged steps, practicum certificate hours), login demo guides in
+  lifecycle order, UAT E8 staff-for-panelist (I-434), stale-demo-data warning (IM2a, I-435), shared site
+  miguisanson.dev removed (deploy/, Docker, UAT.md; desktop shortcuts recycled; domain + tunnel stay on the owner's
+  Cloudflare account), Start.exe/Stop.exe + Start.command/Stop.command (`launcher/`).
+- Release zip: `python scripts/package_release.py --seed-db --env-file E:/Github_Projects/CAPSTONE-USLS-MVP-team.env`
+  -> `dist_release/CAP-2521-IT-CAPSTONE-PROJECT.zip`: no AI tooling, prebuilt web pages (no Node needed), seeded DB,
+  the team `.env` (owner: keys included; **rotate the Gemini key and Calendar secret after grading**).
+- Known gaps: the graduation "Move to…" menu opens partly off-screen on the wide board (p126 uses dispatchEvent).
+
 ## PAUSED 2026-11-06 ~16:30 by the owner (playing a game) — resume here
 
 - Branch `v6.4.1-test` @ 103cbd93 pushed (+ this STATE commit). Since the 14:10 pause merged: alumni (**RESEED NEEDED**),
