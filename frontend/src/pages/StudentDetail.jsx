@@ -490,7 +490,7 @@ function WorkflowRecordsCard({ practicum, withdrawal, graduation, eligibility, h
       icon: Briefcase,
       label: "Practicum",
       status: practicum?.status || "Missing",
-      detail: practicum ? `${practicum.completed_hours}/${practicum.required_hours} hours · ${practicum.document_status}` : "No practicum record",
+      detail: practicum ? `${practicum.verified_hours ?? practicum.reported_hours ?? practicum.completed_hours}/${practicum.required_hours} hours · ${practicum.document_status}` : "No practicum record",
     });
   }
   rows.push({

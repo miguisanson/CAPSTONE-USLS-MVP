@@ -56,7 +56,7 @@ function checkMove(item, column) {
 
 function hoursText(item) {
   const record = item.record;
-  return record ? `${record.completed_hours}/${record.required_hours} hrs` : "No hours recorded";
+  return record ? `${record.verified_hours ?? record.reported_hours ?? record.completed_hours}/${record.required_hours} hrs` : "No hours recorded";
 }
 
 // The same card as the staff practicum board (components/process): ready mark, facts grid, message box, Next, View details.

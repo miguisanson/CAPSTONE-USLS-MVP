@@ -195,13 +195,6 @@ const GRADUATION_BATCH_STAGES = [
     currentStatuses: ["Dean Approved"],
     completeStatuses: GRADUATION_STAGE_AFTER_EXPORT,
     attentionStatuses: ["Returned for Revision", "Not Eligible"],
-  },
-  {
-    label: "Sent to the Registrar",
-    detail: "GS Staff emails the exported list to the Registrar and marks it sent; the batch is finished there.",
-    currentStatuses: [GRADUATION_EXPORTED],
-    completeStatuses: GRADUATION_STAGE_AFTER_SEND,
-    attentionStatuses: ["Returned for Revision", "Not Eligible"],
     registrarStep: "export", // complete once the list is exported
   },
   {
@@ -219,14 +212,19 @@ const REGISTRAR_EXPORTED = ["Exported - Ready to Send", "Acknowledged by Registr
 
 // The two Registrar steps read the Registrar status (the endorsement itself stays "Dean Approved").
 function graduationRegistrarStepState(step, group) {
-  const registrar = group.rows.map((row) => row.endorsement?.registrar_status || "");
-  const approved = group.rows.length > 0 && group.rows.every((row) => graduationRowStatus(row) === "Dean Approved");
+  // Legacy rows ("Sent to Registrar" / "Registrar Received") count as exported; "Registrar Received" as acknowledged too.
+  const exported = (row) => GRADUATION_STAGE_AFTER_SEND.includes(graduationRowStatus(row))
+    || (graduationRowStatus(row) === "Dean Approved" && REGISTRAR_EXPORTED.includes(row.endorsement?.registrar_status || ""));
+  const acknowledged = (row) => graduationRowStatus(row) === "Registrar Received"
+    || (graduationRowStatus(row) === "Dean Approved" && row.endorsement?.registrar_status === "Acknowledged by Registrar");
+  const rows = group.rows;
+  const approvedOrLater = rows.length > 0 && rows.every((row) => graduationRowStatus(row) === "Dean Approved" || exported(row));
   if (step === "export") {
-    if (approved && registrar.every((status) => REGISTRAR_EXPORTED.includes(status))) return "Complete";
-    return group.rows.some((row) => graduationRowStatus(row) === "Dean Approved") ? "Current" : "Pending";
+    if (approvedOrLater && rows.every(exported)) return "Complete";
+    return rows.some((row) => graduationRowStatus(row) === "Dean Approved") ? "Current" : "Pending";
   }
-  if (approved && registrar.every((status) => status === "Acknowledged by Registrar")) return "Complete";
-  return approved && registrar.every((status) => REGISTRAR_EXPORTED.includes(status)) ? "Current" : "Pending";
+  if (approvedOrLater && rows.every(acknowledged)) return "Complete";
+  return approvedOrLater && rows.every(exported) ? "Current" : "Pending";
 }
 
 export function graduationRowStatus(row) {

@@ -103,23 +103,21 @@ test.describe("staff Graduation board", () => {
       await route.fulfill({ response, json });
     });
 
-  test("an exported batch offers Mark as sent; a sent batch offers Registrar acknowledged", async ({ page }) => {
+  test("an exported batch is moved to Acknowledged by Registrar by hand, after a yes in the window", async ({ page }) => {
     const posts = [];
-    await page.route(/\/api\/transactions\/graduation$/, async (route) => {
-      posts.push(JSON.parse(route.request().postData() || "{}").endorsement_status);
+    await page.route(/\/api\/graduation\/registrar-acknowledged$/, async (route) => {
+      posts.push(JSON.parse(route.request().postData() || "{}"));
       await route.fulfill({ json: { message: "Spec: saved." } });
     });
     await mock(page, "Dean Approved", "Exported - Ready to Send");
     await page.goto("/workflow/graduation");
-    const send = page.getByRole("button", { name: "Mark as sent to the Registrar" });
-    await expect(send).toHaveCount(1);
-    await send.click();
-    await expect.poll(() => posts).toEqual(["Sent to Registrar"]);
-
-    await page.unroute(/\/api\/transactions\/graduation\/context/);
-    await mock(page, "Sent to Registrar", "Sent to Registrar");
-    await page.reload();
-    await expect(page.getByRole("button", { name: "Registrar acknowledged" })).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Mark as sent to the Registrar" })).toHaveCount(0);
+    const card = page.getByRole("region", { name: "Graduation workflow Kanban board" }).locator("div[draggable]").filter({ hasText: BATCH });
+    await card.getByRole("button", { name: /Move to/ }).click();
+    await page.getByRole("menuitem", { name: "Acknowledged by Registrar", exact: true }).dispatchEvent("click"); // the menu opens partly off screen on a wide board
+    await expect(page.getByRole("dialog").last()).toContainText("Registrar acknowledged this list?");
+    await page.getByRole("button", { name: "Mark as acknowledged", exact: true }).click();
+    await expect.poll(() => posts.length).toBe(1);
+    expect(posts[0].endorsement_ids).toHaveLength(1);
   });
 });

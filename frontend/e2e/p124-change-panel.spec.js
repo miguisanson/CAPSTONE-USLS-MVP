@@ -26,14 +26,15 @@ test("Change panel shows each member under their own role, whatever order the se
   }
 });
 
-// I-371: the graduation stage check finishes the export step once the list is exported, and "Sent to the Registrar" at Sent.
+// I-371: the graduation stage check finishes the export step once the list is exported, and "Registrar acknowledged" once recorded by hand.
 test.describe("I-371 graduation stage check after the Dean's yes", () => {
   test.use({ storageState: join(AUTH_DIR, "dean.json"), viewport: { width: 1366, height: 900 } });
   const BATCH = "Batch 1 October 2026";
   const cases = [
     ["approved, not exported", { endorsement_status: "Dean Approved", registrar_status: "Pending" }, ["Complete", "Current", "Pending"]],
     ["exported", { endorsement_status: "Dean Approved", registrar_status: "Exported - Ready to Send" }, ["Complete", "Complete", "Current"]],
-    ["sent to the Registrar", { endorsement_status: "Sent to Registrar", registrar_status: "Sent to Registrar" }, ["Complete", "Complete", "Complete"]],
+    ["acknowledged by the Registrar", { endorsement_status: "Dean Approved", registrar_status: "Acknowledged by Registrar" }, ["Complete", "Complete", "Complete"]],
+    ["legacy: sent to the Registrar", { endorsement_status: "Sent to Registrar", registrar_status: "Sent to Registrar" }, ["Complete", "Complete", "Current"]],
   ];
   for (const [name, fields, last3] of cases) {
     test(name, async ({ page }) => {
@@ -48,7 +49,7 @@ test.describe("I-371 graduation stage check after the Dean's yes", () => {
       await page.goto("/dean/approvals/graduation?tab=batches");
       await page.getByRole("button", { name: `View details for ${BATCH}` }).first().click();
       const dialog = page.getByRole("dialog");
-      const steps = ["Dean reviews graduation batch", "Export Dean-approved list", "Sent to the Registrar"];
+      const steps = ["Dean reviews graduation batch", "Export Dean-approved list", "Registrar acknowledged"];
       const expected = [last3[0], last3[1], last3[2]];
       for (const [i, label] of steps.entries()) {
         const item = dialog.getByRole("listitem").filter({ hasText: label });
