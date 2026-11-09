@@ -40,10 +40,13 @@ Needs only Python 3.11 or newer (no Node.js). The first run needs internet once,
 Windows
   Start:  double-click Start.exe   (first run installs packages: a few minutes, internet needed)
   Stop:   double-click Stop.exe
+  If a blue "Windows protected your PC" box appears, click More info, then Run anyway.
 
 Mac
   Start:  double-click Start.command   (first time: right-click > Open)
   Stop:   double-click Stop.command
+  If the Mac says you do not have permission: open Terminal in this folder and run
+          chmod +x Start.command Stop.command
 
 The browser opens at http://localhost:5000 (use localhost, not 127.0.0.1: Google Calendar only works there).
 Mac: if port 5000 is busy, turn off System Settings > General > AirDrop & Handoff > AirPlay Receiver.
@@ -140,6 +143,7 @@ def main() -> int:
             if arc.endswith((".command", ".sh")):  # Mac/Linux scripts: LF endings + executable bit
                 info = zipfile.ZipInfo.from_file(disk, f"{TOP}/{arc}")
                 info.external_attr = 0o100755 << 16
+                info.create_system = 3  # Unix: otherwise Mac unzip ignores the mode bits
                 info.compress_type = zipfile.ZIP_DEFLATED
                 z.writestr(info, disk.read_bytes().replace(b"\r\n", b"\n"))
             else:
