@@ -7,7 +7,8 @@ Documents/
   Capstone/            the group's own deliverables
     Proposal/            Final Proposal Document (live, Ch. 1-6), Overall Document, CAP1DEF defense form, edit notes
     Walkthrough/         CAP-2521-IT-WALKTHROUGH.docx (team demo, presenting order) + its screenshots
-    UAT/                 [CAP-IT2] UAT Instrument - Revised (.docx/.pdf) + UAT-REVIEW-NOTES.md
+    Official/            USLS GS Operations Manual.pdf (approved 2026-11-07) + [CAP-IT2] UAT Instrument - Revised.pdf (signed)
+    UAT/                 UAT-REVIEW-NOTES.md (older UAT instrument copies: Documents/Archive/Superseded-2026-11-09/)
     Meeting_2026-11-04/  ZOOM-CHEAT-SHEET, MEETING-CHEAT-SHEET, NARRATION-SCRIPT, README-FOR-MIGUI, videos/
   Graduate_School/     documents for and from the USLS Graduate School
     Forms/               60 documents (forms GS-F-01..54, GS-P-01..06) in one folder per manual chapter, USLS-GS-Forms-Pack.pdf, 00-INVENTORY.md
