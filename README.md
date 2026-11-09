@@ -210,6 +210,8 @@ Set `SESSION_COOKIE_SECURE=1` when serving over HTTPS.
 ## Configuration
 
 Set these in the environment or in `.env` (the app never needs `.env` to start).
+The release zip already includes `.env` (the Gemini key for the Policy Assistant and the Google
+Calendar settings); for a git clone, ask the team for the shared file and save it as `.env`.
 
 | Variable | Default | Purpose |
 |---|---|---|

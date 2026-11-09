@@ -82,6 +82,7 @@ let pendingLanding = "";
 
 export default function Login() {
   const { user, refresh } = useAuth();
+  const [demoDataStale, setDemoDataStale] = useState(false); // the seed inputs changed since this database was seeded
   const expired = new URLSearchParams(window.location.search).get("expired") === "1"; // sent by api.js on a 401 (I-211)
   // The form always starts empty: nothing is pre-filled, so a real typed login can be shown.
   // The one exception: the Demo Guide's "Sign in as ..." opens this page with ?as=<email>, so that account is ready to sign in.
@@ -124,6 +125,7 @@ export default function Login() {
       .then((result) => {
         if (!active) return;
         setDemoMode(Boolean(result.show_accounts));
+        setDemoDataStale(Boolean(result.demo_data_stale));
         setSkipDateWaits(result.demo_mode ? Boolean(result.skip_date_waits) : null);
       })
       .catch(() => {
@@ -306,6 +308,12 @@ export default function Login() {
               description="Sign in with your Graduate School account. The screens you see depend on the role your account holds."
             />
           </div>
+
+          {demoDataStale && (
+            <p role="status" className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Your demo data is out of date. Run <code>npm run seed</code> (this resets the demo data).
+            </p>
+          )}
 
           {demoMode && guideOn && (
             <section aria-labelledby="start-demo-title" className="rounded-2xl border border-amber-300 bg-amber-50">

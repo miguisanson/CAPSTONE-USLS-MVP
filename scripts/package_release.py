@@ -46,6 +46,7 @@ Mac
 The browser opens at http://localhost:5000
 Demo accounts: the sign-in page has a "Demo accounts" panel listing every demo login and the shared
 demo password. Click one to fill the form.
+Settings (Policy Assistant AI key, Google Calendar) are already in the .env file in this folder.
 If something fails, see instance/app.log.
 """
 
@@ -107,7 +108,11 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--seed-db", action="store_true")
     ap.add_argument("--no-build", action="store_true", help="reuse the existing frontend/dist")
+    ap.add_argument("--env-file", type=Path, help="team settings file to ship at the zip root as .env "
+                    "(owner 2026-11-09: keys included, rotate after grading); copied, never printed")
     args = ap.parse_args()
+    if args.env_file and not args.env_file.is_file():
+        sys.exit(f"--env-file not found: {args.env_file}")
     if args.seed_db and not args.dry_run:
         seed()
     dist = ROOT / "frontend" / "dist"
@@ -136,6 +141,9 @@ def main() -> int:
                 z.writestr(info, disk.read_bytes().replace(b"\r\n", b"\n"))
             else:
                 z.write(disk, f"{TOP}/{arc}")
+        if args.env_file:
+            z.write(args.env_file, f"{TOP}/.env")
+            print("included .env from --env-file")
         z.writestr(f"{TOP}/HOW-TO-RUN.txt", HOW_TO)
     print(f"wrote {OUT}: {len(items) + 1} files, {OUT.stat().st_size / 1e6:.1f} MB")
     return 0
