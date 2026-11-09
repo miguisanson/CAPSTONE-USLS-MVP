@@ -19,7 +19,7 @@ comprehensive exam result. The Advise Slip prints after a readmission is approve
 
 **Your questions:** all answered with the policy default, as the stakeholders agreed (IM42-IM44 in DECISIONS.md).
 
-**After pulling:** run `npm run seed` (new columns). Live site: `deploy/UPDATE-SITE.cmd` (it reseeds).
+**After pulling:** run `npm run seed` (new columns).
 
 ---
 

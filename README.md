@@ -137,19 +137,6 @@ FLASK_PORT=5001 npm run dev
 
 Then open <http://localhost:5001>.
 
-### 5. Put the site online (deploy)
-
-The live demo site is not started by `npm run dev`. It runs in Docker and is published through a
-Cloudflare tunnel; the full steps are in [`deploy/DOCKER.md`](deploy/DOCKER.md). On the Windows PC
-that hosts it, use the desktop buttons **USLS site - Start** and **USLS site - Stop**
-(`deploy/site-start.ps1` and `deploy/site-stop.ps1`). Other scripts in `deploy/`:
-
-- `deploy/UPDATE-SITE.cmd`: gets the latest code, rebuilds the Docker site, resets the demo data only when the new version needs it, and checks the public address. Docker Desktop must be running.
-- `deploy/RESET-DEMO-DATA.cmd`: rebuilds the demo data after typing `YES`. It resets the Docker site when Docker runs it; otherwise it resets the local file and the local site must be closed first.
-- `deploy/START-SITE.cmd`: runs the site without Docker (`npm run uat` on port 5000) and the tunnel, for a PC where Docker cannot run.
-
-The Docker site always uses its own SQLite file, so a `DATABASE_URL` in `.env` does not move it.
-
 ### Development with frontend hot reload
 
 For normal demo/use, `npm run dev` is enough. If you are editing React files and want Vite hot

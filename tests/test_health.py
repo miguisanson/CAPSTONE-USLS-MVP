@@ -574,17 +574,14 @@ class StartupTests(HealthTestBase):
 
 
 class TrackedFilesHoldNoSecretsTests(unittest.TestCase):
-    """I-330: a live Cloudflare tunnel token was pasted into the tracked example file. The real one lives in
-    deploy/tunnel.env (gitignored); the example must keep its placeholder."""
+    """I-330: a live Cloudflare tunnel token was once pasted into a tracked example file. The shared site
+    (deploy/) was removed on 2026-11-09, but no tracked file may ever hold such a token again."""
 
-    def test_the_tunnel_example_keeps_its_placeholder(self):
-        text = (REPO_ROOT / "deploy" / "tunnel.env.example").read_text(encoding="utf-8")
-        values = [line.split("=", 1)[1].strip() for line in text.splitlines() if line.startswith("TUNNEL_TOKEN=")]
-        self.assertTrue(values)
-        for value in values:
-            # Cloudflare tunnel tokens are long base64 strings starting "ey"; the placeholder is short text.
-            self.assertFalse(value.startswith("ey") or len(value) > 60,
-                             "Put the real token in deploy/tunnel.env (not committed), not in the example file.")
+    def test_no_tracked_file_holds_a_tunnel_token(self):
+        import subprocess
+        names = subprocess.run(["git", "grep", "-lE", r"TUNNEL_TOKEN=ey[A-Za-z0-9_-]{40,}"], cwd=REPO_ROOT,
+                               capture_output=True, text=True).stdout.split()
+        self.assertEqual(names, [], "A Cloudflare tunnel token is committed; remove it and rotate the token.")
 
 
 if __name__ == "__main__":

@@ -120,7 +120,7 @@ table([
 bullets([
     "Password: every demo account uses the same shared demo password. The sign-in page lists the demo accounts under 'Demo accounts' — one click fills them in.",
     "Student demo logins: loa.daniel@usls.edu.ph (LOA), readmission.therese@usls.edu.ph (Readmission), awol.maya@usls.edu.ph (AWOL).",
-    "Site: https://miguisanson.dev (runs on my PC through Cloudflare). Backup: this PC runs the same site without Docker (deploy/START-SITE.cmd); open http://127.0.0.1:5000.",
+    "Site: runs on this laptop. Double-click Start.exe (Mac: Start.command); it opens http://localhost:5000. Stop.exe when done.",
     "If a drag and drop does not go through: use 'Move to…' on the card. It is the same step, checked by the same rules.",
     "Recorded videos of every part are in Documents/Capstone/Meeting_2026-11-04/ — play them if the live site misbehaves.",
 ])
@@ -216,7 +216,7 @@ doc.add_heading("7. Questions the panel or stakeholders may ask (any part)", 1)
 qa([
     ("Who can see what?", "Each account has one role: Student, Faculty, GS Staff, Academic Coordinator, Research Coordinator, Dean, Administrator. The server decides which portal opens and checks the role on every action, not only in the menu."),
     ("Is it secure enough for real data?", "It was built and tested as a demo: password sign-in with lockout, role checks on every request, audit log, security headers, uploads size-limited. Before real data it would need the university's sign-in (e.g. Google Workspace), hosting by the university's IT, backups and a data-privacy review under the Data Privacy Act of 2012."),
-    ("What technology is it?", "Python (Flask) back end with a SQLite database, React front end. It runs on one computer; for the demo it is published through a Cloudflare Tunnel at miguisanson.dev."),
+    ("What technology is it?", "Python (Flask) back end with a SQLite database, React front end. It runs on one computer and opens in the browser at http://localhost:5000."),
     ("How was it tested?", "Automated tests run on every change, and the screens of every role were clicked through in a browser before the demo."),
     ("Where did the processes come from?", "The Graduate School Handbook 2022-2023, the Research Protocol AY 2024-2025, the AC monitoring sheets, the defense panel's comments, and our draft Operations Manual, which we ask the Graduate School to validate. Each rule on screen names its source."),
     ("What do you need from us?", "Validation of the Operations Manual and the forms pack (signatures), confirmation of the rules marked Needs review, the UAT evaluation forms, and answers to three open questions (below)."),
@@ -248,12 +248,12 @@ bullets([
 doc.add_heading("10. If something goes wrong", 1)
 table([
     ["Problem", "Do this"],
-    ["Site does not load", "Check the PC is on and the window called 'USLS site - keep open' is still open. If not, double-click deploy/START-SITE.cmd and leave both windows it opens; after a minute https://miguisanson.dev/api/health should say status ok. Docker is not used on this PC. Or play the recorded video."],
+    ["Site does not load", "Double-click Stop.exe, then Start.exe again and wait for the browser to open (the first start is slow). If it still fails, read instance/app.log. Or play the recorded video."],
     ["A demo student is already used up", "Sign-in page > Demo accounts > Student workflow demos > Reset next to that student."],
     ["Drag and drop does not move the card", "Use 'Move to…' on the card, or the button in View details. Same step."],
     ["Numbers differ from the rehearsal", "Expected: reports are live measurements. Read them off the screen."],
     ["Policy Assistant says \"Offline answer\"", "Expected today: Gemini was failing (HTTP 503) on 4 Nov, so the site runs without it. The answer is still quoted and cited from the Handbook / Protocol."],
-    ["Withdrawal window is closed", "The demo semester is dated from the day of the seed; reset in the morning: close the 'USLS site' window, double-click deploy/RESET-DEMO-DATA.cmd, then deploy/START-SITE.cmd again."],
+    ["Withdrawal window is closed", "The demo semester is dated from the day of the seed; reset in the morning: Stop.exe, then npm run seed, then Start.exe."],
     ["Someone asks for a feature we do not have", "Write it down, say it goes into the improvement list, and ask which office would use it and how often."],
 ], [5.0, 12.4])
 
