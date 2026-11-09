@@ -235,16 +235,34 @@ class HonestAnswerTests(AssistantBase):
         self.assertEqual(payload["sources"], [])
         self.assertFalse(payload["source"]["ai_used"])
 
-    def test_an_uncovered_question_says_so_and_never_calls_gemini(self):
+    def test_an_uncovered_question_gets_a_general_answer_labelled_as_not_from_the_documents(self):
+        # Owner 2026-11-09: with Gemini on, a question the documents miss gets a short general answer about USLS
+        # Bacolod instead of a flat "not covered"; it is labelled as such, cites nothing, and points to the office.
         v_index, v_query = self.vectors([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])  # the embedding sees no likeness
         for email in ("dean@usls.edu.ph", STUDENT_A_EMAIL):
             for question in UNCOVERED_QUESTIONS:
                 with self.subTest(user=email.split("@")[0], question=question):
-                    generate = MagicMock(return_value="This should never be shown.")
+                    generate = MagicMock(return_value="The campus gym hours are posted by the Physical Education office.")
                     with self.with_key(), v_index, v_query, patch.object(appmod, "_gemini_generate", generate):
                         payload = self.ask(email, question)
-                    generate.assert_not_called()
-                    self.assertNotCovered(payload)
+                    generate.assert_called_once()
+                    prompt = generate.call_args.args[0]
+                    self.assertIn(question, prompt)
+                    self.assertIn("University of St. La Salle", prompt)
+                    self.assertFalse(payload["not_covered"], payload)
+                    self.assertEqual(payload["mode"], "general-knowledge")
+                    self.assertTrue(payload["answer"].startswith(appmod.GENERAL_ANSWER_PREFIX), payload["answer"])
+                    self.assertIn("Physical Education office", payload["answer"])
+                    self.assertEqual(payload["citations"], [])
+                    self.assertTrue(payload["source"]["ai_used"])
+                    self.assertIn("not from the policy documents", payload["source"]["label"])
+
+    def test_when_the_general_answer_fails_the_plain_refusal_stays(self):
+        v_index, v_query = self.vectors([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+        generate = MagicMock(side_effect=RuntimeError("Gemini is down"))
+        with self.with_key(), v_index, v_query, patch.object(appmod, "_gemini_generate", generate):
+            payload = self.ask("dean@usls.edu.ph", UNCOVERED_QUESTIONS[0])
+        self.assertNotCovered(payload)
 
     def test_an_uncovered_question_without_a_key_gets_the_same_plain_answer(self):
         for question in UNCOVERED_QUESTIONS:

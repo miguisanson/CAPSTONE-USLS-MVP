@@ -12808,6 +12808,38 @@ def _split_used_passages(generated: str, chunks: list[dict]) -> tuple[str, list[
     return generated, used or chunks[:1]
 
 
+GENERAL_ANSWER_PREFIX = (
+    "The Graduate School's policy documents don't cover this, so here is a general answer. "
+    "Please confirm it with the Graduate School office.\n\n"
+)
+GENERAL_ANSWER_SYSTEM = (
+    "You are the Policy Assistant of the Graduate School of the University of St. La Salle (USLS), a Lasallian "
+    "university in Bacolod City, Negros Occidental, Philippines. The Graduate School's Handbook, Research Protocol "
+    "and Operations Manual were searched and do not answer the question. Give a short, helpful general answer "
+    "(at most four sentences) from what is generally known about USLS Bacolod and about graduate study in the "
+    "Philippines. Never invent specific figures, fees, dates, names, schedules, room numbers or rules: when the "
+    "exact detail is not known, say so and name the USLS office that would know. If the question has nothing to "
+    "do with USLS, graduate study or student life, say briefly that you can only help with USLS Graduate School "
+    "matters. Plain English, no headings, no lists."
+)
+
+
+def general_usls_answer(question: str) -> str:
+    """Owner 2026-11-09: when the documents do not cover a question, a labelled general answer instead of a flat
+    refusal. Raises when Gemini is unavailable or gives nothing usable, so the caller keeps the plain refusal."""
+    text = (_gemini_generate(f"Question: {question}", system=GENERAL_ANSWER_SYSTEM) or "").strip()
+    if not text or _model_says_not_covered(text) or text == _prag.NOT_FOUND_ANSWER:
+        raise PolicyAnswerNotFound("no general answer")
+    return GENERAL_ANSWER_PREFIX + text
+
+
+def _general_or_not_found(question: str, not_found_mode: str) -> tuple[str, list, str]:
+    try:
+        return general_usls_answer(question), [], "general-knowledge"
+    except Exception:  # noqa: BLE001 - any failure keeps the honest refusal
+        return _prag.NOT_FOUND_ANSWER, [], not_found_mode
+
+
 def call_document_rag(
     question: str, snippets: list[dict], payload: dict | None, student: Student | None,
 ) -> tuple[str, list[dict]]:
@@ -13666,6 +13698,11 @@ def _assistant_source(mode: str, intent_ai_used: bool = False, role: str = "") -
             "Answered from the documents (keyword search)",
             "Found by keyword search in the Handbook, Research Protocol and uploaded policies and quoted from them. No AI service was used; add a Gemini key for fuller, reworded answers.", False,
         ),
+        "general-knowledge": (
+            "General answer · not from the policy documents",
+            "The Handbook, Research Protocol and Operations Manual do not cover this, so Gemini gave a short general "
+            "answer about USLS. Confirm it with the Graduate School office.", True,
+        ),
         "policy-not-found": (
             "Not covered by the documents",
             "The Handbook, Research Protocol and uploaded policies were searched and none of them answers this question.", False,
@@ -14147,8 +14184,8 @@ def generate_answer(
                 if not student:
                     _rag_cache_set(cache_key, (answer, rag_citations))
         except PolicyAnswerNotFound:
-            # Retrieval was weak, or Gemini said the excerpts do not answer: say so, show no passages.
-            answer, rag_citations, mode = _prag.NOT_FOUND_ANSWER, [], "policy-not-found"
+            # Retrieval was weak, or Gemini said the excerpts do not answer: a labelled general answer, else say so.
+            answer, rag_citations, mode = _general_or_not_found(question, "policy-not-found")
         except Exception:
             try:
                 answer, rag_citations = call_local_document_rag(question)
@@ -14276,7 +14313,7 @@ def generate_student_answer(question: str, student: Student) -> dict:
             )
             mode = "student-document-rag"
         except PolicyAnswerNotFound:
-            answer, rag_citations, mode = _prag.NOT_FOUND_ANSWER, [], "student-document-not-found"
+            answer, rag_citations, mode = _general_or_not_found(question, "student-document-not-found")
         except Exception:
             try:
                 answer, rag_citations = call_local_document_rag(question)
