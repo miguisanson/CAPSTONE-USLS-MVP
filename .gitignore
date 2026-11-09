@@ -105,3 +105,5 @@ E:/
 instance/app.pid
 instance/app.log
 dist_release/
+# Never track a path with a colon: Windows cannot check it out (v6.6 screenshots under frontend/E:/...)
+*:*

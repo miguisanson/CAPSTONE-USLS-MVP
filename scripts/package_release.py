@@ -29,7 +29,9 @@ AI_FILES = {"AGENTS.md", "CLAUDE.md", "GEMINI.md", ".cursorrules", ".windsurfrul
             "NEXT_SESSION_PLAN.md", "CHECKLIST_PHASE_PLAN.md", "DEFENSE_REVISIONS.md",  # agent work queues
             "Documents/Capstone/Proposal/PROPOSAL_EDIT_NOTES.md", "Documents/Capstone/UAT/UAT-REVIEW-NOTES.md",
             "scripts/package_release.py", "tests/test_package_release.py"}
-SKIP_PREFIXES = ("test-results/", "frontend/e2e-artifacts/", "outputs/", "demo_sandboxes/", "dist_release/", "archive/", "Documents/Archive/")
+SKIP_PREFIXES = ("test-results/", "frontend/e2e-artifacts/", "outputs/", "demo_sandboxes/", "dist_release/", "archive/", "Documents/Archive/",
+                 "Documents/Capstone/Meeting_2026-11-04/Archive/",  # old shared-site setup notes
+                 "scripts/demo/")  # presenter-only build scripts with local E:/ paths
 
 HOW_TO = """USLS Graduate School platform - how to run it
 
@@ -43,7 +45,8 @@ Mac
   Start:  double-click Start.command   (first time: right-click > Open)
   Stop:   double-click Stop.command
 
-The browser opens at http://localhost:5000
+The browser opens at http://localhost:5000 (use localhost, not 127.0.0.1: Google Calendar only works there).
+Mac: if port 5000 is busy, turn off System Settings > General > AirDrop & Handoff > AirPlay Receiver.
 Demo accounts: the sign-in page has a "Demo accounts" panel listing every demo login and the shared
 demo password. Click one to fill the form.
 Settings (Policy Assistant AI key, Google Calendar) are already in the .env file in this folder.

@@ -3,7 +3,7 @@
 How to show every step of the three workflows by hand, with the Demo Guide switched **off**. The seed leaves one record
 waiting at the start of each step, so no step needs setting up first.
 
-- Site: http://localhost:5001 (or the demo site URL)
+- Site: http://localhost:5000 (open `localhost`, not `127.0.0.1`; Google Calendar only works there)
 - Password for every account below: `DemoPass123!`
 - Staff, Dean and both coordinators are in the sign-in page's **Demo accounts** list; the demo students
   (Elena, Joshua, Paolo, Andrea, Carlo, Bianca) are in its **Demo students** list. Other students sign in by email.

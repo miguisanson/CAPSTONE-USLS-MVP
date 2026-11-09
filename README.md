@@ -128,14 +128,13 @@ runner, for `python app.py --seed`, and when `USLS_SKIP_STARTUP_TASKS=1` is set.
 
 Then open <http://localhost:5000>. Press `Ctrl+C` in the terminal to stop the server.
 
-On macOS, port 5000 may already be used by Control Center / AirPlay Receiver. If that happens,
-start the app on port 5001 instead:
+Open `localhost`, not `127.0.0.1`: the sign-in cookie and the Google Calendar redirect are set up for
+`http://localhost:5000`.
 
-```cmd
-FLASK_PORT=5001 npm run dev
-```
-
-Then open <http://localhost:5001>.
+On macOS, port 5000 may already be used by AirPlay Receiver. Turn it off in
+**System Settings > General > AirDrop & Handoff > AirPlay Receiver**, then use port 5000.
+Google Calendar only works on `http://localhost:5000`. As a last resort you can run
+`FLASK_PORT=5001 npm run dev` and open <http://localhost:5001>, but Google Calendar will not connect there.
 
 ### Development with frontend hot reload
 
