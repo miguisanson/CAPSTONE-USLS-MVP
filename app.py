@@ -14324,6 +14324,7 @@ def register_routes(app: Flask) -> None:
         return no_store(jsonify({
             "demo_mode": demo_mode_enabled(), "show_accounts": demo_accounts_listing_enabled(),
             "skip_date_waits": demo_skip_date_waits(), "sandbox": current_sandbox_id() is not None,
+            "demo_data_stale": demo_data_stale(),
         }))
 
     @app.route("/api/auth/demo-settings", methods=["POST"])
@@ -15955,7 +15956,7 @@ def register_routes(app: Flask) -> None:
                 record.status = "Documents Submitted"
                 message = ("Documents submitted. The hours could not be read from the file, so Graduate School staff will "
                            "enter the hours from the certificate when forwarding the documents to the Academic Coordinator.")
-            elif read_hours < record.required_hours:
+            elif read_hours < (record.required_hours or practicum_required_hours()):
                 record.status = "Hours Incomplete"
                 message = (f"Documents submitted. The certificate states {read_hours} hours completed. Graduate School staff "
                            "will record and forward them to the Academic Coordinator.")
@@ -23089,6 +23090,41 @@ def register_routes(app: Flask) -> None:
             counts[item["status"]] = counts.get(item["status"], 0) + 1
         return jsonify({"invitations": items, "counts": counts})
 
+    def apply_panel_invitation_response(row: PanelInvitation, faculty: Faculty, response: str, reason: str, recorder: UserAccount | None = None):
+        """Accept or decline a panel seat. `recorder` is the staff member answering for the panelist (UAT E8); None = the panelist."""
+        student = row.student
+        defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(row.gate, "defense")
+        actor = f"{recorder.full_name} (for the panel)" if recorder else f"{faculty.name} (Faculty Member)"
+        by_note = f" Recorded by {recorder.full_name} for {faculty.name}." if recorder else ""
+        if response == "accept" and row.status == "Declined":
+            return jsonify({"error": "This invitation was declined. Ask the Research Coordinator to send the invitation again."}), 409
+        if response == "accept":
+            row.status, row.reason, row.responded_at = "Accepted", None, now_utc()
+            close_research_tasks(row.student_id, prefix=f"Replace declined panelist: {faculty.name}")
+            db.session.flush()
+            if not unanswered_panel_invitations(student, row.gate) and active_schedule_for_gate(student, row.gate):
+                close_research_tasks(student.id, f"Confirm assigned panel acceptance ({defense_type})", "Confirm assigned panel acceptance")
+            add_log("defense-scheduling", student.id, actor, row.gate,
+                    f"Panel invitation accepted ({row.panel_role})", "Research Coordinator",
+                    f"{faculty.name} accepted the {defense_type} panel seat.{by_note}" + (f" Reason: {reason}" if recorder else ""))
+        elif response == "decline":
+            if len(reason) < 3:
+                return jsonify({"error": "Give a short reason for declining; the coordinators see it."}), 400
+            row.status, row.reason, row.responded_at = "Declined", reason, now_utc()
+            ensure_open_task(student.id, f"Replace declined panelist: {faculty.name} ({defense_type})", "Research Coordinator", 2, 60)
+            notify_many(
+                accounts_for_roles("research_coordinator", "staff"), "panel_declined",
+                f"{faculty.name} declined the {defense_type} panel of {student.name}", f"Reason: {reason}.{by_note} Replace the panelist or reschedule.",
+                link="/workflow/panel-matching", related_type="panel_invitation", related_id=row.id,
+                dedupe_key=f"panel_declined:{row.id}:{now_utc().strftime('%Y%m%d%H%M%S')}",
+            )
+            add_log("defense-scheduling", student.id, actor, row.gate,
+                    f"Panel invitation declined ({row.panel_role})", "Research Coordinator", f"Reason: {reason}.{by_note}".strip())
+        else:
+            return jsonify({"error": "Choose accept or decline."}), 400
+        db.session.commit()
+        return jsonify({"ok": True, "invitation": panel_invitation_dict(row, include_schedule=True)})
+
     @app.route("/api/faculty-portal/panel-invitations/<int:invitation_id>/respond", methods=["POST"])
     @require_api_login("faculty")
     def faculty_panel_invitation_respond(invitation_id: int):
@@ -23099,37 +23135,43 @@ def register_routes(app: Flask) -> None:
         if not row or not PanelAssignment.query.filter_by(student_id=row.student_id, faculty_id=faculty.id, gate=row.gate).first():
             return jsonify({"error": "We could not find that invitation."}), 404
         data = json_body()
-        response = str(data.get("response") or "").strip()
         reason = re.sub(r"\s+", " ", str(data.get("reason") or "")).strip()[:500]
-        student = row.student
-        defense_type = RESEARCH_GATE_DEFENSE_TYPES.get(row.gate, "defense")
-        if response == "accept" and row.status == "Declined":
-            return jsonify({"error": "This invitation was declined. Ask the Research Coordinator to send the invitation again."}), 409
-        if response == "accept":
-            row.status, row.reason, row.responded_at = "Accepted", None, now_utc()
-            close_research_tasks(row.student_id, prefix=f"Replace declined panelist: {faculty.name}")
-            db.session.flush()
-            if not unanswered_panel_invitations(student, row.gate) and active_schedule_for_gate(student, row.gate):
-                close_research_tasks(student.id, f"Confirm assigned panel acceptance ({defense_type})", "Confirm assigned panel acceptance")
-            add_log("defense-scheduling", student.id, f"{faculty.name} (Faculty Member)", row.gate,
-                    f"Panel invitation accepted ({row.panel_role})", "Research Coordinator", f"{faculty.name} accepted the {defense_type} panel seat.")
-        elif response == "decline":
-            if len(reason) < 3:
-                return jsonify({"error": "Give a short reason for declining; the coordinators see it."}), 400
-            row.status, row.reason, row.responded_at = "Declined", reason, now_utc()
-            ensure_open_task(student.id, f"Replace declined panelist: {faculty.name} ({defense_type})", "Research Coordinator", 2, 60)
-            notify_many(
-                accounts_for_roles("research_coordinator", "staff"), "panel_declined",
-                f"{faculty.name} declined the {defense_type} panel of {student.name}", f"Reason: {reason}. Replace the panelist or reschedule.",
-                link="/workflow/panel-matching", related_type="panel_invitation", related_id=row.id,
-                dedupe_key=f"panel_declined:{row.id}:{now_utc().strftime('%Y%m%d%H%M%S')}",
-            )
-            add_log("defense-scheduling", student.id, f"{faculty.name} (Faculty Member)", row.gate,
-                    f"Panel invitation declined ({row.panel_role})", "Research Coordinator", f"Reason: {reason}")
-        else:
-            return jsonify({"error": "Choose accept or decline."}), 400
+        return apply_panel_invitation_response(row, faculty, str(data.get("response") or "").strip(), reason)
+
+    @app.route("/api/panel-invitations/<int:invitation_id>/respond-for-panelist", methods=["POST"])
+    @require_api_login("staff", "research_coordinator")
+    def staff_panel_invitation_respond(invitation_id: int):
+        """UAT E8: staff or the Research Coordinator answers a panel invitation for the panelist (reason required)."""
+        account = current_account()
+        row = db.session.get(PanelInvitation, invitation_id)
+        if not row or not row.faculty or not PanelAssignment.query.filter_by(student_id=row.student_id, faculty_id=row.faculty_id, gate=row.gate).first():
+            return jsonify({"error": "We could not find that invitation."}), 404
+        data = json_body()
+        reason = re.sub(r"\s+", " ", str(data.get("reason") or "")).strip()[:500]
+        if len(reason) < 5:
+            return jsonify({"error": "Give the reason you are answering for the panelist (for example, how the panelist told you)."}), 400
+        return apply_panel_invitation_response(row, row.faculty, str(data.get("response") or "").strip(), reason, account)
+
+    @app.route("/api/faculty/<int:faculty_id>/availability/working-hours", methods=["PUT"])
+    @require_api_login("staff", "research_coordinator")
+    def staff_save_faculty_hours(faculty_id: int):
+        """UAT E8: staff or the Research Coordinator enters the weekly hours for a panelist."""
+        account = current_account()
+        faculty = Faculty.query.get_or_404(faculty_id)
+        data = json_body()
+        hours = data.get("hours")
+        if not isinstance(hours, list):
+            return jsonify({"error": "Send the weekly hours as a list."}), 400
+        try:
+            save_weekly_hours(faculty, [item for item in hours if isinstance(item, dict)], "staff")
+        except ValueError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+        reason = re.sub(r"\s+", " ", str(data.get("reason") or "")).strip()[:300]
+        add_log("defense-scheduling", None, f"{account.full_name} (for the panel)", faculty.name,
+                "Weekly hours entered for the panelist", "Research Coordinator", f"Entered for {faculty.name}." + (f" Reason: {reason}" if reason else ""))
         db.session.commit()
-        return jsonify({"ok": True, "invitation": panel_invitation_dict(row, include_schedule=True)})
+        return jsonify({"ok": True, "message": "Weekly hours saved for the panelist.", **availability_payload(faculty)})
 
     @app.route("/api/faculty-portal/defense-schedules/<int:schedule_id>/venue", methods=["POST"])
     @require_api_login("faculty")
@@ -44622,6 +44664,65 @@ def _demo_build_environment():
                 os.environ[key] = value
 
 
+SEED_INPUT_FILES = ("panel_demo_data.py", "seed_curriculum_data.py", "business_rules_catalog.py")
+SEED_INPUT_DIRS = ("Documents/Sample_Data/Monitoring_Sheets", "Documents/Sample_Data/Faculty_Sheet")
+STALE_DEMO_DATA_WARNING = "Your demo data is out of date. Run npm run seed (this resets the demo data)."
+
+
+def _normalize_seed_bytes(data: bytes) -> bytes:
+    return data.replace(b"\r\n", b"\n")  # Windows and Mac checkouts hash alike
+
+
+def seed_inputs_fingerprint() -> int:
+    """A 31-bit fingerprint of the files the seed reads (sorted relative paths + bytes, CRLF as LF).
+
+    app.py is left out on purpose: a harmless edit there would warn every teammate. 31 bits fit
+    SQLite's PRAGMA user_version, where build_demo_database stamps it (no new table, IM4).
+    """
+    paths = [BASE_DIR / name for name in SEED_INPUT_FILES]
+    for folder in SEED_INPUT_DIRS:
+        paths += [p for p in (BASE_DIR / folder).rglob("*") if p.is_file()]
+    digest = hashlib.sha256()
+    for path in sorted(paths, key=lambda p: p.relative_to(BASE_DIR).as_posix()):
+        digest.update(path.relative_to(BASE_DIR).as_posix().encode() + b"\0")
+        digest.update(_normalize_seed_bytes(path.read_bytes()) + b"\0")
+    return (int(digest.hexdigest()[:8], 16) & 0x7FFFFFFF) or 1
+
+
+def read_seed_stamp() -> int:
+    """The stamp of the main database file (a visitor's sandbox copy may predate it)."""
+    path = _main_sqlite_path()
+    if path is None:
+        return int(db.session.execute(text("PRAGMA user_version")).scalar() or 0)
+    conn = sqlite3.connect(str(path))
+    try:
+        return int(conn.execute("PRAGMA user_version").fetchone()[0])
+    finally:
+        conn.close()
+
+
+def write_seed_stamp(value: int) -> None:
+    path = _main_sqlite_path()
+    if path is None:
+        db.session.execute(text(f"PRAGMA user_version = {int(value)}"))
+        db.session.commit()
+        return
+    conn = sqlite3.connect(str(path))
+    try:
+        conn.execute(f"PRAGMA user_version = {int(value)}")
+    finally:
+        conn.close()
+
+
+def demo_data_stale() -> bool:
+    """True when the database was seeded from other seed inputs than the ones on disk (or never stamped)."""
+    return read_seed_stamp() != seed_inputs_fingerprint()
+
+
+def demo_data_stale_warning() -> str:
+    return STALE_DEMO_DATA_WARNING if demo_data_stale() else ""
+
+
 def build_demo_database() -> dict:
     """Reset the database and build the one complete demo dataset (owner decisions IM2, IM4, IM16).
 
@@ -44677,6 +44778,7 @@ def build_demo_database() -> dict:
         seed_stage_events()  # last: the stage clock, and the risk levels that read it
         seed_comprehensive_exam_results()
         accept_privacy_notice_for_seeded_accounts()
+        write_seed_stamp(seed_inputs_fingerprint())
         return sync_result
 
 
@@ -44724,6 +44826,8 @@ with app.app_context():
         if should_run_startup_tasks() and not database_has_demo_data():
             build_demo_database()
             print("Built the demo database (it was empty).")
+        elif should_run_startup_tasks() and demo_data_stale():
+            print(STALE_DEMO_DATA_WARNING)
 
 
 if __name__ == "__main__":

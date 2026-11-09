@@ -10,6 +10,7 @@ import { useAuth } from "../auth";
 import { useApi } from "../hooks";
 import { Button, Card, DataTable, Field, InlineNotice, Input, Modal, PageHeader, SearchInput, Select, Spinner, StatusChip, Textarea } from "../components/ui/index.js";
 import { formatDate, formatTimeRange, initials } from "../lib/format";
+import { WeeklyHours } from "./faculty/FacultyAvailabilityEditor";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 import { useConfirm } from "../components/confirm";
 import { PAGE } from "../lib/labels.js";
@@ -311,6 +312,9 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
   const calendar = faculty.calendar || {};
   const feedUrl = calendar.feed_url || `/api/faculty/${faculty.id}/calendar.ics`;
   const [showCvAssistant, setShowCvAssistant] = useState(false);
+  const [showHours, setShowHours] = useState(false);
+  const { user } = useAuth();
+  const canEnterHours = user?.role === "staff" || user?.role === "research_coordinator";
   return (
     <>
       <Modal
@@ -337,6 +341,7 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
           {detailLoading && <p className="meta font-semibold" role="status">Refreshing calendar status and schedule…</p>}
           {detailError && <InlineNotice tone="warning" role="alert">Live calendar details could not be refreshed: {detailError}</InlineNotice>}
           <WeeklyCalendar faculty={faculty} />
+          {canEnterHours && <Button variant="secondary" icon={CalendarDays} onClick={() => setShowHours(true)}>Enter weekly hours for this panelist</Button>}
           <div className="grid gap-6 lg:grid-cols-3">
             <ProfileSection icon={BriefcaseBusiness} title="Specialization">
               <p className="text-sm leading-relaxed text-slate-600">{faculty.specialization}</p>
@@ -393,6 +398,15 @@ function FacultyProfileModal({ faculty: initialFaculty, courses, onSaved, onClos
 
         </div>
       </Modal>
+      {showHours && (
+        <Modal title="Weekly hours for this panelist" subtitle={faculty.name} size="xl" onClose={() => setShowHours(false)} closeLabel="Close weekly hours">
+          <WeeklyHours
+            data={faculty}
+            save={(hours) => api.saveFacultyHoursForPanelist(faculty.id, { hours })}
+            onSaved={async () => { await onSaved?.(); setShowHours(false); }}
+          />
+        </Modal>
+      )}
       {showCvAssistant && <FacultyAssignmentProfile faculty={faculty} onClose={() => setShowCvAssistant(false)} />}
     </>
   );

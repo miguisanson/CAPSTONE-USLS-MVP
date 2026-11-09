@@ -36,7 +36,7 @@ function rangeProblem(start, end) {
   return "";
 }
 
-function WeeklyHours({ data, onSaved }) {
+export function WeeklyHours({ data, onSaved, save: saveHours = api.saveFacultyWorkingHours }) {
   const [rows, setRows] = useState(() => toRows(data.working_hours));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -72,7 +72,7 @@ function WeeklyHours({ data, onSaved }) {
     }
     setSaving(true);
     try {
-      await api.saveFacultyWorkingHours(
+      await saveHours(
         rows.map((row) => ({
           weekday: row.weekday,
           enabled: row.enabled,

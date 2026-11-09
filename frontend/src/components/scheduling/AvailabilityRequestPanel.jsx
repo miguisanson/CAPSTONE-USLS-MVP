@@ -1,13 +1,34 @@
 import { useEffect, useState } from "react";
 import { BellRing, CheckCircle2, Send } from "lucide-react";
 import { api } from "../../api";
+import { useAuth } from "../../auth";
+import ReasonDialog from "../monitoring/ReasonDialog";
 import { Button, Card, DataTable, Field, InlineNotice, Input, StatusChip, Textarea } from "../ui/index.js";
 import { addDays, isoDay, parseDay } from "../calendar/CalendarView";
 import { availabilityLabel, isAvailabilityEntered, longDate } from "./dates";
 
 // Invitation state shown next to a panelist (Invited / Accepted / Declined + the reason).
-export function InvitationChip({ invitation }) {
+// With `onAnswered`, staff can answer a waiting invitation for the panelist (UAT E8): a reason is required and the history says "(for the panel)".
+export function InvitationChip({ invitation, onAnswered }) {
+  const [answering, setAnswering] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const { user } = useAuth();
+  const canAnswer = user?.role === "staff" || user?.role === "research_coordinator";
   if (!invitation) return null;
+  async function answer(reason) {
+    setBusy(true);
+    setError("");
+    try {
+      await api.respondPanelInvitationForPanelist(invitation.id, { response: answering, reason });
+      setAnswering("");
+      await onAnswered?.();
+    } catch (err) {
+      setError(err.message || "Could not save the answer.");
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <div className="mt-2 space-y-1">
       <StatusChip status={invitation.status === "Invited" ? "Invited" : invitation.status} dot={false} />
@@ -15,6 +36,23 @@ export function InvitationChip({ invitation }) {
         <InlineNotice tone="warning" className="!px-3 !py-2 text-xs">
           Declined{invitation.reason ? `: ${invitation.reason}` : ""}. Replace this panelist or ask the panelist to accept.
         </InlineNotice>
+      )}
+      {onAnswered && canAnswer && invitation.status === "Invited" && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button size="sm" variant="secondary" onClick={() => setAnswering("accept")}>Accept for panelist</Button>
+          <Button size="sm" variant="secondary" onClick={() => setAnswering("decline")}>Decline for panelist</Button>
+        </div>
+      )}
+      {answering && (
+        <ReasonDialog
+          title={answering === "accept" ? "Accept the seat for the panelist" : "Decline the seat for the panelist"}
+          message={`You are answering for ${invitation.faculty_name}. The history shows your name and "(for the panel)".`}
+          confirmLabel={answering === "accept" ? "Accept for panelist" : "Decline for panelist"}
+          busy={busy}
+          error={error}
+          onConfirm={answer}
+          onCancel={() => { setAnswering(""); setError(""); }}
+        />
       )}
     </div>
   );

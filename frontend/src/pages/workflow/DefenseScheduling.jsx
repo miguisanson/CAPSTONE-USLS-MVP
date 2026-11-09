@@ -348,7 +348,7 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
                   <p className="meta mt-3">{member.college || "Department not recorded"}</p>
                   <p className="mt-1 text-sm text-slate-700">{member.specialization || "Specialization not recorded"}</p>
                   <p className="meta mt-1">{availabilityLabel(participant)}</p>
-                  <InvitationChip invitation={invitation} />
+                  <InvitationChip invitation={invitation} onAnswered={refetch} />
                 </Card>
               );
             })}

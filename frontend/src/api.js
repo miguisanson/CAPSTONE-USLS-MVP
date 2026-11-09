@@ -629,6 +629,10 @@ export const api = {
   facultyPanelInvitations: () => request("/faculty-portal/panel-invitations"),
   respondPanelInvitation: (id, payload) =>
     request(`/faculty-portal/panel-invitations/${id}/respond`, { method: "POST", body: JSON.stringify(payload) }),
+  respondPanelInvitationForPanelist: (id, payload) =>
+    request(`/panel-invitations/${id}/respond-for-panelist`, { method: "POST", body: JSON.stringify(payload) }),
+  saveFacultyHoursForPanelist: (facultyId, payload) =>
+    request(`/faculty/${facultyId}/availability/working-hours`, { method: "PUT", body: JSON.stringify(payload) }),
   setDefenseVenue: (scheduleId, payload) =>
     request(`/faculty-portal/defense-schedules/${scheduleId}/venue`, { method: "POST", body: JSON.stringify(payload) }),
   cannotAttendDefense: (scheduleId, payload) =>
