@@ -11862,6 +11862,20 @@ def _trim_to_last_sentence(text: str) -> str:
 
 
 def _gemini_generate(prompt: str, system: str | None = None) -> str:
+    """Ask GEMINI_MODEL; when it is used up (429: the free tier allows 20 answers a day per model) or overloaded
+    (503), ask each model in GEMINI_FALLBACK_MODELS (comma-separated, empty by default) in turn. Owner 2026-11-09."""
+    fallbacks = [m.strip() for m in os.getenv("GEMINI_FALLBACK_MODELS", "").split(",") if m.strip()]
+    models = [os.getenv("GEMINI_MODEL", "gemini-flash-latest")] + fallbacks
+    for index, model in enumerate(models):
+        try:
+            return _gemini_generate_with_model(prompt, system, model)
+        except GeminiHTTPError as exc:
+            if exc.code not in (429, 503) or index == len(models) - 1:
+                raise
+    raise RuntimeError("Gemini did not answer.")  # pragma: no cover - the loop returns or raises
+
+
+def _gemini_generate_with_model(prompt: str, system: str | None, model: str) -> str:
     """Make one bounded, stateless Gemini request without a heavyweight SDK.
 
     ``system`` is sent as the model's system instruction (rules that the prompt text cannot override).
@@ -11874,7 +11888,7 @@ def _gemini_generate(prompt: str, system: str | None = None) -> str:
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
     if not api_key:
         raise RuntimeError("Google AI Studio is not configured.")
-    model_name = os.getenv("GEMINI_MODEL", "gemini-flash-latest").removeprefix("models/")
+    model_name = model.removeprefix("models/")
     if not re.fullmatch(r"[A-Za-z0-9._-]+", model_name):
         raise RuntimeError("The configured Gemini model name is invalid.")
     endpoint = (
@@ -36266,6 +36280,26 @@ def generate_local_panel_matching_rag(paper_text: str, retrieved_faculty: list[d
     }
 
 
+_PANEL_ANALYSIS_CACHE: OrderedDict[str, dict] = OrderedDict()  # prompt hash -> Gemini analysis (a page view re-asks)
+
+
+def _with_gemini_patience(attempt):
+    """Run a Gemini call; on any failure (a free-tier 429, a slow answer) wait and try again until
+    PANEL_GEMINI_MAX_WAIT_SECONDS (default 60) is spent, then raise the last error. Owner 2026-11-09: the panel
+    demo must show Gemini's analysis, not the keyword fallback, so waiting is better than giving up."""
+    budget = max(0.0, env_float("PANEL_GEMINI_MAX_WAIT_SECONDS", 60))
+    waited = 0.0
+    while True:
+        try:
+            return attempt()
+        except Exception:
+            wait = min(20.0, budget - waited)  # the free tier counts requests per minute
+            if wait < 1:
+                raise
+            _gemini_sleep(wait)
+            waited += wait
+
+
 def generate_panel_matching_keywords_with_rag(paper_text: str, retrieved_faculty: list[dict], limit: int = 18) -> dict:
     local_payload = generate_local_panel_matching_rag(paper_text, retrieved_faculty, limit)
     if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")):
@@ -36282,17 +36316,28 @@ def generate_panel_matching_keywords_with_rag(paper_text: str, retrieved_faculty
         f"Manuscript body excerpt:\n{paper_excerpt(paper_text, 5000)}\n\n"
         f"Retrieved faculty specialization snippets:\n{snippets}"
     )
+    cache_key = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    if cache_key in _PANEL_ANALYSIS_CACHE:
+        _PANEL_ANALYSIS_CACHE.move_to_end(cache_key)
+        return dict(_PANEL_ANALYSIS_CACHE[cache_key])
+
+    def analyse() -> dict:
+        parsed = parse_panel_matching_rag_response(str(_gemini_generate(prompt)))
+        if not parsed.get("keywords"):
+            raise RuntimeError("Gemini returned no keywords.")
+        return parsed
+
     try:
-        response = _gemini_generate(prompt)
-        parsed = parse_panel_matching_rag_response(str(response))
-        if parsed.get("keywords"):
-            parsed["mode"] = "document-rag"
-            parsed["faculty_matches"] = parsed.get("faculty_matches") or local_payload["faculty_matches"]
-            parsed["summary"] = parsed.get("summary") or local_payload["summary"]
-            return parsed
+        parsed = _with_gemini_patience(analyse)
     except Exception:
-        pass
-    return {**local_payload, "mode": "local-rag-fallback"}
+        return {**local_payload, "mode": "local-rag-fallback"}
+    parsed["mode"] = "document-rag"
+    parsed["faculty_matches"] = parsed.get("faculty_matches") or local_payload["faculty_matches"]
+    parsed["summary"] = parsed.get("summary") or local_payload["summary"]
+    _PANEL_ANALYSIS_CACHE[cache_key] = dict(parsed)
+    while len(_PANEL_ANALYSIS_CACHE) > 64:
+        _PANEL_ANALYSIS_CACHE.popitem(last=False)
+    return parsed
 
 
 def paper_excerpt(text: str, limit: int = 220) -> str:
@@ -39887,7 +39932,9 @@ def panel_matching_result(student: Student, profile: dict | None = None) -> dict
     similarities = {fid: result["similarity"] for fid, result in tfidf["results"].items()}
     if paper_text and panel_gemini_configured():
         try:
-            similarities = panel_embedding_similarities(paper_text, {fid: item["text"] for fid, item in profiles.items()})
+            similarities = _with_gemini_patience(
+                lambda: panel_embedding_similarities(paper_text, {fid: item["text"] for fid, item in profiles.items()})
+            )
             method = "gemini-embeddings"
             method_note = "Cosine similarity of Gemini embeddings of the paper and each faculty member's expertise records."
         except Exception as exc:  # noqa: BLE001 - any failure falls back to the always-available method

@@ -17,6 +17,7 @@ from unittest.mock import patch
 _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
+os.environ.setdefault("PANEL_GEMINI_MAX_WAIT_SECONDS", "0")  # tests that fake a Gemini failure fall back at once
 
 import app as app_module  # noqa: E402
 from app import (  # noqa: E402
