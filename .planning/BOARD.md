@@ -1,5 +1,11 @@
 # USLS GS Platform — board
 
+## FINAL SUBMISSION — frozen 2026-11-09 11:10
+
+`v6.7-fixed` = `main` (content of ee0dd241) is the final submission; no changes after this. Zip:
+`dist_release/CAP-2521-IT-CAPSTONE-PROJECT.zip` (built from the same file tree). After grading: rotate the Gemini key
+and the Google Calendar client secret (they are inside the zip's `.env`).
+
 ## Final polish loop day 2 (2026-11-06, branch `v6.4.1-test`)
 
 **Done so far today:** Fable review 3 fixes merged (research status shown live everywhere, graduation history only on

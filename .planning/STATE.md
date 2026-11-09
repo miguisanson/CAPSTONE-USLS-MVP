@@ -1,5 +1,11 @@
 # State
 
+## 2026-11-09 11:10 — FINAL SUBMISSION, FROZEN: `v6.7-fixed` = `main` (content of ee0dd241)
+
+- Owner: no changes after this. `main` was fast-forwarded to `v6.7-fixed` (`git merge -s ours origin/main`, no force
+  push); the submission zip was built from the same file tree (8ea3e7f2 = ee0dd241 tree; later commits touch only
+  `.planning/`, which the zip leaves out).
+
 ## 2026-11-09 ~11:00 — v6.7-fixed: final submission branch (deadline 11:30)
 
 - Branch **`v6.7-fixed`** (worktree `E:/Github_Projects/CAPSTONE-USLS-MVP-wt/v67`) = `v6.4.1-test` + Khloe's
