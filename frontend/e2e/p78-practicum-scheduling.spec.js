@@ -57,6 +57,8 @@ async function withPristineRoster(page) {
   await page.route(/\/api\/transactions\/practicum\/context/, async (route) => {
     const response = await route.fetch();
     const body = await response.json();
+    // the two quick-login practicum students; the seed's stage-ready cases (PANEL_DEMO_CHECKLIST.md) are left out
+    body.roster = body.roster.filter((row) => ["Andrea Villanueva", "Paolo Ramirez"].includes(row.student.name));
     for (const row of body.roster) {
       row.record = null;
       row.has_submitted_documents = false;
@@ -134,12 +136,13 @@ test.describe("Practicum (staff)", () => {
       await expect(board.getByText(card, { exact: true }), card).toBeVisible();
     }
     await expect(board.getByText("2690201 · MAPSY")).toBeVisible();
-    await expect(board.getByText("Waiting for documents").first()).toBeVisible();
+    await expect(board.getByText("Waiting for MOA").first()).toBeVisible(); // no record yet: the MOA comes first
     await expect(board.getByText("Waiting for: Student").first()).toBeVisible();
     await shotsAt(page, "practicum-board");
   });
 
   test("a search narrows the board and can be cleared", async ({ page }) => {
+    await withPristineRoster(page);
     await page.goto("/workflow/practicum");
     const board = main(page).getByRole("region", { name: "Practicum workflow board" });
     await expect(board.getByText("Paolo Ramirez", { exact: true })).toBeVisible();

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, FileSpreadsheet, MailCheck, Send } from "lucide-react";
 import { api } from "../../api";
-import { useApi } from "../../hooks";
-import { formatDate, formatDateTime } from "../../lib/format";
-import { Button, DataTable, EmptyState, HistoryPanel, InlineNotice, Spinner, StatusChip } from "../../components/ui/index.js";
+import { formatDate } from "../../lib/format";
+import { Button, DataTable, EmptyState, HistoryPanel, InlineNotice, StatusChip } from "../../components/ui/index.js";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
+import ExportHistory from "../../components/ExportHistory";
 import { plural, whenText } from "./leaveHelpers";
 
 const HANDOFF_TONE = {
@@ -15,29 +15,6 @@ const HANDOFF_TONE = {
 };
 
 const EXPORTABLE = ["Pending Handoff", "Exported - Ready to Send"];
-
-const HISTORY_COLUMNS = [
-  { key: "file_name", header: "File", cell: (row) => <span className="font-medium text-ink">{row.file_name}</span> },
-  { key: "case_count", header: "Requests" },
-  { key: "exported_by", header: "Downloaded by" },
-  { key: "exported_at", header: "When", cell: (row) => <span className="text-slate-500">{formatDateTime(row.exported_at)}</span> },
-];
-
-function ExportHistory({ slug }) {
-  const { data, loading, error } = useApi(() => api.leaveExportLog(slug), [slug]);
-  if (loading) return <Spinner label="Loading export history…" />;
-  if (error) return <InlineNotice tone="danger">{error}</InlineNotice>;
-  return (
-    <DataTable
-      caption="Registrar lists downloaded"
-      columns={HISTORY_COLUMNS}
-      rows={data?.items || []}
-      minWidth="sm"
-      pageSize={0}
-      empty={{ title: "No lists downloaded yet", hint: "Each download is recorded here." }}
-    />
-  );
-}
 
 async function downloadAwolReports(items) {
   const files = [];

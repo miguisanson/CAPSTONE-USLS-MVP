@@ -9,10 +9,11 @@
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { AUTH_DIR } from "./support/paths.mjs";
 import { attachWatchers, formatProblems, stubExternal } from "./support/checker.js";
 
-const SHOTS = process.env.P88_SHOTS || "E:/Temp/claude/shots-p66/after";
+const SHOTS = process.env.P88_SHOTS || join(tmpdir(), "claude-shots", "shots-p66", "after");
 
 let tracker;
 test.beforeAll(() => mkdirSync(SHOTS, { recursive: true }));
@@ -367,9 +368,8 @@ test.describe("I-116: staff home, Work Queue", () => {
   test("(b) the staff home button says 'Open Subject Withdrawal' (the page's name), not the server's 'Open Withdrawal'", async ({ page }) => {
     await patchJson(page, "**/api/tasks**", addTasks);
     await homeReady(page);
-    // the mocked task comes first; a real withdrawal row (other specs leave one) may follow, and its link also opens the board (I-348/F5-16)
-    const row = main(page).locator("li", { hasText: "Record and forward withdrawal request" }).first();
-    await expect(row.getByRole("link", { name: "Open Subject Withdrawal" })).toHaveAttribute("href", "/workflow/withdrawal?show=open"); // I-198 (pkt/staffux): staff task links open the open requests
+    const row = main(page).locator("li", { hasText: "Record and forward withdrawal request" });
+    await expect(row.getByRole("link", { name: "Open Subject Withdrawal" }).first()).toHaveAttribute("href", "/workflow/withdrawal?show=open"); // I-198 (pkt/staffux): staff task links open the open requests
     await expect(main(page)).not.toContainText("Open Withdrawal");
     const awol = main(page).locator("li", { hasText: "Review automatic AWOL policy alert" }).first();
     await expect(awol.getByRole("link", { name: "Open AWOL & Residency" })).toBeVisible();

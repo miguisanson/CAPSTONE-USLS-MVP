@@ -367,9 +367,9 @@ function Breadcrumb({ path, current, role, recordTitle }) {
           <li key={`${index}-${crumb.label}`} className={`min-w-0 items-center gap-1.5 ${crumb.hide || "flex"}`}>
             {index > 0 && <ChevronRight className={`h-4 w-4 shrink-0 text-slate-300 ${index === 1 && crumbs[0].hide ? "max-sm:hidden" : ""}`} aria-hidden="true" />}
             {crumb.to ? (
-              <Link to={crumb.to} className="truncate font-semibold text-slate-500 hover:text-brand-700 hover:underline">{crumb.label}</Link>
+              <Link to={crumb.to} title={crumb.label} className="truncate font-semibold text-slate-500 hover:text-brand-700 hover:underline">{crumb.label}</Link>
             ) : (
-              <span className={`font-semibold ${crumb.page ? "break-words text-ink" : "truncate text-slate-500"}`} aria-current={crumb.page ? "page" : undefined}>{crumb.label}</span>
+              <span title={crumb.label} className={`truncate font-semibold ${crumb.page ? "text-ink" : "text-slate-500"}`} aria-current={crumb.page ? "page" : undefined}>{crumb.label}</span>
             )}
           </li>
         ))}

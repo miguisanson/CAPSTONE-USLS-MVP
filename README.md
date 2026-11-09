@@ -357,3 +357,8 @@ POST /api/transactions/<slug>          run a workflow (JSON body)
 GET/POST /api/faculty/<id>/expertise      faculty expertise records used by Panel Matching
 PUT/DELETE /api/faculty-expertise/<id>   edit or remove one expertise record
 ```
+
+## Run it locally
+
+Windows: double-click `Start.exe` (opens the app at http://localhost:5000) and `Stop.exe` when done. Mac: `Start.command` / `Stop.command`.
+Needs Python 3.11+ and Node 18+; the first run installs packages and builds the web pages. Log: `instance/app.log`. Rebuild the exes with `launcher/build.cmd`; build the hand-in zip with `python scripts/package_release.py --seed-db`.

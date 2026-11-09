@@ -66,7 +66,19 @@ export const REQUEST_GROUPS = [
         lockedWhen: (data) => !data.student.program_has_practicum,
         lockedReason: "Practicum is available only to Psychology and Master of Science in Guidance and Counseling (MSGC) students.",
       },
-      { id: "graduation", label: PAGE.graduationEndorsement, icon: GraduationCap },
+      {
+        id: "graduation",
+        label: PAGE.graduationEndorsement,
+        icon: GraduationCap,
+        // Owner 2026-11-08: for a program with a practicum, the application opens only after the Dean approves the
+        // practicum completion. An application already on file stays visible.
+        lockedWhen: (data) => {
+          const gate = data.graduation_eligibility?.practicum_gate;
+          return Boolean(gate?.required && !gate.dean_approved && !data.graduation_endorsement);
+        },
+        lockedReason: "The graduation application opens after the Dean approves your practicum completion.",
+        lockedReasonFrom: (data) => data.graduation_eligibility?.practicum_gate?.message,
+      },
     ],
   },
 ];

@@ -204,11 +204,12 @@ test.describe("Student forms never ask for what the system knows", () => {
       await expect(main).toContainText("200"); // as text
       await expect(page.locator("label.block").filter({ has: page.locator(".field-label", { hasText: /^Required hours/ }) }).locator("input")).toHaveCount(0);
       await main.locator('input[type="file"]').setInputFiles(PDF);
-      await ctl(page, "Hours you completed (your own report)").fill("200");
+      // owner 2026-11-08: the completed hours are read from the certificate by the server, never typed or sent
+      await expect(page.getByLabel("Completed hours")).toHaveCount(0);
       await submitButton(page, "Submit completion stage").click();
       await confirmSend(page);
       expect(lastWrite(writes, "requests/practicum").body).toEqual({
-        attachment_id: 6001, certificate_attachment_id: 7001, practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec", completed_hours: "200", remarks: "",
+        attachment_id: 6001, certificate_attachment_id: 7001, practicum_site: "Spec Clinic", supervisor_name: "Dr. Spec", remarks: "",
       });
     } finally {
       await context.close();

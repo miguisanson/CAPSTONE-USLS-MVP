@@ -10,11 +10,12 @@
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { AUTH_DIR, BASE_URL } from "./support/paths.mjs";
 import { PASSWORD } from "./support/accounts.js";
 import { attachWatchers, formatProblems, stubExternal } from "./support/checker.js";
 
-const SHOTS = process.env.P105_SHOTS || "E:/Temp/claude/shots-sweep2";
+const SHOTS = process.env.P105_SHOTS || join(tmpdir(), "claude-shots", "shots-sweep2");
 const authFile = (key) => join(AUTH_DIR, `${key}.json`);
 const MAYA = "awol.maya@usls.edu.ph";
 const norm = (text) => (text || "").replace(/\s+/g, " ").trim();

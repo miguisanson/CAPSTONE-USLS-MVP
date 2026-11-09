@@ -237,7 +237,7 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     expect(raw.charCodeAt(0)).toBe(0xfeff);
     const text = raw.slice(1);
     const lines = text.split("\r\n");
-    expect(lines[0]).toBe(["Student", "Student ID", "AY Entry", "YR", ...courses.map((c) => c.code), "Completed", "Total", "% Complete"].map((v) => `"${v}"`).join(","));
+    expect(lines[0]).toBe(["Student", "Student ID", "AY Entry", "YR", "Lifecycle stage", ...courses.map((c) => c.code), "Completed", "Total", "% Complete"].map((v) => `"${v}"`).join(","));
     expect(lines.length).toBeGreaterThan(grid.students.length);
     expect(lines[1]).toContain('"Bernardo, Camille"');
     expect(text).toContain('"Salonga, Bea"');

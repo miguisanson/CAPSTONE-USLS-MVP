@@ -59,6 +59,8 @@ function VerifiedHoursForm({ record, student, onSave }) {
 
 // The confirm window of a practicum step: the one StepDialog. `onConfirm(payload)` throws to refuse (the message is shown inside).
 function WorkflowTransitionModal({ slug, student, action, onClose, onConfirm }) {
+  // The certificate stated no hours number: staff read the file and enter the hours here (owner 2026-11-08).
+  const [hours, setHours] = useState("");
   const requiresReason = Boolean(action.requireReason);
   const requiresComment = requiresReason || Boolean(action.requireComment);
   const showsTransitionComment = requiresComment || ["practicum", "withdrawal", "graduation"].includes(slug);
@@ -66,6 +68,7 @@ function WorkflowTransitionModal({ slug, student, action, onClose, onConfirm }) 
   async function confirm(_key, comment) {
     const payload = {
       ...action.payload,
+      ...(action.needsHours ? { completed_hours: hours.trim() } : {}),
       ...(comment ? { workflow_comment: comment } : {}),
       ...(requiresReason ? { return_reason: comment, staff_remarks: comment } : {}),
     };
@@ -88,7 +91,16 @@ function WorkflowTransitionModal({ slug, student, action, onClose, onConfirm }) 
       reasonHint={requiresComment ? "Required for this step." : "Optional. Leave blank if there is nothing to add."}
       reasonPlaceholder={action.commentPlaceholder || (requiresReason ? "Tell the student what to correct or upload next." : "Add instructions or context for the next reviewer. Leave blank if there is nothing to add.")}
       requiredMessage={action.commentRequiredError || (requiresReason ? "Enter the exact reason before moving this request." : "Enter the required follow-through details before moving this request.")}
-    />
+      validate={action.needsHours ? () => (/^\d{1,4}$/.test(hours.trim()) ? "" : "Enter the hours completed shown on the certificate, as a whole number.") : undefined}
+    >
+      {action.needsHours && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <label htmlFor="practicum-staff-hours" className="field-label">Hours completed (from the certificate)</label>
+          <p className="meta mt-0.5">The system could not find an hours number in the uploaded file. Open the certificate and enter the hours it states.</p>
+          <input id="practicum-staff-hours" type="number" min="0" step="1" inputMode="numeric" value={hours} onChange={(event) => setHours(event.target.value)} className="field-input mt-2 w-40" />
+        </div>
+      )}
+    </StepDialog>
   );
 }
 
@@ -114,7 +126,7 @@ function practicumReadyForDeanReview(row) {
 }
 
 // Khloe's practicum card: name and number, a green card and "Ready for Dean review" when the report is with the Dean (a grey
-// "Waiting for documents" before any file), a facts grid, the amber message box, "Next:", then View and Message.
+// "Waiting for MOA" before the MOA is sent, "Waiting for documents" after it), a facts grid, the amber message box, "Next:", then View and Message.
 function PracticumBoardCard({ row, onOpen, onMessage }) {
   const record = row.record;
   const readyForDean = practicumReadyForDeanReview(row);
@@ -122,12 +134,13 @@ function PracticumBoardCard({ row, onOpen, onMessage }) {
   const updated = row.last_activity_at || record?.updated_at;
   return (
     <CaseCardShell ready={ready}>
-      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
-        <div className="min-w-0">
+      {/* The mark sits under the name, not beside it: beside it the name was squeezed to a few letters per line. */}
+      <div className="flex flex-col items-start gap-1.5">
+        <div className="min-w-0 max-w-full">
           <p className="break-words text-sm font-semibold text-ink">{row.student.name}</p>
           <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
         </div>
-        <ReadyMark ready={readyForDean} waiting={!ready} />
+        <ReadyMark ready={readyForDean} waiting={!ready} waitingLabel={record ? "Waiting for documents" : "Waiting for MOA"} />
       </div>
       <CaseCardFacts
         facts={[
@@ -187,8 +200,8 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
     if (accountRole === "academic_coordinator" && record.status === "MOA Under Review") {
       return { label: "Mark practicum in progress", payload: { ...base, status: "Practicum In Progress", moa_status: "Verified" } };
     }
-    if (accountRole === "staff" && record.status === "Documents Submitted") {
-      return { label: "Forward documents to Academic Coordinator", payload: { ...base, status: "Documents Under Review" } };
+    if (accountRole === "staff" && ["Hours Incomplete", "Documents Submitted"].includes(record.status)) {
+      return { label: "Forward documents to Academic Coordinator", payload: { ...base, status: "Documents Under Review" }, needsHours: Boolean(record.hours_need_entry) };
     }
     if (accountRole === "academic_coordinator" && record.status === "Documents Under Review" && row.hours_status !== "Complete") {
       return { label: "Request additional certificates", payload: { ...base, status: "Additional Certificates Requested" }, requireReason: true };
@@ -395,7 +408,7 @@ function PracticumCaseDetails({ row }) {
         <StatCard size="sm" label="Eligibility" value={row.eligibility.status} badge />
         <StatCard size="sm" label="MOA" value={row.moa_status} badge />
         <StatCard size="sm" label="Documents" value={row.documents_status} badge />
-        <StatCard size="sm" label="Hours" value={record ? (record.verified_hours == null ? `Not verified (reported ${record.reported_hours ?? record.completed_hours})` : `${record.verified_hours}/${record.required_hours} verified`) : "Not started"} />
+        <StatCard size="sm" label="Hours" value={record ? (record.hours_need_entry ? "Staff to enter" : record.verified_hours == null ? `Not verified (reported ${record.reported_hours ?? record.completed_hours})` : `${record.verified_hours}/${record.required_hours} verified`) : "Not started"} />
         <StatCard size="sm" label="Supervisor" value={record?.supervisor_name || "Not provided"} />
         <StatCard size="sm" label="Completion" value={record?.completion_status || "Pending"} />
       </div>

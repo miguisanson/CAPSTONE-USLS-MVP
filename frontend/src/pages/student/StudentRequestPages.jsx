@@ -15,7 +15,7 @@ import {
   UserCheck,
   UserX,
 } from "lucide-react";
-import { Button, Card, InlineNotice, PageHeader, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, HistoryPanel, InlineNotice, PageHeader, StatusChip } from "../../components/ui/index.js";
 import { useStudentPortal } from "./StudentPortalContext";
 import { RequestSentContext, STUDENT_MESSAGE_SLUG_BY_VIEW, StudentClarificationPanel, StudentSchedulePanel, isLiveSchedule } from "./shared";
 import { BOOKABLE_DEFENSES, ResearchRequestForm, ScheduleRequestForm } from "./ResearchForms";
@@ -157,6 +157,22 @@ function RequestSentNotice({ message }) {
   );
 }
 
+// Practicum and graduation: every step taken on the request, newest first, so the student can follow it without asking.
+// The server sends only the steps meant for the student (no reviewer notes). Withdrawal shows its own history on its case card.
+function RequestProgressHistory({ id, data }) {
+  const rows = data.process_history?.[id] || [];
+  if (!rows.length) return null;
+  const entries = rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    at: row.created_at,
+    actorRole: row.actor_role,
+    from: row.from_status && row.to_status && row.from_status !== row.to_status ? row.from_status : undefined,
+    to: row.from_status && row.to_status && row.from_status !== row.to_status ? row.to_status : undefined,
+  }));
+  return <HistoryPanel entries={entries} label="View progress history" hideLabel="Hide progress history" count={entries.length} className="mt-4" />;
+}
+
 export function StudentRequestPage({ id, aside = null }) {
   const { data, refetch } = useStudentPortal();
   const [sent, setSent] = useState("");
@@ -198,6 +214,7 @@ export function StudentRequestPage({ id, aside = null }) {
         ) : (
           page.render(data, refetch)
         )}
+        {["practicum", "graduation"].includes(id) && <RequestProgressHistory id={id} data={data} />}
       </Card>
     </div>
     </RequestSentContext.Provider>

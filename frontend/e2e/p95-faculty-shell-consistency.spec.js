@@ -11,10 +11,11 @@
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { AUTH_DIR } from "./support/paths.mjs";
 import { attachWatchers, formatProblems, stubExternal } from "./support/checker.js";
 
-const SHOTS = process.env.P95_SHOTS || "E:/Temp/claude/shots-conE/after";
+const SHOTS = process.env.P95_SHOTS || join(tmpdir(), "claude-shots", "shots-conE", "after");
 const authFile = (key) => join(AUTH_DIR, `${key}.json`);
 const main = (page) => page.locator("main");
 const norm = (text) => (text || "").replace(/\s+/g, " ").trim();

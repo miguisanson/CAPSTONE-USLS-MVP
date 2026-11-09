@@ -24,7 +24,14 @@ import defenseScheduling from "./defense-scheduling.js";
 import verdicts from "./verdicts.js";
 import proposalFinal from "./proposal-final.js";
 
-export const GUIDES = [leaveOfAbsence, readmission, awol, monitoring, reports, withdrawal, practicum, graduation, courseAdjustments, businessRules, policyAssistant, policyDocuments, studentHandoff, enrollment, dropping, residency, calendars, portals, bestFeatures, researchTitle, panelMatching, defenseScheduling, verdicts, proposalFinal];
+// Lifecycle order (owner 2026-11-09): the student's path first, then side processes, then tools.
+export const GUIDES = [
+  studentHandoff, courseAdjustments, enrollment, dropping,
+  researchTitle, panelMatching, defenseScheduling, verdicts, proposalFinal,
+  practicum, graduation,
+  leaveOfAbsence, readmission, awol, residency, withdrawal,
+  monitoring, reports, calendars, businessRules, policyDocuments, policyAssistant, portals, bestFeatures,
+];
 
 // The ready-made demo students that the existing reset (POST /api/auth/demo-students/<key>/reset) knows, by student number.
 export const RESET_KEYS = {

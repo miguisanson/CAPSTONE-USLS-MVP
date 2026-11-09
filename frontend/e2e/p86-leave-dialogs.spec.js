@@ -405,6 +405,8 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
         const response = await route.fetch();
         const json = await response.json();
         let tagged = false; // F7-02: two seeded students are named Adrian Lim; tag only the first so the panel counts 1
+        // only Adrian's request is tagged here (the seed also has a stage-ready tagged one)
+        json.cases = json.cases.filter((item) => item.student.name === "Adrian Lim" || item.status !== "Subject Tagged - Registrar Preparation");
         json.cases = json.cases.map((item) =>
           item.student.name === "Adrian Lim" && !tagged && (tagged = true)
             ? {

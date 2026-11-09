@@ -10,6 +10,8 @@ import { Link } from "react-router-dom";
 import { Activity, ArrowRight, CheckCircle2, Hourglass, ListChecks } from "lucide-react";
 import { Button, EmptyState, PageHeader, SectionCard, StatCard } from "./ui/index.js";
 import { toneOf } from "../lib/tone";
+import { useAuth } from "../auth";
+import { useSeenMarks } from "../lib/seenMarks";
 
 /** The most recent-activity entries shown; the "View all" link leads to the rest. */
 export const MAX_ACTIVITY = 6;
@@ -55,6 +57,9 @@ export default function RoleHome({
   notice = null,
 }) {
   const shownActivity = (activity || []).slice(0, MAX_ACTIVITY);
+  // Owner 2026-11-08: a "Needs your action" row the person has not opened yet is green with a "New" mark.
+  const { user } = useAuth();
+  const seen = useSeenMarks(`actions:${user?.id || "guest"}`);
   const waitingItems = waiting?.items || [];
   return (
     <div className="space-y-5 animate-fade-up">
@@ -82,9 +87,10 @@ export default function RoleHome({
           >
             {actions.length ? (
               <ul className="space-y-2">
-                {actions.map((item) => (
-                  <ActionRow key={item.key ?? item.title} item={item} />
-                ))}
+                {actions.map((item) => {
+                  const id = String(item.key ?? item.title);
+                  return <ActionRow key={id} item={item} fresh={!seen.marks[id]} onOpen={() => seen.mark(id)} />;
+                })}
               </ul>
             ) : (
               <EmptyState
@@ -167,14 +173,22 @@ export default function RoleHome({
   );
 }
 
-function ActionRow({ item }) {
+function ActionRow({ item, fresh = false, onOpen }) {
   const { title, detail, meta, tone = "neutral", chip, to, linkLabel } = item;
   return (
-    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+    <li
+      data-fresh={fresh ? "true" : undefined}
+      className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border px-3 py-2.5 ${
+        fresh ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"
+      }`}
+    >
       <div className="flex min-w-0 flex-1 basis-56 items-start gap-2.5">
         <span aria-hidden="true" className={`mt-2 h-2 w-2 shrink-0 rounded-full ${toneOf(tone).dot}`} />
         <div className="min-w-0">
-          <p className="break-words text-sm font-semibold text-ink">{title}</p>
+          <p className="break-words text-sm font-semibold text-ink">
+            {fresh && <span className="mr-2 inline-block rounded-full bg-emerald-800 px-2 py-0.5 align-middle text-xs font-bold uppercase tracking-wide text-white">New</span>}
+            {title}
+          </p>
           {detail && <p className="meta mt-0.5 break-words">{detail}</p>}
           {(meta || chip) && (
             <p className="meta mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -185,7 +199,7 @@ function ActionRow({ item }) {
         </div>
       </div>
       {to && (
-        <Button as={Link} to={to} variant="secondary" size="sm" className="shrink-0 gap-1.5 max-sm:w-full max-sm:justify-center">
+        <Button as={Link} to={to} onClick={onOpen} variant="secondary" size="sm" className="shrink-0 gap-1.5 max-sm:w-full max-sm:justify-center">
           {linkLabel || "Open"}
           <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
         </Button>

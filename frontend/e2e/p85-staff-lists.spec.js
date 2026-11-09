@@ -12,10 +12,11 @@
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { AUTH_DIR } from "./support/paths.mjs";
 import { attachWatchers, formatProblems, stubExternal } from "./support/checker.js";
 
-const SHOTS = process.env.LISTS_SHOTS || "E:/Temp/claude/shots-lists/after";
+const SHOTS = process.env.LISTS_SHOTS || join(tmpdir(), "claude-shots", "shots-lists", "after");
 
 let tracker;
 test.beforeAll(() => mkdirSync(SHOTS, { recursive: true }));

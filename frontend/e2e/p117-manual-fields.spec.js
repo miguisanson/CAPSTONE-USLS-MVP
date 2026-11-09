@@ -204,11 +204,13 @@ test.describe("Dates and numbers that cannot be wrong", () => {
 });
 
 test.describe("Student practicum hours", () => {
-  test("B-23: completed hours are a whole number, 0 up to twice the required hours", async ({ browser }) => {
+  // Owner 2026-11-08 (replaces B-23's typed hours): the system reads the completed hours from the uploaded certificate;
+  // the student never types them and the request never carries a typed number.
+  test("the completed hours are read from the certificate, shown read-only and never typed", async ({ browser }) => {
     const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width: 1366, height: 768 } });
     const res = await context.request.post("/api/auth/login", { data: { email: "student@usls.edu.ph", password: PASSWORD } });
     expect(res.ok()).toBeTruthy();
-    const writes = [];
+    const bodies = [];
     await context.route("**/api/student-portal/context", async (route) => {
       const response = await route.fetch();
       const d = await response.json();
@@ -219,26 +221,23 @@ test.describe("Student practicum hours", () => {
       d.workflow_messages = [];
       await route.fulfill({ response, json: d });
     });
-    await context.route("**/api/student-portal/requests/practicum", (route) => { writes.push(route.request().method()); return route.fulfill({ json: { message: "Spec: request saved." } }); });
+    await context.route("**/api/student-portal/requests/practicum", (route) => { bodies.push(route.request().postDataJSON()); return route.fulfill({ json: { message: "Spec: request saved." } }); });
     await context.route("**/api/student-portal/request-attachments/upload", (route) => route.fulfill({ json: { attachment: { id: 7001, name: "spec.pdf", url: "/spec/spec.pdf", file_exists: true } } }));
+    await context.route("**/api/student-portal/practicum/certificate-hours/7001", (route) => route.fulfill({ json: { hours: 150, message: "The certificate states 150 hours completed." } }));
     const page = await context.newPage();
     await page.goto("/student/practicum");
     const main = page.locator("main");
+    await expect(main.locator("#practicum-hours")).toHaveCount(0);
     await main.locator('input[type="file"]').setInputFiles({ name: "spec.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 spec") });
-    const hours = main.locator("#practicum-hours");
-    await expect(hours).toHaveAttribute("max", "400");
-    await expect(hours).toHaveAttribute("step", "1");
-    await hours.fill("401");
+    await expect(main.getByText("150 (read from the certificate)")).toBeVisible();
     await main.getByRole("button", { name: "Submit completion stage" }).click();
-    await expect(main.getByText(/more than 400 hours/).first()).toBeVisible();
-    expect(writes).toHaveLength(0);
-    await hours.fill("12.5");
-    await main.getByRole("button", { name: "Submit completion stage" }).click();
-    await expect(main.getByText(/whole number/).first()).toBeVisible();
-    expect(writes).toHaveLength(0);
-    await hours.fill("200");
-    await main.getByRole("button", { name: "Submit completion stage" }).click();
-    await expect(page.getByRole("dialog", { name: "Send this request?" })).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: "Send this request?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/read from the certificate\): 150 of 200/)).toBeVisible();
+    await dialog.getByRole("button", { name: "Send request" }).click();
+    await expect.poll(() => bodies.length).toBe(1);
+    expect(bodies[0]).not.toHaveProperty("completed_hours");
+    expect(bodies[0].certificate_attachment_id).toBe(7001);
     await context.unrouteAll({ behavior: "ignoreErrors" });
     await context.close();
   });

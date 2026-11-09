@@ -22,8 +22,21 @@ DEMO_STUDENT_NUMBERS = {
     "PM-07": "2690107",
     "PRAC-01": "2690201",
     "PRAC-02": "2690202",
+    "PRAC-03": "2690203",  # stage-ready practicum students (seed_stage_ready_cases), one per practicum step
+    "PRAC-04": "2690204",
+    "PRAC-05": "2690205",
+    "PRAC-06": "2690206",
+    "PRAC-07": "2690207",
+    "PRAC-08": "2690208",
+    "PRAC-09": "2690209",
     "GRAD-01": "2690301",
     "GRAD-02": "2690302",
+    "GRAD-03": "2690303",  # Dean-approved batch, ready for the Dean's export (no sign-in of their own)
+    "GRAD-04": "2690304",
+    "GRAD-05": "2690305",  # stage-ready candidates (seed_stage_ready_cases): application submitted, coursework,
+    "GRAD-06": "2690306",  # research and endorsement-prep batches, so every Graduation step can be shown by hand
+    "GRAD-07": "2690307",
+    "GRAD-08": "2690308",
     "WD-01": "2690401",
     "WD-02": "2690402",
     "ENR-01": "2690501",

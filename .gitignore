@@ -98,3 +98,11 @@ test-results/
 
 # Per-visitor demo databases
 demo_sandboxes/
+
+# Screenshots from e2e runs on Mac/Linux when a spec defaulted to a Windows path (I-v6.7)
+E:/
+
+# Start.exe / Stop.exe runtime files and the release zip
+instance/app.pid
+instance/app.log
+dist_release/

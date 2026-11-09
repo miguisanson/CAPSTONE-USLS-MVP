@@ -61,24 +61,23 @@ export default {
     },
     {
       id: "pr-hours", title: "The student sends hours and certificates", role: "student", route: "/student/practicum", page: "Practicum",
-      do: "Enter the hours you completed (200 for the straight path; the number is the student's own report), choose the certificates PDF, add a remark and select Submit completion stage, then Send request.",
+      do: "Choose the certificates PDF. The system reads the completed hours from the file and shows the number (200 for the straight path; a certificate with fewer shows the Hours Incomplete detour). Add a remark and select Submit completion stage, then Send request.",
       actions: [
-        { type: "#practicum-hours", text: "200" },
         { upload: "#practicum-certificates", fixture: "practicum-certificates.pdf" },
         { type: { label: "Remarks for the reviewer" }, text: "Certificates covering all 200 practicum hours." },
         { click: "submit" },
         { click: { role: "button", name: "Send request", in: "dialog" } },
       ],
       doneWhen: { status: from(PRACTICUM_ORDER, "Hours Incomplete") },
-      rule: "The required hours (200 for MSGC) are shown by the system. The hours the student types are a claim; the Academic Coordinator verifies the total from the certificates.",
+      rule: "The required hours (200 for MSGC) are shown by the system, and the completed hours are read from the certificate. Fewer certified hours leave the case at Hours Incomplete.",
       ifAsked: [
-        { q: "What if fewer than 200 hours are verified?", a: "The case is recorded as Hours Incomplete and the practicum cannot be completed. The student then uploads additional certificates." },
-        { q: "Can the student type the required hours?", a: "No. The required hours come from the system, so nobody types a value that is already known." },
+        { q: "What if the certificate shows fewer than 200 hours?", a: "The case is recorded as Hours Incomplete and the practicum cannot be completed. The Coordinator then asks for additional certificates." },
+        { q: "Can the student type the hours?", a: "No. The system reads the completed hours from the uploaded certificate. If the file states no hours number, Graduate School staff enter the hours from the certificate when forwarding the documents." },
       ],
     },
     {
       id: "pr-forward-docs", title: "Staff forward the documents", role: "staff", route: "/workflow/practicum", page: "Practicum",
-      do: "Open View details on the card and select Forward documents to Academic Coordinator, then confirm.",
+      do: "Open View details on the card in Documents Review and select Forward documents to Academic Coordinator, then confirm. When the certificate stated no hours number, type the hours from the certificate in the window first.",
       actions: [
         { click: { role: "button", name: "View details for Paolo Ramirez" } },
         { click: { role: "button", name: "Forward documents to Academic Coordinator", exact: true, in: "dialog" } },
@@ -112,7 +111,7 @@ export default {
     },
     {
       id: "pr-verify", title: "The Coordinator verifies completion", role: "academic_coordinator", route: "/workflow/practicum", page: "Practicum",
-      do: "The card is in Completed. Open View details again and select Send status report to Dean, then confirm.",
+      do: "The card is in Completion Review. Open View details again and select Send status report to Dean, then confirm.",
       actions: [
         { click: { role: "button", name: "View details for Paolo Ramirez" } },
         { click: { role: "button", name: "Send status report to Dean", exact: true, in: "dialog" } },
@@ -138,14 +137,14 @@ export default {
       ifAsked: [
         { q: "If the Dean was already signed in, why is the card missing?", a: "The Dean page is read when it opens. Reload it to see the new card." },
         { q: "What does staff see afterwards?", a: "The card in Completed with every file in the Submitted file history and no action due." },
+        { q: "When can the student apply for graduation?", a: "Only now. For a program with a practicum the Graduation page stays locked until the Dean marks the practicum report reviewed." },
       ],
     },
     {
       id: "pr-resubmit", side: true, title: "The student sends the missing documents again", role: "student", route: "/student/practicum", page: "Practicum",
-      do: "Read the Coordinator's message, enter the new completed hours, choose the additional certificate PDF and send the completion stage again.",
+      do: "Read the Coordinator's message, choose the additional certificate PDF (the system reads the hours from it) and send the completion stage again.",
       target: 'main form button[type="submit"]',
       actions: [
-        { type: "#practicum-hours", text: "200" },
         { upload: "#practicum-certificates", fixture: "practicum-certificates.pdf" },
         { type: { label: "Remarks for the reviewer" }, text: "The additional certificate covers the remaining practicum hours." },
         { click: "submit" },

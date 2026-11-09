@@ -64,7 +64,7 @@ const BOARDS = [
     slug: "withdrawal",
     title: "Subject Withdrawal",
     region: "Subject withdrawal board",
-    columns: ["Submitted", "Returned to student", "With the Dean", "Subject tagging", "Excel export", "Exported - email the Registrar", "With the Registrar", "Not approved"],
+    columns: ["Submitted", "Returned to student", "With the Dean", "Subject tagging", "Excel export", "Exported - Ready to Send", "Not approved"],
     cards: [["Submitted", "Adrian Lim"]],
   },
 ];

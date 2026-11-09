@@ -1,3 +1,4 @@
+import { refusalMessage } from "../../lib/refusal";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
@@ -180,7 +181,9 @@ function SingleWorkflowPage() {
       await refetch();
       return strict ? res : true;
     } catch (err) {
-      const message = err.message || "Could not save. Please review the form.";
+      const raw = err.message || "Could not save. Please review the form.";
+      // A refused graduation / practicum step changes nothing; say so first, in the same words as the board.
+      const message = slug === "graduation" || slug === "practicum" ? refusalMessage(raw) : raw;
       if (strict) throw new Error(message);
       setSubmitError(message);
       return false;
