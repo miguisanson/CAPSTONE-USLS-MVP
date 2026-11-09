@@ -126,9 +126,11 @@ class VerifiedPracticumHoursTests(Audit2Base):
         self.assertEqual(response.status_code, 200, response.get_json())
         with app.app_context():
             record = db.session.get(PracticumRecord, record_id)
-            self.assertEqual(record.status, "Documents Submitted")  # 120 of 200 claimed does not make it Hours Incomplete
+            # v6.7 merge: Khloe's rule (owner 2026-11-09): hours are read from the certificate; the typed number is ignored
+            self.assertEqual(record.status, "Documents Submitted")
             payload = practicum_record_dict(record)
-            self.assertEqual(payload["reported_hours"], 120)
+            self.assertNotEqual(payload["reported_hours"], 120)
+            self.assertTrue(payload["hours_need_entry"])  # unreadable certificate: staff enter the hours
             self.assertIsNone(payload["verified_hours"])
 
     def test_the_coordinator_enters_verified_hours_with_who_and_when(self):

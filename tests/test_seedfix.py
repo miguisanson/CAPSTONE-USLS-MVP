@@ -45,8 +45,10 @@ class SeedFixTests(unittest.TestCase):
     # ---- I-374
     def test_seeded_history_decided_endorsements_are_already_handled(self):
         with app.app_context():
+            # v6.7 merge: Khloe's rule (owner 2026-11-09): seeded Dean Approved rows are already exported
             stuck = [
                 e.id for e in GraduationEndorsement.query.filter_by(dean_remarks="Seeded history.", endorsement_status="Dean Approved").all()
+                if e.registrar_status != "Exported - Ready to Send"
             ]
             self.assertEqual(stuck, [], "past approved endorsements must carry the final Registrar state")
             done = GraduationEndorsement.query.filter_by(dean_remarks="Seeded history.", endorsement_status="Registrar Received").all()
@@ -93,10 +95,9 @@ class SeedFixTests(unittest.TestCase):
         from standalone_process import BOARD_COLUMNS, SLUG_WITHDRAWAL
         columns = BOARD_COLUMNS[SLUG_WITHDRAWAL]
         todo = next(c for c in columns if "Exported - Ready to Send" in c["statuses"])
-        self.assertEqual(todo["statuses"], ["Exported - Ready to Send"])
-        done = next(c for c in columns if "Sent to Registrar" in c["statuses"])
-        self.assertIn("Withdrawn Confirmed", done["statuses"])
-        self.assertNotEqual(done["key"], todo["key"])
+        # v6.7 merge: Khloe's rule (owner 2026-11-09): the Sent column is merged; exported counts as finished
+        self.assertEqual(todo["statuses"], ["Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"])
+        self.assertFalse(any(c is not todo and "Exported - Ready to Send" in c["statuses"] for c in columns))
         for column in columns:
             self.assertLessEqual(len(column["description"]), 90, column["key"])
 

@@ -120,7 +120,8 @@ def test_the_sign_in_label_for_the_research_demo_student_matches_the_seeded_stat
 def test_a_withdrawal_is_closed_once_it_is_sent_to_the_registrar(self):
     student_id = self.students["withdrawal"]
     application_id = self.make_withdrawal(dean_decision="Approved")
-    for status, closed in (("Exported - Ready to Send", False), ("Sent to Registrar", True),
+    # v6.7 merge: Khloe's rule (owner 2026-11-09)
+    for status, closed in (("Exported - Ready to Send", True), ("Sent to Registrar", True),
                            ("Withdrawn Confirmed", True), ("Denied", True)):
         with app.app_context():
             db.session.get(WithdrawalApplication, application_id).status = status
@@ -131,7 +132,8 @@ def test_a_withdrawal_is_closed_once_it_is_sent_to_the_registrar(self):
 @_test
 def test_a_graduation_endorsement_is_closed_once_it_is_sent_to_the_registrar(self):
     student_id = self.students["withdrawal"]
-    for status, closed in (("Dean Approved", False), ("Sent to Registrar", True), ("Registrar Received", True)):
+    # v6.7 merge: Khloe's rule (owner 2026-11-09): exported (registrar_status) closes it even while "Dean Approved"
+    for status, closed in (("Dean Approved", True), ("Sent to Registrar", True), ("Registrar Received", True)):
         with app.app_context():
             row = GraduationEndorsement(
                 student_id=student_id, review_window="AY 2026-2027", endorsement_status=status,

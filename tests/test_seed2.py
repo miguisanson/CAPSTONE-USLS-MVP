@@ -48,8 +48,9 @@ class Seed2Tests(unittest.TestCase):
     def test_a_practicum_case_waits_for_the_hours_check(self):
         with app.app_context():
             waiting = PracticumRecord.query.filter_by(status="Documents Under Review").all()
-            self.assertEqual(len(waiting), 1)
-            record = waiting[0]
+            # v6.7 merge: Khloe's rule (owner 2026-11-09): her stage-ready seed adds a second waiting case
+            self.assertEqual(len(waiting), 2)
+            record = next(r for r in waiting if r.completed_hours == 200)
             self.assertEqual(record.completed_hours, 200)  # what the student reported
             self.assertIsNone(record.verified_hours)
             self.assertIsNotNone(record.certificate_attachment_id)

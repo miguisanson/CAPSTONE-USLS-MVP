@@ -305,8 +305,9 @@ class SearchAndAnswerTests(EvalBase):
             db.session.add(student)
             db.session.commit()
             source = appmod.generate_student_answer("Until when can a student withdraw a subject?", student)["source"]
-        self.assertEqual(source["note"], "The assistant is answering from the policy documents without AI right now.")
-        self.assertNotRegex(source["note"] + source["detail"], r"(?i)gemini key|api key|No AI key")
+        # I-432 (srv9): students get no offline note at all; the developer key text must never reach them.
+        self.assertIsNone(source["note"])
+        self.assertNotRegex((source["note"] or "") + (source["detail"] or ""), r"(?i)gemini key|api key|No AI key")
 
     def test_withdraw_a_subject_wording_finds_the_withdrawal_rule(self):
         # I-175: "drop" is what students say; the Handbook calls it withdrawal (p. 49).

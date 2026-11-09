@@ -494,7 +494,8 @@ class StandaloneConsistencyTests(unittest.TestCase):
     def test_the_student_pages_use_one_case_card(self):
         forms = (FRONTEND / "pages" / "student" / "RequestForms.jsx").read_text(encoding="utf-8")
         # I-178 split the Withdrawal page into a closed-window notice and the form; both branches show the same card.
-        self.assertIn("<ProcessCaseList cases={data.standalone_cases?.awol || []} />", forms, "AWOL shows the shared card")
+        # The AWOL card also gets the return term the student picked (returning prop); still the shared card.
+        self.assertIn("<ProcessCaseList cases={data.standalone_cases?.awol || []}", forms, "AWOL shows the shared card")
         self.assertIn("<ProcessCaseList cases={data.standalone_cases?.withdrawal || []} />", forms, "Withdrawal shows the shared card")
         self.assertEqual(forms.count("<ProcessCaseList"), forms.count("standalone_cases?.awol") + forms.count("standalone_cases?.withdrawal"),
                          "the shared card is only used for AWOL and Withdrawal")
