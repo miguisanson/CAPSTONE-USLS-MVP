@@ -104,3 +104,19 @@ test("--uat fills an empty redirect line but never replaces a value that is alre
   run(file2, "--uat");
   assert.match(fs.readFileSync(file2, "utf8"), /^GOOGLE_CALENDAR_REDIRECT_URI=http:\/\/localhost:5000\/cb$/m);
 });
+
+test("adds an empty Claude key line once, and never replaces or prints an existing one", () => {
+  const file = tmp();
+  fs.writeFileSync(file, "GOOGLE_API_KEY=k\n");
+  run(file);
+  assert.match(fs.readFileSync(file, "utf8"), /^ANTHROPIC_API_KEY=$/m);
+  assert.match(run(file), /nothing to change/);
+
+  const file2 = tmp();
+  fs.writeFileSync(file2, "GOOGLE_API_KEY=k\nANTHROPIC_API_KEY=my-claude-key\n");
+  const out = run(file2);
+  const text = fs.readFileSync(file2, "utf8");
+  assert.match(text, /^ANTHROPIC_API_KEY=my-claude-key$/m);
+  assert.strictEqual((text.match(/^ANTHROPIC_API_KEY=/gm) || []).length, 1);
+  assert.doesNotMatch(out, /my-claude-key/);
+});

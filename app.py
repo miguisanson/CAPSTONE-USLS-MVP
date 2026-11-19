@@ -11688,23 +11688,27 @@ def create_policy_document(
 
 
 OPERATIONS_MANUAL_FILE = BASE_DIR / "Documents" / "Graduate_School" / "Operations_Manual" / "USLS GS Operations Manual - DRAFT for Validation.docx"
+# Owner 2026-11-19: the Graduate School validated and signed the manual, so the library holds it as an approved
+# document (no Draft label, no draft warning on answers). The project file keeps its old name because the document
+# scripts build it under that name; the library shows the plain name below.
+OPERATIONS_MANUAL_UPLOAD_NAME = "USLS GS Operations Manual.docx"
 OPERATIONS_MANUAL_VALUES = {
-    "title": "USLS Graduate School Operations Manual (draft for validation)",
+    "title": "USLS Graduate School Operations Manual",
     "description": (
-        "The capstone group's written description of how the Graduate School carries out each process, "
-        "with the business rules register. A draft: every answer that uses it says it is pending validation."
+        "The written description of how the Graduate School carries out each process, with the business rules "
+        "register. Prepared by the capstone group; validated and signed by the Graduate School."
     ),
     "category": "Operations Manual",
-    "status": "draft",
-    "validation_note": "Prepared by the capstone group for Graduate School validation",
+    "status": "active",
+    "validation_note": "Validated and signed by the Graduate School",
 }
 OPERATIONS_MANUAL_SEED_NOTE = "Seeded from the project files"
 
 
 def ensure_operations_manual_policy_document() -> int:
-    """Register the draft Operations Manual in the policy library (idempotent).
+    """Register the signed Operations Manual in the policy library (idempotent).
 
-    It is searchable by the Policy Assistant as a Draft document. Once staff replace the file or
+    It is searchable by the Policy Assistant as an approved document. Once staff replace the file or
     change the record themselves this never overwrites their work; only an untouched seeded copy
     follows a newer file in the project folder. Returns the number of records created or updated.
     """
@@ -11712,7 +11716,7 @@ def ensure_operations_manual_policy_document() -> int:
     if not path.is_file() or path.stat().st_size <= 0:
         return 0
     file_bytes = path.read_bytes()
-    existing = PolicyDocument.query.filter_by(original_name=_policy_upload_names(path.name)[0]).first()
+    existing = PolicyDocument.query.filter_by(original_name=_policy_upload_names(OPERATIONS_MANUAL_UPLOAD_NAME)[0]).first()
     if existing is None:
         existing = PolicyDocument.query.filter_by(title=OPERATIONS_MANUAL_VALUES["title"]).first()
     if existing is not None:
@@ -11722,7 +11726,7 @@ def ensure_operations_manual_policy_document() -> int:
         stored = POLICY_DOCUMENT_UPLOAD_ROOT / existing.stored_name
         if untouched and stored.is_file() and stored.read_bytes() != file_bytes:
             replace_policy_document_file(
-                existing, file_bytes, path.name, db.session.get(UserAccount, existing.uploaded_by_user_id), {},
+                existing, file_bytes, OPERATIONS_MANUAL_UPLOAD_NAME, db.session.get(UserAccount, existing.uploaded_by_user_id), {},
                 "Updated from the project files",
             )
             return 1
@@ -11736,7 +11740,7 @@ def ensure_operations_manual_policy_document() -> int:
         return 0
     # A file name taken from the content, so every machine seeds the same row (R-001).
     create_policy_document(
-        file_bytes, path.name, owner, dict(OPERATIONS_MANUAL_VALUES), OPERATIONS_MANUAL_SEED_NOTE,
+        file_bytes, OPERATIONS_MANUAL_UPLOAD_NAME, owner, dict(OPERATIONS_MANUAL_VALUES), OPERATIONS_MANUAL_SEED_NOTE,
         stored_prefix=hashlib.sha256(file_bytes).hexdigest()[:10],
     )
     return 1
@@ -11895,6 +11899,70 @@ def _trim_to_last_sentence(text: str) -> str:
         if not _NOT_A_SENTENCE_END.search(text[:match.end()]):
             end = match.end()
     return text[:end].strip()
+
+
+def ai_provider() -> str:
+    """Which service writes answers: "claude" when ANTHROPIC_API_KEY is set, unless AI_PROVIDER=gemini; else "gemini".
+
+    Owner 2026-11-19: the free Gemini tier allows 20 answers a day per model, too few for the defense demonstration,
+    so answers can be written by Claude. Gemini stays the designed service (AI_PROVIDER=gemini switches back) and
+    always makes the embeddings, the similarity numbers behind the document search and the panel match."""
+    if (os.getenv("AI_PROVIDER") or "").strip().lower() == "gemini":
+        return "gemini"
+    return "claude" if (os.getenv("ANTHROPIC_API_KEY") or "").strip() else "gemini"
+
+
+def ai_text_configured() -> bool:
+    """True when the service that writes answers has its key."""
+    if ai_provider() == "claude":
+        return True
+    return bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY"))
+
+
+def _ai_generate(prompt: str, system: str | None = None) -> str:
+    """One answer from the configured service. Every caller treats an exception as "no AI answer" and falls back."""
+    if ai_provider() == "claude":
+        return _claude_generate(prompt, system)
+    return _gemini_generate(prompt) if system is None else _gemini_generate(prompt, system=system)
+
+
+def _claude_client():
+    """The Anthropic SDK client; it reads ANTHROPIC_API_KEY itself. One retry, and a timeout short enough for a demo."""
+    try:
+        import anthropic  # imported here so the app still starts where the package is not installed yet
+    except ImportError as exc:
+        raise RuntimeError("The anthropic package is not installed; run: npm run install:python") from exc
+    return anthropic.Anthropic(timeout=max(5.0, env_float("CLAUDE_REQUEST_TIMEOUT_SECONDS", 45)), max_retries=1)
+
+
+def _claude_generate(prompt: str, system: str | None = None) -> str:
+    """Make one bounded, stateless Claude request (CLAUDE_MODEL, default claude-opus-5-5).
+
+    ``system`` carries the rules the prompt text cannot override. Effort is low by default (CLAUDE_EFFORT): the answers
+    are short and grounded in the supplied excerpts. A refusal, an SDK error or an empty answer raises, so the caller
+    falls back exactly as it does for Gemini. An answer cut off by the token limit keeps only its whole sentences.
+    """
+    request_body: dict = {
+        "model": (os.getenv("CLAUDE_MODEL") or "claude-opus-5-5").strip(),
+        "max_tokens": max(4096, env_int("CLAUDE_MAX_OUTPUT_TOKENS", 16000)),
+        "output_config": {"effort": (os.getenv("CLAUDE_EFFORT") or "low").strip().lower()},
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if system:
+        request_body["system"] = system
+    client = _claude_client()
+    try:
+        response = client.messages.create(**request_body)
+    except Exception as exc:  # noqa: BLE001 - every SDK failure (rate limit, timeout, bad key) means "no AI answer"
+        raise RuntimeError(f"Claude did not answer ({type(exc).__name__}).") from exc
+    if getattr(response, "stop_reason", None) == "refusal":
+        raise RuntimeError("Claude declined to answer.")
+    answer = "".join(str(block.text) for block in response.content if getattr(block, "type", "") == "text").strip()
+    if getattr(response, "stop_reason", None) == "max_tokens":
+        answer = _trim_to_last_sentence(answer)
+    if not answer:
+        raise RuntimeError("Claude returned an empty answer.")
+    return answer
 
 
 def _gemini_generate(prompt: str, system: str | None = None) -> str:
@@ -12740,7 +12808,7 @@ def call_personal_gemini(question: str, record_text: str, subject: str) -> str:
         "record does not answer the question, say so. Use at most 120 words, plain language, no tables.\n\n"
         f"YOUR RECORD\n{record_text}\n\nQuestion: {question}"
     )
-    return _gemini_generate(prompt)
+    return _ai_generate(prompt)
 
 
 def personal_answer(question: str, subject: str, record_text: str, offline_answer: str, has_data: bool) -> tuple[str, str]:
@@ -12749,8 +12817,7 @@ def personal_answer(question: str, subject: str, record_text: str, offline_answe
     The mode is ``record-ai`` when Gemini wrote it, ``record-offline`` otherwise. With nothing in the record
     to explain, Gemini is not called.
     """
-    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
-    if api_key and has_data:
+    if ai_text_configured() and has_data:
         try:
             return call_personal_gemini(question, record_text, subject).strip(), "record-ai"
         except Exception:  # noqa: BLE001 - a Gemini error or timeout falls back to the offline answer
@@ -12863,7 +12930,7 @@ GENERAL_ANSWER_SYSTEM = (
 def general_usls_answer(question: str) -> str:
     """Owner 2026-11-09: when the documents do not cover a question, a labelled general answer instead of a flat
     refusal. Raises when Gemini is unavailable or gives nothing usable, so the caller keeps the plain refusal."""
-    text = (_gemini_generate(f"Question: {question}", system=GENERAL_ANSWER_SYSTEM) or "").strip()
+    text = (_ai_generate(f"Question: {question}", system=GENERAL_ANSWER_SYSTEM) or "").strip()
     if not text or _model_says_not_covered(text) or text == _prag.NOT_FOUND_ANSWER:
         raise PolicyAnswerNotFound("no general answer")
     return GENERAL_ANSWER_PREFIX + text
@@ -12909,7 +12976,7 @@ def call_document_rag(
     )
     prompt += _rag_passages_block(retrieved_chunks)
     prompt += f"\n\nQuestion: {question}"
-    generated = (_gemini_generate(prompt, system=RAG_SYSTEM_INSTRUCTION) or "").strip()
+    generated = (_ai_generate(prompt, system=RAG_SYSTEM_INSTRUCTION) or "").strip()
     generated, used_chunks = _split_used_passages(generated, retrieved_chunks)
     if _model_says_not_covered(generated):
         raise PolicyAnswerNotFound("The model found no answer in the passages.")
@@ -13335,7 +13402,7 @@ def _classify_assistant_intent_with_gemini(question: str, has_student: bool) -> 
         + f"\nQuestion: {question}"
     )
     try:
-        label = _gemini_generate(prompt).strip().lower()
+        label = _ai_generate(prompt).strip().lower()
     except Exception:
         return None
     return label if label in allowed else None
@@ -13724,19 +13791,19 @@ def _assistant_source(mode: str, intent_ai_used: bool = False, role: str = "") -
         ),
         "document-rag": (
             "AI answer grounded in the documents",
-            "Written by Gemini using only the retrieved passages of the Handbook, Research Protocol and uploaded policies; every answer names its page and section.", True,
+            "Written by AI using only the retrieved passages of the Handbook, Research Protocol and uploaded policies; every answer names its page and section.", True,
         ),
         "document-rag-cache": (
             "AI answer grounded in the documents (saved)",
-            "Written earlier by Gemini using only the retrieved passages of the policy documents.", True,
+            "Written earlier by AI using only the retrieved passages of the policy documents.", True,
         ),
         "document-rag-local": (
             "Answered from the documents (keyword search)",
-            "Found by keyword search in the Handbook, Research Protocol and uploaded policies and quoted from them. No AI service was used; add a Gemini key for fuller, reworded answers.", False,
+            "Found by keyword search in the Handbook, Research Protocol and uploaded policies and quoted from them. No AI service was used; add an AI key for fuller, reworded answers.", False,
         ),
         "general-knowledge": (
             "General answer · not from the policy documents",
-            "The Handbook, Research Protocol and Operations Manual do not cover this, so Gemini gave a short general "
+            "The Handbook, Research Protocol and Operations Manual do not cover this, so the AI service gave a short general "
             "answer about USLS. Confirm it with the Graduate School office.", True,
         ),
         "policy-not-found": (
@@ -13744,8 +13811,8 @@ def _assistant_source(mode: str, intent_ai_used: bool = False, role: str = "") -
             "The Handbook, Research Protocol and uploaded policies were searched and none of them answers this question.", False,
         ),
         "record-ai": (
-            "Your record · written by Gemini",
-            "Gemini wrote this from the signed-in user's own record only; no other person's record was used.", True,
+            "Your record · written by AI",
+            "The AI service wrote this from the signed-in user's own record only; no other person's record was used.", True,
         ),
         "record-offline": (
             "Your record · offline answer",
@@ -13768,20 +13835,20 @@ def _assistant_source(mode: str, intent_ai_used: bool = False, role: str = "") -
         mode, ("Local assistant", "Answered by the local advisory assistant.", False)
     )
     if intent_ai_used and mode == "database-rules":
-        label = "Live record · Gemini interpreted"
-        detail = "Gemini classified the question only; verified database rules produced the answer."
+        label = "Live record · AI interpreted"
+        detail = "The AI service classified the question only; verified database rules produced the answer."
         ai_used = True
     if role == "student" and mode == "document-rag-local":  # a student reads no model or search names (I-427)
         label = "From the policy documents"
         detail = "Answers come from the Graduate School Handbook, the Research Protocol and the Operations Manual."
-    ai_configured = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY"))
+    ai_configured = ai_text_configured()
     note = None
     if not ai_configured and mode in {"document-rag-local", "policy-not-found", "student-document-rag-local"}:
         if role == "admin":  # only the administrator can add the key (I-179)
-            note = "No AI key is set, so answers are quoted straight from the documents. Add a Gemini key for fuller, reworded answers."
+            note = "No AI key is set, so answers are quoted straight from the documents. Add an AI key for fuller, reworded answers."
         else:
             note = None if role == "student" else "The assistant is answering from the policy documents without AI right now."
-            detail = detail.replace("; add a Gemini key for fuller, reworded answers.", ".")
+            detail = detail.replace("; add an AI key for fuller, reworded answers.", ".")
     offline = mode in ASSISTANT_OFFLINE_MODES
     return {
         "label": label, "detail": detail, "ai_used": ai_used, "ai_configured": ai_configured, "note": note,
@@ -14177,7 +14244,7 @@ def generate_answer(
         return personal_queue_response(question, account)
     # The assistant is advisory only: it retrieves policy passages and explains
     # backend-computed facts. It never changes records or approves decisions.
-    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+    api_key = ai_text_configured()
     intent = _assistant_intent(question)
     intent_ai_used = False
     if (
@@ -14322,7 +14389,7 @@ def generate_student_answer(question: str, student: Student) -> dict:
         }
     payload = student_recommendations(student)
     snippets = _relevant_policy_snippets(question, retrieve_policy(question, k=3))
-    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+    api_key = ai_text_configured()
     mode = "student-fast"
     rag_citations = []
     personal = False
@@ -36019,7 +36086,7 @@ PANEL_MATCH_WORKLOAD_LIMIT = 6
 PANEL_MATCH_OVERLOAD_AT = 4
 PANEL_MATCH_METHOD_LABELS = {
     "tfidf": "Similarity match (keyword TF-IDF)",
-    "gemini-embeddings": "Semantic match (Gemini embeddings)",
+    "gemini-embeddings": "Semantic match (AI embeddings)",
 }
 PANEL_EVIDENCE_KIND_WEIGHT = {
     "specialization": 1.0,
@@ -36377,7 +36444,7 @@ def _with_gemini_patience(attempt):
 
 def generate_panel_matching_keywords_with_rag(paper_text: str, retrieved_faculty: list[dict], limit: int = 18) -> dict:
     local_payload = generate_local_panel_matching_rag(paper_text, retrieved_faculty, limit)
-    if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_API_KEY")):
+    if not ai_text_configured():
         return local_payload
     snippets = "\n".join(
         f"- faculty_id={item['id']}; {item['name']}; {item['specialization']}; matched_terms={', '.join(item.get('matched_terms', []))}"
@@ -36397,7 +36464,7 @@ def generate_panel_matching_keywords_with_rag(paper_text: str, retrieved_faculty
         return dict(_PANEL_ANALYSIS_CACHE[cache_key])
 
     def analyse() -> dict:
-        parsed = parse_panel_matching_rag_response(str(_gemini_generate(prompt)))
+        parsed = parse_panel_matching_rag_response(str(_ai_generate(prompt)))
         if not parsed.get("keywords"):
             raise RuntimeError("Gemini returned no keywords.")
         return parsed
@@ -36577,9 +36644,9 @@ def research_matching_profile(student: Student) -> dict:
         # Honest wording for the screen: the ranking itself is a similarity
         # score; Gemini, when configured, only helps with keywords and notes.
         "analysis_label": {
-            "document-rag": "Keyword extraction assisted by Gemini",
+            "document-rag": "Keyword extraction assisted by AI",
             "local-rag": "Keyword analysis (local, no AI service)",
-            "local-rag-fallback": "Keyword analysis (local; Gemini did not respond)",
+            "local-rag-fallback": "Keyword analysis (local; the AI service did not respond)",
             "waiting": "Waiting for readable paper text",
         }.get(rag_payload.get("mode", "local-rag"), "Keyword analysis"),
         "query_text": query_text,
@@ -40012,9 +40079,10 @@ def panel_matching_result(student: Student, profile: dict | None = None) -> dict
                 lambda: panel_embedding_similarities(paper_text, {fid: item["text"] for fid, item in profiles.items()})
             )
             method = "gemini-embeddings"
-            method_note = "Cosine similarity of Gemini embeddings of the paper and each faculty member's expertise records."
+            method_note = "Cosine similarity of AI embeddings of the paper and each faculty member's expertise records."
         except Exception as exc:  # noqa: BLE001 - any failure falls back to the always-available method
-            method_note = f"Gemini embeddings could not be used ({str(exc)[:90]}); the score fell back to keyword TF-IDF."
+            reason = str(exc).replace("Gemini embeddings", "the embedding service").replace("Gemini", "the AI service")[:90]
+            method_note = f"AI embeddings could not be used ({reason}); the score fell back to keyword TF-IDF."
     pool_ids = [fid for fid in profiles if fid not in advisers]
     pool_values = [similarities.get(fid, 0.0) for fid in pool_ids]
     top_similarity = max(pool_values) if pool_values else 0.0

@@ -9,6 +9,7 @@ _DB_FILE = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
 _DB_FILE.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 os.environ["GOOGLE_API_KEY"] = ""
+os.environ["ANTHROPIC_API_KEY"] = ""  # the tests never call Claude, whatever .env holds
 os.environ["GOOGLE_AI_STUDIO_API_KEY"] = ""
 os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="policy-uploads-"))
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))

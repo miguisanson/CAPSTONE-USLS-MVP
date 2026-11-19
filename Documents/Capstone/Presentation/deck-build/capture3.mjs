@@ -1,0 +1,26 @@
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+const require = createRequire("/Users/miguelsanson/Projects/CAPSTONE-USLS-MVP/frontend/package.json");
+const { chromium } = require("@playwright/test");
+const SP = process.argv[2], OUT = SP + "/shots";
+const acc = JSON.parse(readFileSync(SP + "/app/accounts.json", "utf8"));
+const BASE = "http://localhost:5055";
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1366, height: 854 }, deviceScaleFactor: 2 });
+const page = await ctx.newPage();
+await page.goto(BASE + "/", { waitUntil: "networkidle" });
+await page.fill('input[name="email"]', acc.staff);
+await page.fill('input[name="password"]', "DemoPass123!");
+await page.click('button[type="submit"]');
+await page.waitForSelector("aside nav a", { timeout: 20000 });
+await page.goto(BASE + "/business-rules", { waitUntil: "networkidle" });
+const box = page.getByRole("searchbox").or(page.getByPlaceholder(/search/i)).first();
+await box.fill("withdraw");
+await page.waitForTimeout(1200);
+// bring the search field and the first matching rule to the top, so the rule and its source fill the picture
+await box.evaluate((el) => el.scrollIntoView({ block: "start" }));
+await page.evaluate(() => { const m = document.querySelector("main"); if (m) m.scrollBy(0, -90); window.scrollBy(0, -90); });
+await page.waitForTimeout(700);
+await page.screenshot({ path: `${OUT}/rules2.png` });
+console.log("shot rules2");
+await browser.close();

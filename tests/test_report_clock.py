@@ -18,6 +18,7 @@ os.environ.setdefault("USLS_UPLOAD_DIR", tempfile.mkdtemp(prefix="usls-uploads-"
 os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="policy-uploads-"))
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 os.environ["GOOGLE_API_KEY"] = ""
+os.environ["ANTHROPIC_API_KEY"] = ""  # the tests never call Claude, whatever .env holds
 os.environ["GOOGLE_AI_STUDIO_API_KEY"] = ""
 
 from app import (  # noqa: E402

@@ -175,7 +175,7 @@ class OperationsManualLibraryTests(PolishBase):
             patch.object(appmod, "RAG_DOCUMENT_PATHS", []),
             patch.object(appmod, "_RAG_EMBED_COOLDOWN_UNTIL", 0.0, create=True),
             patch.dict(os.environ, {
-                "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": "", "RAG_DOCUMENT_DIRS": "",
+                "ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": "", "RAG_DOCUMENT_DIRS": "",
                 "RAG_BACKGROUND_EMBED": "0",
             }),
         ]
@@ -185,7 +185,7 @@ class OperationsManualLibraryTests(PolishBase):
         appmod._reset_rag_indexes()
         self.addCleanup(appmod._reset_rag_indexes)
 
-    def test_the_draft_manual_is_seeded_once_as_a_draft_operations_manual(self):
+    def test_the_signed_manual_is_seeded_once_as_an_approved_operations_manual(self):
         with app.app_context():
             self.assertEqual(appmod.ensure_operations_manual_policy_document(), 1)
             self.assertEqual(appmod.ensure_operations_manual_policy_document(), 0)  # idempotent
@@ -193,12 +193,14 @@ class OperationsManualLibraryTests(PolishBase):
             self.assertEqual(len(documents), 1)
             document = documents[0]
             self.assertEqual(document.category, "Operations Manual")
-            self.assertEqual(document.status, "draft")
-            self.assertEqual(document.validation_note, "Prepared by the capstone group for Graduate School validation")
+            self.assertEqual(document.status, "active")   # owner 2026-11-19: validated and signed, no longer a draft
+            self.assertEqual(document.validation_note, "Validated and signed by the Graduate School")
+            self.assertNotIn("draft", document.title.lower())
+            self.assertNotIn("draft", document.original_name.lower())
             self.assertIn("Operations Manual", document.title)
             self.assertTrue((self.upload_root / document.stored_name).is_file())
 
-    def test_an_answer_from_the_manual_carries_the_draft_label(self):
+    def test_an_answer_from_the_signed_manual_carries_no_draft_label(self):
         with app.app_context():
             appmod.ensure_operations_manual_policy_document()
         response = self.client("staff").post("/api/assistant", json={
@@ -206,8 +208,8 @@ class OperationsManualLibraryTests(PolishBase):
         })
         self.assertEqual(response.status_code, 200, response.get_json())
         payload = response.get_json()
-        self.assertIn(DRAFT_WARNING, payload["answer"])
-        self.assertEqual(payload["citations"][0]["status"], "draft")
+        self.assertNotIn(DRAFT_WARNING, payload["answer"])
+        self.assertEqual(payload["citations"][0]["status"], "active")
         self.assertIn("Operations Manual", payload["citations"][0]["title"])
 
     def test_nothing_is_seeded_when_there_is_no_account_to_own_it(self):

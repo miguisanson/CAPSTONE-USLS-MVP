@@ -64,7 +64,7 @@ export default {
       do: "Each feature takes data the Graduate School already has, adds the policy behind it, and turns it into a decision, a warning or a measurement. The limits are stated plainly: no e-mail is sent, Google Calendar is optional, official data comes only from AIMS.",
       actions: [{ pause: 2500, caption: "Closing" }],
       doneWhen: "manual",
-      ifAsked: [{ q: "What is not built?", a: "E-mail from the portal, a required Google connection, and any edit of official AIMS data. The Operations Manual stays a Draft until the Graduate School validates it." }],
+      ifAsked: [{ q: "What is not built?", a: "E-mail from the portal, a required Google connection, and any edit of official AIMS data. The Operations Manual was validated and signed by the Graduate School." }],
     },
   ],
 };

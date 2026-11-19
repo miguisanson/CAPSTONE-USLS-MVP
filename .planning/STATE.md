@@ -1,5 +1,34 @@
 # State
 
+## 2026-11-19 (night) — branch `v7.0-defense` (from `v6.9-khloechanges`): defense deck v7, script, Claude for answers
+
+- Branch `v7.0-defense` = Khloe's `a5c7873` plus the owner's uncommitted work that GitHub Desktop had stashed at 22:11
+  when the branch was switched (deck v2 to v6, `deck-build/`, the relabelled signed manual PDF, the miguisanson.dev
+  Docker and `deploy/` files, the notes below). `git stash apply` only; the stash itself was NOT dropped.
+- Owner decisions (grill, 2026-11-19 night): demo runs on someone else's laptop (Windows or Mac, see `INSTALL.md`);
+  slides are a 5-minute skim around a 30-minute live demonstration; order Migui (opening, features 1-3), Myrine (4-5),
+  Natalie (6-8), Khloe (UAT, conclusions, recommendations); features renumbered to that order (Monitoring Sheet 1,
+  Reports 2, Operations Manual 3, Business Rules 4, Policy Assistant 5, Panel Matching 6, Defense Scheduling 7, Google
+  Calendar 8); Khloe's Withdrawal / Practicum / Graduation changes are shown only if the panel asks.
+- Deck: `Documents/Capstone/Presentation/CAP-2521-IT-CAP2DEFPRESv7.pptx` (36 slides, 12 main; the seven feature slides
+  are backup slides 13 to 19). Built from the v6 file by `deck-build/build_deck7.py` (no assets folder needed).
+  Looked at through Keynote (a notes-free copy; the real file did not open there). Not opened in Google Slides.
+- Script: `Documents/Capstone/Presentation/CAP-2521-IT-CAP2DEF-SCRIPT.docx` from `deck-build/build_script.py`. Owner:
+  plain Word text, the flow on top, the script straight after, no cue page, no tables, as few pages as possible (3).
+  Click steps come from the code's labels; they were not rehearsed in the running app.
+- Claude for answer-writing (owner: the free Gemini tier allows 20 answers a day): `ai_provider()`, `ai_text_configured()`,
+  `_ai_generate()`, `_claude_generate()` in `app.py`; `ANTHROPIC_API_KEY` in `.env` turns it on, `AI_PROVIDER=gemini`
+  switches back, `CLAUDE_MODEL` (default `claude-opus-5-5`), `CLAUDE_EFFORT` (default `low`). Gemini still makes the
+  embeddings. `anthropic==2.10.0` in `requirements.txt` (an existing `.venv` needs `npm run install:python`).
+  Screens name no company: every label says "AI". Tests: `tests/test_ai_provider.py`; every test file that sets the
+  Google key also blanks `ANTHROPIC_API_KEY`, so a real key in `.env` is never used by the tests.
+  **Not verified: a real call to Claude.** There was no key on this machine; only the mocked tests ran.
+- Operations Manual in the policy library is now an approved document (`status` active, "Validated and signed by the
+  Graduate School", shown as `USLS GS Operations Manual.docx`). The seeded text is still the project's DRAFT .docx, so
+  its cover wording ("To be validated by...") can still be quoted in an answer. RESEED NEEDED (`npm run seed`).
+- Tooling on this Mac: Khloe's commit untracked `.claude/`, so the pull removed GSD, `ui-ux-pro-max`,
+  `intelligence-layer` and `/continue_CAPSTONE-USLS-MVP` from disk here. Not restored (owner not asked yet).
+
 ## 2026-11-19 — owner requests (Withdrawal, Practicum, Graduation only), branch `v6.8-update`, NOT committed
 
 - Server: Dean cannot deny a subject withdrawal (`standalone_process.py` move removed; `/api/approvals/workflow/withdrawal/.../decide`
@@ -39,6 +68,87 @@
   original code too; `focus({ preventScroll: true })` in MoveMenu reduces it - not applied, owner said other boards untouched), p97:128, p126-boards5:36,
   p78:162, p33:316, p98:133, test_crosscut at_risk count, test_policy_assistant off-topic (key=True) and test_uat_serving env example
   fail on the original code too. Full gate 2026-11-19: 1378 tests, only those pre-existing failures.
+## 2026-11-19 11:10 — Deck v6: numbered features, "no defects" enhancements slide, Cloudflare traffic charts
+
+- `Documents/Capstone/Presentation/CAP-2521-IT-CAP2DEFPRESv6.pptx` (also in `~/Downloads`): 35 slides, 18 main. The owner
+  confirmed v5's text shows correctly in Google Slides (screenshot); v6 itself was not opened there.
+- Features are numbered 1 to 8 on slide 3; slides 4 to 10 follow the same numbers with a tracker at the top right
+  (scheduling + Google Calendar = features 4 and 5; the Operations Manual moved up as feature 8).
+- The UAT "revisions" slide is now "Enhancements requested during user acceptance testing" and leads with "No defects
+  were reported" (owner: the old slide read as if the app had issues). Results slide reworded to match.
+- Owner decisions (grill, 2026-11-19): show the Cloudflare screenshot on the UAT procedure slide, charts only; the gap
+  between the paper (one respondent, submitted 9 Nov) and the later evaluation goes in the speaker notes only.
+- Cloudflare screenshot (`~/Downloads/ss.png`): I told the owner its heading says "Simulated traffic", its top country is
+  France, and this log has the public site down from about 9 Nov until 16 Nov 20:25. The slide caption therefore says
+  only "Site traffic recorded by Cloudflare, 30 days to 19 November 2026"; the notes tell the presenter to call it site
+  traffic and nothing more.
+- Checked against Chapter 7 of the paper: the six recommendations on the slide are the paper's items 1 (students only),
+  3, 4, 5, 6 and 7; items 1 (other users) and 2 are done. "UAT form" is now used everywhere (the paper's term).
+- Business Rules picture retaken so the rule and its source fill the frame.
+
+## 2026-11-19 10:35 — Deck v5: formal wording, comparison slide, icons, Google Slides text fix
+
+- `Documents/Capstone/Presentation/CAP-2521-IT-CAP2DEFPRESv5.pptx` (also in `~/Downloads`): 35 slides, 18 main.
+- Owner decisions (grill, 2026-11-19): formal wording like the paper; one side-by-side slide (Capstone 1 = 100% of the
+  processes, Capstone 2 = the remaining work) followed by a details slide; never say "round" for the UAT, name each by
+  evaluator, and show the Dean with the four personnel as ONE combined evaluation with every name written out; tag only
+  "Panel revision", no "our own improvement" tag; Google Calendar is its own list item but is shown inside the Defense
+  Scheduling slide; removed the "where we started" slide and the "new features" list slide.
+- Owner's worry: nothing on a slide that is hard to defend. Flagged topics: panel matching score, policy assistant,
+  Google Calendar, UAT coverage. Those slides carry only claims visible on screen.
+- Cause of the broken text in Google Slides: letter-spacing (`spc`) on small caps labels. v5 has none, no double spaces,
+  and no spaces at the edge of a text run. Still not checked inside Google Slides itself.
+- New scripts in `deck-build/`: `deckkit2.py`, `build_deck5.py`, `icons.mjs` (app icon set to PNG), `gs_probe.py`.
+
+## 2026-11-19 10:00 — Deck v4: Google Calendar added, demo slides in the talk, two UAT forms named by signer
+
+- `Documents/Capstone/Presentation/CAP-2521-IT-CAP2DEFPRESv4.pptx` (also copied to `~/Downloads`): 38 slides, 21 main.
+  "What is new" now has eight cards, including Google Calendar integration and defense scheduling checks. Seven demo
+  slides (one per new feature, fresh screenshots) follow the Live demo slide. The "who reviewed" slide is now "Two signed
+  UAT forms": form 1 signed by Eddie de Paula, Jr., form 2 signed by Dean Eric Arthur N. Dio for the four personnel.
+- The owner's file names: v2 = long first version, v3 = short version of 18 Nov, v4 = this one.
+- Build scripts are kept in `Documents/Capstone/Presentation/deck-build/` because the session scratch folder was wiped
+  overnight. `prep.py` rebuilds the pictures from a deck file; `capture.mjs` takes app screenshots from a private copy.
+- The Policy Documents screen was left out of the backup screens: that page still labels the manual a draft.
+- Still not checked inside Google Slides. Nothing committed.
+
+## 2026-11-18 16:15 — Deck redone shorter (owner: "too wordy", "too numerical", show only what is required)
+
+- `Documents/Capstone/Presentation/CAP-2521-IT-CAP2DEFPRES.pptx` is now the short version: 34 slides, 14 main. Short
+  headlines, no score counts or manual counts on slides, no Conditional Pass card, no "left at Capstone 1" slide, no UAT
+  score table. Panel revisions moved to one backup slide. Signed UAT pages stay in the backup (group was told to add them).
+- The earlier long version is `CAP-2521-IT-CAP2DEFPRESv2.pptx` in the same folder (the owner's copy, byte-identical to the
+  14:00 build). Build script for the short one: scratchpad `scripts/build_deck2.py`.
+- Still not checked inside Google Slides.
+
+## 2026-11-18 14:00 — Capstone 2 defense deck built (no app code changed, nothing committed)
+
+- Deck: `Documents/Capstone/Presentation/CAP-2521-IT-CAP2DEFPRES.pptx` (36 slides: 15 main, demo in the middle, appendix with
+  every signed UAT page, UAT detail, Capstone 1 follow-ups, feature spotlights, 36 current screens; speaker notes on 1-15).
+  New design (owner: not tied to the old template), Arial only because the group presents from Google Slides.
+- Owner decisions 2026-11-18: UAT Round 2 sessions and hands-on testing all 9-14 Nov, several meetings per evaluator; the
+  DRAFT label on the Dean-signed manual was an error -> relabelled copy
+  `Documents/Capstone/Presentation/USLS-GS-Operations-Manual-Approved-Signed.pdf` ("Approved v0.2", same wording as
+  `Capstone/Official/`; labels only, rules and signatures untouched). The 7 Nov copy in `Capstone/Official/` was NOT replaced.
+  Originals of the four signed PDFs are in `~/Downloads`.
+- Facts used: both signed forms 91/91 Yes, 0 of 8 process problems; ratings 4 then 5; SUS 67.5 then 100; Round 1
+  "Accepted with minor revisions" (signed 6 Nov), Round 2 "Accepted" (signed 17 Nov); acceptance letter 17 Nov.
+- Not verified: how the file looks after import into Google Slides (checked here only through Keynote).
+- Still says draft inside the app: Policy Documents lists the Operations Manual as "Draft - pending Graduate School
+  validation", and the Best features guide's last answer says the manual "stays a Draft". Owner to decide before the demo.
+- Side effects on this Mac: `frontend/node_modules` reinstalled (`npm ci`) and `frontend/dist` rebuilt from the current code
+  for screenshots; the screenshot copy of the app ran on port 5055 with its own temp database and is stopped.
+
+## 2026-11-16 20:25 — miguisanson.dev back, now served from the MacBook (old PC died)
+
+- Restored the Docker site from a82e27f^ (Dockerfile, .dockerignore, docker-compose.yml, deploy/docker/entrypoint.sh,
+  deploy/tunnel.env.example) and added Mac scripts: deploy/site-{common,start,stop}.sh,
+  deploy/MAC-SITE.md. Docker = Colima (brew colima docker docker-compose; 4 CPU / 4 GB). `deploy/tunnel.env` gitignored
+  again (test `test_tunnel_token_file_is_never_committed`).
+- Owner 2026-11-16 20:30: **no schedule, manual only.** Buttons in the project folder: `Website ON.command` /
+  `Website OFF.command` (call deploy/site-start.sh / site-stop.sh). launchd agent and Desktop buttons removed.
+- LIVE: token in deploy/tunnel.env, tunnel registered 4 connections, https://miguisanson.dev/api/health ok and the
+  sign-in page loads publicly (checked 20:36). Nothing committed.
 
 ## 2026-11-09 11:10 — FINAL SUBMISSION, FROZEN: `v6.7-fixed` = `main` (content of ee0dd241)
 

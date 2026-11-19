@@ -8,3 +8,4 @@ PyMuPDF>=1.24.0
 Pillow>=10.4.0
 pytesseract>=0.3.13
 waitress==3.0.2
+anthropic==2.10.0

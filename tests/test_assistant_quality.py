@@ -80,7 +80,7 @@ class EvalBase(unittest.TestCase):
             patch.object(appmod, "POLICY_DOCUMENT_UPLOAD_ROOT", Path(_TEST_ROOT) / "policy_documents"),
             patch.object(appmod, "RAG_INDEX_DIR", _INDEX_DIR),
             patch.dict(os.environ, {
-                "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": "", "RAG_DOCUMENT_DIRS": "", "RAG_BACKGROUND_EMBED": "0",
+                "ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": "", "RAG_DOCUMENT_DIRS": "", "RAG_BACKGROUND_EMBED": "0",
             }),
         ]
         for item in patches:
@@ -281,7 +281,7 @@ class SearchAndAnswerTests(EvalBase):
         self.assertEqual(source["label"], "Answered from the documents (keyword search)")
         self.assertFalse(source["ai_used"])
         self.assertIn("No AI key", source["note"])
-        self.assertIn("Gemini key", source["detail"])
+        self.assertIn("AI key", source["detail"])
 
     def test_non_admin_roles_never_read_the_developer_key_text(self):
         plain = "The assistant is answering from the policy documents without AI right now."
@@ -358,7 +358,7 @@ class GeminiHybridPathTests(EvalBase):
             seen["prompt"] = prompt
             return generated
 
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch.object(
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"}), patch.object(
             appmod, "_load_rag_vector_index",
             side_effect=lambda chunks: {c["id"]: self.fake_vector(c["text"]) for c in chunks},
         ), patch.object(appmod, "_embed_rag_query", side_effect=lambda q: self.fake_vector(q)), patch.object(
@@ -392,7 +392,7 @@ class GeminiHybridPathTests(EvalBase):
         self.assertEqual(payload["citations"], [])
 
     def test_when_the_model_is_down_the_keyword_answer_is_used(self):
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch.object(
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"}), patch.object(
             appmod, "_load_rag_vector_index", side_effect=RuntimeError("offline"),
         ), patch.object(appmod, "_gemini_generate", side_effect=RuntimeError("down")):
             with app.app_context():

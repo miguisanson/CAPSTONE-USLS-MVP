@@ -43,6 +43,7 @@ class GeminiDefaultModelTests(unittest.TestCase):
 
         env = {key: value for key, value in os.environ.items() if key != "GEMINI_MODEL"}
         env["GOOGLE_API_KEY"] = "test-key"
+        env["ANTHROPIC_API_KEY"] = ""  # the tests never call Claude, whatever .env holds
         with patch.dict(os.environ, env, clear=True), patch.object(app, "urlopen", fake_urlopen):
             self.assertEqual("ready", app._gemini_generate("say ready"))
         self.assertIn("/models/gemini-flash-latest:generateContent", seen["url"])
@@ -54,7 +55,7 @@ class GeminiDefaultModelTests(unittest.TestCase):
             seen["url"] = request.full_url
             return _FakeResponse({"candidates": [{"content": {"parts": [{"text": "ok"}]}}]})
 
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key", "GEMINI_MODEL": "gemini-3.5-flash"}), patch.object(app, "urlopen", fake_urlopen):
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key", "GEMINI_MODEL": "gemini-3.5-flash"}), patch.object(app, "urlopen", fake_urlopen):
             app._gemini_generate("hi")
         self.assertIn("/models/gemini-3.5-flash:generateContent", seen["url"])
 

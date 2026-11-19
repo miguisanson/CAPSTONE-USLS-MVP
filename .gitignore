@@ -51,6 +51,7 @@ npm-debug.log*
 
 # Private local notes and deployment files
 PRIVATE_UBUNTU_HOSTING_NOTES.txt
+deploy/tunnel.env
 
 # Ignore accidental nested copies of this repository
 CAPSTONE-USLS-MVP/
@@ -111,3 +112,6 @@ dist_release/
 # Owner 2026-11-19: Claude Code / GSD tooling stays on the owner's machine only. Teammates on Windows do not need it to
 # run the app, and it made their clones show thousands of changed files. (The files are untracked, not deleted.)
 .claude/
+
+# Owner 2026-11-19: older defense decks stay on this machine only (about 38 MB); v6 and v7 are in git.
+Documents/Capstone/Presentation/CAP-2521-IT-CAP2DEFPRESv[2-5].pptx

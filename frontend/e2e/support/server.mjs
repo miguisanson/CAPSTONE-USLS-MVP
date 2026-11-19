@@ -55,6 +55,7 @@ const env = {
   // (load_dotenv never overrides a variable that is already set), so the assistant takes the offline path.
   GOOGLE_API_KEY: "",
   GOOGLE_AI_STUDIO_API_KEY: "",
+  ANTHROPIC_API_KEY: "", // and no Claude key either (owner 2026-11-19: Claude writes answers when it is set)
 };
 
 console.log(`[e2e] python: ${python}`);

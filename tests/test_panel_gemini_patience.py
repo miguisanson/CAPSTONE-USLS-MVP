@@ -33,7 +33,7 @@ class PanelGeminiPatienceTests(unittest.TestCase):
         appmod._PANEL_ANALYSIS_CACHE.clear()
         self.addCleanup(appmod._PANEL_ANALYSIS_CACHE.clear)
         self.sleep = MagicMock()
-        for item in (patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key", "PANEL_GEMINI_MAX_WAIT_SECONDS": "60"}), patch.object(appmod, "_gemini_sleep", self.sleep)):
+        for item in (patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key", "PANEL_GEMINI_MAX_WAIT_SECONDS": "60"}), patch.object(appmod, "_gemini_sleep", self.sleep)):
             item.start()
             self.addCleanup(item.stop)
 
@@ -87,7 +87,7 @@ class GeminiFallbackModelTests(unittest.TestCase):
     def test_a_used_up_model_hands_the_question_to_the_fallback_model(self):
         quota = HTTPError("https://generativelanguage.googleapis.com", 429, "Too Many Requests", {}, None)
         urlopen = MagicMock(side_effect=[quota, quota, self.response("Seven years.")])
-        env = {"GOOGLE_API_KEY": "k", "GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_FALLBACK_MODELS": "gemini-flash-lite-latest"}
+        env = {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "k", "GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_FALLBACK_MODELS": "gemini-flash-lite-latest"}
         with patch.dict(os.environ, env), patch.object(appmod, "urlopen", urlopen), patch.object(appmod, "_gemini_sleep"):
             self.assertEqual(appmod._gemini_generate("Question: test"), "Seven years.")
         self.assertIn("gemini-2.5-flash:", urlopen.call_args_list[0].args[0].full_url)
@@ -96,7 +96,7 @@ class GeminiFallbackModelTests(unittest.TestCase):
     def test_without_a_fallback_the_429_still_raises(self):
         quota = HTTPError("https://generativelanguage.googleapis.com", 429, "Too Many Requests", {}, None)
         urlopen = MagicMock(side_effect=[quota, quota])
-        env = {"GOOGLE_API_KEY": "k", "GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_FALLBACK_MODELS": ""}
+        env = {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "k", "GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_FALLBACK_MODELS": ""}
         with patch.dict(os.environ, env), patch.object(appmod, "urlopen", urlopen), patch.object(appmod, "_gemini_sleep"):
             with self.assertRaises(appmod.GeminiHTTPError):
                 appmod._gemini_generate("Question: test")

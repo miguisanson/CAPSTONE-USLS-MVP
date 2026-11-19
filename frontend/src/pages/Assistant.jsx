@@ -80,7 +80,7 @@ export default function Assistant({ policyOnly: policyOnlyProp = false, student 
               {student ? (
                 <li>Answers come from the Graduate School Handbook, the Research Protocol and the Operations Manual.</li>
               ) : (
-                <li>An &ldquo;Offline answer&rdquo; label means Gemini was not used and the answer is a keyword match.</li>
+                <li>An &ldquo;Offline answer&rdquo; label means AI was not used and the answer is a keyword match.</li>
               )}
               {student && (
                 <li>

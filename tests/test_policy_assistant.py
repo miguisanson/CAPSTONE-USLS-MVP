@@ -132,7 +132,7 @@ class AssistantBase(unittest.TestCase):
 
     def setUp(self):
         env = patch.dict(os.environ, {
-            "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": "", "RAG_BACKGROUND_EMBED": "0",
+            "ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": "", "RAG_BACKGROUND_EMBED": "0",
         })
         env.start()
         self.addCleanup(env.stop)
@@ -156,7 +156,7 @@ class AssistantBase(unittest.TestCase):
 
     @staticmethod
     def with_key():
-        return patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"})
+        return patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"})
 
     @staticmethod
     def keyword_only():

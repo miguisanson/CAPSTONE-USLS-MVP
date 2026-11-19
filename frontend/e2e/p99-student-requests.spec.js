@@ -304,9 +304,9 @@ test.describe("P99 student requests behave alike", () => {
           citations: [], personal: false,
           source: {
             label: "Answered from the documents (keyword search)",
-            detail: "Found by keyword search in the Handbook. No AI service was used; add a Gemini key for fuller, reworded answers.",
+            detail: "Found by keyword search in the Handbook. No AI service was used; add an AI key for fuller, reworded answers.",
             ai_used: false, ai_configured: false, offline: true, badge: "Offline answer",
-            note: "No AI key is set, so answers are quoted straight from the documents. Add a Gemini key for fuller, reworded answers.",
+            note: "No AI key is set, so answers are quoted straight from the documents. Add an AI key for fuller, reworded answers.",
           },
         },
       }));
@@ -317,7 +317,7 @@ test.describe("P99 student requests behave alike", () => {
       await expect(badge).toBeVisible();
       await expect(badge).toContainText("The assistant is answering from the policy documents without AI right now");
       const everything = await page.locator("body").evaluate((el) => el.innerText + [...el.querySelectorAll("[title]")].map((n) => n.getAttribute("title")).join(" "));
-      expect(everything).not.toMatch(/Gemini key|No AI key|API key/i);
+      expect(everything).not.toMatch(/Gemini key|AI key|No AI key|API key/i);
     } finally {
       await context.close();
     }

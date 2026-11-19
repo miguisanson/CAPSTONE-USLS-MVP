@@ -570,7 +570,7 @@ class StartupTests(HealthTestBase):
                 self.assertEqual(UserAccount.query.count(), first_accounts)
                 self.assertEqual(Student.query.count(), first_students)
                 from app import PolicyDocument
-                self.assertEqual(PolicyDocument.query.filter_by(category="Operations Manual", status="draft").count(), 1)
+                self.assertEqual(PolicyDocument.query.filter_by(category="Operations Manual", status="active").count(), 1)
 
 
 class TrackedFilesHoldNoSecretsTests(unittest.TestCase):
@@ -582,6 +582,12 @@ class TrackedFilesHoldNoSecretsTests(unittest.TestCase):
         names = subprocess.run(["git", "grep", "-lE", r"TUNNEL_TOKEN=ey[A-Za-z0-9_-]{40,}"], cwd=REPO_ROOT,
                                capture_output=True, text=True).stdout.split()
         self.assertEqual(names, [], "A Cloudflare tunnel token is committed; remove it and rotate the token.")
+
+    def test_tunnel_token_file_is_never_committed(self):
+        # The Docker site (deploy/, restored 2026-11-16 for the Mac) reads the token from deploy/tunnel.env.
+        import subprocess
+        result = subprocess.run(["git", "check-ignore", "-q", "deploy/tunnel.env"], cwd=REPO_ROOT)
+        self.assertEqual(result.returncode, 0, "deploy/tunnel.env must be listed in .gitignore")
 
 
 if __name__ == "__main__":

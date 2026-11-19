@@ -449,7 +449,7 @@ test.describe("Assistant sources (staff, Policy Assistant)", () => {
 
     const badge = page.getByTestId("answer-badge").last();
     await expect(badge).toContainText("Offline answer");
-    await expect(badge).toContainText("Found by keyword search; Gemini was not used");
+    await expect(badge).toContainText("Found by keyword search; AI was not used");
     const sources = page.getByTestId("source-list").last();
     await expect(sources).toContainText("Sources (2)");
     const first = sources.locator("details").nth(0);

@@ -119,7 +119,7 @@ class PanelMatchingTests(unittest.TestCase):
         return Faculty.query.filter_by(name=name).one()
 
     def _rank(self, number, **kwargs):
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""}):
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""}):
             return recommend_panel(self._student(number), **kwargs)
 
     # ------------------------------------------------------------------ D1/D2
@@ -286,7 +286,7 @@ class PanelMatchingTests(unittest.TestCase):
         self.assertIn("adviser", response.get_json()["error"].lower())
         with app.app_context():
             self.assertEqual(PanelAssignment.query.filter_by(student_id=sid).count(), 0)
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""}):
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""}):
             response = client.post("/api/transactions/panel-matching", json={"student_id": sid})
         self.assertEqual(response.status_code, 200, response.get_json())
         with app.app_context():
@@ -394,20 +394,20 @@ class PanelMatchingTests(unittest.TestCase):
 
         with app.app_context():
             student = self._student("2690104")
-            with patch.dict(os.environ, {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""}):
+            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""}):
                 plain = panel_matching_result(student)
             self.assertEqual(plain["method"], "tfidf")
             self.assertEqual(plain["method_label"], "Similarity match (keyword TF-IDF)")
-            with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), \
+            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"}), \
                     patch("app._gemini_generate", side_effect=RuntimeError("offline")), \
                     patch("app._gemini_embed_texts", side_effect=fake_embeddings):
                 semantic = panel_matching_result(student)
             self.assertEqual(semantic["method"], "gemini-embeddings")
-            self.assertEqual(semantic["method_label"], "Semantic match (Gemini embeddings)")
+            self.assertEqual(semantic["method_label"], "Semantic match (AI embeddings)")
             self.assertTrue(all(row["method"] == "gemini-embeddings" for row in semantic["rows"]))
             self.assertGreater(len({row["score"] for row in semantic["rows"]}), 6)
             app_module._PANEL_EMBEDDING_CACHE.clear()
-            with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), \
+            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"}), \
                     patch("app._gemini_generate", side_effect=RuntimeError("offline")), \
                     patch("app._gemini_embed_texts", side_effect=RuntimeError("quota")):
                 fallback = panel_matching_result(student)
@@ -418,7 +418,7 @@ class PanelMatchingTests(unittest.TestCase):
         with app.app_context():
             student_id = self._student("2690101").id
         client = self._client(self.staff_id, "staff")
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""}):
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""}):
             response = client.get(f"/api/transactions/panel-matching/context?student_id={student_id}")
         self.assertEqual(response.status_code, 200, response.get_json())
         payload = response.get_json()

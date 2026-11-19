@@ -3,6 +3,7 @@
 //  - removes a DATABASE_URL line that points at MySQL (the app is SQLite only now and refuses it);
 //  - adds an empty GOOGLE_API_KEY= line if there is none, ready for you to paste your Gemini key after the "=";
 //  - adds the five empty GOOGLE_CALENDAR_* lines if they are missing;
+//  - adds an empty ANTHROPIC_API_KEY= line if there is none (owner 2026-11-19: Claude writes the answers when it is set);
 //  - with --uat (User Acceptance Testing at https://miguisanson.dev): SESSION_COOKIE_SECURE=1 and the public
 //    Google Calendar redirect URI - added when missing, an empty redirect line is filled, a value that is
 //    already there is never replaced (a differing SESSION_COOKIE_SECURE is only reported).
@@ -52,6 +53,15 @@ const appendLines = (...added) => {
   while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
   lines.push("", ...added, "");
 };
+
+if (keyLineIndex("ANTHROPIC_API_KEY") < 0) {
+  appendLines(
+    "# Claude key (https://console.anthropic.com > API keys). When it is set, Claude writes the Policy Assistant's answers",
+    "# and the panel-matching analysis. Paste it after the =. Leave it empty to use Gemini; AI_PROVIDER=gemini also switches back.",
+    "ANTHROPIC_API_KEY=",
+  );
+  changes.push("added an empty ANTHROPIC_API_KEY= line - open .env and paste your Claude key after the =");
+}
 
 const missingCalendar = CALENDAR_KEYS.filter((key) => keyLineIndex(key) < 0);
 if (missingCalendar.length) {

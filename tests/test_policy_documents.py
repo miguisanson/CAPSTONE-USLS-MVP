@@ -120,7 +120,7 @@ class PolicyTestBase(unittest.TestCase):
             patch.object(appmod, "RAG_INDEX_DIR", _SHARED_INDEX_DIR),
             patch.object(appmod, "_RAG_EMBED_COOLDOWN_UNTIL", 0.0, create=True),
             patch.dict(os.environ, {
-                "GOOGLE_API_KEY": "",
+                "ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "",
                 "GOOGLE_AI_STUDIO_API_KEY": "",
                 "RAG_DOCUMENT_DIRS": "",
                 "RAG_BACKGROUND_EMBED": "0",
@@ -382,7 +382,7 @@ class UploadsWinTests(PolicyTestBase):
 
     def test_with_a_key_the_document_library_is_asked_first(self):
         self.upload_ok(make_docx(TABLET_DOC), "library-memo.docx", title="Library Lending Memo")
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch.object(
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"}), patch.object(
             appmod, "call_document_rag",
             return_value=("Seven tablets.", [{"id": "d1", "title": "Library Lending Memo", "source": "Library Lending Memo, part 1", "text": TABLET_RULE}]),
         ) as rag:
@@ -493,7 +493,7 @@ class VersionHistoryTests(PolicyTestBase):
 
     def test_a_draft_cited_through_the_ai_path_also_carries_the_warning(self):
         self.upload_ok(make_docx(TABLET_DOC), "memo.docx", title="Library Lending Memo", status="draft")
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch.object(
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"}), patch.object(
             appmod, "_gemini_embed_texts", side_effect=RuntimeError("offline"),
         ), patch.object(appmod, "_gemini_generate", return_value="A student may borrow seven tablets."):
             payload = self.ask(TABLET_QUESTION)
@@ -614,7 +614,7 @@ class RobustnessTests(PolicyTestBase):
 
     def test_embedding_outage_does_not_lose_or_stall_a_new_upload(self):
         self.upload_ok(make_docx(TABLET_DOC), "memo.docx", title="Library Lending Memo")
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch.object(
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"}), patch.object(
             appmod, "_gemini_embed_texts", side_effect=RuntimeError("embeddings down"),
         ) as embed, patch.object(appmod, "_gemini_generate", side_effect=RuntimeError("generation down")):
             first = self.ask(TABLET_QUESTION)
@@ -638,7 +638,7 @@ class RobustnessTests(PolicyTestBase):
                 vectors.append([v / norm for v in bucket])
             return vectors
 
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch.object(
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"}), patch.object(
             appmod, "_gemini_embed_texts", side_effect=fake_embed,
         ), patch.object(appmod, "_gemini_generate", return_value="Seven tablets."), patch.object(
             appmod, "RAG_INDEX_DIR", Path(tempfile.mkdtemp(dir=_TEST_ROOT)),

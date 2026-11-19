@@ -1849,7 +1849,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             self.assertEqual(too_long.status_code, 200, too_long.get_json())
             self.assertEqual(too_long.get_json()["mode"], "student-guarded")
 
-            with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch(
+            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"}), patch(
                 "app.call_document_rag"
             ) as document_rag, patch(
                 "app._gemini_generate", side_effect=RuntimeError("no network in tests")
@@ -1894,7 +1894,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
     def test_policy_assistant_uses_fast_path_and_guards_unsupported_requests(self):
         client = self._staff_client()
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch(
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"}), patch(
             "app.call_document_rag"
         ) as document_rag:
             # Owner rule (B3, 2026-10-01): the document library is asked first for every
@@ -2033,7 +2033,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             }
             with patch.dict(
                 os.environ,
-                {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""},
+                {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""},
             ), patch(
                 "app.call_local_document_rag",
                 return_value=(citation["text"], [citation]),
@@ -2150,7 +2150,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
 
     def test_policy_assistant_falls_back_when_document_rag_fails(self):
         client = self._staff_client()
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}), patch(
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "test-key"}), patch(
             "app.call_document_rag",
             side_effect=RuntimeError("provider unavailable"),
         ), patch(
@@ -2175,7 +2175,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
         }
         with patch.dict(
             os.environ,
-            {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""},
+            {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""},
         ), patch(
             "app.call_local_document_rag",
             return_value=(citation["text"], [citation]),
@@ -4192,7 +4192,7 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             }
             with patch("app.research_matching_profile", return_value=matching_profile), patch.dict(
                 os.environ,
-                {"GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""},
+                {"ANTHROPIC_API_KEY": "", "GOOGLE_API_KEY": "", "GOOGLE_AI_STUDIO_API_KEY": ""},
             ):
                 recommendations = recommend_panel(miguel)
             self.assertEqual(len(recommendations), 12)

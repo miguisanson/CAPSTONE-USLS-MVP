@@ -223,6 +223,9 @@ Calendar settings); for a git clone, ask the team for the shared file and save i
 | `LOGIN_MAX_FAILURES`, `LOGIN_LOCKOUT_SECONDS` | `5`, `300` | sign-in lockout |
 | `GOOGLE_API_KEY` (or `GOOGLE_AI_STUDIO_API_KEY`) | none, optional | Gemini key for the Policy Assistant |
 | `GEMINI_MODEL`, `GEMINI_EMBEDDING_MODEL` | `gemini-flash-latest`, `gemini-embedding-2` | Gemini models (`gemini-2.5-flash` is closed to new keys since 2026) |
+| `ANTHROPIC_API_KEY` | none, optional | Claude key. When set, Claude writes the Policy Assistant's answers and the panel-matching analysis (the free Gemini tier allows 20 answers a day). Gemini still makes the embeddings. |
+| `AI_PROVIDER` | not set | `gemini` switches answer-writing back to Gemini while a Claude key is set |
+| `CLAUDE_MODEL`, `CLAUDE_EFFORT` | `claude-opus-5-5`, `low` | Claude model and effort used for the answers |
 | `RAG_PREWARM` | `1` | pre-build the document index at start-up (only when a Gemini key is set) |
 | `TESSERACT_CMD` | on `PATH` | OCR for scanned PDFs |
 

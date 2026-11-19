@@ -12,7 +12,7 @@ export default {
   steps: [
     {
       id: "pd-open", title: "Open the policy library", role: "staff", route: "/policy-documents", page: "Policy Documents",
-      do: "Open Policy Documents under Monitoring & support. The Handbook and the Research Protocol are built in and view-only; the Operations Manual is a Draft until the Graduate School validates it.",
+      do: "Open Policy Documents under Monitoring & support. The Handbook and the Research Protocol are built in and view-only; the Operations Manual was validated and signed by the Graduate School.",
       actions: [{ pause: 1500, caption: "Showing the policy library" }],
       doneWhen: { route: "/policy-documents", roleIs: "staff" },
       ifAsked: [{ q: "What does Draft mean?", a: "The document is searched, but every assistant answer that uses it says it is pending Graduate School validation." }],
