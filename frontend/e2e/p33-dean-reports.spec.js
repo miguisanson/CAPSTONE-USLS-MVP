@@ -184,7 +184,8 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await expect(card).toContainText("Students: Isabel Flores");
     await expect(card).toContainText("Step 7: Dean reviews graduation batch");
     await expect(card).toContainText("Next: Dean");
-    await expect(card.getByRole("button", { name: /Move to/ })).toBeVisible();
+    // Owner 2026-11-19: Graduation cards never move to another column by hand; every card can be reordered in its column.
+    await expect(card.getByRole("button", { name: /Move to/ })).toHaveCount(0);
     await expect(card.getByRole("button", { name: `View details for ${BATCH}` })).toBeVisible();
     await shot(page, "batches-ready-1366.png");
 

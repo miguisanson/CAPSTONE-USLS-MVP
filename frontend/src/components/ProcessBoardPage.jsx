@@ -1,15 +1,17 @@
 import { refusalMessage } from "../lib/refusal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { HelpCircle, History, RefreshCw } from "lucide-react";
+import { Eye, HelpCircle, History, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { formatDateTime } from "../lib/format";
 import ListExportButtons from "./ListExportButtons";
-import { Button, EmptyState, InlineNotice, Modal, PageHeader, SkeletonBoard } from "./ui/index.js";
+import { nextWithdrawalBatchName } from "../pages/process/WithdrawalExport";
+import { useConfirm } from "./confirm";
+import { Button, EmptyState, InlineNotice, Modal, PageHeader, SkeletonBoard, StatusChip } from "./ui/index.js";
 import PolicyRules from "./PolicyRules";
-import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "./StageBoard";
-import { StageColumnHeader } from "./process";
+import StageBoard, { BoardNotice, BoardSummary, COLUMN_LOCKED_HINT, boardSummaryLine, useBoardNotice } from "./StageBoard";
+import { GroupCard, StageColumnHeader } from "./process";
 import { GUIDES, PROCESS_CONFIG } from "./processConfig";
 import ActionDialog from "../pages/leave/ActionDialog";
 import BatchBar, { BatchResult } from "../pages/leave/BatchBar";
@@ -29,6 +31,56 @@ import {
 } from "../pages/leave/leaveHelpers";
 
 const getItemId = (item) => item.id;
+// The stage for the green "New for you" mark: the status and when the request was filed (a new or reset request is new).
+const getItemStatus = (item) => `${item.status}|${item.submitted_at || item.created_at || ""}`;
+const getItemStudentName = (item) => item.student?.name || "this request";
+// When a card last changed: the newest is at the top of its column (owner 2026-11-19). A batch is as new as its newest student.
+const getItemTime = (item) =>
+  item.kind === "batch"
+    ? item.items.map((row) => row.last_activity_at || row.updated_at || "").sort().pop()
+    : item.last_activity_at || item.updated_at || item.submitted_at || "";
+// Owner 2026-11-19: on the Withdrawal board a card moves to the next column only by the approval steps (it can be reordered
+// inside its column), and it is green while it is new and waits on the signed-in person. The other process boards are unchanged.
+const COLUMN_LOCKED_SLUGS = new Set(["withdrawal"]);
+// Owner 2026-11-19: from the Excel export on, the withdrawals exported together travel as one batch card (like Graduation).
+const REGISTRAR_STATUSES = new Set(["Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"]);
+const casesOf = (columnItems) => columnItems.flatMap((item) => (item.kind === "batch" ? item.items : [item]));
+
+// One exported withdrawal batch on the board: the batch name, its students (each with View) and the Registrar dates.
+function WithdrawalBatchCard({ batch, onOpen, actions = null }) {
+  const first = batch.items[0];
+  const registrar = first.registrar || {};
+  const facts = [
+    { label: "Students", value: batch.items.map((item) => item.student.name).join(", ") },
+    { label: "Next", value: first.owner || "No further step" },
+    ...(registrar.exported_at ? [{ label: "Exported", value: formatDateTime(registrar.exported_at) }] : []),
+    ...(registrar.sent_at ? [{ label: "Sent to the Registrar", value: formatDateTime(registrar.sent_at) }] : []),
+    ...(registrar.acknowledged_at ? [{ label: "Acknowledged", value: formatDateTime(registrar.acknowledged_at) }] : []),
+  ];
+  return (
+    <div data-batch-count={batch.items.length}>
+      <GroupCard
+        title={batch.batch_name}
+        count={plural(batch.items.length, "student")}
+        chip={<StatusChip status={first.status_label} size="sm" dot={false} />}
+        facts={facts}
+        actions={actions}
+      >
+        <ul className="space-y-1.5" aria-label={`Students in ${batch.batch_name}`}>
+          {batch.items.map((item) => (
+            <li key={item.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
+              <span className="min-w-0">
+                <span className="block break-words text-sm font-semibold text-ink">{item.student.name}</span>
+                <span className="meta block break-words">{item.subject?.code ? `${item.subject.code} - ${item.subject.title}` : item.student.student_number}</span>
+              </span>
+              <Button variant="secondary" size="sm" icon={Eye} onClick={() => onOpen(item)} aria-label={`View details for ${item.student.name}`}>View</Button>
+            </li>
+          ))}
+        </ul>
+      </GroupCard>
+    </div>
+  );
+}
 const NO_ACTIONS = [];
 
 function GuideWindow({ slug, policyQuestions, onClose }) {
@@ -73,7 +125,9 @@ function GuideWindow({ slug, policyQuestions, onClose }) {
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-700">
             <span className="font-semibold">Moving a card: </span>
-            drag it to the next column, or use &quot;Move to…&quot; on the card. Both do exactly what the buttons in the request window do, and the server refuses a move the rules do not allow.
+            {COLUMN_LOCKED_SLUGS.has(slug)
+              ? "a card moves to the next column by itself when a step is done in the request window. Drag a card up or down to reorder it inside its column."
+              : <>drag it to the next column, or use &quot;Move to…&quot; on the card. Both do exactly what the buttons in the request window do, and the server refuses a move the rules do not allow.</>}
           </div>
           {policyQuestions.length > 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -147,6 +201,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
   const role = user?.role || "";
   const isStaff = role === "staff" || role === "admin"; // an administrator acts as Graduate School staff
   const Icon = config.icon;
+  const columnLocked = COLUMN_LOCKED_SLUGS.has(slug);
 
   const [state, setState] = useState({ data: null, loading: true, error: "" });
   const [view, setView] = useState("board");
@@ -237,6 +292,30 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
   const getColumnKey = useCallback((item) => columnKeyByStatus[item.status] || "other", [columnKeyByStatus]);
 
   const filtered = useMemo(() => cases.filter((item) => matchesFilters(item, filters)), [cases, filters]);
+  // The board's cards: on the Withdrawal board the exported withdrawals of one batch are one card per batch and stage.
+  const boardItems = useMemo(() => {
+    if (slug !== "withdrawal") return filtered;
+    const out = [];
+    const batches = new Map();
+    filtered.forEach((item) => {
+      if (!REGISTRAR_STATUSES.has(item.status) || !item.batch_name) {
+        out.push(item);
+        return;
+      }
+      const key = `batch:${item.batch_name}:${item.status}`;
+      if (!batches.has(key)) {
+        const batch = {
+          kind: "batch", id: key, batch_name: item.batch_name, status: item.status, status_label: item.status_label,
+          owner: item.owner, actions: item.actions || NO_ACTIONS, submitted_at: item.registrar?.exported_at || item.updated_at,
+          student: { name: item.batch_name }, items: [],
+        };
+        batches.set(key, batch);
+        out.push(batch);
+      }
+      batches.get(key).items.push(item);
+    });
+    return out;
+  }, [filtered, slug]);
 
   const totals = useMemo(() => {
     const result = {};
@@ -352,44 +431,105 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
     }
   }
 
+  // Owner 2026-11-19: the batch's Registrar step is a button on the batch card itself.
+  const batchStepRef = useRef(null); // runBatchStep is made further down; the card button calls it through this ref
+  const batchStepButton = useCallback(
+    (batch) => {
+      if (!isStaff) return null;
+      const step = ["send", "acknowledge"].find((key) => (batch.actions || NO_ACTIONS).some((action) => action.action === key));
+      if (!step) return null;
+      const words = step === "send"
+        ? { button: "Mark as sent to the Registrar", title: "Sent this list to the Registrar?", message: "Use this after the Excel list was emailed to the Registrar. The batch moves to Waiting for Registrar acknowledgement." }
+        : { button: "Mark as acknowledged", title: "Registrar acknowledged this list?", message: "Use this only after the Registrar confirmed receipt of the emailed list. The batch moves to Acknowledged by Registrar." };
+      return (
+        <Button
+          size="sm"
+          variant={step === "acknowledge" ? "primary" : "secondary"}
+          className="w-full"
+          aria-label={`${words.button}: ${batch.batch_name}`}
+          onClick={() => batchStepRef.current?.(batch.items, step, batch.batch_name, words)}
+        >
+          {words.button}
+        </Button>
+      );
+    },
+    [isStaff],
+  );
+
   // ---- board pieces ------------------------------------------------------------------
+  // Owner 2026-11-19: on the Withdrawal board staff tick cards in "Excel export" and make one batch of them.
+  const isExportable = useCallback(
+    (item) => slug === "withdrawal" && isStaff && (item.actions || NO_ACTIONS).some((action) => action.action === "export"),
+    [slug, isStaff],
+  );
   const renderCard = useCallback(
-    (item) => (
+    (item) => item.kind === "batch" ? (
+      <WithdrawalBatchCard batch={item} onOpen={(row) => { setDetailFocus(""); setDetailId(row.id); }} actions={batchStepButton(item)} />
+    ) : (
       <CaseCard
         item={item}
         role={role}
-        selectable={batchActionsOf(item).length > 0}
+        // Owner 2026-11-19: on the Withdrawal board each request is forwarded and decided one at a time; the only
+        // checkboxes are in "Excel export", where staff make a batch.
+        selectable={slug === "withdrawal" ? isExportable(item) : batchActionsOf(item).length > 0}
         selected={selected.has(item.id)}
         onToggleSelect={toggleSelect}
         onOpen={(row) => { setDetailFocus(""); setDetailId(row.id); }}
         onMessage={(row) => { setDetailFocus("messages"); setDetailId(row.id); }}
       />
     ),
-    [role, selected],
+    [role, selected, isExportable, slug, batchStepButton],
   );
 
   // Khloe's header (components/process): the stage's number, its name, what it holds and how many cards.
-  const renderColumnHeader = useCallback(
-    (column, columnItems) => {
-      const total = totals[column.key] || 0;
-      return (
-        <StageColumnHeader
-          column={column}
-          count={columnItems.length}
-          total={total}
-          number={columns.findIndex((entry) => entry.key === column.key) + 1}
-          countLabel={columnItems.length === total ? plural(total, "request") : null}
-        />
-      );
+
+  // Owner 2026-11-19 (Withdrawal): the Registrar hand-off is done per export batch, with one button per batch.
+  const confirmStep = useConfirm();
+  const runBatchStep = useCallback(
+    async (items, action, batchName, words) => {
+      const sure = await confirmStep({
+        title: words.title,
+        message: `${batchName}: ${items.map((item) => item.student.name).join(", ")}\n\n${words.message}`,
+        confirmLabel: words.button,
+      });
+      if (!sure) return;
+      try {
+        const result = await api.processCasesBatch(slug, { case_ids: items.map((item) => item.id), action });
+        await load({ quiet: true });
+        setDetailVersion((value) => value + 1);
+        if (onChanged) await onChanged();
+        boardNotice.show(result.updated?.length === 0 ? "error" : "success", `${batchName}: ${result.message || "Done."}`);
+      } catch (error) {
+        boardNotice.show("error", refusalMessage(error.message, "The batch step was refused."));
+      }
     },
-    [totals, columns],
+    [confirmStep, slug, load, onChanged, boardNotice],
+  );
+  batchStepRef.current = runBatchStep;
+
+  const exportBatch = useCallback(
+    async (items) => {
+      const batchName = nextWithdrawalBatchName(cases);
+      const sure = await confirmStep({
+        title: "Create this batch and download the Excel list?",
+        highlights: [{ label: "Batch", value: `${batchName} · ${plural(items.length, "student")}` }],
+        message: `${items.map((item) => item.student.name).join(", ")}\n\nThe Excel list downloads now and the batch moves to Exported - Ready to Send. Then email the file to the Registrar.`,
+        confirmLabel: "Create batch and download",
+      });
+      if (!sure) return;
+      setSelected(new Set());
+      setSignal({ type: "export-batch", ids: items.map((item) => item.id) });
+    },
+    [cases, confirmStep],
   );
 
   const renderColumnFooter = useCallback(
     (column, columnItems) => {
+      if (slug === "withdrawal") return null; // the Excel export column has its own controls at the top
       if (!columnItems.length || !columnItems.every((item) => batchActionsOf(item).length)) return null;
       const allOn = columnItems.every((item) => selected.has(item.id));
       return (
+        <>
         <button
           type="button"
           onClick={() => setMany(columnItems, !allOn)}
@@ -397,9 +537,60 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
         >
           {allOn ? "Clear selection in this column" : "Select all in this column"}
         </button>
+        </>
       );
     },
-    [selected],
+    [selected, slug],
+  );
+
+  // Owner 2026-11-19 (Withdrawal): the column's group steps sit at the top, under the column title, like Graduation.
+  const columnTopControls = useCallback(
+    (column, columnItems) => {
+      if (slug !== "withdrawal" || !isStaff) return null;
+      if (column.key !== "export") return null; // the Registrar steps are buttons on each batch card
+      {
+        const exportable = columnItems.filter(isExportable);
+        if (!exportable.length) return null;
+        const ticked = exportable.filter((item) => selected.has(item.id));
+        const allOn = ticked.length === exportable.length;
+        return (
+          <div className="mb-3 space-y-2">
+            <button
+              type="button"
+              onClick={() => setMany(exportable, !allOn)}
+              className="cursor-pointer rounded-lg px-2 py-1.5 text-xs font-semibold text-brand-700 transition-colors duration-200 hover:bg-brand-50 focus:outline-none focus:ring-2 focus:ring-brand-500 max-sm:min-h-11"
+            >
+              {allOn ? "Clear selection in this column" : "Select all in this column"}
+            </button>
+            <Button size="sm" className="w-full" disabled={!ticked.length} onClick={() => exportBatch(ticked)}>
+              {`Create batch and download Excel list (${ticked.length})`}
+            </Button>
+            {!ticked.length && <p className="meta">Tick the students to put in one batch.</p>}
+          </div>
+        );
+      }
+    },
+    [selected, slug, isStaff, isExportable, exportBatch],
+  );
+
+  const renderColumnHeader = useCallback(
+    (column, columnItems) => {
+      const total = totals[column.key] || 0;
+      const shown = casesOf(columnItems).length; // a batch card counts its students
+      return (
+        <>
+          <StageColumnHeader
+            column={columnLocked ? { ...column, hyphenate: true } : column} // a long title ("acknowledgement") breaks with a hyphen
+            count={shown}
+            total={total}
+            number={columns.findIndex((entry) => entry.key === column.key) + 1}
+            countLabel={shown === total ? plural(total, "request") : null}
+          />
+          {columnTopControls(column, columnItems)}
+        </>
+      );
+    },
+    [totals, columns, columnLocked, columnTopControls],
   );
 
   // ---- extras a process brings ---------------------------------------------------------
@@ -460,6 +651,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
 
       <BoardSummary
         line={summaryLine}
+        hint={columnLocked ? COLUMN_LOCKED_HINT : ""}
         actions={HeaderActions ? <div className="flex flex-wrap gap-2"><HeaderActions ctx={ctx} /></div> : null}
       />
 
@@ -508,7 +700,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
           {view === "board" ? (
             <StageBoard
               columns={columns}
-              items={filtered}
+              items={boardItems}
               getItemId={getItemId}
               getColumnKey={getColumnKey}
               renderCard={renderCard}
@@ -521,6 +713,11 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
               emptyText={`No ${config.noun} here`}
               ariaLabel={config.boardLabel}
               boardNotice={boardNotice}
+              columnLocked={columnLocked}
+              freshWhen={columnLocked ? "needsMe" : "moved"}
+              getStageKey={columnLocked ? getItemStatus : null}
+              getItemLabel={getItemStudentName}
+              getItemTime={columnLocked ? getItemTime : null}
             />
           ) : filtered.length ? (
             <CaseTable

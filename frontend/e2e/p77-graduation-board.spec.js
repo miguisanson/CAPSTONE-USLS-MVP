@@ -144,7 +144,9 @@ for (const [role, path] of ROLES) {
       await expect(bianca).toContainText("2690301 · MAED");
       await expect(bianca.getByText("Next: Student")).toBeVisible();
       await expect(bianca.getByText("Waiting for: Student (signed application)", { exact: true })).toBeVisible();
-      await expect(bianca).toHaveAttribute("draggable", "false");
+      // Owner 2026-11-19: Graduation cards never move to another column by hand; every card can be reordered in its column.
+      await expect(bianca).toHaveAttribute("draggable", "true");
+      await expect(bianca.getByRole("button", { name: /Move to/ })).toHaveCount(0);
       // The old extra filter card is gone; the course filter is one more control in the toolbar.
       await expect(page.getByText("Completed course cohort", { exact: true })).toHaveCount(0);
       await expect(page.getByRole("combobox", { name: /Filter by completed courses/ })).toBeVisible();
@@ -217,7 +219,7 @@ test.describe("P7.7 Graduation actions as staff", () => {
     await ready.getByRole("button", { name: "Select all in this column" }).click();
     await expect(bar).toBeVisible();
 
-    await page.getByRole("button", { name: "Create graduation batch" }).click();
+    await page.getByRole("button", { name: "Create graduation batch", exact: true }).click();
     let dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading").first()).toContainText("Create batch");
     // Owner 2026-11-08 (replaces I-258 / B-33): the batch name is given by the system, never typed. It is the next free
@@ -259,12 +261,9 @@ test.describe("P7.7 Graduation actions as staff", () => {
     await page.getByRole("dialog").getByRole("button", { name: "Close details" }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
-    await batch.getByRole("button", { name: /Move to/ }).click();
-    const menu = page.getByRole("menu");
-    await expect(menu).toBeVisible();
-    await expect(menu.getByRole("menuitem", { name: "Coursework review", exact: true })).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("menu")).toHaveCount(0);
+    // Owner 2026-11-19: Graduation cards never move to another column by hand; every card can be reordered in its column.
+    await expect(batch.getByRole("button", { name: /Move to/ })).toHaveCount(0);
+    await expect(batch).toHaveAttribute("draggable", "true");
     await shot(page, "staff-actions-1366.png");
   });
 
@@ -350,7 +349,9 @@ test.describe("P7.7 Graduation actions as the Dean", () => {
     await expect(exported.getByText("Exported - Ready to Send")).toBeVisible();
     // I-329: once exported the card no longer says to export it.
     // owner 2026-11-08: the Dean (or staff) moves an exported batch by hand to "Acknowledged by Registrar"
-    await expect(exported.getByRole("button", { name: /Move to/ })).toBeVisible();
+    // owner 2026-11-19: no Move to; the acknowledgement is a button on the card
+    await expect(exported.getByRole("button", { name: /Move to/ })).toHaveCount(0);
+    await expect(exported.getByRole("button", { name: "Mark as acknowledged", exact: true })).toBeVisible();
     await expect(exported.getByText("Approved. Export it from this card.")).toHaveCount(0);
     await exported.getByRole("button", { name: `View details for ${BATCH}` }).click();
     await expect(page.getByRole("dialog").getByRole("button", { name: "Export approved list again" })).toBeVisible();

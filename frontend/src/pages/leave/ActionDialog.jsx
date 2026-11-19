@@ -30,6 +30,24 @@ const PANEL_TONE = { danger: "reject", warn: "return" };
  * return checklist and the note for the Dean. `onConfirm(payload)` must call api.processCaseTransition; if it throws,
  * the message is shown inside the dialog and the box stays open.
  */
+// Owner 2026-11-19: on a subject withdrawal the subject and the reason stand out in their own boxes (staff and Dean).
+function WithdrawalFacts({ item, detail }) {
+  const subject = item.subject?.code ? `${item.subject.code} — ${item.subject.title}` : (detail?.summary_rows || []).find((row) => row.label === "Subject")?.value;
+  const reason = item.reason || (detail?.summary_rows || []).find((row) => row.label === "Reason")?.value;
+  const rows = [["Subject to be withdrawn", subject], ["Reason for withdrawing", reason]].filter(([, value]) => value);
+  if (!rows.length) return null;
+  return (
+    <dl className="space-y-2" data-testid="withdrawal-facts">
+      {rows.map(([label, value]) => (
+        <div key={label} className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5">
+          <dt className="eyebrow text-brand-800">{label}</dt>
+          <dd className="mt-0.5 whitespace-pre-line break-words text-sm font-semibold text-ink">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export default function ActionDialog({ item, action, vocabulary, detail: detailProp = null, onCancel, onConfirm }) {
   const isForward = action.action === "forward";
   // Readmission and Return from AWOL share the two office checks (Business Office clearance, interview).
@@ -99,6 +117,7 @@ export default function ActionDialog({ item, action, vocabulary, detail: detailP
       withReason={!isForward}
       reasonLabel={action.needs_comment ? COMMENT_LABELS[action.action] || "Reason" : "Note (optional)"}
       reasonRows={action.needs_comment ? 4 : 3}
+      {...(item.slug === "withdrawal" ? { children: <WithdrawalFacts item={item} detail={detail} /> } : {})}
       extra={
         isForward && (
           <>

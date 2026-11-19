@@ -44,7 +44,7 @@ const STANDALONE = [
   },
   {
     slug: "withdrawal", title: "Subject Withdrawal", types: ["withdrawal"],
-    description: "Requests to withdraw from one subject that Graduate School staff forwarded for your decision. Approve, return or deny each one.",
+    description: "Requests to withdraw from one subject that Graduate School staff forwarded for your decision. Approve each one, or return it to the student to correct.", // no deny (owner 2026-11-19)
   },
 ];
 const STAFF_VOICE = [

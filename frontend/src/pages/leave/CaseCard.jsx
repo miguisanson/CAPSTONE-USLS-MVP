@@ -52,6 +52,11 @@ export default function CaseCard({ item, role, selectable, selected, onToggleSel
         </div>
       )}
 
+      {/* Owner 2026-11-19: an exported withdrawal shows the batch it was exported in. */}
+      {item.slug === "withdrawal" && item.batch_name && (
+        <div className="mt-2"><StatusChip label={item.batch_name} tone="muted" size="sm" dot={false} /></div>
+      )}
+
       <CaseCardFacts facts={caseFacts(item)} />
 
       {requirements.length > 0 && <RequirementBoxes items={requirements} ariaLabel="Requirements for this request" className="mt-3 !grid-cols-1" />}

@@ -336,7 +336,7 @@ def test_the_dean_approving_a_withdrawal_for_a_subject_already_dropped_is_told_w
     self.assertEqual(refused.status_code, 409, refused.get_json())
     message = refused.get_json()["error"]
     self.assertIn("already Dropped", message)
-    self.assertIn("Deny the request and tell the student", message)
+    self.assertIn("Return the request to the student", message)  # no deny (owner 2026-11-19)
     self.assertNotIn("handoff list", message)
 
 

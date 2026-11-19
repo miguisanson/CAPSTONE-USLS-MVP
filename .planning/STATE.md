@@ -1,5 +1,45 @@
 # State
 
+## 2026-11-19 — owner requests (Withdrawal, Practicum, Graduation only), branch `v6.8-update`, NOT committed
+
+- Server: Dean cannot deny a subject withdrawal (`standalone_process.py` move removed; `/api/approvals/workflow/withdrawal/.../decide`
+  accepts approve only). Practicum "Record Verified Hours" keeps the case at Documents Under Review (no auto Hours Incomplete);
+  "Additional Certificates Requested" needs saved verified hours; a student resubmission clears the verified hours. The
+  student subject list shows "Withdrawn" for a subject withdrawn this term. Tests: `tests/test_owner_1119.py` + updated
+  expectations in test_v53_backend3, test_standalone_consistency, test_bpm_workflows, test_crosscut, test_im43b.
+- UI: `StageBoard` gained opt-in `columnLocked` (no cross-column moves, reorder inside a column, kept per browser),
+  `freshWhen="needsMe"` (green = new and waiting on me; other cards white) and `getStageKey`/`getItemLabel`. Only the
+  Withdrawal (ProcessBoardPage slug), Practicum and Graduation boards turn them on. Practicum case window: "Request
+  additional certificates" grey until hours are saved, saving keeps the window open, the request shows "...Practicum
+  Document submission has been reopened...". Graduation: "Create graduation batch (n)" under "Select all"; "Mark as
+  acknowledged" button replaces the drag to Acknowledged by Registrar. e2e: new `p145-owner-1119.spec.js`, old specs updated.
+- Second list (same day): green = new and waiting on me, also after my own step moves a card to a new stage (Practicum
+  Completion Review, Graduation Approved ready to export); the stage key includes the filing time. Withdrawal: subject and
+  reason boxes in the student "Send this request?" (confirm `highlights`) and the staff/Dean ActionDialog; red Withdrawn tag
+  on the student enrollment page; automatic batch name derived from the export time (`withdrawal_export_batch_name`, no
+  schema change); new columns "Waiting for Registrar acknowledgement" (Sent to Registrar) and "Registrar acknowledged";
+  per-batch "Mark as sent to the Registrar" / "Registrar acknowledged" buttons. Graduation batch popup: View submitted document.
+- Third list (same day): resetting a Graduation / Withdrawal demo student tops up "Application submitted" / "Excel export"
+  to five other students (`top_up_graduation_demo_queue`, `top_up_withdrawal_demo_queue`; seed helpers factored into
+  `_seed_stage_ready_graduation` / `_seed_stage_ready_withdrawal`, seed determinism tests still pass). Withdrawal: Excel
+  export column has Select all + "Create batch and download Excel list"; columns end "Waiting for Registrar acknowledgement"
+  -> "Acknowledged by Registrar" with per-batch "Mark as acknowledged"; request section (staff, Dean, student read-only)
+  shows subject and reason in green boxes; red Withdrawn tag uses the latest enrollment of the subject in any semester, and
+  the staff Enrollment page shows it red too. e2e `p146-owner-1119-flows` writes data, so it runs in the `autopilot` project.
+- Fourth list (same day): reset-added graduation students get numbers 2799xxx and keep the research baseline
+  (`DEMO_QUEUE_NUMBER_PREFIX`), so they stay eligible and appear in the Dean's CSV (test: full batch flow to the CSV).
+  Withdrawal reason is the student's own words (`student_only` edit rule; staff/Dean 403, no Edit button). Withdrawal board:
+  exported withdrawals are one batch card per batch and stage (`boardItems` in ProcessBoardPage); the Excel export controls
+  and the per-batch "Mark as sent" / "Mark as acknowledged" sit at the top of their columns; the seed stamps one export time
+  per seeded list (without touching updated_at) so older lists group into batches too. RESEED NEEDED (`npm run seed`).
+- Fifth list (same day): columnLocked boards list the newest card first (`getItemTime`; the viewer's own up/down order
+  still wins for cards placed by hand, new ones go above). Withdrawal: no checkbox / Select all in Submitted; "Mark as sent
+  to the Registrar" and "Mark as acknowledged" are buttons inside each batch card (not in the column).
+- Known, not from this work: p97:80 (AWOL Move-to menu: focus before placement can scroll the board; failed 3 of 5 on the
+  original code too; `focus({ preventScroll: true })` in MoveMenu reduces it - not applied, owner said other boards untouched), p97:128, p126-boards5:36,
+  p78:162, p33:316, p98:133, test_crosscut at_risk count, test_policy_assistant off-topic (key=True) and test_uat_serving env example
+  fail on the original code too. Full gate 2026-11-19: 1378 tests, only those pre-existing failures.
+
 ## 2026-11-09 11:10 — FINAL SUBMISSION, FROZEN: `v6.7-fixed` = `main` (content of ee0dd241)
 
 - Owner: no changes after this. `main` was fast-forwarded to `v6.7-fixed` (`git merge -s ours origin/main`, no force

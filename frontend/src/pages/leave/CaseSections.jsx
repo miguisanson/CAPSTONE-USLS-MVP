@@ -5,7 +5,16 @@ import { Button, EditableText, HistoryPanel, StatusChip } from "../../components
 import { Block } from "./leaveUi";
 import { keyFact, plural, restLines, whenDates, whenText } from "./leaveHelpers";
 
-function Row({ label, children, full = false }) {
+function Row({ label, children, full = false, highlight = false }) {
+  // `highlight` (Withdrawal's subject and reason, owner 2026-11-19): a green box across the row so it stands out.
+  if (highlight) {
+    return (
+      <div className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5 sm:col-span-2" data-testid="request-highlight">
+        <dt className="eyebrow text-brand-800">{label}</dt>
+        <dd className="mt-0.5 whitespace-pre-wrap break-words text-base font-semibold text-ink">{children}</dd>
+      </div>
+    );
+  }
   return (
     <div className={full ? "sm:col-span-2" : ""}>
       <dt className="eyebrow">{label}</dt>
@@ -13,6 +22,8 @@ function Row({ label, children, full = false }) {
     </div>
   );
 }
+
+const WITHDRAWAL_HIGHLIGHT = { Subject: "Subject to be withdrawn", Reason: "Reason for withdrawing" };
 
 // AWOL and Withdrawal send their own rows (`summary_rows`); the layout is the same as Leave's.
 function SummaryRows({ item, onEdited }) {
@@ -25,8 +36,17 @@ function SummaryRows({ item, onEdited }) {
             {item.student.student_number} · {item.student.program_name || item.student.program_code}
           </span>
         </Row>
-        {item.summary_rows.map((row) => (
-          <Row key={row.label} label={row.label} full={Boolean(row.full)}>
+        {(item.slug === "withdrawal"
+          // the subject and the reason come first, in their green boxes
+          ? [...item.summary_rows.filter((row) => WITHDRAWAL_HIGHLIGHT[row.label]), ...item.summary_rows.filter((row) => !WITHDRAWAL_HIGHLIGHT[row.label])]
+          : item.summary_rows
+        ).map((row) => (
+          <Row
+            key={row.label}
+            label={(item.slug === "withdrawal" && WITHDRAWAL_HIGHLIGHT[row.label]) || row.label}
+            full={Boolean(row.full)}
+            highlight={item.slug === "withdrawal" && Boolean(WITHDRAWAL_HIGHLIGHT[row.label])}
+          >
             {row.edit ? (
               <EditableText edit={row.edit} value={row.value === "None" ? "" : row.value} onSaved={onEdited} />
             ) : row.date ? formatDate(row.value) : row.value || "-"}
@@ -44,7 +64,7 @@ export function CaseHeadline({ item }) {
   const first = leave ? { label: "Reason", value: keyFact(item) } : { label: item.kind === "READMISSION" ? "Returning in" : "About", value: keyFact(item) };
   const second = leave ? { label: "Leave period", value: whenText(item), sub: whenDates(item) } : restLines(item)[0] ? { label: "Details", value: restLines(item)[0] } : null;
   return (
-    <dl data-testid="case-summary-top" className="grid gap-x-6 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2">
+    <dl data-testid="case-summary-top" className={`grid gap-x-6 gap-y-2 rounded-xl border px-4 py-3 sm:grid-cols-2 ${item.slug === "withdrawal" ? "border-brand-200 bg-brand-50" : "border-slate-200 bg-slate-50"}`}>
       {[first, second].filter(Boolean).map((row) => (
         <div key={row.label} className="min-w-0">
           <dt className="eyebrow">{row.label}</dt>

@@ -160,7 +160,7 @@ class VerifiedPracticumHoursTests(Audit2Base):
         done = self.client("academic_coordinator").post("/api/transactions/practicum", json={"student_id": self.student_id, "status": "Completed"})
         self.assertEqual(done.status_code, 200, done.get_json())
 
-    def test_fewer_verified_hours_than_claimed_needs_a_note_and_sets_hours_incomplete(self):
+    def test_fewer_verified_hours_than_claimed_needs_a_note_and_stays_with_the_coordinator(self):
         record_id = self.under_review(claimed=200)
         no_note = self.verify(verified_hours="150")
         self.assertEqual(no_note.status_code, 400, no_note.get_json())
@@ -168,7 +168,8 @@ class VerifiedPracticumHoursTests(Audit2Base):
         self.assertEqual(response.status_code, 200, response.get_json())
         with app.app_context():
             record = db.session.get(PracticumRecord, record_id)
-            self.assertEqual((record.status, record.verified_hours, record.completed_hours), ("Hours Incomplete", 150, 200))
+            # Owner 2026-11-19: saving only records the hours; the Coordinator then requests additional certificates.
+            self.assertEqual((record.status, record.verified_hours, record.completed_hours), ("Documents Under Review", 150, 200))
             self.assertEqual(record.hours_verified_note, "Certificates add up to 150 hours.")
 
     def test_only_the_academic_coordinator_verifies_and_only_during_documents_review(self):

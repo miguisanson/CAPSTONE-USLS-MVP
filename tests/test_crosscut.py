@@ -196,7 +196,7 @@ class WithdrawalLifecycleTests(CrossCutBase):
             self.assertEqual(self._after_dean_open, [], "Dean review task must close when the Dean decides")
             self.assertEqual([t.title for t in open_tasks(self.student_id, "withdrawal")], [])
 
-    def test_denied_withdrawal_leaves_no_open_task(self):
+    def test_the_dean_cannot_deny_a_withdrawal_and_the_dean_task_stays_open(self):
         with app.app_context():
             student = self._student_login()
             first = self._enrollment("XC-611")
@@ -204,9 +204,11 @@ class WithdrawalLifecycleTests(CrossCutBase):
             staff = self.staff()
             staff.post("/api/transactions/withdrawal", json={"student_id": self.student_id, "workflow_action": "forward_to_dean", "workflow_comment": "Forwarded."})
             application = WithdrawalApplication.query.filter_by(student_id=self.student_id).one()
+            open_before = [t.title for t in open_tasks(self.student_id, "withdrawal")]
             deny = self.dean().post(f"/api/approvals/workflow/withdrawal/{application.id}/decide", json={"decision": "deny", "note": "Not within the approved grounds."})
-            self.assertEqual(deny.status_code, 200, deny.get_json())
-            self.assertEqual([t.title for t in open_tasks(self.student_id, "withdrawal")], [])
+            # Owner 2026-11-19: no deny for a subject withdrawal; nothing changes and the Dean still has the request.
+            self.assertEqual(deny.status_code, 400, deny.get_json())
+            self.assertEqual([t.title for t in open_tasks(self.student_id, "withdrawal")], open_before)
 
 
 def _minimal_row(table, **overrides):

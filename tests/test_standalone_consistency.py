@@ -361,12 +361,13 @@ class StandaloneConsistencyTests(unittest.TestCase):
         with app.app_context():
             self.assertEqual(db.session.get(WithdrawalApplication, application_id).status, "Submitted to GS Staff")
 
-    def test_withdrawal_can_be_denied_with_a_reason_only(self):
+    def test_the_dean_cannot_deny_a_withdrawal(self):
+        """Owner 2026-11-19: a request filed inside the withdrawal window has no reason to be denied."""
         application_id = self.make_withdrawal(status="Dean Review")
-        self.assert_refused(self.move("withdrawal", application_id, "deny", client=self.dean()), "reason")
-        denied = self.move("withdrawal", application_id, "deny", client=self.dean(), comment="Past the window.")
-        self.assertEqual(denied.status_code, 200, denied.get_json())
-        self.assertEqual(denied.get_json()["case"]["status"], "Denied")
+        refused = self.move("withdrawal", application_id, "deny", client=self.dean(), comment="Past the window.")
+        self.assertIn(refused.status_code, (400, 409), refused.get_json())
+        with app.app_context():
+            self.assertEqual(db.session.get(WithdrawalApplication, application_id).status, "Dean Review")
 
     def test_withdrawal_can_be_returned_to_the_student(self):
         application_id = self.make_withdrawal()
@@ -484,7 +485,7 @@ class StandaloneConsistencyTests(unittest.TestCase):
         # The Dean's steps arrive from the server as the card's actions, like staff's.
         withdrawal_id = self.make_withdrawal(status="Dean Review")
         case = [row for row in self.listing("withdrawal", self.dean())["cases"] if row["id"] == withdrawal_id][0]
-        self.assertEqual({a["action"] for a in case["actions"]}, {"approve", "deny", "return"})
+        self.assertEqual({a["action"] for a in case["actions"]}, {"approve", "return"})  # no deny (owner 2026-11-19)
         # AD9 / I-130: staff see the lock ("Waiting for: Dean") on a Dean Review case, no move.
         self.assertEqual([a["action"] for a in self.listing("withdrawal")["cases"][0]["actions"]], [])
         refused = self.move("withdrawal", withdrawal_id, "return", comment="Staff cannot return a case the Dean holds.")

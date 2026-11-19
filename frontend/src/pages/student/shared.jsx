@@ -261,6 +261,7 @@ export function useSubmitRequest(type, onSaved) {
       title: "Send this request?",
       message: [...lines, "Check these details before you send."].join("\n"),
       files: summary.files || [], // the documents sent with the request, each with a View link
+      highlights: summary.highlights || [], // key facts in their own boxes (Withdrawal: the subject and the reason)
       confirmLabel: "Send request",
     });
     if (!sure) return;

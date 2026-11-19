@@ -119,7 +119,7 @@ test.describe("P7.3 boards of the same kind behave the same", () => {
     ["practicum", "Practicum workflow board"],
     ["graduation", "Graduation workflow Kanban board"],
   ]) {
-    test(`${slug}: every card offers Move to... or says why not, and the page has the same toggle`, async ({ page }) => {
+    test(`${slug}: no card offers Move to..., a waiting card says why, and the page has the same toggle`, async ({ page }) => {
       await page.goto(`/workflow/${slug}`);
       const board = page.getByRole("region", { name: region });
       await expect(board).toBeVisible();
@@ -131,13 +131,12 @@ test.describe("P7.3 boards of the same kind behave the same", () => {
         const hasMenu = (await card.getByRole("button", { name: /Move to/ }).count()) > 0;
         const hasReason = (await card.locator("svg.lucide-lock").count()) > 0;
         const draggable = (await card.getAttribute("draggable")) === "true";
+        // Owner 2026-11-19: Practicum and Graduation cards never move to another column by hand (no "Move to..."); every
+        // card can be dragged inside its own column, and a card waiting on someone else still says why.
+        expect(hasMenu, `card ${i}: no Move to on a column-locked board`).toBe(false);
+        expect(draggable, `card ${i}: draggable inside its column`).toBe(true);
         if (hasReason) {
-          expect(hasMenu, `card ${i}: a locked card has no Move to`).toBe(false);
-          expect(draggable, `card ${i}: a locked card is not draggable`).toBe(false);
-          await expect(card.getByText(/^(Waiting for|Only|Open the case|Use|Finished|Exported)/).first(), `card ${i}: the reason is text`).toBeVisible();
-        } else {
-          expect(hasMenu, `card ${i}: a card without a reason offers Move to`).toBe(true);
-          expect(draggable, `card ${i}: and is draggable`).toBe(true);
+          await expect(card.getByText(/^(Waiting for|Only|Open the case|Use|Finished|Exported|Acknowledged|Approved)/).first(), `card ${i}: the reason is text`).toBeVisible();
         }
       }
       if (slug === "practicum") {

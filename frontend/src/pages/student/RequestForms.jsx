@@ -501,10 +501,14 @@ export function WithdrawalRequestForm({ data, onSaved }) {
     }
     clear();
     const windowInfo = selectedSubject?.withdrawal_window;
+    // Owner 2026-11-19: the subject and the reason stand out, each in its own box.
     submit({ student_id: data.student.id, ...form }, {
+      highlights: [
+        { label: "Subject to be withdrawn", value: `${selectedSubject?.course_code || ""} — ${selectedSubject?.course_title || ""}` },
+        { label: "Reason for withdrawing", value: String(form.reason || "").trim() },
+      ],
       lines: [
         "Subject withdrawal",
-        `Subject: ${selectedSubject?.course_code || ""} — ${selectedSubject?.course_title || ""}`,
         `Semester: ${selectedSubject?.term_label || ""}`,
         windowInfo?.fee_consequence ? `Fee: ${windowInfo.fee_consequence}` : "",
       ],
@@ -599,11 +603,15 @@ export function WithdrawalRequestForm({ data, onSaved }) {
               disabledHint={blockedHint}
               label={returned ? "Resubmit withdrawal request" : "Submit withdrawal request"}
             />
-            <p className="meta" data-testid="withdrawal-next">After you send it: Graduate School staff check the request and pass it to the Dean. The Dean says yes or no. You can follow it on this page, in the Request Center, and in the bell. If the Dean says yes, pay or settle any fee at the Business Office.</p>
+            <p className="meta" data-testid="withdrawal-next">After you send it: Graduate School staff check the request and pass it to the Dean. The Dean approves it, or returns it to you to correct. You can follow it on this page, in the Request Center, and in the bell. Once the Dean approves, pay or settle any fee at the Business Office.</p>
           </div>
         ) : (
           <div className="mt-4 space-y-3">
-            <p className="text-sm font-semibold text-ink">{existing?.subject?.course_code || "Subject pending"} — {existing?.subject?.course_title || "Selected subject"}</p>
+            {/* Owner 2026-11-19: the subject and the reason stand out in green boxes. */}
+            <div className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5" data-testid="request-highlight">
+              <p className="eyebrow text-brand-800">Subject to be withdrawn</p>
+              <p className="mt-0.5 text-base font-semibold text-ink">{existing?.subject?.course_code || "Subject pending"} — {existing?.subject?.course_title || "Selected subject"}</p>
+            </div>
             <p className="text-sm text-slate-600">{existing?.effective_term || existing?.subject?.term_label || "Semester pending"} · submitted {formatDate(existing?.created_at)}</p>
             <InlineNotice tone="success" role="status" icon={CalendarClock}>
               <p className="eyebrow text-current">Eligibility recorded at submission</p>
@@ -611,7 +619,10 @@ export function WithdrawalRequestForm({ data, onSaved }) {
               <p className="mt-1 text-xs font-semibold">{existing?.withdrawal_window?.status || "Eligibility recorded"}</p>
               {existing?.withdrawal_window?.fee_consequence && <p className="mt-1 text-xs font-normal">Fee: {existing.withdrawal_window.fee_consequence}</p>}
             </InlineNotice>
-            <p className="text-sm text-slate-600">{existing?.reason || "No reason recorded."}</p>
+            <div className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5" data-testid="request-highlight">
+              <p className="eyebrow text-brand-800">Reason for withdrawing</p>
+              <p className="mt-0.5 whitespace-pre-wrap break-words text-base font-semibold text-ink">{existing?.reason || "No reason recorded."}</p>
+            </div>
           </div>
         )}
       </RequestFormCard>

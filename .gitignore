@@ -107,3 +107,7 @@ instance/app.log
 dist_release/
 # Never track a path with a colon: Windows cannot check it out (v6.6 screenshots under frontend/E:/...)
 *:*
+
+# Owner 2026-11-19: Claude Code / GSD tooling stays on the owner's machine only. Teammates on Windows do not need it to
+# run the app, and it made their clones show thousands of changed files. (The files are untracked, not deleted.)
+.claude/

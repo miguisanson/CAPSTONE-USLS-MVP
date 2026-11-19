@@ -64,7 +64,8 @@ for (const { role, path } of ROLES) {
         }
 
         // Cards: the shared anatomy.
-        const cards = region.locator("article");
+        // Owner 2026-11-19: an exported Withdrawal batch is one group card (like Graduation), not a request card.
+        const cards = region.locator("article").filter({ hasNot: page.locator("[aria-label^='Students in ']") });
         const count = await cards.count();
         expect(count, "the demo data has cards on this board").toBeGreaterThan(0);
         for (let i = 0; i < count; i++) {

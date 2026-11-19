@@ -232,7 +232,7 @@ export const api = {
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
-    return { count: Number(res.headers.get("X-Exported-Count") || 0), filename, registrarEmail: res.headers.get("X-Registrar-Email") || "" };
+    return { count: Number(res.headers.get("X-Exported-Count") || 0), filename, registrarEmail: res.headers.get("X-Registrar-Email") || "", batchName: res.headers.get("X-Batch-Name") || "" };
   },
   // Staff record when an exported withdrawal list was sent to the Registrar and when the Registrar acknowledged it ("sent" | "acknowledged").
   // The case does not move; only the dates are saved.

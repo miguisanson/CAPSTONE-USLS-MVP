@@ -115,7 +115,8 @@ test.describe("p116 edit anything with history", () => {
     await Promise.all([student.dispose(), staff.dispose()]);
   });
 
-  test("Subject withdrawal: staff correct the student's reason and their own message, and read the history", async ({ browser, playwright }) => {
+  // Owner 2026-11-19: the withdrawal reason is the student's own words; only the student changes it (staff have no Edit).
+  test("Subject withdrawal: the student corrects the reason, staff read it (no Edit) and correct their own message", async ({ browser, playwright }) => {
     const staffApi = await playwright.request.newContext({ baseURL: BASE_URL });
     await okJson(await staffApi.post("/api/auth/login", { data: { email: "staff@usls.edu.ph", password: PASSWORD } }), "staff sign in");
 
@@ -139,18 +140,25 @@ test.describe("p116 edit anything with history", () => {
       "staff writes to Elena",
     );
 
+    const cases = (await okJson(await staffApi.get("/api/process-cases?slug=withdrawal"), "withdrawal list")).cases;
+    const filed = cases.find((item) => item.student.name === name && item.status === "Submitted to GS Staff");
+    await okJson(
+      await student.patch(`/api/edits/withdrawal_application/${filed.id}`, {
+        data: { field: "reason", value: "I cannot attend the classes.", reason: "Typo, confirmed with the student" },
+      }),
+      "Elena corrects her reason",
+    );
+    const refused = await staffApi.patch(`/api/edits/withdrawal_application/${filed.id}`, { data: { field: "reason", value: "x", reason: "y" } });
+    expect(refused.status(), "staff cannot change the student's reason").toBe(403);
+
     const { context, page } = await signedIn(browser, "staff@usls.edu.ph");
     await page.goto("/workflow/withdrawal");
     await page.getByRole("button", { name: `View details for ${name}`, exact: true }).click();
     const caseWindow = page.getByRole("dialog");
     await expect(caseWindow.getByRole("heading", { name: "The request", exact: true })).toBeVisible();
 
-    // The student's reason: staff may correct it, with a reason of their own.
-    await field(page, "reason").getByRole("button", { name: "Edit", exact: true }).click();
-    const editor = page.getByRole("dialog").last();
-    await editor.locator("textarea").first().fill("I cannot attend the classes.");
-    await editor.getByLabel(/Reason for the change/).fill("Typo, confirmed with the student");
-    await editor.getByRole("button", { name: "Save change" }).click();
+    // The student's reason: read-only for staff, with the Edited chip and the history.
+    await expect(field(page, "reason").getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
     await expect(field(page, "reason")).toContainText("I cannot attend the classes.");
     const chip = field(page, "reason").locator("[data-edit-chip]");
     await expect(chip).toHaveText("Edited");

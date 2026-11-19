@@ -70,7 +70,9 @@ test.describe("Dean Graduation page", () => {
     const mine = board.locator("div[draggable]").filter({ hasText: BATCH });
     await expect(mine).toHaveCount(1);
     await expect(mine.getByRole("button", { name: `View details for ${BATCH}` })).toBeVisible();
-    await expect(mine.getByRole("button", { name: /Move to/ })).toBeVisible();
+    // Owner 2026-11-19: Graduation cards never move to another column by hand; every card can be reordered in its column.
+    await expect(mine.getByRole("button", { name: /Move to/ })).toHaveCount(0);
+    await expect(mine).toHaveAttribute("draggable", "true");
     // a card that waits for somebody else: the lock reason is text on the card, and there is no "Move to…"
     const theirs = board.getByRole("article").filter({ hasText: OTHER }).locator(".."); // the card and its lock note
     await expect(theirs).toHaveCount(1);

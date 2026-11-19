@@ -375,7 +375,10 @@ export default function Enrollment() {
               </Button>
             </div>
           ) : (
-            <StatusChip status={course.status_label || "Not taken"} dot={false} />
+            course.status_label === "Withdrawn"
+              // Owner 2026-11-19: a withdrawn subject carries a red Withdrawn tag.
+              ? <StatusChip status="Denied" label="Withdrawn" dot={false} data-testid="withdrawn-tag" />
+              : <StatusChip status={course.status_label || "Not taken"} dot={false} />
           )}
           <p className="meta leading-relaxed">{course.status_reason}</p>
           {(notes.byCode[course.course_code] || []).map((note) => (

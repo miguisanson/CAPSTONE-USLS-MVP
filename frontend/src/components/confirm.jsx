@@ -29,6 +29,8 @@ export function ConfirmProvider({ children }) {
         title: options.title || "Are you sure?",
         message: options.message || "",
         files: (options.files || []).filter((file) => file && file.url),
+        // Optional `highlights: [{ label, value }]`: the key facts, each in its own box above the message (Withdrawal uses it).
+        highlights: (options.highlights || []).filter((row) => row && row.value),
         confirmLabel: options.confirmLabel || "Confirm",
         cancelLabel: options.cancelLabel || "Cancel",
         tone: options.tone || "default",
@@ -72,6 +74,16 @@ export function ConfirmProvider({ children }) {
             </>
           }
         >
+          {dialog.highlights.length > 0 && (
+            <dl className="mb-3 space-y-2" data-testid="confirm-highlights">
+              {dialog.highlights.map((row) => (
+                <div key={row.label} className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5">
+                  <dt className="eyebrow text-brand-800">{row.label}</dt>
+                  <dd className="mt-0.5 whitespace-pre-line break-words text-sm font-semibold text-ink">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           {dialog.message && (
             <p id={messageId} className="whitespace-pre-line text-sm leading-relaxed text-slate-600">{dialog.message}</p>
           )}

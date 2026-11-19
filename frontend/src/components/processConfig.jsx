@@ -45,9 +45,9 @@ export const GUIDES = {
   withdrawal: {
     purpose: "Withdraws a student from one enrolled subject until the end of the second week of classes (10% of the term is charged in the first week, 20% in the second), without changing program standing or unrelated classes.",
     submitter: "The student chooses an eligible enrolled subject and states the reason for withdrawing.",
-    reviewers: "Graduate School Staff forwards the request; the Dean approves or denies; an approval returns to GS Staff for Excel export followed by manual Registrar email.",
-    stages: ["Student submission", "GS Staff forwarding", "Dean approval or denial", "Subject removal", "Excel list export", "Manual email and acknowledgement outside the portal"],
-    incomplete: "A Dean denial closes this subject request and leaves every enrollment unchanged. Messages and action comments remain in the case history.",
+    reviewers: "Graduate School Staff forwards the request; the Dean approves it (or returns it to the student to correct); an approval returns to GS Staff for Excel export followed by manual Registrar email.",
+    stages: ["Student submission", "GS Staff forwarding", "Dean approval", "Subject removal", "Excel list export", "Manual email and acknowledgement outside the portal"],
+    incomplete: "A request filed inside the withdrawal window is not denied. Staff or the Dean can return it to the student to correct; messages and action comments remain in the case history.",
     final: "The portal ends at Excel export. GS Staff emails the file through the official channel and waits for Registrar acknowledgement outside the portal.",
   },
 };
@@ -161,7 +161,7 @@ export const PROCESS_CONFIG = {
     icon: LogOut,
     rulesProcess: "withdrawal",
     description: "Withdraw a student from one subject until the end of the second week of classes, without changing program standing.",
-    deanDescription: "Requests to withdraw from one subject that Graduate School staff forwarded for your decision. Approve, return or deny each one.",
+    deanDescription: "Requests to withdraw from one subject that Graduate School staff forwarded for your decision. Approve each one, or return it to the student to correct.",
     noun: "requests",
     boardLabel: "Subject withdrawal board",
     emptyTitle: "No withdrawal requests yet",

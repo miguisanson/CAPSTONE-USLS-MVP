@@ -95,8 +95,8 @@ class SeedFixTests(unittest.TestCase):
         from standalone_process import BOARD_COLUMNS, SLUG_WITHDRAWAL
         columns = BOARD_COLUMNS[SLUG_WITHDRAWAL]
         todo = next(c for c in columns if "Exported - Ready to Send" in c["statuses"])
-        # v6.7 merge: Khloe's rule (owner 2026-11-09): the Sent column is merged; exported counts as finished
-        self.assertEqual(todo["statuses"], ["Exported - Ready to Send", "Sent to Registrar", "Withdrawn Confirmed"])
+        # Owner 2026-11-19: exported, sent (waiting for the Registrar's acknowledgement) and acknowledged are three columns.
+        self.assertEqual(todo["statuses"], ["Exported - Ready to Send"])
         self.assertFalse(any(c is not todo and "Exported - Ready to Send" in c["statuses"] for c in columns))
         for column in columns:
             self.assertLessEqual(len(column["description"]), 90, column["key"])

@@ -57,10 +57,10 @@ export default defineConfig({
     // "pages": its own project runs after every other writer has finished (e2e/DATA-OWNERSHIP.md).
     ...(negative
       ? []
-      : [{ name: "pages", testMatch: /(^|[\/])p(?!115-|122-)\d+-[\w-]+\.spec\.js$/, dependencies: ["setup"] }]),
+      : [{ name: "pages", testMatch: /(^|[\/])p(?!115-|122-|146-)\d+-[\w-]+\.spec\.js$/, dependencies: ["setup"] }]),
     ...(negative
       ? []
-      : [{ name: "autopilot", testMatch: /p(115-autopilot|122-autopilot-more)\.spec\.js$/, dependencies: ["sweep", "section-j", "pages"] }]),
+      : [{ name: "autopilot", testMatch: /p(115-autopilot|122-autopilot-more|146-owner-1119-flows)\.spec\.js$/, dependencies: ["sweep", "section-j", "pages"] }]),
     // Phase 5 component gallery at /__ui (ui-gallery.spec.js plus one ui-gallery-<packet>.spec.js per packet). Read-only. Needs the e2e build (VITE_UI_GALLERY=1, set by
     // `node scripts/e2e.mjs --build`, which `npm run e2e` uses). Not in the negative control.
     ...(negative

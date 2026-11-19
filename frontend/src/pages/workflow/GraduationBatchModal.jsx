@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileCheck, Briefcase, CheckSquare, BookOpenCheck } from "lucide-react";
+import { FileCheck, Briefcase, CheckSquare, BookOpenCheck, Eye } from "lucide-react";
 import { api } from "../../api";
 import { Field, Select } from "../../components/ui/index.js";
 import StepDialog from "../../components/StepDialog";
@@ -168,6 +168,19 @@ export function GraduationBatchModal({ rows, allRows, accountRole, reviewWindows
                       <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
                     </div>
                     <div className="flex flex-wrap justify-end gap-2">
+                      {/* Owner 2026-11-19: the application the student submitted opens from here too (a new tab). */}
+                      {row.endorsement?.request_attachment?.url && row.endorsement.request_attachment.file_exists !== false && (
+                        <a
+                          href={row.endorsement.request_attachment.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn-ghost cursor-pointer px-2.5 py-1.5 text-xs transition-colors"
+                          aria-label={`View the submitted graduation application of ${row.student.name} (opens in a new tab)`}
+                        >
+                          <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                          View submitted document
+                        </a>
+                      )}
                       {showCourseworkActions && (
                         <button
                           type="button"

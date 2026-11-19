@@ -123,7 +123,8 @@ test.describe("I-252: the Academic Coordinator enters the verified practicum hou
     await dialog.getByLabel(/^Note/).fill("The certificates add up to 150 hours.");
     await expect(save).toBeEnabled();
     await save.click();
-    await expect(page.getByText("Spec: hours verified.")).toBeVisible();
+    // Owner 2026-11-19: saving keeps the case window open and says so there (p145 covers the next step).
+    await expect(dialog.getByText(/Verified hours saved \(150\)/)).toBeVisible();
     expect(writes[0]).toEqual({ student_id: expect.any(Number), status: "Record Verified Hours", verified_hours: "150", verified_note: "The certificates add up to 150 hours." });
   });
 });

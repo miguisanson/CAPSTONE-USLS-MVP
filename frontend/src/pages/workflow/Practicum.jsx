@@ -3,7 +3,7 @@ import { ArrowUpRight, Eye, MessageSquare } from "lucide-react";
 import { Button, DataTable, EditableText, EmptyState, Field, InlineNotice, Input, StatCard, StatusChip, Textarea } from "../../components/ui/index.js";
 import StepDialog from "../../components/StepDialog";
 import WorkflowTimeline from "../../components/WorkflowTimeline";
-import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
+import StageBoard, { BoardNotice, BoardSummary, COLUMN_LOCKED_HINT, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
 import { useOpenFilters } from "../leave/useOpenFilter";
@@ -21,7 +21,8 @@ function hoursText(record) {
 }
 
 // The Academic Coordinator enters the hours verified from the certificates (and says why if they differ from the claim).
-function VerifiedHoursForm({ record, student, onSave }) {
+// Owner 2026-11-19: saving keeps the case window open; the step button below then turns on.
+function VerifiedHoursForm({ record, student, onSave, savedMessage = "" }) {
   const reported = record.reported_hours ?? record.completed_hours ?? 0;
   const [hours, setHours] = useState(record.verified_hours == null ? "" : String(record.verified_hours));
   const [note, setNote] = useState(record.hours_verified_note || "");
@@ -35,6 +36,7 @@ function VerifiedHoursForm({ record, student, onSave }) {
       await onSave({ student_id: student.id, status: "Record Verified Hours", verified_hours: hours, verified_note: note.trim() });
     } catch (err) {
       setError(err.message || "Could not save the verified hours.");
+    } finally {
       setBusy(false);
     }
   }
@@ -51,6 +53,7 @@ function VerifiedHoursForm({ record, student, onSave }) {
         </Field>
       </div>
       {error && <InlineNotice tone="danger" className="mt-3">{error}</InlineNotice>}
+      {savedMessage && !error && <InlineNotice tone="success" role="status" className="mt-3">{savedMessage}</InlineNotice>}
       <Button className="mt-3" disabled={busy || hours === "" || (differs && !note.trim())} onClick={save}>{busy ? "Saving…" : record.verified_hours == null ? "Save verified hours" : "Update verified hours"}</Button>
       {record.verified_hours != null && record.hours_verified_by && <p className="meta mt-2">Last verified by {record.hours_verified_by}{record.hours_verified_at ? ` on ${formatDate(record.hours_verified_at)}` : ""}.</p>}
     </div>
@@ -118,6 +121,7 @@ const PRACTICUM_BOARD_COLUMNS = [
 // The same columns for the shared StageBoard (each needs a key).
 const PRACTICUM_STAGE_COLUMNS = PRACTICUM_BOARD_COLUMNS.map((column) => ({ ...column, key: column.label }));
 const practicumBoardItemId = (row) => row.student.id;
+const practicumStageKey = (row) => `${row.record?.status || "Not Submitted"}|${row.record?.verified_hours ?? ""}|${row.record?.created_at || ""}`;
 const practicumBoardColumnKey = (row) =>
   PRACTICUM_STAGE_COLUMNS.find((column) => column.statuses.includes(row.record?.status || "Not Submitted"))?.key || "";
 
@@ -169,6 +173,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
   const [viewMode, setViewMode] = useState("board");
   const [pendingAction, setPendingAction] = useState(null);
   const [moveRow, setMoveRow] = useState(null); // the card a drop or "Move to..." opened the confirm window for
+  const [hoursSaved, setHoursSaved] = useState(""); // the "Verified hours saved" line in the open case window
   const reset = useDemoCaseReset("practicum", refetch);
   // A reset answers in the board notice too. The case window closes so the notice is not hidden behind it.
   useEffect(() => {
@@ -203,6 +208,10 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
     if (accountRole === "staff" && ["Hours Incomplete", "Documents Submitted"].includes(record.status)) {
       return { label: "Forward documents to Academic Coordinator", payload: { ...base, status: "Documents Under Review" }, needsHours: Boolean(record.hours_need_entry) };
     }
+    // Owner 2026-11-19: the Coordinator saves the hours seen on the certificates first; until then the button is grey.
+    if (accountRole === "academic_coordinator" && record.status === "Documents Under Review" && record.verified_hours == null) {
+      return { label: "Request additional certificates", payload: { ...base, status: "Additional Certificates Requested" }, requireReason: true, disabled: true, disabledReason: "Save the verified hours first." };
+    }
     if (accountRole === "academic_coordinator" && record.status === "Documents Under Review" && row.hours_status !== "Complete") {
       return { label: "Request additional certificates", payload: { ...base, status: "Additional Certificates Requested" }, requireReason: true };
     }
@@ -222,7 +231,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
   // step really leads to. A step that stays in the same column is done from the case window.
   function practicumMoveFor(row) {
     const action = actionFor(row);
-    if (!action) return null;
+    if (!action || action.disabled) return null;
     const from = practicumBoardColumnKey(row);
     const to = PRACTICUM_STAGE_COLUMNS.find((column) => column.statuses.includes(action.payload.status));
     return to && to.key !== from ? { action, to } : null;
@@ -230,6 +239,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
   function practicumLockReason(row) {
     if (!row.record) return "Waiting for: Student";
     const action = actionFor(row);
+    if (action?.disabled) return "Open the case to: Save verified hours";
     if (action) return `Open the case to: ${action.label}`;
     return `Waiting for: ${row.next_action_owner || "the next reviewer"}`;
   }
@@ -249,16 +259,32 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
 
   // A confirmed step: the dialogs and the case window close, the board says what happened.
   async function confirmStep(payload) {
+    const student = (moveRow || selectedRow)?.student;
     const saved = await submit(payload, { strict: true });
     setPendingAction(null);
     setMoveRow(null);
     setSelectedStudentId(null);
-    boardNotice.show("success", saved?.message || "Saved.");
+    setHoursSaved("");
+    // Owner 2026-11-19: say plainly that the student can send a new file.
+    if (payload.status === "Additional Certificates Requested") {
+      boardNotice.show("success", `${student?.name ? `${student.name}: ` : ""}Student's Practicum Document submission has been reopened for a new submission.`);
+    } else boardNotice.show("success", saved?.message || "Saved.");
+  }
+
+  // Saving the verified hours keeps the case window open, so the next step (request additional certificates or verify
+  // completion) can be chosen right after.
+  async function saveVerifiedHours(payload) {
+    await submit(payload, { strict: true });
+    const short = Number(payload.verified_hours) < Number(selectedRow?.record?.required_hours || 0);
+    setHoursSaved(short
+      ? `Verified hours saved (${payload.verified_hours}). The hours are short: select Request additional certificates.`
+      : `Verified hours saved (${payload.verified_hours}). Select Verify completion.`);
   }
 
   function openCase(studentId) {
     clearSubmitFeedback();
     reset.clearResetFeedback();
+    setHoursSaved("");
     setSelectedStudentId(studentId);
   }
 
@@ -277,7 +303,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
       <ProcessScopeNote title="Program scope: Psychology and MSGC only">
         {context.practicum_program_scope?.description || "This roster includes only Psychology programs and the Master of Science in Guidance and Counseling (MSGC)."} Students from every other program are excluded from the practicum roster and actions.
       </ProcessScopeNote>
-      <BoardSummary line={summaryLine} windowName="case window" />
+      <BoardSummary line={summaryLine} windowName="case window" hint={COLUMN_LOCKED_HINT} />
       <BoardFilterRow toggle={<ViewToggle value={viewMode} onChange={setViewMode} />}>
         <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={filteredRows.length} total={rows.length} noun="students" />
       </BoardFilterRow>
@@ -302,6 +328,12 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
           onMove={movePracticumRow}
           emptyText="No practicum students here"
           boardNotice={boardNotice}
+          columnLocked
+          freshWhen="needsMe"
+          needsMe={(row) => Boolean(actionFor(row))}
+          getStageKey={practicumStageKey}
+          getItemLabel={(row) => row.student.name}
+          getItemTime={(row) => row.last_activity_at || row.record?.updated_at || ""}
         />
       ) : filteredRows.length === 0 ? (
         <>
@@ -368,10 +400,17 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
               {selectedRow.record && <Button variant="secondary" icon={MessageSquare} onClick={() => setMessageRow(selectedRow)}>Message / Return</Button>}
               {selectedAction ? (
                 <div>
-                  <Button disabled={submitting || refreshing} onClick={() => setPendingAction({ ...selectedAction, fromStatus: selectedRow.record.status, toStatus: selectedAction.payload.status })}>
+                  <Button
+                    variant={selectedAction.disabled ? "secondary" : "primary"}
+                    disabled={submitting || refreshing || Boolean(selectedAction.disabled)}
+                    aria-describedby={selectedAction.disabled ? "practicum-step-hint" : undefined}
+                    onClick={() => setPendingAction({ ...selectedAction, fromStatus: selectedRow.record.status, toStatus: selectedAction.payload.status })}
+                  >
                     {submitting ? "Saving…" : refreshing ? "Updating…" : selectedAction.label}
                   </Button>
-                  {selectedAction.label === "Request additional certificates" && <p className="mt-1 text-xs font-semibold text-red-700">*Incomplete hours</p>}
+                  {selectedAction.disabled ? (
+                    <p id="practicum-step-hint" className="mt-1 text-xs font-semibold text-slate-600">{selectedAction.disabledReason}</p>
+                  ) : selectedAction.label === "Request additional certificates" && <p className="mt-1 text-xs font-semibold text-red-700">*Incomplete hours</p>}
                 </div>
               ) : (
                 <span className="meta self-center font-semibold">{selectedRow.record ? `No ${WORKFLOW_ROLE_LABELS[accountRole]} action is currently due.` : "Awaiting student submission."}</span>
@@ -381,7 +420,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
         >
           <div className="space-y-4">
             {accountRole === "academic_coordinator" && selectedRow.record?.status === "Documents Under Review" && (
-              <VerifiedHoursForm key={`${selectedRow.student.id}-${selectedRow.record.verified_hours ?? "none"}`} record={selectedRow.record} student={selectedRow.student} onSave={confirmStep} />
+              <VerifiedHoursForm key={selectedRow.student.id} record={selectedRow.record} student={selectedRow.student} onSave={saveVerifiedHours} savedMessage={hoursSaved} />
             )}
             <PracticumCaseDetails row={selectedRow} />
             <CaseMessageHistory messages={selectedRow.messages} onReply={(message) => { setReplyTo(message); setMessageRow(selectedRow); }} />

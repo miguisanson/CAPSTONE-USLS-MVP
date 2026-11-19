@@ -94,11 +94,17 @@ test.describe("conC: the six boards have the same parts", () => {
       await expect(line).toBeVisible();
       const lineText = ((await line.textContent()) || "").trim();
       expect(lineText, "a count per column, or 'No ... yet'").toMatch(/^\d+ .+$|^No .+ yet$/);
-      await expect(summary).toContainText("Move to");
+      // Owner 2026-11-19: Withdrawal, Practicum and Graduation say cards move by themselves; the other boards keep "Move to".
+      await expect(summary).toContainText(["withdrawal", "practicum", "graduation"].includes(slug) ? "moves to the next column by itself" : "Move to");
       // The numbers add up to the cards on the board (nothing is filtered at page load).
       const cards = cardsOf(board);
       const total = [...lineText.matchAll(/(?:^|, )(\d+) /g)].reduce((sum, match) => sum + Number(match[1]), 0);
-      expect(total, `"${lineText}" adds up to the cards on the board`).toBe(await cards.count());
+      // Owner 2026-11-19: an exported Withdrawal batch is one card for several students ([data-batch-count]).
+      const shown = await cards.evaluateAll((nodes) => nodes.reduce((sum, node) => {
+        const batch = node.querySelector("[data-batch-count]");
+        return sum + (batch ? Number(batch.getAttribute("data-batch-count")) : 1);
+      }, 0));
+      expect(total, `"${lineText}" adds up to the cards on the board`).toBe(shown);
 
       // Every column has a one-line description under its title.
       const sections = board.locator(":scope section[aria-label]");
@@ -115,6 +121,7 @@ test.describe("conC: the six boards have the same parts", () => {
       const count = await cards.count();
       for (let i = 0; i < count; i++) {
         const card = cards.nth(i);
+        if (await card.locator("[data-batch-count]").count()) continue; // a batch card lists its students, each with View
         const buttons = card.getByRole("button");
         const names = await buttons.evaluateAll((nodes) => nodes.map((node) => ({ name: node.getAttribute("aria-label") || node.textContent.trim(), text: node.textContent.trim(), primary: node.classList.contains("btn-primary") })));
         const view = names.filter((item) => /^View details for /.test(item.name));
@@ -124,7 +131,9 @@ test.describe("conC: the six boards have the same parts", () => {
         // CHANGED BY kstand (I-360): LOA, readmission, AWOL, withdrawal and residency cards are Khloe's cards too: View + Message.
         const khloe = true;
         if (slug !== "graduation") expect(view[0].text, `card ${i}: the button says "View"`).toBe("View");
-        const KHLOE_EXTRA = /^Message |^(View|Hide) students$|^Select batch$|^Export batch|^Select .* for batch creation$/;
+        // Owner 2026-11-19: Withdrawal, Practicum and Graduation cards are reordered in their column with up/down buttons, and an
+        // exported graduation batch has "Mark as acknowledged".
+        const KHLOE_EXTRA = /^Message |^(View|Hide) students$|^Select batch$|^Export batch|^Select .* for batch creation$|^Move .+ (up|down)$|^Mark as acknowledged$/;
         for (const item of names) {
           const allowedExtra = khloe && (KHLOE_EXTRA.test(item.name) || (slug === "graduation" && item.primary));
           expect(item.primary && !allowedExtra, `card ${i}: "${item.name}" is a primary button on a card`).toBe(false);

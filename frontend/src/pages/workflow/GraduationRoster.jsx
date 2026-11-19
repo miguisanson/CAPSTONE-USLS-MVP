@@ -12,6 +12,7 @@ import {
   Printer,
   Send,
   Users,
+  Plus,
 } from "lucide-react";
 import { api } from "../../api";
 import { useConfirm } from "../../components/confirm";
@@ -24,7 +25,7 @@ import WorkflowTimeline, { graduationTimelineSteps } from "../../components/Work
 import ListExportButtons from "../../components/ListExportButtons";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
 import ExportHistory from "../../components/ExportHistory";
-import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
+import StageBoard, { BoardNotice, BoardSummary, COLUMN_LOCKED_HINT, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
 import { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { GroupBadge, GroupCard, GroupOverview, MemberList, StageColumnHeader, selectionWords, stageCheckSummary } from "../../components/process";
 import { GraduationBatchModal } from "./GraduationBatchModal";
@@ -76,7 +77,7 @@ function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, det
 
 // "View details" on a batch card: the stage check and, below it, every student of the batch.
 // The batch's step (and the Dean's Export) are buttons in this window, not on the card, like the process boards.
-function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStudent, onMessageStudent, onProcessBatch, onExportBatch, onPrintBatch = null, exporting = false }) {
+function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStudent, onMessageStudent, onProcessBatch, onExportBatch, onAcknowledgeBatch = null, onPrintBatch = null, exporting = false }) {
   const currentStage = stageCheckSummary(graduationBatchStages(group)).current;
   const modalId = `graduation-stage-${String(group.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
   const stageSelection = graduationStageSelection(group.rows, accountRole);
@@ -92,6 +93,9 @@ function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStuden
       footer={(
         <>
           {onPrintBatch && <Button variant="secondary" icon={Printer} onClick={() => onPrintBatch(group)}>Print endorsement</Button>}
+          {onAcknowledgeBatch && graduationAwaitingAcknowledgement(group) && graduationCanAcknowledge(accountRole) && (
+            <Button variant={canExport ? "secondary" : "primary"} icon={CheckSquare} onClick={() => onAcknowledgeBatch(group)}>Mark as acknowledged</Button>
+          )}
           {canExport ? (
             <Button icon={Download} loading={exporting} onClick={() => onExportBatch(group)}>
               {exporting ? "Exporting…" : alreadyExported ? "Export approved list again" : "Export approved list"}
@@ -211,6 +215,11 @@ function graduationReadyForDeanReview(group) {
 
 function graduationBoardItemId(item) {
   return item.kind === "student" ? `student:${item.row.student.id}` : `batch:${item.group.id}`;
+}
+
+// The stage a card is at, for the green "New for you" mark (owner 2026-11-19): the column, and for a batch its status.
+function graduationStageKey(item) {
+  return item.kind === "student" ? `${item.stage}|${item.row.endorsement?.submitted_at || ""}` : `${graduationBoardColumnKey(item)}|${item.group.boardStatus}`;
 }
 
 function graduationBoardColumnKey(item) {
@@ -406,7 +415,7 @@ function graduationBatchFacts(group) {
 }
 
 // The batch card in Khloe's layout: GroupCard with Students, Next, the stage strip, and View students / Select batch / the step.
-function GraduationBatchCard({ group, accountRole, selectedIds, expanded, onToggleBatch, onToggleExpanded, onViewBatch, onProcessBatch, onExportBatch, exporting, children }) {
+function GraduationBatchCard({ group, accountRole, selectedIds, expanded, onToggleBatch, onToggleExpanded, onViewBatch, onProcessBatch, onExportBatch, onAcknowledgeBatch = null, exporting, children }) {
   const selection = graduationBatchSelectionState(group, selectedIds);
   const stageSelection = graduationStageSelection(group.rows, accountRole);
   const facts = graduationBatchFacts(group);
@@ -444,6 +453,10 @@ function GraduationBatchCard({ group, accountRole, selectedIds, expanded, onTogg
         <>
           <Button variant="secondary" size="sm" icon={Users} onClick={() => onToggleExpanded(group.id)} aria-expanded={expanded}>{expanded ? "Hide students" : "View students"}</Button>
           {onToggleBatch && <Button variant="secondary" size="sm" onClick={() => onToggleBatch(group)}>Select batch</Button>}
+          {/* Owner 2026-11-19: cards no longer move to another column by hand, so the Registrar's acknowledgement is a button. */}
+          {onAcknowledgeBatch && graduationAwaitingAcknowledgement(group) && graduationCanAcknowledge(accountRole) && (
+            <Button size="sm" icon={CheckSquare} onClick={() => onAcknowledgeBatch(group)}>Mark as acknowledged</Button>
+          )}
           {canExport ? (
             <Button size="sm" icon={Download} loading={exporting} onClick={() => onExportBatch(group)}>{alreadyExported ? "Export batch again" : "Export batch"}</Button>
           ) : stageSelection.action ? (
@@ -706,6 +719,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
         onViewBatch={(group) => setStageGroupId(group.id)}
         onProcessBatch={processBatchGroup}
         onExportBatch={accountRole === "dean" ? (group) => exportApproved([group]) : null}
+        onAcknowledgeBatch={acknowledgeBatch}
         exporting={exportingBatchId === item.group.id}
       >
         <GraduationBatchStudentList
@@ -747,15 +761,24 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
   function selectAllButton(column, columnItems, place) {
     if (column.key !== "stage-2" || accountRole !== "staff" || !columnItems.length) return null;
     const allOn = columnItems.every((item) => selectedIds.has(item.row.student.id));
+    const ticked = columnItems.filter((item) => selectedIds.has(item.row.student.id)).length;
     return (
-      <button
-        type="button"
-        onClick={() => setSelectedIds(allOn ? new Set() : new Set(readyForBatchRows.map((row) => row.student.id)))}
-        className={`${place} inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors duration-200 hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-500 max-sm:min-h-11`}
-      >
-        <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
-        {allOn ? "Clear selection in this column" : "Select all in this column"}
-      </button>
+      <div className={`${place} flex flex-wrap items-center gap-2`}>
+        <button
+          type="button"
+          onClick={() => setSelectedIds(allOn ? new Set() : new Set(readyForBatchRows.map((row) => row.student.id)))}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors duration-200 hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-500 max-sm:min-h-11"
+        >
+          <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
+          {allOn ? "Clear selection in this column" : "Select all in this column"}
+        </button>
+        {/* Owner 2026-11-19: the step that makes the batch sits right here, as soon as a candidate is ticked. */}
+        {ticked > 0 && (
+          <Button size="sm" icon={Plus} onClick={createPreBatch}>
+            {`Create graduation batch (${ticked})`}
+          </Button>
+        )}
+      </div>
     );
   }
   // A phone shows plain stage headings (no custom header), so there the button stays under the column's cards.
@@ -860,7 +883,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
   return (
     <div className="flex flex-col gap-4">
       {/* No card title and no loose line under the header: the page header says it all, with who does what in its description (finding 11, I-157). */}
-      <BoardSummary line={summaryLine} windowName="details window" />
+      <BoardSummary line={summaryLine} windowName="details window" hint={COLUMN_LOCKED_HINT} />
       {accountRole === "dean" && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <Button icon={Download} loading={exportingBatchId === "all"} disabled={!approvedGroups.length} onClick={() => exportApproved(exportGroups, "all")} className="max-sm:w-full">
@@ -929,6 +952,11 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           renderColumnHeader={renderBoardColumnHeader}
           columnClassName="w-[320px]"
           emptyText="No candidates here"
+          columnLocked
+          freshWhen="needsMe"
+          getStageKey={graduationStageKey}
+          getItemLabel={(item) => (item.kind === "student" ? item.row.student.name : item.group.label)}
+          getItemTime={(item) => (item.kind === "student" ? item.row.last_activity_at || item.row.endorsement?.updated_at || "" : item.group.updatedAt || "")}
         />
         </div>
       ) : tableRows.length ? (
@@ -964,6 +992,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           onProcessBatch={processBatchGroup}
           onExportBatch={accountRole === "dean" ? (group) => { setStageGroupId(null); exportApproved([group]); } : null}
           onPrintBatch={accountRole === "dean" ? printGraduationBatch : null}
+          onAcknowledgeBatch={(group) => { setStageGroupId(null); acknowledgeBatch(group); }}
           exporting={exportingBatchId === stageGroup.id}
         />
       )}

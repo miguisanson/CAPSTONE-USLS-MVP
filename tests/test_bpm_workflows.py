@@ -387,6 +387,16 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             db.session.commit()
             self._transition(staff, "practicum", {"student_id": self.student.id, "status": "Documents Under Review"})
             self.assertEqual(record.status, "Documents Under Review")
+            # Owner 2026-11-19: the verified hours are saved first, then additional certificates can be requested.
+            self._transition(academic, "practicum", {
+                "student_id": self.student.id,
+                "status": "Additional Certificates Requested",
+                "return_reason": "Upload the signed completion certificate.",
+            }, 400)
+            self._transition(academic, "practicum", {
+                "student_id": self.student.id, "status": "Record Verified Hours", "verified_hours": "0",
+                "verified_note": "No certificate hours yet.",
+            })
             self._transition(academic, "practicum", {
                 "student_id": self.student.id,
                 "status": "Additional Certificates Requested",
@@ -614,9 +624,11 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
                 f"/api/approvals/workflow/withdrawal/{denied.id}/decide",
                 json={"decision": "deny", "note": "The request does not meet the approved withdrawal grounds."},
             )
-            self.assertEqual(response.status_code, 200)
+            # Owner 2026-11-19: the Dean cannot deny a subject withdrawal; the request stays with the Dean.
+            self.assertEqual(response.status_code, 400, response.get_json())
             db.session.refresh(denied_student)
-            self.assertEqual(denied.status, "Denied")
+            db.session.refresh(denied)
+            self.assertEqual(denied.status, "Dean Review")
             self.assertEqual(denied_student.standing, "Active")
             self.assertEqual(denied_student.enrollment_tag, "Enrolled")
 

@@ -90,7 +90,10 @@ export function MyCoursesPanel({ data, onSaved }) {
                 return <label key={subject.id} className={`flex items-start gap-3 border-b border-slate-100 p-3 last:border-b-0 ${disabled ? "cursor-not-allowed bg-slate-50/70" : "cursor-pointer transition-colors hover:bg-brand-50/40"}`}>
                   <input type="checkbox" checked={subject.status === "Completed" || checked} onChange={() => toggle(subject)} disabled={disabled} title={closed ? period.reason : undefined} className="mt-1 h-4 w-4 accent-brand-600" aria-label={`Currently enrolled in ${subject.code}`} />
                   <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{subject.code} · {subject.title}</span><span className="meta mt-0.5 block">{subject.units} units · {subject.recommended_term || "No suggested semester"}</span></span>
-                  <span className="flex flex-wrap justify-end gap-1.5"><StatusChip status={subject.status === "Missing" ? "Not taken" : subject.status} dot={false} /><StatusChip status={subject.is_offered ? "Offered" : "Not offered"} dot={false} /></span>
+                  <span className="flex flex-wrap justify-end gap-1.5">{subject.status === "Withdrawn"
+                    // Owner 2026-11-19: a withdrawn subject carries a red Withdrawn tag on the student's enrollment page.
+                    ? <StatusChip status="Denied" label="Withdrawn" dot={false} data-testid="withdrawn-tag" />
+                    : <StatusChip status={subject.status === "Missing" ? "Not taken" : subject.status} dot={false} />}<StatusChip status={subject.is_offered ? "Offered" : "Not offered"} dot={false} /></span>
                 </label>;
               })}
             </div>

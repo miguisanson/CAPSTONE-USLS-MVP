@@ -5511,6 +5511,9 @@ def student_enrollment_snapshot(
         item.course_id: item
         for item in CourseRecord.query.filter_by(student_id=student.id).all()
     }
+    latest_by_course: dict[int, SubjectEnrollment] = {}
+    for item in rows:  # newest semester first
+        latest_by_course.setdefault(item.course_id, item)
     return {
         "term": term_dict(term),
         "offered_subjects": [
@@ -5538,7 +5541,13 @@ def student_enrollment_snapshot(
                     course.id in current_by_course
                     and current_by_course[course.id].status in ACTIVE_SUBJECT_ENROLLMENT_STATUSES
                 ),
-                "status": records[course.id].status if course.id in records else "Missing",
+                # Owner 2026-11-19: a withdrawn subject says so (the withdrawal resets the monitoring row). The latest
+                # enrollment of the subject decides, in any semester: demo withdrawals are often for the next one.
+                "status": (
+                    "Withdrawn"
+                    if course.id in latest_by_course and latest_by_course[course.id].status == "Withdrawn"
+                    else records[course.id].status if course.id in records else "Missing"
+                ),
             }
             for course in monitoring_curriculum_courses(student.program)
         ],
@@ -6061,10 +6070,10 @@ _NOTE_STAFF = ("staff", "academic_coordinator", "research_coordinator")
 
 
 def _f(kind, *, roles=_NOTE_STAFF, check=None, get=None, apply=None, applies=None, options=None,
-       label="", multiline=True, staff_for_panel=False):
+       label="", multiline=True, staff_for_panel=False, student_only=False):
     return {"kind": kind, "roles": roles, "check": check or _edit_text(), "get": get, "apply": apply,
             "applies": applies, "options": options, "label": label, "multiline": multiline,
-            "staff_for_panel": staff_for_panel}
+            "staff_for_panel": staff_for_panel, "student_only": student_only}
 
 
 def _note(label, roles=_NOTE_STAFF, limit=4000):
@@ -6131,7 +6140,8 @@ def _build_editable() -> dict:
             "request": lambda r: r.id,
             "open": lambda r: r.status in {"Submitted to GS Staff", "Returned", "Returned for Clarification"},
             "fields": {
-                "reason": _f("request", label="Reason"),
+                # Owner 2026-11-19: the withdrawal reason is the student's own words; reviewers read it, never change it.
+                "reason": _f("request", label="Reason", student_only=True),
                 "staff_remarks": _note("Staff notes"),
                 "academic_coordinator_remarks": _note("Academic Coordinator remarks", ("academic_coordinator",)),
                 "dean_remarks": _note("Dean remarks", ("dean",)),
@@ -6229,6 +6239,8 @@ def record_edit_rule(account, entity: str, row, field: str) -> dict:
         if not account.student_id or account.student_id != spec["student"](row):
             raise EditRefused("This is not your request.", 403)
         return {"reason_required": True}  # even after staff acted: the history and chip show the change to everyone
+    if fspec.get("student_only"):
+        raise EditRefused("Only the student can change this; it is the student's own words.", 403)
     if role in EDIT_STAFF_ROLES:
         return {"reason_required": True}
     raise EditRefused("Only the student or Graduate School staff can edit this.", 403)
@@ -10176,6 +10188,28 @@ def _process_brief_for_earlier(slug: str, kind_label: str, status: str, period: 
     }
 
 
+def withdrawal_export_batch_name(application: WithdrawalApplication) -> str | None:
+    """Owner 2026-11-19: every Excel export is one batch, named like a graduation batch ("Batch 2 November 2026").
+
+    The withdrawals exported together share one export time, so the batch is derived from it: the n-th export of that
+    month. Nothing is typed and nothing extra is stored."""
+    at = application.registrar_report_generated_at
+    if not at:
+        return None
+    start = datetime(at.year, at.month, 1)
+    end = datetime(at.year + (at.month == 12), at.month % 12 + 1, 1)
+    stamps = sorted({
+        stamp for (stamp,) in WithdrawalApplication.query
+        .with_entities(WithdrawalApplication.registrar_report_generated_at)
+        .filter(WithdrawalApplication.registrar_report_generated_at >= start,
+                WithdrawalApplication.registrar_report_generated_at < end)
+        .distinct().all()
+        if stamp
+    })
+    number = stamps.index(at) + 1 if at in stamps else len(stamps) + 1
+    return f"Batch {number} {at:%B} {at.year}"
+
+
 def withdrawal_process_case(application: WithdrawalApplication, role: str = "staff", detail: bool = False) -> dict:
     student = application.student
     subject = application.subject_enrollment
@@ -10221,7 +10255,9 @@ def withdrawal_process_case(application: WithdrawalApplication, role: str = "sta
         "window": ({"status": window["status"], "deadline": window.get("deadline"), "fee_percent": window.get("fee_percent"),
                     "fee_tier": window.get("fee_tier")} if window else None),
         "reason_category": "",
-        "batch_name": None,
+        # Owner 2026-11-19: the reason is on the card too, so the staff and Dean confirm windows can show it in its own box.
+        "reason": application.reason or "",
+        "batch_name": withdrawal_export_batch_name(application),
         "registrar": {"status": registrar, "exported_at": iso(application.registrar_report_generated_at),
                       "sent_at": iso(application.registrar_sent_at), "acknowledged_at": iso(application.registrar_confirmed_at),
                       **registrar_export_history("withdrawal", application.student_id, WITHDRAWAL_EXPORT_RESULT, application.created_at)},
@@ -15999,6 +16035,11 @@ def register_routes(app: Flask) -> None:
             if read_hours is not None:
                 read_hours = min(read_hours, 2 * max(record.required_hours or practicum_required_hours(), 1))
             record.completed_hours = read_hours
+            # Owner 2026-11-19: new certificates are counted again; the Coordinator verifies the hours afresh.
+            record.verified_hours = None
+            record.hours_verified_by = None
+            record.hours_verified_at = None
+            record.hours_verified_note = None
             record.document_status = "Pending Review"
             if student_remark:
                 record.remarks = student_remark
@@ -16276,6 +16317,7 @@ def register_routes(app: Flask) -> None:
             headers={
                 "Content-Disposition": f'attachment; filename="{filename}"',
                 "X-Exported-Count": str(len(applications)),
+                "X-Batch-Name": withdrawal_export_batch_name(applications[0]) or "",
                 "X-Registrar-Email": registrar_email(),
             },
         )
@@ -20194,8 +20236,9 @@ def register_routes(app: Flask) -> None:
             previous_status = application.status
             if application.dean_decision != "Pending" or application.status != "Dean Review":
                 return jsonify({"error": "This withdrawal request already has a Dean decision."}), 400
-            if decision not in {"approve", "deny"}:
-                return jsonify({"error": "Withdrawal decisions must be approve or deny, as defined by the standalone withdrawal process."}), 400
+            # Owner 2026-11-19: a request filed inside the withdrawal window is approved, never denied.
+            if decision != "approve":
+                return jsonify({"error": "A subject withdrawal filed inside the withdrawal window is approved; to change it, return it to the student."}), 400
             if decision == "approve":
                 application.dean_decision = "Approved"
                 subject_enrollment = application.subject_enrollment
@@ -20204,7 +20247,7 @@ def register_routes(app: Flask) -> None:
                 if subject_enrollment.status not in ACTIVE_SUBJECT_ENROLLMENT_STATUSES:
                     return jsonify({"error": (
                         f"{subject_enrollment.course.code} is already {subject_enrollment.status}, so there is nothing to withdraw. "
-                        "Deny the request and tell the student.")}), 409
+                        "Return the request to the student.")}), 409
                 application.effective_date = application.effective_date or (
                     application.created_at.date() if application.created_at else ph_today()
                 )
@@ -34286,26 +34329,17 @@ def handle_practicum(data: MultiDict) -> int:
         record.hours_verified_at = now_utc()
         record.hours_verified_note = note or None
         transition_comment = transition_comment or note
+        # Owner 2026-11-19: saving the hours only records them; the case stays with the Coordinator, who then
+        # requests additional certificates (short) or verifies completion (enough).
         if verified < (record.required_hours or 0):
-            record.status = "Hours Incomplete"
             record.completion_status = "Incomplete - verified hours below the requirement"
-            workflow_message_record(
-                "practicum", student, account, "Student",
-                "Verified practicum hours are below the requirement",
-                f"The Academic Coordinator verified {verified} of {record.required_hours} hours. "
-                + (note or "Upload the additional certificates."), "return",
-                previous_status, record.status, visibility="student_visible",
-            )
-            transition_message_added = True
-            add_task(student.id, "Submit additional practicum certificates", "Student", 7, 45)
-            recompute_risk(student)
-            next_owner = "Student"
-        else:
-            next_owner = "Academic Coordinator"
+        next_owner = "Academic Coordinator"
     elif requested_status in {"Hours Incomplete", "Additional Certificates Requested"}:
         account = require_workflow_actor("academic_coordinator")
         if record.status != "Documents Under Review":
             raise ValueError("GS Staff must forward the practicum documents before certificates can be reviewed.")
+        if record.verified_hours is None:
+            raise ValueError("Save the verified hours from the certificates before requesting additional certificates.")
         return_reason = (data.get("return_reason") or transition_comment or data.get("remarks") or "").strip()
         if not return_reason:
             raise ValueError("Enter a reason before requesting additional practicum evidence.")
@@ -34867,6 +34901,8 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
                 "Completion Evidence": "Final Defense",
             }
             student.current_stage = stage_by_gate.get(research_case.current_gate, "Coursework") if research_case else "Coursework"
+        db.session.flush()
+        top_up_withdrawal_demo_queue()
     elif slug == "research":
         # Delete only this student's research-cycle state. Academic records and
         # the adviser assignment remain intact so existing role actions work again.
@@ -34891,6 +34927,8 @@ def reset_workflow_demo_case(slug: str, student: Student) -> dict:
             endorsement.request_attachment_id = None
             db.session.delete(endorsement)
         removed_records = len(records)
+        db.session.flush()
+        top_up_graduation_demo_queue()
     elif slug == "enrollment":
         removed_records += SubjectEnrollment.query.filter_by(student_id=student.id).delete(synchronize_session=False)
         removed_records += TermEnrollment.query.filter_by(student_id=student.id).delete(synchronize_session=False)
@@ -37943,7 +37981,8 @@ def research_requirement_state(
                 current_gate="Completion Evidence",
                 status="Verified Complete",
             ).first()
-            if demo_config or student.student_number in SEEDED_RESEARCH_COMPLETE_NUMBERS else None
+            if demo_config or student.student_number in SEEDED_RESEARCH_COMPLETE_NUMBERS
+            or str(student.student_number or "").startswith(DEMO_QUEUE_NUMBER_PREFIX) else None
         )
         if verified_demo_case:
             # Practicum and Graduation workflow-demo students begin after research completion.
@@ -43073,6 +43112,125 @@ def _seed_current_subject(student: Student, term: AcademicTerm, added_by: str) -
     return enrollment
 
 
+def _seed_stage_ready_withdrawal(student: Student, active_term: AcademicTerm, status: str, registrar_status: str,
+                                 reason: str = "The workload clashes with my full-time job.") -> WithdrawalApplication | None:
+    """One Dean-approved withdrawal at `status` for a student with a subject this semester (seed and demo reset)."""
+    enrollment = _seed_current_subject(student, active_term, "Panel demo enrollment")
+    if not enrollment or not enrollment.course:
+        return None
+    ensure_term_enrollment(student, active_term, "Enrolled", "Panel demo enrollment")
+    decided = now_utc() - timedelta(days=1, hours=2)
+    form = _seed_request_pdf(student, "withdrawal", f"Withdrawal_Request_{student.student_number}.pdf", "Request", days_ago=4)
+    application = WithdrawalApplication(
+        student_id=student.id, reason=reason, effective_term=active_term.label,
+        subject_enrollment_id=enrollment.id, withdrawal_scope="Subject", request_attachment_id=form.id,
+        fee_status="Pending", requirement_status="Not Applicable", dean_decision="Approved",
+        dean_remarks="Approved within the withdrawal window.", registrar_status=registrar_status, status=status,
+        created_at=decided - timedelta(days=3), decided_at=decided, updated_at=decided,
+    )
+    db.session.add(application)
+    db.session.flush()
+    form.workflow_request_id = application.id
+    if status == "Subject Tagged - Registrar Preparation":
+        apply_approved_subject_withdrawal(application)
+    add_log("withdrawal", student.id, "Dean" if status.startswith("Approved") else "Graduate School Staff", "Withdrawal request",
+            "Withdrawal approved by the Dean" if status.startswith("Approved") else "Subject tagged as Withdrawn",
+            "Graduate School Staff", f"Subject: {enrollment.course.code}. Effective semester: {active_term.label}.",
+            previous_status="Dean Review" if status.startswith("Approved") else "Approved - Awaiting Subject Tag", new_status=status)
+    return application
+
+
+def _seed_stage_ready_graduation(student: Student, status: str = "For Review") -> GraduationEndorsement:
+    """One graduation application at `status` with the signed application on file (seed and demo reset)."""
+    application = _seed_request_pdf(student, "graduation", f"Graduation_Application_{student.student_number}.pdf", "For Review")
+    endorsement = GraduationEndorsement(
+        student_id=student.id, review_window=default_graduation_school_year() or "Current review window",
+        batch_name=None if status == "For Review" else default_graduation_batch_name(),
+        endorsement_status=status, registrar_status="Pending", request_attachment_id=application.id,
+        submitted_at=now_utc() - timedelta(days=5),
+    )
+    db.session.add(endorsement)
+    db.session.flush()
+    application.workflow_request_id = endorsement.id
+    apply_graduation_eligibility(endorsement, graduation_eligibility(student))
+    endorsement.endorsement_status = status
+    student.current_stage = "Final Defense"
+    owner, actor = STAGE_READY_GRADUATION_OWNER[status]
+    add_log("graduation", student.id, actor, "Graduation endorsement list", f"Graduation endorsement: {status}", owner,
+            "Seeded for the panel demo.", new_status=status)
+    return endorsement
+
+
+# Owner 2026-11-19: resetting a Graduation or Withdrawal demo student also fills "Application submitted" (Graduation) and
+# "Excel export" (Withdrawal) up to five other students, so "Select all" and "Create batch" can be shown with a group.
+DEMO_QUEUE_SIZE = 5
+# Students the reset adds for Graduation get numbers 2799xxx: like the seeded graduation students they begin after research
+# completion, so research_requirement_state keeps their verified baseline and the Dean's export includes them.
+DEMO_QUEUE_NUMBER_PREFIX = "2799"
+DEMO_QUEUE_FIRST_NAMES = ("Andrea", "Bea", "Carlo", "Dana", "Elijah", "Faye", "Gino", "Hannah", "Ivan", "Jessa",
+                          "Kyle", "Lia", "Mark", "Nico", "Olive", "Paolo", "Rica", "Sam", "Tina", "Vince")
+DEMO_QUEUE_LAST_NAMES = ("Aguilar", "Belleza", "Cuenca", "Dizon", "Escalante", "Fuentes", "Gaston", "Hilado", "Infante",
+                         "Jalandoni", "Lacson", "Mirasol", "Ojeda", "Puentevella", "Quiros", "Ramos", "Sarabia", "Tan")
+
+
+def top_up_graduation_demo_queue(target: int = DEMO_QUEUE_SIZE) -> int:
+    """Fill "Application submitted" up to `target` students besides the demo accounts. Returns the applications made."""
+    demo_numbers = set(DEMO_STUDENT_NUMBERS.values())
+    waiting = [
+        item for item in GraduationEndorsement.query.filter(
+            GraduationEndorsement.batch_name.is_(None), GraduationEndorsement.request_attachment_id.isnot(None),
+            GraduationEndorsement.endorsement_status.in_(["Not Prepared", "For Review", "Returned for Clarification"]),
+        ).all()
+        if item.student and item.student.student_number not in demo_numbers
+    ]
+    made = 0
+    rng = random.SystemRandom()
+    attempts = 0
+    while len(waiting) + made < target and attempts < 50:
+        attempts += 1
+        number = f"{DEMO_QUEUE_NUMBER_PREFIX}{rng.randint(100, 999)}"
+        if Student.query.filter_by(student_number=number).first():
+            continue
+        student = _seed_eligible_graduation_student(number, rng.choice(DEMO_QUEUE_FIRST_NAMES), rng.choice(DEMO_QUEUE_LAST_NAMES))
+        if not student:
+            continue
+        db.session.flush()
+        _seed_stage_ready_graduation(student, "For Review")
+        made += 1
+    return made
+
+
+def top_up_withdrawal_demo_queue(target: int = DEMO_QUEUE_SIZE) -> int:
+    """Fill "Excel export" (tagged, not exported) up to `target` students besides the demo accounts, picked at random
+    from enrolled students with no other case. Returns the withdrawals made."""
+    active_term = get_active_term()
+    if not active_term:
+        return 0
+    demo_numbers = set(DEMO_STUDENT_NUMBERS.values())
+    waiting = [
+        item for item in WithdrawalApplication.query.filter_by(status="Subject Tagged - Registrar Preparation").all()
+        if item.student and item.student.student_number not in demo_numbers
+    ]
+    busy: set[int] = set()
+    for model in (LeaveCase, AwolCase, WithdrawalApplication, GraduationEndorsement, PracticumRecord):
+        busy |= {sid for (sid,) in db.session.query(model.student_id).distinct().all() if sid}
+    pool = [
+        student for student in Student.query.filter(Student.standing == "Active", Student.enrollment_tag == "Enrolled").all()
+        if student.id not in busy and student.student_number not in demo_numbers and not program_allows_practicum(student.program)
+    ]
+    random.SystemRandom().shuffle(pool)
+    reasons = ("The workload clashes with my full-time job.", "My work schedule changed this semester.",
+               "A family matter needs my time this term.", "I need to focus on my thesis this semester.")
+    made = 0
+    for student in pool:
+        if len(waiting) + made >= target:
+            break
+        if _seed_stage_ready_withdrawal(student, active_term, "Subject Tagged - Registrar Preparation", "Pending Excel Export",
+                                        reason=random.SystemRandom().choice(reasons)):
+            made += 1
+    return made
+
+
 def seed_stage_ready_cases() -> int:
     """Records waiting at each step (STAGE_READY_*). Practicum and Withdrawal use roster students with no other case;
     Graduation uses its own eligible demo students. Returns the records made."""
@@ -43141,31 +43299,11 @@ def seed_stage_ready_cases() -> int:
     for student in pool:
         if used >= len(STAGE_READY_WITHDRAWAL) or not active_term:
             break
-        enrollment = _seed_current_subject(student, active_term, "Panel demo enrollment")
-        if not enrollment or not enrollment.course:
-            continue
-        ensure_term_enrollment(student, active_term, "Enrolled", "Panel demo enrollment")
         status, registrar_status = STAGE_READY_WITHDRAWAL[used]
+        if not _seed_stage_ready_withdrawal(student, active_term, status, registrar_status):
+            continue
         used += 1
         busy.add(student.id)
-        decided = now_utc() - timedelta(days=1, hours=2)
-        form = _seed_request_pdf(student, "withdrawal", f"Withdrawal_Request_{student.student_number}.pdf", "Request", days_ago=4)
-        application = WithdrawalApplication(
-            student_id=student.id, reason="The workload clashes with my full-time job.", effective_term=active_term.label,
-            subject_enrollment_id=enrollment.id, withdrawal_scope="Subject", request_attachment_id=form.id,
-            fee_status="Pending", requirement_status="Not Applicable", dean_decision="Approved",
-            dean_remarks="Approved within the withdrawal window.", registrar_status=registrar_status, status=status,
-            created_at=decided - timedelta(days=3), decided_at=decided, updated_at=decided,
-        )
-        db.session.add(application)
-        db.session.flush()
-        form.workflow_request_id = application.id
-        if status == "Subject Tagged - Registrar Preparation":
-            apply_approved_subject_withdrawal(application)
-        add_log("withdrawal", student.id, "Dean" if status.startswith("Approved") else "Graduate School Staff", "Withdrawal request",
-                "Withdrawal approved by the Dean" if status.startswith("Approved") else "Subject tagged as Withdrawn",
-                "Graduate School Staff", f"Subject: {enrollment.course.code}. Effective semester: {active_term.label}.",
-                previous_status="Dean Review" if status.startswith("Approved") else "Approved - Awaiting Subject Tag", new_status=status)
         made += 1
 
     # Graduation: application submitted (no batch yet), then one batch each at coursework, research and endorsement prep.
@@ -43174,22 +43312,7 @@ def seed_stage_ready_cases() -> int:
         if not student:
             continue
         db.session.flush()
-        application = _seed_request_pdf(student, "graduation", f"Graduation_Application_{student.student_number}.pdf", "For Review")
-        endorsement = GraduationEndorsement(
-            student_id=student.id, review_window=default_graduation_school_year() or "Current review window",
-            batch_name=None if status == "For Review" else default_graduation_batch_name(),
-            endorsement_status=status, registrar_status="Pending", request_attachment_id=application.id,
-            submitted_at=now_utc() - timedelta(days=5),
-        )
-        db.session.add(endorsement)
-        db.session.flush()
-        application.workflow_request_id = endorsement.id
-        apply_graduation_eligibility(endorsement, graduation_eligibility(student))
-        endorsement.endorsement_status = status
-        student.current_stage = "Final Defense"
-        owner, actor = STAGE_READY_GRADUATION_OWNER[status]
-        add_log("graduation", student.id, actor, "Graduation endorsement list", f"Graduation endorsement: {status}", owner,
-                "Seeded for the panel demo.", new_status=status)
+        _seed_stage_ready_graduation(student, status)
         made += 1
     # Every batched candidate the seed made elsewhere (Dean review, returned for revision) has its signed application too,
     # so no seeded batch shows "Application document issue".
@@ -43252,6 +43375,21 @@ def seed_registrar_export_history() -> int:
         by_term.setdefault(application.effective_term or "", []).append(application)
     for cases in by_term.values():
         at = max((case.decided_at or case.updated_at or now_utc()) for case in cases) + timedelta(days=2)
+        # Owner 2026-11-19: one downloaded list is one batch (withdrawal_export_batch_name reads this time). Written without
+        # touching updated_at, so the seeded cards keep their dates.
+        unstamped = [case.id for case in cases if not case.registrar_report_generated_at]
+        if unstamped:
+            db.session.flush()
+            from sqlalchemy import update as _sa_update
+            db.session.execute(
+                _sa_update(WithdrawalApplication)
+                .where(WithdrawalApplication.id.in_(unstamped))
+                .values(registrar_report_generated_at=at, updated_at=WithdrawalApplication.updated_at)
+                .execution_options(synchronize_session=False)
+            )
+            for case in cases:
+                if case.id in unstamped:
+                    db.session.refresh(case)
         at = min(at, now_utc() - timedelta(hours=1))
         history_row("withdrawal", f"approved-subject-withdrawals-{at:%Y-%m-%d}.xlsx", "xlsx", cases, at, staff_name, staff,
                     WITHDRAWAL_EXPORT_RESULT)

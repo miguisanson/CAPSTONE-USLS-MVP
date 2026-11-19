@@ -64,7 +64,8 @@ const BOARDS = [
     slug: "withdrawal",
     title: "Subject Withdrawal",
     region: "Subject withdrawal board",
-    columns: ["Submitted", "Returned to student", "With the Dean", "Subject tagging", "Excel export", "Exported - Ready to Send", "Not approved"],
+    // Owner 2026-11-19: the Registrar hand-off has its own two columns.
+    columns: ["Submitted", "Returned to student", "With the Dean", "Subject tagging", "Excel export", "Exported - Ready to Send", "Waiting for Registrar acknowledgement", "Acknowledged by Registrar", "Not approved"],
     cards: [["Submitted", "Adrian Lim"]],
   },
 ];

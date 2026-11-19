@@ -10,6 +10,17 @@ import { exportCountText } from "../../lib/refusal";
 import { openGmailDraft, registrarDraft } from "../../lib/mailDraft";
 
 const TAGGED = "Subject Tagged - Registrar Preparation";
+
+// Owner 2026-11-19: one export is one batch, named automatically ("Batch 2 November 2026"), like Graduation.
+export function nextWithdrawalBatchName(cases) {
+  const now = new Date();
+  const suffix = `${now.toLocaleString("en-US", { month: "long" })} ${now.getFullYear()}`;
+  const numbers = cases
+    .map((item) => item.batch_name || "")
+    .filter((name) => name.endsWith(` ${suffix}`))
+    .map((name) => Number(name.split(" ")[1]) || 0);
+  return `Batch ${(numbers.length ? Math.max(...numbers) : 0) + 1} ${suffix}`;
+}
 const EXPORTED = "Exported - Ready to Send";
 
 /**
@@ -28,7 +39,17 @@ export default function WithdrawalExport({ ctx }) {
   const [recording, setRecording] = useState(0);
   const [historyKey, setHistoryKey] = useState(0); // bumped after a download so the export history reloads // the withdrawal whose Registrar date is being saved
 
+  // Owner 2026-11-19: one export is one batch, named automatically ("Batch 2 November 2026"), like Graduation.
+  const nextBatchName = useMemo(() => nextWithdrawalBatchName(ctx.cases), [ctx.cases]);
   const signalled = ctx.signal?.type === "export";
+  // "Create batch and download Excel list" in the Excel export column: download the ticked cards at once (owner 2026-11-19).
+  const batchSignal = ctx.signal?.type === "export-batch" ? ctx.signal : null;
+  useEffect(() => {
+    if (!batchSignal) return;
+    ctx.clearSignal();
+    download(batchSignal.ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batchSignal]);
   const open = (pickerOpen || signalled) && ctx.isStaff;
   const signalItem = signalled ? ctx.signal.item : null;
 
@@ -61,15 +82,16 @@ export default function WithdrawalExport({ ctx }) {
     });
   }
 
-  async function download() {
-    const ids = rows.filter((item) => selected.has(item.id)).map((item) => item.id);
+  async function download(chosen = null) {
+    const ids = chosen || rows.filter((item) => selected.has(item.id)).map((item) => item.id);
     if (!ids.length) return;
     setBusy(true);
     setError("");
     try {
       const exported = await api.exportWithdrawalXlsx(ids);
       // Owner 2026-11-08: open a pre-filled Gmail draft to the Registrar right after the download.
-      const draft = registrarDraft({ to: exported.registrarEmail, fileLabel: "approved subject withdrawals list", filename: exported.filename, what: plural(exported.count, "withdrawal") });
+      const batchName = exported.batchName || nextBatchName;
+      const draft = registrarDraft({ to: exported.registrarEmail, fileLabel: "approved subject withdrawals list", filename: exported.filename, what: `${batchName}: ${plural(exported.count, "withdrawal")}` });
       openGmailDraft(draft);
       setFollowUp({ filename: exported.filename, count: exported.count, draft });
       setHistoryKey((key) => key + 1);
@@ -77,7 +99,7 @@ export default function WithdrawalExport({ ctx }) {
       if (signalled) ctx.clearSignal();
       setSelected(new Set());
       await ctx.reload();
-      ctx.banner("success", `${plural(exported.count, "approved subject withdrawal")} exported as ${exported.filename}.`);
+      ctx.banner("success", `${batchName}: ${plural(exported.count, "approved subject withdrawal")} exported as ${exported.filename}.`);
     } catch (err) {
       setError(err.message || "Could not export the approved-withdrawals workbook.");
     } finally {
@@ -90,9 +112,12 @@ export default function WithdrawalExport({ ctx }) {
     setRecording(item.id);
     setError("");
     try {
-      const saved = await api.recordWithdrawalRegistrarFollowup(item.id, step);
+      // Owner 2026-11-19: "sent" is the board's own step, so the card moves to "Waiting for Registrar acknowledgement".
+      const saved = step === "sent"
+        ? await api.processCaseTransition("withdrawal", item.id, { action: "send" })
+        : await api.recordWithdrawalRegistrarFollowup(item.id, step);
       await ctx.reload();
-      ctx.banner("success", `${saved.message} (${item.student.name}).`);
+      ctx.banner("success", `${saved.message || "Saved."} (${item.student.name}).`);
     } catch (err) {
       setError(err.message || "Could not save the Registrar date.");
     } finally {
@@ -226,14 +251,14 @@ export default function WithdrawalExport({ ctx }) {
         <Modal
           size="xl"
           title="Approved subject withdrawals"
-          subtitle={`${plural(selected.size, "request")} ticked · export the Excel list for the manual Registrar email`}
+          subtitle={`${nextBatchName} · ${plural(selected.size, "request")} ticked · export the Excel list for the manual Registrar email`}
           onClose={close}
           dismissible={!busy}
           closeLabel="Close the export window"
           footer={
             <>
               <Button variant="secondary" onClick={close} disabled={busy}>Close</Button>
-              <Button icon={Download} loading={busy} onClick={download} disabled={busy || !selected.size}>
+              <Button icon={Download} loading={busy} onClick={() => download()} disabled={busy || !selected.size}>
                 {busy ? "Exporting…" : "Download Excel list"}
               </Button>
             </>

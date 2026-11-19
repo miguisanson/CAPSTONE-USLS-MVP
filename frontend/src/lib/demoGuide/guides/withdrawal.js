@@ -44,13 +44,13 @@ export default {
       doneWhen: { status: from(WITHDRAWAL_ORDER, "Dean Review") },
       rule: "Staff can return a request to the student only while it is still Submitted; after that the card waits for the Dean.",
       ifAsked: [
-        { q: "Can staff approve it?", a: "No. At Dean Review the card is locked for staff (Waiting for: Dean). Only the Dean approves, returns or denies." },
+        { q: "Can staff approve it?", a: "No. At Dean Review the card is locked for staff (Waiting for: Dean). Only the Dean approves or returns it." },
         { q: "What if the request arrived after the deadline?", a: "A request is judged on the date it was submitted, so it stays valid if reviewers act after the deadline." },
       ],
     },
     {
       id: "wd-decide", title: "The Dean decides", role: "dean", route: "/dean/approvals/withdrawal", page: "Subject Withdrawal (Dean)",
-      do: "Open View details on the card and select Approve the withdrawal, confirm in the dialog. Return to student and Deny the withdrawal are the other choices.",
+      do: "Open View details on the card and select Approve the withdrawal, confirm in the dialog. Return to student is the other choice; a request filed inside the window is not denied.",
       actions: [
         { click: { role: "button", name: "View details for Elena Navarro" } },
         { click: { role: "button", name: "Approve the withdrawal", in: "dialog" } },

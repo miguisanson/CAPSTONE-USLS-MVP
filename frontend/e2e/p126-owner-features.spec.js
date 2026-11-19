@@ -92,27 +92,19 @@ test.describe("New and moved items are green until opened (staff)", () => {
     await expect(section.locator("li").first()).not.toHaveAttribute("data-fresh", "true");
   });
 
-  test("a card that moved by itself is green until it is touched", async ({ page }) => {
+  // Owner 2026-11-19 (Withdrawal, Practicum, Graduation): green means new AND waiting on the signed-in person.
+  test("a withdrawal card is green while it is new and waits on staff; a card with the Dean is not", async ({ page }) => {
     await page.goto("/workflow/withdrawal");
     const board = page.getByRole("region", { name: /board/i }).first();
-    const card = board.locator("[data-card-id]").first();
-    await expect(card).toBeVisible();
-    // The first visit only records where every card is: nothing is green.
-    await expect(board.locator('[data-fresh="true"]')).toHaveCount(0);
-    const id = await card.getAttribute("data-card-id");
-    // Pretend this card was last seen in another column (someone else moved it), then come back.
-    await page.evaluate((cardId) => {
-      const key = Object.keys(localStorage).find((name) => name.startsWith("usls-seen:board:"));
-      const marks = JSON.parse(localStorage.getItem(key));
-      marks[cardId] = "some-other-column";
-      localStorage.setItem(key, JSON.stringify(marks));
-    }, id);
-    await page.reload();
-    const moved = page.locator(`[data-card-id="${id}"]`).first();
-    await expect(moved).toHaveAttribute("data-fresh", "true");
-    await expect(moved.getByText("Moved here · new")).toBeVisible();
-    await moved.click({ position: { x: 8, y: 8 } });
-    await expect(moved).not.toHaveAttribute("data-fresh", "true");
+    await expect(board.locator("[data-card-id]").first()).toBeVisible();
+    const withDean = board.locator("section[aria-label='With the Dean'] [data-card-id]");
+    if (await withDean.count()) await expect(withDean.first()).not.toHaveAttribute("data-fresh", "true");
+    const submitted = board.locator("section[aria-label='Submitted'] [data-card-id]").first();
+    await expect(submitted).toHaveAttribute("data-fresh", "true");
+    await expect(submitted.getByText("New for you")).toBeVisible();
+    const id = await submitted.getAttribute("data-card-id");
+    await submitted.click({ position: { x: 8, y: 8 } });
+    await expect(page.locator(`[data-card-id="${id}"]`).first()).not.toHaveAttribute("data-fresh", "true");
     await page.reload();
     await expect(page.locator(`[data-card-id="${id}"]`).first()).not.toHaveAttribute("data-fresh", "true");
   });

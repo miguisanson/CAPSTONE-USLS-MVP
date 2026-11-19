@@ -138,7 +138,8 @@ export function WorkflowApprovalCard({ item, note, setNote, template, setTemplat
   const actions = canDecide
     ? [
         { key: item.type === "practicum" ? "review" : "approve", label: approveLabel, tone: "approve", icon: CheckCircle2, confirm: confirmFor(approveLabel, "Approved / reviewed") },
-        ...(item.type === "withdrawal" || standingChange
+        // Owner 2026-11-19: a subject withdrawal filed inside the window is approved, never denied.
+        ...(standingChange
           ? [{ key: "deny", label: "Deny", tone: "reject", icon: AlertTriangle, confirm: confirmFor("Deny request", "Denied") }]
           : []),
         ...(item.type !== "withdrawal"

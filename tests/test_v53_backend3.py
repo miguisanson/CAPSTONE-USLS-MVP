@@ -17,9 +17,10 @@ class DeanReviewIsLockedForStaffTests(unittest.TestCase):
                 f"{role} must see the lock 'Waiting for: Dean', not a move",
             )
 
-    def test_the_dean_can_still_return_or_decide_a_withdrawal_in_dean_review(self):
+    def test_the_dean_can_still_return_or_approve_a_withdrawal_in_dean_review(self):
+        # Owner 2026-11-19: a request filed inside the withdrawal window has no reason to be denied, so the Dean has no deny.
         actions = {m["action"] for m in sp.transitions_from("withdrawal", "Dean Review", sp.KIND_WITHDRAWAL, "dean")}
-        self.assertEqual(actions, {"approve", "deny", "return"})
+        self.assertEqual(actions, {"approve", "return"})
 
     def test_staff_can_still_return_a_withdrawal_before_it_reaches_the_dean(self):
         actions = {m["action"] for m in sp.transitions_from("withdrawal", "Submitted to GS Staff", sp.KIND_WITHDRAWAL, "staff")}

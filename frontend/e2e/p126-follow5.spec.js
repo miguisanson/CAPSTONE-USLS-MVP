@@ -113,10 +113,11 @@ test.describe("staff Graduation board", () => {
     await page.goto("/workflow/graduation");
     await expect(page.getByRole("button", { name: "Mark as sent to the Registrar" })).toHaveCount(0);
     const card = page.getByRole("region", { name: "Graduation workflow Kanban board" }).locator("div[draggable]").filter({ hasText: BATCH });
-    await card.getByRole("button", { name: /Move to/ }).click();
-    await page.getByRole("menuitem", { name: "Acknowledged by Registrar", exact: true }).dispatchEvent("click"); // the menu opens partly off screen on a wide board
-    await expect(page.getByRole("dialog").last()).toContainText("Registrar acknowledged this list?");
-    await page.getByRole("button", { name: "Mark as acknowledged", exact: true }).click();
+    // Owner 2026-11-19: no Move to on the Graduation board; "Mark as acknowledged" is a button on the card.
+    await card.getByRole("button", { name: "Mark as acknowledged", exact: true }).click();
+    const confirm = page.getByRole("dialog").last();
+    await expect(confirm).toContainText("Registrar acknowledged this list?");
+    await confirm.getByRole("button", { name: "Mark as acknowledged", exact: true }).click();
     await expect.poll(() => posts.length).toBe(1);
     expect(posts[0].endorsement_ids).toHaveLength(1);
   });
