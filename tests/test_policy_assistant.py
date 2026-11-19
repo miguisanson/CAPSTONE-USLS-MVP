@@ -613,21 +613,26 @@ class PlainOfflineAnswerTests(AssistantBase):
         for citation in data["citations"]:
             self.assertFalse(citation["section"].endswith("Purpose"), citation["section"])
 
-    def test_a_student_answer_uses_plain_words_for_the_source_and_the_draft(self):
+    def test_a_student_answer_from_the_signed_manual_has_no_draft_wording(self):
+        # Owner 2026-11-19: the Operations Manual is validated and signed, so an answer that uses it carries no draft wording.
         data = self.ask(STUDENT_A_EMAIL, self.QUESTION)
         text = data["answer"] + json.dumps(data["citations"])
+        self.assertIn("Operations Manual", text)
         self.assertNotIn("pending Graduate School validation", text)
         self.assertNotIn("draft for validation", text)
-        self.assertIn("Graduate School practice (being finalised)", text)
+        self.assertNotIn("being finalised", text)
 
     def test_a_student_handbook_answer_says_which_page(self):
         data = self.ask(STUDENT_A_EMAIL, COVERED_QUESTION)
         self.assertRegex(data["answer"], r"Sources: [^\n]*Handbook[^\n]* p\. \d+")
         self.assertNotIn("Source:", data["answer"])
 
-    def test_staff_keep_the_draft_wording(self):
+    def test_staff_answer_from_the_signed_manual_has_no_draft_wording(self):
+        # Owner 2026-11-19: the Operations Manual is validated and signed, so an answer that uses it carries no draft wording.
         data = self.ask("dean@usls.edu.ph", self.QUESTION)
-        self.assertIn("pending Graduate School validation", data["answer"] + json.dumps(data["citations"]))
+        text = data["answer"] + json.dumps(data["citations"])
+        self.assertIn("Operations Manual", text)
+        self.assertNotIn("pending Graduate School validation", text)
 
     def test_a_student_source_has_no_keyword_search_wording(self):
         source = self.ask(STUDENT_A_EMAIL, self.QUESTION)["source"]

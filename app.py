@@ -11696,7 +11696,7 @@ OPERATIONS_MANUAL_VALUES = {
     "title": "USLS Graduate School Operations Manual",
     "description": (
         "The written description of how the Graduate School carries out each process, with the business rules "
-        "register. Prepared by the capstone group; validated and signed by the Graduate School."
+        "register. Validated and signed by the Graduate School."
     ),
     "category": "Operations Manual",
     "status": "active",
@@ -12438,7 +12438,7 @@ def _retrieve_rag_document_chunks(
         pass
     # Embeddings are down: retrieval is exactly the keyword search the offline answer uses, never weaker.
     found = search_policy_passages(question, limit, chunks)
-    found.sort(key=lambda item: (item.get("status") or "active") != "active")  # in force before draft (stable)
+    found.sort(key=_prag.is_supporting_source)  # the Handbook and Protocol before a draft or the manual (stable)
     return [{**item, "_retrieval": "lexical-fallback"} for item in found]
 
 
@@ -12890,7 +12890,7 @@ def _rag_passages_block(chunks: list[dict]) -> str:
     body = "\n\n".join(
         f"[{number}. {clean(chunk['source'])}"
         + (" — DRAFT, pending Graduate School validation" if (chunk.get("status") or "active") == "draft" else "")
-        + (" — staff-uploaded" if chunk.get("kind") == "managed" else "")
+        + (" — staff-uploaded" if chunk.get("kind") == "managed" and (chunk.get("category") or "") != "Operations Manual" else "")
         + f"]\n{clean(chunk['text'])}"
         for number, chunk in enumerate(chunks, start=1)
     )

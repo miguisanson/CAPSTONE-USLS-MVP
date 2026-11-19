@@ -26,8 +26,36 @@
 - Operations Manual in the policy library is now an approved document (`status` active, "Validated and signed by the
   Graduate School", shown as `USLS GS Operations Manual.docx`). The seeded text is still the project's DRAFT .docx, so
   its cover wording ("To be validated by...") can still be quoted in an answer. RESEED NEEDED (`npm run seed`).
+- After the first commit (`f2dbf17`), same night: (1) with the manual approved it outranked the Handbook as the first
+  source (walkthrough p80 caught it). `policy_rag.is_supporting_source()` keeps a draft or the Operations Manual behind
+  the Handbook and the Research Protocol for a rule both state, and the manual is no longer shown to the model as
+  "staff-uploaded". (2) Four tests that expected draft wording on answers from the manual now expect none; the draft
+  wording for a real draft is still tested (`test_srv8.test_a_draft_source_is_still_worded_plainly_for_a_student`,
+  `tests/test_policy_documents.py`). (3) Deck **v8** (`deck-build/build_deck8.py`, wording only): slide 3, backup slide
+  15 with its notes and appendix slide 30 follow the owner's rule on the Operations Manual wording. v7 is kept.
+  The cover picture of the manual on slide 15 is the real cover and still carries its own small "Prepared by" line.
+- Walkthroughs run on this Mac (`USLS_PYTHON` = a Python 3.13 venv): p80, p99 pass; p87 passes except :543 and :567
+  (staff Practicum case window: no "View details for Andrea Villanueva" button in the table). The Practicum page is
+  Khloe's work and was not touched; not checked against `a5c7873`.
 - Tooling on this Mac: Khloe's commit untracked `.claude/`, so the pull removed GSD, `ui-ux-pro-max`,
   `intelligence-layer` and `/continue_CAPSTONE-USLS-MVP` from disk here. Not restored (owner not asked yet).
+- **Script v2 (owner, 2026-11-19 late): Khloe does the opening**, Migui starts at feature 1 (this replaces the order
+  above). `Documents/Capstone/Presentation/CAP-2521-IT-CAP2DEF-SCRIPTv2.docx` from the same `deck-build/build_script.py`
+  (the v1 file is kept). Features 1 to 3 rewritten: Monitoring Sheet says what changed since Capstone 1 (it was view
+  only, filled by upload; the panel asked why staff could not add or edit in the system), Reports is walked tab by tab
+  (17 tabs of tables at Capstone 1, now one question per tab), feature 2 is 5 min and feature 3 is 2 min.
+  Click steps and the Capstone 1 comparison come from the code (`4970d8c`, 2026-08-06); not rehearsed in the running app.
+- **Owner rule for the Operations Manual wording (2026-11-19 late): never say the Graduate School had no manual, never
+  say the group prepared it.** Say only that the Graduate School approved and signed it and that it is in Policy
+  Documents. Done: the script v2, and the Policy Documents card (`OPERATIONS_MANUAL_VALUES["description"]` in `app.py`,
+  test `tests.test_polish.OperationsManualLibraryTests.test_the_manual_card_does_not_say_who_prepared_it`). The card
+  text is written only when the demo data is built, so a database that exists keeps the old sentence until
+  `npm run seed`, or until staff edit the card on the Policy Documents page. NOT done: deck v7 slide 3 ("Prepared by
+  the group; ...") and backup slide 15 with its notes ("The Graduate School had no operations manual. The group
+  prepared one; ...") still carry the old wording.
+- Tests on this Mac: `OperationsManualLibraryTests.test_an_answer_from_the_signed_manual_carries_no_draft_label`
+  errors (the answer has no citations) with the old card text too, so it is not from this change; not investigated.
+  `.venv` here is Python 3.9.6 and `seed_curriculum_data.py` uses `str | None`. The full gate was not run.
 
 ## 2026-11-19 — owner requests (Withdrawal, Practicum, Graduation only), branch `v6.8-update`, NOT committed
 

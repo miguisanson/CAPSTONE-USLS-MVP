@@ -71,7 +71,7 @@ class Srv8Tests(unittest.TestCase):
         self.assertTrue(text.rstrip().split("\n")[-1].startswith("Sources: Operations Manual 4."), text)
         self.assertEqual(1, text.count("Operations Manual"), text)
         self.assertIn("What you can do: Open Return from AWOL", text)
-        self.assertIn("Some of this is Graduate School practice that is still being finalised.", text)
+        self.assertNotIn("being finalised", text)   # owner 2026-11-19: the manual is validated and signed, not a draft
         passages = [p for p in text.split("\n\n") if not p.startswith(("What you can do", "Some of this", "Sources"))]
         self.assertEqual(len(passages), len(set(passages)))
 
@@ -89,10 +89,18 @@ class Srv8Tests(unittest.TestCase):
         self.assertIn("What you can do: Open Leave of Absence", out)
         self.assertTrue(out.endswith("Sources: Graduate School Handbook p. 54, p. 55"), out)
 
+    def test_a_draft_source_is_still_worded_plainly_for_a_student(self):
+        # The signed Operations Manual is no longer a draft; any other draft document keeps the plain note for a student.
+        from app import _student_plain_policy, POLICY_DRAFT_WARNING
+        text = f"Tablets may be borrowed for three days.\nSource: Library Lending Memo (p. 1)\n\n{POLICY_DRAFT_WARNING}: Library Lending Memo."
+        out, _ = _student_plain_policy(text, [], "can I borrow a tablet?")
+        self.assertNotIn("pending Graduate School validation", out)
+        self.assertIn("Some of this is Graduate School practice that is still being finalised.", out)
+
     def test_staff_answer_keeps_its_shape(self):
         data = self.ask("dean@usls.edu.ph")
         text = data["answer"] + json.dumps(data["citations"])
-        self.assertIn("pending Graduate School validation", text)
+        self.assertNotIn("pending Graduate School validation", text)   # owner 2026-11-19: the manual is signed, not a draft
         self.assertNotIn("Sources:", data["answer"])
         self.assertNotIn("What you can do", data["answer"])
 

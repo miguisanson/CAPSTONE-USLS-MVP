@@ -200,6 +200,15 @@ class OperationsManualLibraryTests(PolishBase):
             self.assertIn("Operations Manual", document.title)
             self.assertTrue((self.upload_root / document.stored_name).is_file())
 
+    def test_the_manual_card_does_not_say_who_prepared_it(self):
+        # Owner 2026-11-19: the card says the Graduate School validated and signed the manual, and nothing about who prepared it.
+        with app.app_context():
+            appmod.ensure_operations_manual_policy_document()
+            description = PolicyDocument.query.one().description
+            self.assertNotIn("prepared", description.lower())
+            self.assertNotIn("capstone group", description.lower())
+            self.assertIn("alidated and signed by the Graduate School", description)
+
     def test_an_answer_from_the_signed_manual_carries_no_draft_label(self):
         with app.app_context():
             appmod.ensure_operations_manual_policy_document()

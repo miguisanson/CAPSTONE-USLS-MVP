@@ -338,6 +338,29 @@ class SearchAndAnswerTests(EvalBase):
         top = policy_rag.search("How long can a leave last?", [draft, real], 2)
         self.assertEqual(top[0]["id"], "d2")
 
+    def test_the_approved_operations_manual_never_outranks_the_handbook_for_the_same_rule(self):
+        # Owner 2026-11-19: the manual is approved (no Draft label), but it restates the Handbook's rules, so the
+        # Handbook stays the first source: the panel is shown the document and the page.
+        rule = "The leave may be approved for a period of one (1) year but may be renewed for at most another year."
+        manual = {"id": "d1", "title": "USLS Graduate School Operations Manual", "source": "Operations Manual", "status": "active",
+                  "kind": "managed", "category": "Operations Manual", "text": rule, "section": "Leave", "sec": "m#0", "page": None}
+        real = {"id": "d2", "title": "Handbook", "source": "Handbook, p. 52", "status": "active", "category": "Handbook",
+                "kind": "system", "text": rule, "section": "Leave", "sec": "h#0", "page": 52}
+        top = policy_rag.search("How long can a leave last?", [manual, real], 2)
+        self.assertEqual(top[0]["id"], "d2")
+        # an approved staff memo still counts as the newer word
+        memo = {**manual, "id": "d3", "title": "Leave Memo", "source": "Leave Memo, p. 1", "category": "Memo", "page": 1}
+        self.assertEqual(policy_rag.search("How long can a leave last?", [memo, real], 2)[0]["id"], "d3")
+
+    def test_the_manual_is_not_presented_to_the_model_as_the_newer_staff_upload(self):
+        manual = {"source": "USLS Graduate School Operations Manual", "text": "Leave lasts one year.", "status": "active",
+                  "kind": "managed", "category": "Operations Manual"}
+        memo = {"source": "Leave Memo, p. 1", "text": "Leave lasts one year.", "status": "active", "kind": "managed", "category": "Memo"}
+        block = appmod._rag_passages_block([manual, memo])
+        first, second = block.split("[2. ")
+        self.assertNotIn("staff-uploaded", first)
+        self.assertIn("staff-uploaded", second)
+
 
 class GeminiHybridPathTests(EvalBase):
     """With a key: embeddings and BM25 are fused and the model must stay inside the passages. No network."""

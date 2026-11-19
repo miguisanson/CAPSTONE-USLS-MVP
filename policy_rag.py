@@ -808,6 +808,14 @@ def _chunk_best_sentence(query: QueryTerms, index: PolicyIndex, position: int) -
 # --------------------------------------------------------------------------- search
 _PURPOSE_SECTION = re.compile(r"(?:^|[›>]\s*)(?:[\d.]+\s+)?purpose\s*$", re.I)
 _ASKS_PURPOSE = re.compile(r"\b(purpose|why|aim|goal|objective)\b", re.I)
+
+
+def is_supporting_source(chunk: dict) -> bool:
+    """A draft, or the Operations Manual. The manual is approved (owner 2026-11-19) but it restates the Handbook and
+    the Research Protocol, so those stay the first source for a rule both state; it only leads where they are silent."""
+    return (chunk.get("status") or "active") == "draft" or (chunk.get("category") or "") == "Operations Manual"
+
+
 def search(
     question: str,
     chunks: list[dict],
@@ -844,8 +852,8 @@ def search(
         fused = 1.0 / (1 + other[chunk["id"]]) if chunk.get("id") in other else 0.0
         title_hit = _title_match(query, index, chunk.get("section") or "")
         score = 0.40 * (bm25_value / max_bm25) + 0.40 * (best / max_sentence) + 0.12 * fused + 0.10 * title_hit
-        if (chunk.get("status") or "active") == "draft":
-            score *= 0.85  # the handbook is in force; a draft only answers what the handbook does not
+        if is_supporting_source(chunk):
+            score *= 0.85  # the handbook is in force; a draft or the manual only answers what the handbook does not
         elif chunk.get("kind") == "managed":
             score *= 1.05  # a staff upload is the newer, approved word
         window = " ".join(sentences[max(0, best_i - 1): best_i + 2])
@@ -996,8 +1004,8 @@ def compose_answer(
             value = score_sentence(sentence, query, index, set(section_sequence), section_sequence)
             if value > 0:
                 value *= rank_weight * (1.0 if chunk_position == position else 0.85)
-                if (chunk.get("status") or "active") == "draft":
-                    value *= 0.85  # the handbook is in force; a draft only adds what the handbook does not say
+                if is_supporting_source(chunk):
+                    value *= 0.85  # the handbook is in force; a draft or the manual only adds what the handbook does not say
                 scored.append((value, stream, number))
     if not scored:
         return None

@@ -2,7 +2,9 @@
 
 Owner 2026-11-19: plain and easy to edit (no tables, no colours), the flow on top, the script straight after, as few
 pages as possible. Slides are a 5-minute skim, the live demonstration is 30 minutes. Slide numbers follow deck v7.
-Order: Migui (opening, features 1-3), Myrine (4-5), Natalie (6-8), Khloe (UAT, conclusions, recommendations).
+Order: Khloe (opening), Migui (features 1-3), Myrine (4-5), Natalie (6-8), Khloe (UAT, conclusions, recommendations).
+v2 (owner 2026-11-19, late): Khloe opens; features 1-3 say what changed since Capstone 1; the Operations Manual lines
+say only that the Graduate School approved and signed it (never that it had none, or who prepared it).
 
 A line is "text", or ("cue", "text"): the cue is what to click or show and prints in bold square brackets.
 """
@@ -55,9 +57,10 @@ head("CAP-2521-IT CAPSTONE 2 DEFENSE: FLOW AND SCRIPT", size=13, before=0)
 lines(["Slides: about 5 minutes. Live demonstration: 30 minutes. Slide numbers follow deck v7."])
 
 head("DEFENSE FLOW", size=11.5)
-head("MIGUI - Opening (slides 1-4), then features 1, 2, 3", before=3)
-lines(["- 1 Monitoring Sheet: pick a program and year admitted, show the grid and Add student or Edit.",
-       "- 2 Reports: open \"By year started\", click a number to open its list of students.",
+head("KHLOE - Opening (slides 1-4)", before=3)
+head("MIGUI - Features 1, 2, 3", before=3)
+lines(["- 1 Monitoring Sheet: say what changed since Capstone 1, pick a program and year admitted, Add student, add a subject entry, Change history.",
+       "- 2 Reports: say what changed, show the filters and the six figures, go through each tab, click a number in \"By year started\" to open its list of students.",
        "- 3 Operations Manual: Policy Documents, then the signed sign-off page."])
 head("MYRINE - Features 4 and 5", before=3)
 lines(["- 4 Business Rules: search \"withdraw\", show the rule with its source document and page.",
@@ -72,7 +75,7 @@ head("Q&A - all four", before=3)
 # ---------------------------------------------------------------- script
 head("SCRIPT", size=11.5, before=10)
 
-head("MIGUI - Opening (slides 1-4, about 2 min)", before=3)
+head("KHLOE - Opening (slides 1-4, about 2 min)", before=3)
 lines([("Slide 1", "Good day, members of the panel."),
        "We are CAP-2521-IT.",
        "This is our Capstone 2 defense.",
@@ -84,38 +87,81 @@ lines([("Slide 1", "Good day, members of the panel."),
        "Features 3 to 6 address the revisions required by the panel.",
        "Features 1, 2, 7 and 8 are refinements.",
        ("Slide 4", "We will now show all eight in the live system, in this order."),
-       "I will begin with features 1 to 3.",
+       "Migui will begin with features 1 to 3.",
        ("Switch to the browser, signed in as Staff", "")])
 
-head("MIGUI - Feature 1: Monitoring Sheet (about 4 min)")
+head("DEMO NA:")
+head("MIGUI - Feature 1: Monitoring Sheet (about 4 min)", before=2)
 lines([("Records > Monitoring Sheet", "Feature 1 is the Monitoring Sheet."),
-       "It presents the records of one program and one year in a single grid.",
+       "The panel saw this screen at the Capstone 1 defense.",
+       "We are presenting it again because it has changed.",
+       "At Capstone 1, the sheet was view only.",
+       "Records could be entered only by uploading an Excel workbook.",
+       "The panel asked why staff could not add or edit a record in the system itself.",
+       "That was a shortcoming on our part.",
+       "It has been corrected.",
        ("Pick a Program and a Year admitted", "I select a program and the year the students were admitted."),
        "Each row is one student.",
        "Each column is a subject.",
        "Each cell shows the status of that subject for that student.",
-       ("Click Add student or Edit", "Authorized staff may add or correct an entry."),
-       "An entry added by hand is marked as a manual entry.",
-       "Each change is recorded.",
-       ("Close without saving", "This group view was requested during user acceptance testing."),
+       ("Click Add student", "Staff may now add a student directly in the system."),
+       "The same checks as an upload apply.",
+       "A Student ID that already exists is refused.",
+       ("Cancel. Click the pencil beside a student's name", "Staff may also open the record of any student."),
+       ("Click Add on a subject, choose a status, click Add row", "They may add a subject entry."),
+       "They may change an entry, or remove it.",
+       "Removing an entry requires a reason.",
+       ("Point to Manual entry", "An entry typed in the system is marked as a manual entry."),
+       "It carries the name of the staff member and the time.",
+       ("Change history tab", "Every change is recorded here."),
+       "It shows the old value, the new value, who made the change, and when.",
+       ("Close the record", "Uploading a workbook is still available."),
+       "Grades are not entered here.",
+       "The official record remains in AIMS.",
+       "The view by program and year admitted was requested during user acceptance testing.",
        "It was implemented before the evaluation with the Dean."])
 
-head("MIGUI - Feature 2: Group views and reports (about 4 min)")
-lines([("Reports & Analytics > By year started", "Feature 2 is group views and reports."),
-       "This report presents students by the year they were admitted.",
+head("MIGUI - Feature 2: Group views and reports (about 5 min)")
+lines([("Reports & Analytics", "Feature 2 is group views and reports."),
+       "This page was also shown at Capstone 1, and it has been revised.",
+       "At Capstone 1, it had seventeen separate tabs of tables.",
+       "Staff had to read each table to find what needed action.",
+       "Now each tab answers one question that the office asks.",
+       ("Point to the filters", "The filters are at the top: program, year started, and period."),
+       "They apply to the whole page.",
+       ("Point to the six figures", "Below them are the six figures the office asks about most."),
        "Every figure is computed from the recorded transactions.",
        "No figure is entered by hand.",
+       ("Needs attention", "The first tab is Needs attention."),
+       "It shows which students need action, grouped by cause.",
+       ("Click one cause", "Selecting a cause shows only the students it affects."),
+       "Each row names the office that can move the student forward.",
+       ("Where students get stuck", "The second tab shows how many students are waiting at each stage."),
+       "They are counted as on time, slow, or stuck.",
        ("Click one number", "Each figure is linked to its list of students."),
-       "These are the students counted in that figure.",
-       ("Close the list", "This allows the Graduate School to monitor students by group.")])
+       ("Close the list. Office speed", "The third tab shows how long each office takes to close a request."),
+       ("Records to fix", "The fourth tab lists records with missing details, such as a research student with no adviser."),
+       "When the record is completed, it leaves the list.",
+       ("By year started", "The fifth tab presents students by the year they were admitted."),
+       "Each year is divided into three groups: on coursework, on thesis or dissertation, and graduated.",
+       "Students on leave, AWOL, or withdrawn are counted separately.",
+       ("Click one number", "These are the students counted in that figure."),
+       ("Point to Download Excel and Download PDF", "The list may be downloaded as Excel or PDF."),
+       ("Close the list", "This view was requested during user acceptance testing with the former Associate Dean."),
+       ("Point to Graduation, Overdue and pending, Registrar changes", "The remaining tabs are the graduation list, the pending tasks, and the daily list of changes for the Registrar."),
+       "The revision makes the reports more useful in three ways.",
+       "First, each report states what needs action and which office is responsible.",
+       "Second, every figure can be traced to the students behind it.",
+       "Third, the Graduate School can monitor students by group, not only one at a time."])
 
-head("MIGUI - Feature 3: Operations Manual (about 3 min)")
+head("MIGUI - Feature 3: Operations Manual (about 2 min)")
 lines([("Policy Documents", "Feature 3 is the Operations Manual."),
        "This addresses a revision required by the panel.",
-       "The Graduate School did not have an operations manual.",
-       "The group prepared one.",
-       "It is kept in the policy library, with the Handbook and the Research Protocol.",
-       ("Switch to the signed PDF, sign-off page", "The Graduate School validated the manual."),
+       "The panel asked that the policies in the Operations Manual be included in the system.",
+       "We now have an Operations Manual that the Graduate School has approved and signed.",
+       ("Point to the Operations Manual", "We placed it in our Policy Documents, with the Handbook and the Research Protocol."),
+       "The Policy Assistant now draws its answers from all three documents.",
+       ("Switch to the signed PDF, sign-off page", "This is the approved copy."),
        "This is the sign-off page.",
        "It carries the names, the dates, and the signatures.",
        "Myrine will now present features 4 and 5."])
@@ -177,7 +223,7 @@ lines([("Sign out. Demo accounts > Faculty", "Feature 8 is Google Calendar integ
 head("KHLOE - UAT, conclusions, recommendations (slides 5-12, about 3 min)")
 lines([("Slide 5", "User acceptance testing was conducted with two sets of evaluators."),
        "On 4 November, we met with the former Associate Dean.",
-       "From 9 to 14 November, we held sessions with the Dean and the Graduate School personnel.",
+       "From 9 to 14 November, we held demonstration and training sessions with the Dean and the Graduate School personnel.",
        "Each evaluation had a demonstration, hands-on testing, and a signed UAT form.",
        ("Slide 6", "The former Associate Dean, Sir Eddie de Paula, Jr., evaluated the system individually."),
        "The Dean, Dr. Eric Arthur N. Dio, evaluated it together with four Graduate School personnel.",
