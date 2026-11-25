@@ -65,7 +65,7 @@ test.describe("finding 11: no card title repeats the page title (faculty, staff,
       expect(found.h1).toBe("Assigned Classes");
       expect(found.h2, "the card title 'Assigned class rosters' is gone").not.toContain("Assigned class rosters");
       expectNoRepeat(found);
-      await expect(main(page).getByText("Class rosters for your assigned subjects.")).toBeVisible();
+      // CHANGED BY UX phase 3 (UX-22, IM50): the page line repeated the title; removed.
       await shot(page, "faculty-classes-1366.png");
     });
 
@@ -126,30 +126,35 @@ test.describe("finding 15: Work Queue", () => {
     await page.route("**/api/tasks**", (route) => route.fulfill({ json: { items: TASKS, total: TASKS.length, page: 1, page_size: 50, pages: 1 } }));
   }
 
-  test("a Dean-owned task says 'Dean decides' in Action instead of '-'; every row says something", async ({ page }) => {
+  // CHANGED BY UX phase 4 (UX-23, owner IM50): the Owner column says who holds a task, so the
+  // row does not say it again ("Dean decides"); a task another office holds is greyed, and a task with a page has an arrow.
+  test("finding 15: every row says who holds it; another office's row is greyed; a page opens from the arrow", async ({ page }) => {
     await mockTasks(page);
-    await ready(page, "/work-queue");
+    await ready(page, "/work-queue?view=all");
     const row = (title) => main(page).locator("tbody tr", { hasText: title });
-    await expect(row("Zulu decision")).toContainText("Dean decides");
-    await expect(row("Upload the signed form")).toContainText("Student acts");
+    await expect(row("Zulu decision")).toContainText("Dean");
+    await expect(row("Zulu decision")).toHaveAttribute("data-not-yours", "true");
+    await expect(row("Upload the signed form")).toContainText("Student");
+    await expect(row("Upload the signed form")).toHaveAttribute("data-not-yours", "true");
     await expect(row("Mike check").getByRole("link", { name: "Open Course Adjustments" })).toHaveAttribute("href", "/course-adjustments");
-    await expect(row("Alpha follow-up").getByRole("link")).toHaveCount(2); // the student link and the action link
-    const lastCells = (await main(page).locator("tbody tr td:last-child").allInnerTexts()).map(norm);
-    expect(lastCells.filter((text) => text === "-" || text === ""), "no row has an empty Action").toEqual([]);
+    await expect(row("Alpha follow-up")).not.toHaveAttribute("data-not-yours", "true");
+    await expect(row("Alpha follow-up").getByRole("link")).toHaveCount(2); // the student link and the arrow
+    const owners = (await main(page).locator("tbody tr td:nth-child(2)").allInnerTexts()).map(norm);
+    expect(owners.filter((text) => !text), "every row names who holds it").toEqual([]);
     await shot(page, "work-queue-1366.png");
   });
 
   test("column headers sort: Task A to Z, then Z to A; the Action column has no sort button", async ({ page }) => {
     await mockTasks(page);
-    await ready(page, "/work-queue");
+    await ready(page, "/work-queue?view=all"); // UX-23: the Owner column is on Waiting on others and All
     const titles = async () => (await main(page).locator("tbody tr td:first-child").allInnerTexts()).map(norm);
     await main(page).getByRole("button", { name: "Task", exact: true }).click();
     expect(await titles()).toEqual(["Alpha follow-up call", "Mike check", "Upload the signed form", "Zulu decision on the withdrawal request"]);
     await main(page).getByRole("button", { name: "Task", exact: true }).click();
     expect((await titles())[0]).toBe("Zulu decision on the withdrawal request");
     await expect(main(page).locator("thead th", { hasText: "Task" })).toHaveAttribute("aria-sort", "descending");
-    await expect(main(page).locator("thead th", { hasText: "Action" }).getByRole("button")).toHaveCount(0);
-    for (const name of ["Owner", "Student", "Due", "Status"]) await expect(main(page).locator("thead th").getByRole("button", { name, exact: true }), `${name} sorts`).toHaveCount(1);
+    await expect(main(page).locator("thead th").last().getByRole("button"), "the arrow column does not sort").toHaveCount(0); // UX-23
+    for (const name of ["Owner", "Student", "Due"]) await expect(main(page).locator("thead th").getByRole("button", { name, exact: true }), `${name} sorts`).toHaveCount(1);
   });
 
   test("the staff Faculty list sorts too", async ({ page }) => {

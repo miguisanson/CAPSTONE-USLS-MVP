@@ -15,12 +15,13 @@ export function ReadyMark({ ready, readyLabel = "Ready for Dean review", waiting
 export function CaseCardFacts({ facts }) {
   const shown = facts.map((fact) => (typeof fact === "string" ? { text: fact } : fact)).filter((fact) => fact.text);
   return (
-    <ul data-testid="case-facts" className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-slate-600">
+    // Owner feedback 2026-11-23 (stage 5): one fact per line, as on the Research Gate card (the two-column grid wrapped badly)
+    <ul data-testid="case-facts" className="mt-3 space-y-1 text-xs text-slate-600">
       {shown.map((fact, index) => (
         <li
           key={index}
           data-testid={fact.testId}
-          className={`min-w-0 break-words ${fact.wide ? "col-span-2" : index % 2 ? "text-right" : ""} ${fact.strong ? "text-sm font-semibold text-ink" : ""}`}
+          className={`min-w-0 break-words ${fact.strong ? "text-sm font-semibold text-ink" : ""}`}
         >
           {fact.text}
         </li>
@@ -43,6 +44,42 @@ export function MessageNote({ messages = [], count = messages.length, latest = m
       </p>
       <p className="mt-1 line-clamp-2 text-xs text-amber-900">{latest || unreadHint}</p>
     </div>
+  );
+}
+
+/**
+ * The top of every board card (owner feedback 2026-11-23, stage 5: the Research Gate card): an optional tick box, the name and
+ * the "number · program" line, and one status chip on the right. When the column is narrow the chip drops under the name
+ * instead of squeezing it.
+ */
+export function CaseCardHead({ name, sub, chip = null, select = null }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+      <div className="flex min-w-[9rem] flex-1 items-start gap-2.5">
+        {select}
+        <div className="min-w-0">
+          <p className="break-words text-sm font-semibold text-ink">{name}</p>
+          <p className="text-xs text-slate-500">{sub}</p>
+        </div>
+      </div>
+      {chip}
+    </div>
+  );
+}
+
+/**
+ * The requirements as one line, as on the Research Gate card: "3 of 4 done · Still to do: Practicum completed".
+ * `items` is [{ label, met }].
+ */
+export function RequirementLine({ items, ariaLabel = "Requirements", testId = "requirement-line" }) {
+  if (!items?.length) return null;
+  const open = items.filter((item) => !item.met).map((item) => item.label);
+  const more = open.length - 2;
+  const todo = open.slice(0, 2).join(", ") + (more > 0 ? ` +${more} more` : "");
+  return (
+    <p data-testid={testId} aria-label={ariaLabel} className="mt-2 text-xs text-slate-600">
+      {items.length - open.length} of {items.length} done · {open.length ? `Still to do: ${todo}` : "Nothing left"}
+    </p>
   );
 }
 

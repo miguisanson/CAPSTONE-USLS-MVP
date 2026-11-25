@@ -73,11 +73,11 @@ export function MyCoursesPanel({ data, onSaved }) {
   }
 
   return (
-    <SectionCard pad="lg" title="My suggested curriculum" subtitle="Add published subjects you are taking this semester. Subjects already on your enrollment record stay locked." icon={BookOpenCheck}>
+    <SectionCard pad="lg" title="My suggested curriculum" icon={BookOpenCheck}>
       <EnrollmentBanner term={data.current_term} />
       <div className="rounded-xl border border-brand-100 bg-brand-50/50 p-4 text-sm text-slate-700">
         <p className="font-semibold text-ink">{data.current_term?.label || "Current semester"}</p>
-        <p className="meta mt-1">Current and completed subjects stay locked as part of your academic record. You may select additional subjects only when the subjects are offered this semester.</p>
+        <p className="meta mt-1">Only subjects offered this semester can be added.</p>
       </div>
       {subjects.length ? <div className="space-y-5">
         {Object.entries(grouped).map(([category, rows]) => (

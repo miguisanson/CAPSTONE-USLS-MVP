@@ -87,7 +87,7 @@ test.describe("staff home", () => {
       await expect(main(page).locator("h2").nth(1), "the second section, right under the actions").toHaveText("Waiting on others");
       const waiting = sectionOf(page, "Waiting on others");
       expect(await waiting.locator("li").count()).toBeLessThanOrEqual(3);
-      await expect(waiting.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/work-queue");
+      await expect(waiting.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/work-queue?view=others"); // UX-23: its own tab
       await expect(sectionOf(page, "Needs your action").getByText(/^With the /), "no office-held row under Needs your action").toHaveCount(0);
     }
     const label = main(page).locator('[data-slot="label"]', { hasText: /^Your open tasks$/i }).locator("xpath=..");
@@ -120,7 +120,9 @@ test.describe("staff home", () => {
     await expect(page.getByRole("button", { name: "Clear dashboard filters" })).toHaveCount(0);
     await expect(main(page).locator("select")).toHaveCount(0);
     // the moved blocks stay one click away
-    await expect(main(page).getByRole("link", { name: "Reports", exact: true }).first()).toHaveAttribute("href", "/reports");
+    // UX-11 (owner 2026-11-20): Reports is one click away in the sidebar, not a second button on the home
+    await expect(page.locator("aside:visible nav").getByRole("link", { name: /Reports/ }).first()).toHaveAttribute("href", "/reports");
+    await expect(main(page).getByRole("link", { name: "Reports", exact: true })).toHaveCount(0);
     await expect(main(page).getByRole("link", { name: "Analytics", exact: true }), "CHANGED BY p101 (I-141): the Analytics tab is gone; Reports is the one link").toHaveCount(0);
     await shot(page, "staff-home-1366.png");
   });

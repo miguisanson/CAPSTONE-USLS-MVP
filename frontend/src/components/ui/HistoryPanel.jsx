@@ -13,6 +13,7 @@ import { formatDateTime } from "../../lib/format";
 import { Button } from "./Button.jsx";
 import { EmptyState } from "./Feedback.jsx";
 import { StatusChip } from "./StatusChip.jsx";
+import { statusLabel } from "../../lib/status.js";
 
 const timeOf = (entry) => {
   const t = new Date(entry?.at).getTime();
@@ -36,6 +37,9 @@ function Entry({ entry }) {
   const { title, at, actor, actorRole, from, to, note } = entry;
   const who = [actor, actorRole && actor ? `(${actorRole})` : actorRole].filter(Boolean).join(" ");
   const changed = (from || to) && from !== to;
+  // IM51: two values that share one screen word ("Staff Review" -> "Pending Staff Action") keep their own words here,
+  // or the row would read "In staff review -> In staff review" and hide the change.
+  const sameWord = Boolean(from && to && from !== to && statusLabel(from) === statusLabel(to));
   return (
     <li className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-sm">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-0.5">
@@ -49,9 +53,9 @@ function Entry({ entry }) {
       {who && <p className="mt-0.5 break-words text-xs text-slate-500">{who}</p>}
       {changed && (
         <p className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          {from && <StatusChip status={from} size="sm" dot={false} />}
+          {from && <StatusChip status={from} label={sameWord ? from : undefined} size="sm" dot={false} />}
           {from && to && <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" />}
-          {to && <StatusChip status={to} size="sm" dot={false} />}
+          {to && <StatusChip status={to} label={sameWord ? to : undefined} size="sm" dot={false} />}
         </p>
       )}
       {note && <p className="mt-1 whitespace-pre-wrap break-words text-xs text-slate-600">{note}</p>}

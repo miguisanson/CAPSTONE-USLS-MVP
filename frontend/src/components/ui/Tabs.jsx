@@ -45,7 +45,7 @@ export function Tabs({ label, tabs, value, onChange, className = "" }) {
           >
             {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
             {tab.label}
-            {tab.count ? <span className={cx("rounded-full px-1.5 py-0.5 text-2xs", selected ? "bg-white/25" : "bg-slate-100 text-slate-600")}>{tab.count}</span> : null}
+            {tab.count ? <span className={cx("rounded-full px-1.5 py-0.5 text-2xs", selected ? "bg-white text-brand-700" : "bg-slate-100 text-slate-600")}>{tab.count}</span> : null}
           </button>
         );
       })}

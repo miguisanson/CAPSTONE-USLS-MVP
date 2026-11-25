@@ -83,8 +83,9 @@ test.describe("academic coordinator", () => {
   test("Course Adjustments and Offering setup point at each other", async ({ page }) => {
     await page.goto("/course-adjustments?view=adjustments");
     const main = page.locator("main");
-    await expect(main.getByRole("link", { name: "Offering setup" }).first()).toBeVisible();
-    await expect(main).toContainText("The Academic Coordinator approves and publishes the class schedule on Offering setup");
+    // the Course Adjustments line that pointed at Offering setup is gone; the tab is the way there // CHANGED BY owner feedback 2026-11-23
+    await expect(page.getByRole("tab", { name: "Offering setup" })).toBeVisible();
+    await expect(main).not.toContainText("The Academic Coordinator approves and publishes the class schedule on Offering setup");
     await page.goto("/course-adjustments?view=offerings");
     const panel = page.getByRole("region", { name: "Semester schedule" });
     await expect(panel.getByRole("link", { name: "Course Adjustments" })).toBeVisible();

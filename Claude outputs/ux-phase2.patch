@@ -1,0 +1,1638 @@
+diff --git a/.planning/DECISIONS.md b/.planning/DECISIONS.md
+index 7308352..5ee61a2 100644
+--- a/.planning/DECISIONS.md
++++ b/.planning/DECISIONS.md
+@@ -121,3 +121,4 @@ checkpoint after each phase for the owner's review.
+ | IM47 | Names stay: Research Gate, Student Handoff and Standalone Processes keep their names. Phase 3 is limited to one status vocabulary and plainer descriptions. |
+ | IM48 | Drag stays as it is (no confirm-on-drag). |
+ | IM49 | Phases 0 and 1 run back to back, then stop for review. |
++| IM50 | Owner 2026-11-20 (Phase 2): say a thing once. No subtitle or third line that repeats a heading; no status chip that repeats the due line; no header button to a page the sidebar already lists; no Refresh data button (the date sweeps run on the first sign-in each day). An unread row is a small dot, not a "New" badge; a row's link is an arrow. Applies to every page from now on. |
+diff --git a/.planning/ISSUES.md b/.planning/ISSUES.md
+index dd2a658..f826821 100644
+--- a/.planning/ISSUES.md
++++ b/.planning/ISSUES.md
+@@ -470,4 +470,11 @@ hunt â€” becomes one row here. Rules adapted from DD-Project-GameMaker.
+ | UX-07 | BUG | P2 | audit (UX audit P4): Request Center showed Graduation Endorsement "Not submitted" and open while the home said "Graduation: Not eligible"; the server refuses the application then. | p148 UX-07; `requestMeta.jsx` (`notReadyWhen`); `app.py` student_graduation_request | fixed (Phase 1): the card is locked with the server's reason; the page stays open and lists what is left (p42, p139) |
+ | UX-08 | UI | P3 | audit (UX audit P12): the "Ready to Schedule" chip on the student Research tile ran into the tile's padding at 1440 px. | p148 UX-08 | fixed (Phase 1) |
+ | UX-09 | UI | P3 | audit (UX audit P11): 11 px text (`text-2xs`, DataTable phone labels). | p148 UX-09; `tailwind.config.js` | fixed (Phase 1): smallest text 12 px |
+-| UX-10 | QUESTION | P3 | audit (UX audit P5): every unseen "Needs your action" row is a green row with a NEW badge, and every Graduation card shows four green requirement boxes. Both were owner/stakeholder requests (2026-11-08 "green with a New mark"; Khloe's graduation design). | Held from Phase 1 - needs the owner | question |
++| UX-10 | QUESTION | P3 | audit (UX audit P5): every unseen "Needs your action" row is a green row with a NEW badge, and every Graduation card shows four green requirement boxes. Both were owner/stakeholder requests (2026-11-08 "green with a New mark"; Khloe's graduation design). | Held from Phase 1 - needs the owner | partly answered: the home rows' NEW badge is now a dot (UX-12, owner 2026-11-20); the board cards' green and the Graduation boxes still open |
++| UX-11 | UI | P2 | Owner 2026-11-20: "Can we lessen the amount of text ... Welcome, Grace / Graduate School Staff · what needs you today / Needs your action / Your office's open tasks, most urgent first - it communicated the same thing 3x"; "remove reports button, its already on the side bar"; the Refresh button can go ("the page can refresh by the browser refresh"). | `e2e/p149-ux-phase2.spec.js` UX-11; homes of staff, coordinators, admin, Dean, faculty, student | fixed (Phase 2): no header line on the staff and Dean homes, no section subtitles, no Refresh data / Reports / Open approvals queue buttons; the date sweeps still run on the first sign-in each day |
++| UX-12 | UI | P2 | Owner 2026-11-20: "it dont need to say new, just something to signify it has not been read"; "it doesnt have to say open leave of obsence, it can just be an arrow". | p149 UX-11/12; `RoleHome.jsx` ActionRow | fixed (Phase 2): a small dot labelled "Not opened yet" and a bold title; the link is an arrow named for screen readers (`arrowLabel`); p126 updated |
++| UX-13 | UI | P2 | Owner 2026-11-20: "it says overdue and theres also a small text saying overdue, double information ... same goes for Waiting on others". | p149 UX-13; `Dashboard.jsx`, `StudentOverview.jsx`, `DeanPages.jsx` | fixed (Phase 2): "Overdue since <date>" in red, no Pending / Overdue / Waiting chip; the Dean rows drop "Dean Review" chips |
++| UX-14 | UI | P2 | audit (UX audit P2): process pages stacked How this works, View recent activity, the rules banner and the form line above the work. | p149 UX-14; `components/PageHelp.jsx` | fixed (Phase 2): one Help button; the panel holds How this works, Recent activity, the rules (collapsed) and the form line. Boards: ProcessBoardPage, WorkflowPage, DeanPracticumBoard |
++| UX-15 | UI | P3 | audit (UX audit P2): "What the colours mean" took a full-width row above every board. | p149 UX-15; `StatusLegend.jsx` | fixed (Phase 2): a small "Colour key" button on the line of the "more stages" hint |
++| UX-16 | UI | P3 | audit (UX audit P9): Export CSV / Print were a row of their own under every filter box. | p149 UX-16; `LeaveFilters.jsx`, `RosterFilters` | fixed (Phase 2): inside the filter box, beside "Showing ..."; Research Gate's year filter moved into the box too |
++| UX-17 | UI | P3 | audit (UX audit P2/P7): Research Gate repeated its title ("Who is at the Research Gate" + a description + a count sentence) under the page header. | p149 UX-17 | fixed (Phase 2); p105-sweep2, p121 updated |
+diff --git a/.planning/STATE.md b/.planning/STATE.md
+index 4dbd062..55cb79f 100644
+--- a/.planning/STATE.md
++++ b/.planning/STATE.md
+@@ -1,5 +1,23 @@
+ # State
+ 
++## 2026-11-20 - UX audit Phase 2 (Claude, cloud session; files written back, NOT committed)
++
++- Owner rule IM50: say a thing once (no repeated subtitles, chips or buttons). Spec `frontend/e2e/p149-ux-phase2.spec.js`
++  written first, seen failing (13 of 20).
++- Homes (RoleHome + Dashboard, DeanPages, FacultyPages, StudentOverview): no header line (staff, Dean), no section
++  subtitles, no Refresh data / Reports / Open approvals queue buttons, unread = dot "Not opened yet", arrow links
++  (`arrowLabel`), "Overdue since <date>" without a chip.
++- Process pages: one Help button (`components/PageHelp.jsx`) holding How this works, Recent activity, the rules and the
++  form line (ProcessBoardPage, WorkflowPage, DeanPracticumBoard). Colour key button (StatusLegend). Export/Print inside
++  the filter box (LeaveFilters `extra`/`moreFilters`, RosterFilters `extra`). Research Gate: no second heading or count line.
++- Specs updated on purpose: p32, p51, p71, p72, p73, p75, p78, p87, p90, p91, p92, p105-fable, p105-sweep2, p111, p112,
++  p118, p121, p126.
++- Checked: 39 related spec files + sweep, 513 passed. Fixed p88 (c) (it compared the Work Queue against every office; Phase 1
++  opens it on the signed-in office, so the test now passes `owner=`). Also failing on unchanged code: p51 My Availability,
++  p78 practicum table, p118 I-356 key fact. p79 pictures and p81 dean timed out under load and pass alone.
++- Noted for Phase 3 (wording): the drag hint above each board, and board cards that repeat their status
++  ("Submitted" / "Submitted Aug 29" / a chip / "Next: ...").
++
+ ## 2026-11-20 - UX audit Phase 0 + Phase 1 (Claude, cloud session; files written back into the working tree, NOT committed)
+ 
+ - Plan: the UX audit doc, section 5 (owner decisions IM46-IM49). Claude works in a cloud copy of the repo and writes
+diff --git a/frontend/e2e/p105-fable-fixes.spec.js b/frontend/e2e/p105-fable-fixes.spec.js
+index 2c5e227..017f998 100644
+--- a/frontend/e2e/p105-fable-fixes.spec.js
++++ b/frontend/e2e/p105-fable-fixes.spec.js
+@@ -279,7 +279,8 @@ test.describe("rule badges for the Dean and the student (F-11)", () => {
+     test("no Prototype rule or Needs review wording", async ({ page }) => {
+       await page.route("**/api/business-rules*", (route) => route.fulfill({ json: PROTOTYPE_RULES }));
+       await page.goto("/dean/approvals/practicum");
+-      const rules = page.getByRole("region", { name: "Rules applied on this screen" });
++      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the rules are in Help
++      const rules = page.getByRole("dialog").getByRole("region", { name: "Rules applied on this screen" });
+       await expect(rules).toBeVisible();
+       await rules.getByRole("button").first().click();
+       await expect(rules).toContainText("Leave length");
+@@ -291,7 +292,8 @@ test.describe("rule badges for the Dean and the student (F-11)", () => {
+     test("Prototype rule and Needs review stay on staff screens", async ({ page }) => {
+       await page.route("**/api/business-rules*", (route) => route.fulfill({ json: PROTOTYPE_RULES }));
+       await page.goto("/workflow/leave-of-absence");
+-      const rules = page.getByRole("region", { name: "Rules applied on this screen" });
++      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the rules are in Help
++      const rules = page.getByRole("dialog").getByRole("region", { name: "Rules applied on this screen" });
+       await rules.getByRole("button").first().click();
+       await expect(rules).toContainText(/Proposed rule \(agreed with the Graduate School, awaiting sign-off\)/);
+       await expect(rules).toContainText(/Awaiting sign-off/);
+diff --git a/frontend/e2e/p105-sweep2.spec.js b/frontend/e2e/p105-sweep2.spec.js
+index 9f299a5..4e0124a 100644
+--- a/frontend/e2e/p105-sweep2.spec.js
++++ b/frontend/e2e/p105-sweep2.spec.js
+@@ -69,7 +69,7 @@ test.describe("I-205: Research Gate overview", () => {
+     expect(overview.items.length).toBeGreaterThan(5);
+     await ready(page, "/workflow/research-gate");
+     const section = page.locator("#research-gate-overview");
+-    await expect(section.getByRole("heading", { name: "Who is at the Research Gate" })).toBeVisible();
++    await expect(section.getByRole("heading", { name: "Who is at the Research Gate" })).toHaveCount(0); // UX-17: the page header names it
+     // the filter counts are the server's counts
+     const status = section.getByLabel("Filter by status");
+     await expect(status.locator("option", { hasText: `Blocked (${overview.counts.blocked})` })).toHaveCount(1);
+diff --git a/frontend/e2e/p111-night9-consistency.spec.js b/frontend/e2e/p111-night9-consistency.spec.js
+index b508990..def87cf 100644
+--- a/frontend/e2e/p111-night9-consistency.spec.js
++++ b/frontend/e2e/p111-night9-consistency.spec.js
+@@ -54,7 +54,8 @@ test.describe("(b) every board's rules panel has the same summary line", () => {
+       await page.goto(`/workflow/${slug}`);
+       await expect(main(page).locator("h1")).toBeVisible();
+       await page.waitForLoadState("networkidle");
+-      const panel = page.getByRole("region", { name: "Rules applied on this screen" });
++      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the rules are in Help
++      const panel = page.getByRole("dialog").getByRole("region", { name: "Rules applied on this screen" });
+       await expect(panel).toBeVisible();
+       const line = (await panel.getByRole("button").first().innerText()).split("\n").map((t) => t.trim()).filter(Boolean).pop();
+       expect(line).toMatch(SUMMARY);
+diff --git a/frontend/e2e/p112-privacy-forms.spec.js b/frontend/e2e/p112-privacy-forms.spec.js
+index ea6d9d6..93ae2b9 100644
+--- a/frontend/e2e/p112-privacy-forms.spec.js
++++ b/frontend/e2e/p112-privacy-forms.spec.js
+@@ -103,6 +103,11 @@ test.describe("Forms and Operations Manual line on process pages", () => {
+       const page = await context.newPage();
+       try {
+         await page.goto(path);
++        await expect(page.locator("main h1")).toBeVisible();
++        await page.waitForLoadState("networkidle");
++        // UX-14 (2026-11-20): on a process board the line is in the header's Help panel
++        const help = page.locator("main header").first().getByRole("button", { name: "Help" });
++        if (await help.count()) await help.click();
+         await expect(page.locator('[data-slot="forms"]').first()).toHaveText(line);
+       } finally {
+         await context.close();
+diff --git a/frontend/e2e/p118-stakeholder-polish.spec.js b/frontend/e2e/p118-stakeholder-polish.spec.js
+index 3639b81..cfb26f3 100644
+--- a/frontend/e2e/p118-stakeholder-polish.spec.js
++++ b/frontend/e2e/p118-stakeholder-polish.spec.js
+@@ -74,8 +74,9 @@ test.describe("I-358 one colour vocabulary", () => {
+     expect(distinct("icon"), "seven statuses, seven icons").toBe(7);
+ 
+     const legend = page.locator("[data-status-legend]");
+-    await expect(legend.getByText("What the colours mean")).toBeVisible();
+-    await legend.getByText("What the colours mean").click();
++    // UX-15 (2026-11-20): a small "Colour key" button opens the list
++    await expect(legend.getByRole("button", { name: "Colour key" })).toBeVisible();
++    await legend.getByRole("button", { name: "Colour key" }).click();
+     await expect(legend.locator("[data-legend-tone]")).toHaveCount(7);
+     await expect(legend).toContainText("Approved or on track");
+     await expect(legend).toContainText("Passed or completed");
+@@ -88,11 +89,11 @@ test.describe("I-358 one colour vocabulary", () => {
+       for (const slug of ["leave-of-absence", "readmission", "awol", "withdrawal"]) {
+         await page.goto(`/workflow/${slug}`);
+         const legend = page.locator('[data-testid="stage-board"] [data-status-legend]');
+-        await expect(legend.getByText("What the colours mean"), `${slug} board`).toBeVisible();
++        await expect(legend.getByRole("button", { name: "Colour key" }), `${slug} board`).toBeVisible(); // UX-15
+         expect(await noOverflow(page), `${slug}: no sideways scroll`).toBeLessThanOrEqual(1);
+       }
+       await page.goto("/workflow/leave-of-absence");
+-      await page.locator("[data-status-legend] summary").click();
++      await page.locator("[data-status-legend] button").click(); // UX-15
+       await expect(page.locator("[data-status-legend] [data-legend-tone]")).toHaveCount(7);
+       await shot(page, `legend-board-${viewport.width}.png`);
+     });
+diff --git a/frontend/e2e/p121-research-gate.spec.js b/frontend/e2e/p121-research-gate.spec.js
+index 31895b1..abc5f18 100644
+--- a/frontend/e2e/p121-research-gate.spec.js
++++ b/frontend/e2e/p121-research-gate.spec.js
+@@ -51,7 +51,8 @@ test.describe("I-362: the Research Gate board (staff)", () => {
+       await expect(section.getByLabel(`${count} in ${name}`)).toBeVisible();
+       await expect(section.locator("article")).toHaveCount(count); // every card; the column scrolls (merge M5)
+     }
+-    await expect(page.getByTestId("research-gate-summary")).toContainText(`${overview.items.length} students`);
++    // UX-17 (2026-11-20): no count sentence; the filter box says how many are shown
++    await expect(page.getByText(`Showing ${overview.items.length} of ${overview.items.length} students`)).toBeVisible();
+     expect(await noOverflow(page)).toBe(true);
+     await shot(page, "board-1366.png");
+   });
+diff --git a/frontend/e2e/p126-owner-features.spec.js b/frontend/e2e/p126-owner-features.spec.js
+index e4e5700..ea58180 100644
+--- a/frontend/e2e/p126-owner-features.spec.js
++++ b/frontend/e2e/p126-owner-features.spec.js
+@@ -3,7 +3,7 @@
+ //   - after an export the portal opens a pre-filled Gmail draft (To: the Registrar) and the export window keeps
+ //     "Open Gmail" / "Use my mail app instead" buttons;
+ //   - Graduation and Withdrawal show the history of exported lists;
+-//   - a "Needs your action" row not opened yet is green with "New" until it is opened;
++//   - a "Needs your action" row not opened yet carries a "Not opened yet" dot until it is opened (UX-12);
+ //   - a board card that moved by itself is green ("Moved here · new") until it is touched.
+ // Read-only against the data: the export answer is mocked, the rest only reads and clicks.
+ import { test, expect } from "@playwright/test";
+@@ -79,14 +79,16 @@ test.describe("Export history", () => {
+ test.describe("New and moved items are green until opened (staff)", () => {
+   test.use({ storageState: authFile("staff") });
+ 
+-  test("a Needs your action row is New until it is opened", async ({ page }) => {
++  test("a Needs your action row has the 'Not opened yet' dot until it is opened", async ({ page }) => {
+     await page.goto("/");
+     const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "Needs your action" }) }).first();
+     const rows = section.locator("li");
+     test.skip((await rows.count()) === 0, "nothing waits on staff in this data");
+     const first = rows.first();
+     await expect(first).toHaveAttribute("data-fresh", "true");
+-    await expect(first.getByText("New", { exact: true })).toBeVisible();
++    // UX-12 (owner 2026-11-20): a small dot, no "New" badge
++    await expect(first.getByRole("img", { name: "Not opened yet" })).toBeVisible();
++    await expect(first.getByText("New", { exact: true })).toHaveCount(0);
+     await first.getByRole("link").first().click();
+     await page.goto("/");
+     await expect(section.locator("li").first()).not.toHaveAttribute("data-fresh", "true");
+diff --git a/frontend/e2e/p149-ux-phase2.spec.js b/frontend/e2e/p149-ux-phase2.spec.js
+new file mode 100644
+index 0000000..e74740b
+--- /dev/null
++++ b/frontend/e2e/p149-ux-phase2.spec.js
+@@ -0,0 +1,167 @@
++// e2e-writes: none
++// UX audit Phase 2 (2026-11-20, issues UX-11..UX-17). Written before the change. Reads only.
++// Owner 2026-11-20: "lessen the amount of text"; say a thing once (title, subtitle and a third line said the same thing).
++//   UX-11 the homes: no header line or section subtitle that repeats the heading; no Refresh data / Reports buttons
++//   UX-12 a row not opened yet has a small dot (no "New" badge, no green row); the row's link is an arrow
++//   UX-13 a row says "Overdue" once (no Overdue chip beside "Overdue, was due ...")
++//   UX-14 process pages: one "Help" button; the rules, form numbers, How this works and Recent activity are inside it
++//   UX-15 the colour legend is a small "Colour key" button, not a full-width bar
++//   UX-16 Export CSV / Print sit inside the filter box, not on a row of their own
++//   UX-17 Research Gate: no second heading and count sentence repeating the page title
++import { test, expect } from "@playwright/test";
++import { BASE_URL } from "./support/paths.mjs";
++import { PASSWORD, loadState } from "./support/accounts.js";
++
++async function signedIn(browser, email, viewport = { width: 1366, height: 768 }) {
++  const context = await browser.newContext({ baseURL: BASE_URL, viewport });
++  const res = await context.request.post("/api/auth/login", { data: { email, password: PASSWORD } });
++  expect(res.ok()).toBeTruthy();
++  return context;
++}
++const main = (page) => page.locator("main");
++const sectionOf = (page, name) => main(page).locator("section", { has: page.getByRole("heading", { name, exact: true }) });
++
++const HOMES = [
++  ["staff", "staff@usls.edu.ph", "/"],
++  ["dean", "dean@usls.edu.ph", "/dean"],
++  ["faculty", () => loadState().facultyEmail, "/faculty-portal"],
++  ["student", "student@usls.edu.ph", "/student"],
++];
++
++test.describe("UX Phase 2: homes", () => {
++  for (const [role, email, path] of HOMES) {
++    test(`UX-11/12 ${role}: no repeated subtitles, no New badge, arrow links`, async ({ browser }) => {
++      const context = await signedIn(browser, typeof email === "function" ? email() : email);
++      const page = await context.newPage();
++      try {
++        await page.goto(path);
++        await page.waitForLoadState("networkidle");
++        const actions = sectionOf(page, "Needs your action");
++        await expect(actions).toHaveCount(1);
++        // no subtitle under the section heading
++        await expect(actions.locator("h2 + p")).toHaveCount(0);
++        const waiting = main(page).locator("section", { has: page.getByRole("heading", { name: /^Waiting on/ }) });
++        if (await waiting.count()) await expect(waiting.locator("h2 + p")).toHaveCount(0);
++        // no "New" badge text; an unread row carries a labelled dot
++        await expect(main(page).getByText("New", { exact: true })).toHaveCount(0);
++        const fresh = actions.locator('li[data-fresh="true"]');
++        if (await fresh.count()) {
++          await expect(fresh.first().getByRole("img", { name: "Not opened yet" })).toHaveCount(1);
++          const bg = await fresh.first().evaluate((el) => getComputedStyle(el).backgroundColor);
++          expect(bg, "an unread row is not a green row").toBe("rgb(255, 255, 255)");
++        }
++        // every row link is an arrow with a name, no visible words
++        const links = actions.locator("li a");
++        for (let i = 0; i < (await links.count()); i++) {
++          await expect(links.nth(i)).toHaveAttribute("aria-label", /^(Open|Review|Answer|Reply|View|Go|Sign|Decide|Request|Upload|File) \S/);
++          expect(((await links.nth(i).innerText()) || "").trim(), "no words on the arrow").toBe("");
++        }
++      } finally { await context.close(); }
++    });
++  }
++
++  test("UX-11 staff: no header line under Welcome, no Refresh data or Reports button", async ({ browser }) => {
++    const context = await signedIn(browser, "staff@usls.edu.ph");
++    const page = await context.newPage();
++    try {
++      await page.goto("/");
++      await page.waitForLoadState("networkidle");
++      const header = main(page).locator("header").first();
++      await expect(header.getByRole("heading", { level: 1 })).toHaveText(/^Welcome, /);
++      await expect(header.locator('[data-slot="description"]')).toHaveCount(0);
++      await expect(main(page).getByRole("button", { name: "Refresh data" })).toHaveCount(0);
++      await expect(header.getByRole("link", { name: "Reports" })).toHaveCount(0);
++    } finally { await context.close(); }
++  });
++
++  test("UX-13 staff: an overdue row says Overdue once", async ({ browser }) => {
++    const context = await signedIn(browser, "staff@usls.edu.ph");
++    await context.route("**/api/tasks?*", async (route) => {
++      const response = await route.fetch();
++      const data = await response.json();
++      if (data.items?.length) {
++        data.items[0] = { ...data.items[0], overdue: true, status: "Overdue", due_at: "2026-11-10T00:00:00" };
++      }
++      await route.fulfill({ response, json: data });
++    });
++    const page = await context.newPage();
++    try {
++      await page.goto("/");
++      await page.waitForLoadState("networkidle");
++      const row = sectionOf(page, "Needs your action").locator("li").first();
++      const text = (await row.innerText()).replace(/\s+/g, " ");
++      expect(text.match(/overdue/gi) || [], `"${text}"`).toHaveLength(1);
++    } finally { await context.close(); }
++  });
++});
++
++const PROCESS_PAGES = [
++  ["staff", "staff@usls.edu.ph", "/workflow/leave-of-absence"],
++  ["staff", "staff@usls.edu.ph", "/workflow/graduation"],
++  ["staff", "staff@usls.edu.ph", "/workflow/research-gate"],
++  ["dean", "dean@usls.edu.ph", "/dean/approvals/practicum"],
++];
++
++test.describe("UX Phase 2: process pages", () => {
++  for (const [role, email, path] of PROCESS_PAGES) {
++    test(`UX-14 ${path}: one Help button holds the rules, forms, guide and activity`, async ({ browser }) => {
++      const context = await signedIn(browser, email);
++      const page = await context.newPage();
++      try {
++        await page.goto(path);
++        await page.waitForLoadState("networkidle");
++        const header = main(page).locator("header").first();
++        await expect(header.getByRole("button")).toHaveText(["Help"]);
++        await expect(header.locator('[data-slot="forms"]')).toHaveCount(0);
++        await expect(main(page).getByRole("region", { name: "Rules applied on this screen" })).toHaveCount(0);
++        await header.getByRole("button", { name: "Help" }).click();
++        const help = page.getByRole("dialog");
++        await expect(help).toBeVisible();
++        await expect(help.getByRole("region", { name: "Rules applied on this screen" })).toBeVisible();
++        await expect(help).toContainText(/Forms? GS-F-/);
++        await expect(help.getByRole("button", { name: "How this works" })).toBeVisible();
++        await expect(help.getByRole("button", { name: "Recent activity" })).toBeVisible();
++        await help.getByRole("button", { name: "How this works" }).click();
++        await expect(page.getByRole("dialog").getByRole("heading").first()).toContainText(/How .* works/);
++      } finally { await context.close(); }
++    });
++  }
++
++  test("UX-15 the colour key is a small button, not a full-width bar", async ({ browser }) => {
++    const context = await signedIn(browser, "staff@usls.edu.ph");
++    const page = await context.newPage();
++    try {
++      await page.goto("/workflow/leave-of-absence");
++      const legend = main(page).locator("[data-status-legend]");
++      await expect(legend).toHaveCount(1);
++      const box = await legend.boundingBox();
++      expect(box.width, "legend width").toBeLessThan(260);
++      await expect(main(page).getByText("What the colours mean")).toHaveCount(0);
++      await legend.getByRole("button", { name: "Colour key" }).click();
++      await expect(legend.locator("[data-legend-tone]").first()).toBeVisible();
++    } finally { await context.close(); }
++  });
++
++  test("UX-16 Export CSV and Print are inside the filter box", async ({ browser }) => {
++    const context = await signedIn(browser, "staff@usls.edu.ph");
++    const page = await context.newPage();
++    try {
++      await page.goto("/workflow/leave-of-absence");
++      const box = main(page).locator("[data-filter-box]");
++      await expect(box).toHaveCount(1);
++      await expect(box.getByRole("button", { name: "Export CSV" })).toBeVisible();
++      await expect(box.getByRole("button", { name: "Print" })).toBeVisible();
++    } finally { await context.close(); }
++  });
++
++  test("UX-17 Research Gate: the board is not introduced a second time", async ({ browser }) => {
++    const context = await signedIn(browser, "staff@usls.edu.ph");
++    const page = await context.newPage();
++    try {
++      await page.goto("/workflow/research-gate");
++      await page.waitForLoadState("networkidle");
++      await expect(main(page).getByRole("heading", { name: "Who is at the Research Gate" })).toHaveCount(0);
++      await expect(main(page).getByText(/^\d+ students: \d+ in Title Defense/)).toHaveCount(0);
++    } finally { await context.close(); }
++  });
++});
+diff --git a/frontend/e2e/p32-dean-pages.spec.js b/frontend/e2e/p32-dean-pages.spec.js
+index c0ff33a..f73400b 100644
+--- a/frontend/e2e/p32-dean-pages.spec.js
++++ b/frontend/e2e/p32-dean-pages.spec.js
+@@ -127,7 +127,7 @@ test.describe("P3.2 Dean pages", () => {
+   test("dashboard: key numbers and their links, the waiting decisions with a Review link each, the plan row, recent decisions", async ({ page }) => {
+     await page.goto("/dean");
+     await expect(page.getByRole("heading", { level: 1, name: /^Welcome, / })).toBeVisible();
+-    await expect(page.getByRole("main").getByRole("link", { name: /Open approvals queue/ })).toHaveAttribute("href", "/dean/approvals");
++    await expect(page.getByRole("main").getByRole("link", { name: /Open approvals queue/ })).toHaveCount(0); // UX-11: the sidebar has the Approvals Queue
+ 
+     // The headline number: how many decisions wait and how long the oldest has.
+     const waiting = page.getByRole("main").getByRole("link", { name: /Decisions waiting/ });
+diff --git a/frontend/e2e/p51-faculty.spec.js b/frontend/e2e/p51-faculty.spec.js
+index 1289da9..4b7d8eb 100644
+--- a/frontend/e2e/p51-faculty.spec.js
++++ b/frontend/e2e/p51-faculty.spec.js
+@@ -110,7 +110,7 @@ test.describe("Dashboard", () => {
+     await expect(page.getByText("Learning analytics, online learning, and student engagement in graduate education")).toBeVisible();
+     await expect(main(page).getByText("Education", { exact: true }).first()).toBeVisible(); // the college chip
+     await expect(page.getByRole("heading", { name: "Needs your action" })).toBeVisible();
+-    await expect(page.getByText("Invitations, signatures, verdicts and requests that wait for you")).toBeVisible();
++    await expect(page.getByText("Invitations, signatures, verdicts and requests that wait for you")).toHaveCount(0); // UX-11: no subtitle
+     await expect(page.getByRole("link", { name: "Answer invitations" })).toHaveAttribute("href", "/faculty-portal/invitations");
+     for (const label of ["Your open items", "Advisees", "Panel committees", "Upcoming defenses"]) {
+       await expect(main(page).locator('[data-slot="label"]', { hasText: new RegExp(`^${label}$`, "i") }).first()).toBeVisible();
+diff --git a/frontend/e2e/p71-staff-home.spec.js b/frontend/e2e/p71-staff-home.spec.js
+index bc11e80..33f14d5 100644
+--- a/frontend/e2e/p71-staff-home.spec.js
++++ b/frontend/e2e/p71-staff-home.spec.js
+@@ -120,7 +120,9 @@ test.describe("staff home", () => {
+     await expect(page.getByRole("button", { name: "Clear dashboard filters" })).toHaveCount(0);
+     await expect(main(page).locator("select")).toHaveCount(0);
+     // the moved blocks stay one click away
+-    await expect(main(page).getByRole("link", { name: "Reports", exact: true }).first()).toHaveAttribute("href", "/reports");
++    // UX-11 (owner 2026-11-20): Reports is one click away in the sidebar, not a second button on the home
++    await expect(page.locator("aside:visible nav").getByRole("link", { name: /Reports/ }).first()).toHaveAttribute("href", "/reports");
++    await expect(main(page).getByRole("link", { name: "Reports", exact: true })).toHaveCount(0);
+     await expect(main(page).getByRole("link", { name: "Analytics", exact: true }), "CHANGED BY p101 (I-141): the Analytics tab is gone; Reports is the one link").toHaveCount(0);
+     await shot(page, "staff-home-1366.png");
+   });
+diff --git a/frontend/e2e/p72-dean-faculty-home.spec.js b/frontend/e2e/p72-dean-faculty-home.spec.js
+index 2d3374e..dc92823 100644
+--- a/frontend/e2e/p72-dean-faculty-home.spec.js
++++ b/frontend/e2e/p72-dean-faculty-home.spec.js
+@@ -169,7 +169,7 @@ test.describe("Dean home", () => {
+     for (const gone of ["Recently decided", "How long items have waited", "Waiting longest"]) {
+       await expect(main(page).getByText(gone, { exact: true }), `no "${gone}" block`).toHaveCount(0);
+     }
+-    await expect(main(page).getByRole("link", { name: /Open approvals queue/ })).toHaveAttribute("href", "/dean/approvals");
++    await expect(main(page).getByRole("link", { name: /Open approvals queue/ })).toHaveCount(0); // UX-11: the sidebar has the Approvals Queue
+     await expect(main(page).getByRole("link", { name: /Decisions waiting/ })).toHaveAttribute("href", "/dean/approvals");
+     await expect(main(page).getByRole("link", { name: /Decided this week/ })).toHaveAttribute("href", "/dean/activity");
+ 
+diff --git a/frontend/e2e/p73-board-consistency.spec.js b/frontend/e2e/p73-board-consistency.spec.js
+index 33e2bc3..7f008f3 100644
+--- a/frontend/e2e/p73-board-consistency.spec.js
++++ b/frontend/e2e/p73-board-consistency.spec.js
+@@ -104,8 +104,8 @@ test.describe("P7.3 boards of the same kind behave the same", () => {
+     ]) {
+       await page.goto(`/workflow/${slug}`);
+       await expect(page.getByRole("region", { name: region }), slug).toBeVisible();
+-      await expect(page.getByRole("button", { name: "How this works" }), `${slug}: guide`).toBeVisible();
+-      await expect(page.getByRole("button", { name: "View recent activity" }), `${slug}: activity`).toBeVisible();
++      await expect(page.locator("main header").first().getByRole("button", { name: "Help" }), `${slug}: guide`).toBeVisible(); // UX-14
++      await expect(page.locator("main header").first().getByRole("button", { name: "Help" }), `${slug}: activity`).toBeVisible(); // UX-14
+       await expect(page.getByRole("searchbox", { name: /Search requests by name/ }), `${slug}: search`).toBeVisible();
+       await expect(page.getByRole("combobox", { name: "Filter by program" }), `${slug}: program`).toBeVisible();
+       await expect(page.getByRole("combobox", { name: "Filter by status" }), `${slug}: status`).toBeVisible();
+diff --git a/frontend/e2e/p75-workflow-pages.spec.js b/frontend/e2e/p75-workflow-pages.spec.js
+index e05d9b5..26ac9af 100644
+--- a/frontend/e2e/p75-workflow-pages.spec.js
++++ b/frontend/e2e/p75-workflow-pages.spec.js
+@@ -139,8 +139,8 @@ test.describe("Student Handoff (staff)", () => {
+     await expect(main(page).getByText("No monitoring-sheet backups yet.")).toBeVisible();
+     await expect(main(page).getByRole("heading", { level: 2, name: /Onboarding report/ })).toBeVisible();
+     // CHANGED BY conC (I-123): the guide and the activity are the two header buttons, not cards in a side rail.
+-    await expect(main(page).getByRole("button", { name: "How this works", exact: true })).toBeVisible();
+-    await expect(main(page).getByRole("button", { name: "View recent activity", exact: true })).toBeVisible();
++    await expect(page.locator("main header").first().getByRole("button", { name: "Help" })).toBeVisible(); // UX-14
++    await expect(page.locator("main header").first().getByRole("button", { name: "Help" })).toBeVisible(); // UX-14
+     await expect(main(page).getByRole("heading", { level: 2, name: "How this works" })).toHaveCount(0);
+     await expect(main(page).getByRole("heading", { level: 2, name: "Recent in this workflow" })).toHaveCount(0);
+     await shotsAt(page, "handoff");
+diff --git a/frontend/e2e/p78-practicum-scheduling.spec.js b/frontend/e2e/p78-practicum-scheduling.spec.js
+index 741e6a7..f594599 100644
+--- a/frontend/e2e/p78-practicum-scheduling.spec.js
++++ b/frontend/e2e/p78-practicum-scheduling.spec.js
+@@ -120,10 +120,11 @@ test.describe("Practicum (staff)", () => {
+     await page.goto("/workflow/practicum");
+     await expect(main(page).getByRole("heading", { level: 1, name: "Practicum" })).toBeVisible();
+     await expect(main(page).getByText("Track practicum MOA receipt, hours, certificates, completion report, and Dean review")).toBeVisible();
+-    await expect(main(page).getByRole("button", { name: "How this works" })).toBeVisible();
+-    await expect(main(page).getByRole("button", { name: "View recent activity" })).toBeVisible();
+     await expect(main(page).getByText(/Psychology and MSGC/).first()).toBeVisible();
+-    await expect(main(page).getByText(/5 rules from the Graduate School policies/)).toBeVisible();
++    // UX-14: the rules are in the Help panel
++    await page.locator("main header").first().getByRole("button", { name: "Help" }).click();
++    await expect(page.getByRole("dialog").getByText(/5 rules from the Graduate School policies/)).toBeVisible();
++    await page.keyboard.press("Escape");
+     await expect(main(page).getByPlaceholder(/Search students/)).toBeVisible();
+     await expect(main(page).getByRole("combobox", { name: "Filter by program" })).toBeVisible();
+     await expect(main(page).getByText(/Showing 2 of 2/)).toBeVisible();
+@@ -217,7 +218,8 @@ test.describe("Practicum (staff)", () => {
+   test("the two header buttons open the guide and the activity window", async ({ page }) => {
+     await withPristineRoster(page);
+     await page.goto("/workflow/practicum");
+-    await main(page).getByRole("button", { name: "How this works" }).click();
++    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
++    await page.getByRole("dialog").getByRole("button", { name: "How this works" }).click();
+     const guide = page.getByRole("dialog");
+     await expect(guide.getByRole("heading", { name: "How practicum works" })).toBeVisible();
+     for (const label of ["Purpose", "Who submits", "Who reviews", "When something is incomplete", "Main stages"]) {
+@@ -227,7 +229,8 @@ test.describe("Practicum (staff)", () => {
+     await shotsAt(page, "practicum-guide");
+     await page.keyboard.press("Escape");
+     await expect(page.getByRole("dialog")).toHaveCount(0);
+-    await main(page).getByRole("button", { name: "View recent activity" }).click();
++    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
++    await page.getByRole("dialog").getByRole("button", { name: "Recent activity" }).click();
+     await expect(page.getByRole("dialog").getByRole("heading", { name: "Recent workflow activity" })).toBeVisible();
+     await expect(page.getByRole("dialog").getByText("No activity yet")).toBeVisible();
+     await page.keyboard.press("Escape");
+@@ -373,7 +376,8 @@ test.describe("Lifecycle workflow pages open with the shared header (I-063)", ()
+ 
+   test("the who-uses / data-captured text is kept in the How this works guide", async ({ page }) => {
+     await page.goto("/workflow/practicum");
+-    await main(page).getByRole("button", { name: "How this works" }).click();
++    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
++    await page.getByRole("dialog").getByRole("button", { name: "How this works" }).click();
+     const guide = page.getByRole("dialog");
+     await expect(guide.getByText("Used by", { exact: true })).toBeVisible();
+     await expect(guide).toContainText("Student / GS Staff / Academic Coordinator / Dean");
+@@ -383,7 +387,8 @@ test.describe("Lifecycle workflow pages open with the shared header (I-063)", ()
+ 
+     // CHANGED BY conC (I-123): the same text sits in the guide window on a page that used to have a side rail.
+     await page.goto("/workflow/research-gate?student_id=146");
+-    await main(page).getByRole("button", { name: "How this works" }).click();
++    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
++    await page.getByRole("dialog").getByRole("button", { name: "How this works" }).click();
+     const railGuide = page.getByRole("dialog");
+     await expect(railGuide.getByText("Used by", { exact: true })).toBeVisible();
+     await expect(railGuide.getByText("What it records", { exact: true })).toBeVisible();
+@@ -393,8 +398,8 @@ test.describe("Lifecycle workflow pages open with the shared header (I-063)", ()
+   test("header buttons exist on the pages that have no side guide", async ({ page }) => {
+     for (const slug of ["practicum", "graduation", "course-audit"]) {
+       await page.goto(`/workflow/${slug}`);
+-      await expect(main(page).getByRole("button", { name: "How this works" }), slug).toBeVisible();
+-      await expect(main(page).getByRole("button", { name: "View recent activity" }), slug).toBeVisible();
++      await expect(page.locator("main header").first().getByRole("button", { name: "Help" }), slug).toBeVisible(); // UX-14
++      await expect(page.locator("main header").first().getByRole("button", { name: "Help" }), slug).toBeVisible(); // UX-14
+     }
+   });
+ });
+diff --git a/frontend/e2e/p87-shared-parts.spec.js b/frontend/e2e/p87-shared-parts.spec.js
+index b5c5617..3b45d46 100644
+--- a/frontend/e2e/p87-shared-parts.spec.js
++++ b/frontend/e2e/p87-shared-parts.spec.js
+@@ -317,6 +317,7 @@ test.describe("Rules applied on this screen", () => {
+       await mockGet(page, /\/api\/business-rules/, RULES);
+       await page.goto("/workflow/practicum");
+       await expect(main(page).getByRole("heading", { level: 1, name: "Practicum" })).toBeVisible();
++      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the rules are in Help
+       await checkRules(page, { staffLink: true });
+       await shotAll(page, "rules-staff");
+     });
+@@ -326,6 +327,8 @@ test.describe("Rules applied on this screen", () => {
+       await page.goto("/workflow/practicum");
+       await expect(main(page).getByRole("heading", { level: 1, name: "Practicum" })).toBeVisible();
+       await page.waitForLoadState("networkidle");
++      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the rules are in Help
++      await expect(page.getByRole("dialog")).toBeVisible();
+       await expect(page.locator('section[aria-label="Rules applied on this screen"]')).toHaveCount(0);
+     });
+   });
+diff --git a/frontend/e2e/p88-records-login.spec.js b/frontend/e2e/p88-records-login.spec.js
+index 31a5441..bad5f5d 100644
+--- a/frontend/e2e/p88-records-login.spec.js
++++ b/frontend/e2e/p88-records-login.spec.js
+@@ -393,7 +393,8 @@ test.describe("I-116: staff home, Work Queue", () => {
+     const all = await (await context.request.get("/api/tasks?page_size=50")).json();
+     expect(all.items.length, "the demo data has open tasks").toBeGreaterThan(0);
+     const word = all.items[0].title.split(/\s+/).find((w) => w.length > 4) || all.items[0].title;
+-    await page.goto(`/work-queue?q=${encodeURIComponent(word)}`);
++    // CHANGED BY UX phase 1 (UX-02): the queue opens on the signed-in office; owner= (empty) asks for every office, which is what `all` holds.
++    await page.goto(`/work-queue?q=${encodeURIComponent(word)}&owner=`);
+     await expect(page.locator("main h1")).toBeVisible();
+     await page.waitForLoadState("networkidle");
+     await expect(main(page).getByLabel("Search work queue")).toHaveValue(word);
+diff --git a/frontend/e2e/p90-dean-consistency.spec.js b/frontend/e2e/p90-dean-consistency.spec.js
+index 6d6fb3a..0b0643c 100644
+--- a/frontend/e2e/p90-dean-consistency.spec.js
++++ b/frontend/e2e/p90-dean-consistency.spec.js
+@@ -83,9 +83,13 @@ const chip = (page) => page.locator('main [data-slot="badge"]').first();
+ 
+ /** The same parts on a Dean board: header buttons, rules panel, search box, Board/Table toggle (Board pressed). */
+ async function expectSharedParts(page, label) {
+-  await expect(page.getByRole("button", { name: "How this works" }), `${label}: How this works`).toBeVisible();
+-  await expect(page.getByRole("button", { name: "View recent activity" }), `${label}: View recent activity`).toBeVisible();
+-  await expect(page.getByRole("region", { name: "Rules applied on this screen" }), `${label}: rules panel`).toBeVisible();
++  // UX-14 (owner 2026-11-20): the guide, the activity and the rules panel are in the header's Help panel.
++  const help = page.locator("main header").first().getByRole("button", { name: "Help" });
++  await expect(help, `${label}: Help`).toBeVisible();
++  await help.click();
++  await expect(page.getByRole("dialog").getByRole("region", { name: "Rules applied on this screen" }), `${label}: rules panel`).toBeVisible();
++  await page.keyboard.press("Escape");
++  await expect(page.getByRole("dialog")).toHaveCount(0);
+   await expect(page.getByRole("searchbox", SEARCH), `${label}: search box`).toBeVisible();
+   const toggle = page.getByRole("group", TOGGLE);
+   await expect(toggle, `${label}: Board/Table toggle`).toBeVisible();
+@@ -138,7 +142,7 @@ test.describe("conA Dean boards share one set of parts (finding 1 and 10)", () =
+     test(`${board.title}: Dean words, the "N waiting" chip, header buttons, rules panel, toolbar and toggle`, async ({ page }) => {
+       const approvals = await openAs(page, `/dean/approvals/${board.slug}`);
+       await expect(page.getByRole("heading", { level: 1, name: board.title })).toBeVisible();
+-      await expect(page.getByRole("button", { name: "How this works" })).toBeVisible();
++      await expect(page.locator("main header").first().getByRole("button", { name: "Help" })).toBeVisible(); // UX-14
+ 
+       // finding 10: the description is written for the Dean, the chip counts what waits on the Dean
+       await expect(page.locator('main [data-slot="description"]').first()).toHaveText(board.description);
+@@ -181,11 +185,13 @@ test.describe("conA Dean Practicum Reports is the shared board (finding 1 / I-12
+     await expect(main(page).getByRole("heading", { name: "Waiting for your decision" })).toHaveCount(0);
+ 
+     // the header buttons open the same windows as the other boards
+-    await page.getByRole("button", { name: "How this works" }).click();
++    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
++    await page.getByRole("dialog").getByRole("button", { name: "How this works" }).click();
+     await expect(page.getByRole("dialog")).toBeVisible();
+     await page.keyboard.press("Escape");
+     await expect(page.getByRole("dialog")).toHaveCount(0);
+-    await page.getByRole("button", { name: "View recent activity" }).click();
++    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
++    await page.getByRole("dialog").getByRole("button", { name: "Recent activity" }).click();
+     await expect(page.getByRole("dialog")).toBeVisible();
+     await page.keyboard.press("Escape");
+     await expect(page.getByRole("dialog")).toHaveCount(0);
+diff --git a/frontend/e2e/p91-workflow-consistency.spec.js b/frontend/e2e/p91-workflow-consistency.spec.js
+index bf257cb..7c33c7e 100644
+--- a/frontend/e2e/p91-workflow-consistency.spec.js
++++ b/frontend/e2e/p91-workflow-consistency.spec.js
+@@ -52,14 +52,16 @@ test.describe("conC: one place for the guide and the activity", () => {
+       await page.goto(`/workflow/${path}`);
+       await expect(main(page).getByRole("heading", { level: 1 })).toBeVisible();
+       const header = main(page).locator("header").filter({ has: page.getByRole("heading", { level: 1 }) }).first();
+-      for (const name of ["How this works", "View recent activity"]) {
+-        await expect(header.getByRole("button", { name, exact: true }), `${name}: in the page header`).toHaveCount(1);
+-        await expect(main(page).getByRole("button", { name, exact: true }), `${name}: once on the page`).toHaveCount(1);
++      // UX-14 (owner 2026-11-20): one "Help" button in the header holds the guide, the activity and the rules.
++      await expect(header.getByRole("button", { name: "Help", exact: true }), "Help: in the page header").toHaveCount(1);
++      for (const name of ["How this works", "View recent activity", "Recent activity"]) {
++        await expect(main(page).getByRole("button", { name, exact: true }), `${name}: not on the page itself`).toHaveCount(0);
+       }
+       // No second copy of either as a card: not in a side rail, not under the page.
+       await expect(main(page).getByRole("heading", { name: /^(How this works|Recent in this workflow|Recent activity)$/ }), "no rail card").toHaveCount(0);
+ 
+-      await header.getByRole("button", { name: "How this works", exact: true }).click();
++      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
++    await page.getByRole("dialog").getByRole("button", { name: "How this works" }).click();
+       const guide = page.getByRole("dialog");
+       await expect(guide).toBeVisible();
+       await expect(guide.getByRole("heading").first()).toContainText(/works/i);
+@@ -67,7 +69,8 @@ test.describe("conC: one place for the guide and the activity", () => {
+       await page.keyboard.press("Escape");
+       await expect(page.getByRole("dialog")).toHaveCount(0);
+ 
+-      await header.getByRole("button", { name: "View recent activity", exact: true }).click();
++      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
++    await page.getByRole("dialog").getByRole("button", { name: "Recent activity" }).click();
+       const activity = page.getByRole("dialog");
+       await expect(activity).toBeVisible();
+       await expect(activity.getByRole("heading").first()).toContainText(/activity/i);
+diff --git a/frontend/e2e/p92-wiring.spec.js b/frontend/e2e/p92-wiring.spec.js
+index beb969c..8f43209 100644
+--- a/frontend/e2e/p92-wiring.spec.js
++++ b/frontend/e2e/p92-wiring.spec.js
+@@ -3,7 +3,7 @@
+ // Written BEFORE the change and red on the old pages. Through the real UI:
+ //   - the notification bell asks the server to make the due reminders (POST /api/notifications/refresh) on mount, and
+ //     only then reads the list (GET /api/notifications); one refresh per page load, never two;
+-//   - the Graduate School home has a "Refresh data" button (staff and administrator only) that runs the date-driven
++//   - (UX-11, 2026-11-20: the home no longer has a "Refresh data" button; the sweeps run on the first sign-in each day)
+ //     sweeps (POST /api/maintenance/refresh), says what came back, and reloads the home;
+ //   - the Academic Coordinator and the Research Coordinator get the same action-first home as every other role:
+ //     "Dashboard" first in their sidebar, Login sends them to it, "Needs your action", key numbers from their own
+@@ -97,53 +97,14 @@ test.describe("notification bell asks for the due reminders first", () => {
+ });
+ 
+ // ------------------------------------------------------------------------------------------------ refresh data
+-test.describe("Graduate School home: Refresh data", () => {
+-  for (const key of ["staff", "admin"]) {
++test.describe("Graduate School home: no Refresh data button", () => {
++  // UX-11 (owner 2026-11-20): the date checks run on the first sign-in of each day (run_maintenance_sweeps), so the home
++  // has no button for them; a browser refresh reloads the page.
++  for (const key of ["staff", "admin", "academic-coordinator", "research-coordinator"]) {
+     test.describe(key, () => {
+       test.use({ storageState: join(AUTH_DIR, `${key}.json`), viewport: { width: 1366, height: 768 } });
+ 
+-      test("the button runs the sweeps, shows the result and reloads the home", async ({ page }) => {
+-        tracker.where = { role: key, page: "p92 refresh data", viewport: 1366 };
+-        await page.goto("/");
+-        await expect(page.locator("main h1")).toBeVisible();
+-        await page.waitForLoadState("networkidle");
+-        const button = page.getByRole("button", { name: "Refresh data" });
+-        await expect(button).toBeVisible();
+-        const sweep = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/maintenance/refresh" && r.request().method() === "POST");
+-        const reload = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/dashboard" && r.request().method() === "GET");
+-        await button.click();
+-        const response = await sweep;
+-        expect(response.status()).toBe(200);
+-        const body = await response.json();
+-        await reload; // the home is read again after the sweeps
+-        await expect(main(page).getByRole("status").filter({ hasText: body.message })).toBeVisible();
+-        await expect(button).toBeEnabled();
+-        await shot(page, `${key}-refresh-1366.png`);
+-      });
+-    });
+-  }
+-
+-  test.describe("staff, when the sweeps fail", () => {
+-    test.use({ storageState: join(AUTH_DIR, "staff.json"), viewport: { width: 1366, height: 768 } });
+-
+-    test("says so in words and leaves the home as it was", async ({ page }) => {
+-      tracker.where = { role: "staff", page: "p92 refresh data fails", viewport: 1366 };
+-      await page.route("**/api/maintenance/refresh", (route) => route.fulfill({ status: 500, json: { error: "The sweeps could not run." } }));
+-      await page.goto("/");
+-      await expect(page.locator("main h1")).toBeVisible();
+-      await page.waitForLoadState("networkidle");
+-      await page.getByRole("button", { name: "Refresh data" }).click();
+-      await expect(main(page).getByText("The sweeps could not run.")).toBeVisible();
+-      await expect(sectionOf(page, "Needs your action")).toBeVisible();
+-      forgetMockedFailure();
+-    });
+-  });
+-
+-  for (const key of ["academic-coordinator", "research-coordinator"]) {
+-    test.describe(key, () => {
+-      test.use({ storageState: join(AUTH_DIR, `${key}.json`), viewport: { width: 1366, height: 768 } });
+-
+-      test("has no Refresh data button (the sweeps are the Graduate School's)", async ({ page }) => {
++      test("has no Refresh data button", async ({ page }) => {
+         tracker.where = { role: key, page: "p92 no refresh data", viewport: 1366 };
+         await page.goto("/");
+         await expect(page.locator("main h1")).toBeVisible();
+@@ -154,6 +115,7 @@ test.describe("Graduate School home: Refresh data", () => {
+   }
+ });
+ 
++
+ // ------------------------------------------------------------------------------------------------ coordinator homes
+ for (const key of ["academic-coordinator", "research-coordinator"]) {
+   test.describe(`${key} home`, () => {
+diff --git a/frontend/src/components/PageHelp.jsx b/frontend/src/components/PageHelp.jsx
+new file mode 100644
+index 0000000..e4c89fa
+--- /dev/null
++++ b/frontend/src/components/PageHelp.jsx
+@@ -0,0 +1,61 @@
++// PageHelp (UX-14, owner 2026-11-20): every process page has ONE "Help" button in its header. The rules that apply,
++// the form and Operations Manual numbers, "How this works" and the recent activity all live in the side panel it opens,
++// so the page itself starts with the work. Used by the process boards (ProcessBoardPage), the single workflow pages
++// (WorkflowPage) and the Dean's Practicum board - the same parts on every page of that kind (IM24).
++import { BookOpen, HelpCircle, History, X } from "lucide-react";
++import { Button, Drawer } from "./ui/index.js";
++import PolicyRules from "./PolicyRules";
++import { formRefLine } from "../lib/formRefs.js";
++
++export function HelpButton({ onClick }) {
++  return (
++    <Button variant="secondary" icon={HelpCircle} onClick={onClick} aria-haspopup="dialog">
++      Help
++    </Button>
++  );
++}
++
++/**
++ * @param title         the page's name ("Help: Leave of Absence")
++ * @param forms         a key of lib/formRefs.js: the "Forms GS-F-07 · Operations Manual 4.6" line
++ * @param rulesProcess  the process whose rules PolicyRules lists
++ * @param onGuide       opens the "How this works" guide (the panel closes first)
++ * @param onActivity    opens the recent activity (optional)
++ * @param onClose       closes the panel
++ */
++export function PageHelpDrawer({ title, forms, rulesProcess, onGuide, onActivity, onClose }) {
++  const formsLine = forms ? formRefLine(forms) : "";
++  const open = (fn) => () => {
++    onClose();
++    fn();
++  };
++  return (
++    <Drawer label={`Help: ${title}`} onClose={onClose}>
++      <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
++        <div className="min-w-0">
++          <p className="eyebrow">Help</p>
++          <h2 className="section-title break-words">{title}</h2>
++        </div>
++        <Button variant="icon" icon={X} aria-label="Close help" onClick={onClose} />
++      </div>
++      <div className="space-y-4 p-5">
++        <div className="grid gap-2 sm:grid-cols-2">
++          <Button variant="secondary" icon={BookOpen} onClick={open(onGuide)} className="justify-start">
++            How this works
++          </Button>
++          {onActivity && (
++            <Button variant="secondary" icon={History} onClick={open(onActivity)} className="justify-start">
++              Recent activity
++            </Button>
++          )}
++        </div>
++        {rulesProcess && <PolicyRules process={rulesProcess} />}
++        {formsLine && (
++          <p data-slot="forms" className="meta">
++            {formsLine}
++          </p>
++        )}
++      </div>
++    </Drawer>
++  );
++}
+diff --git a/frontend/src/components/ProcessBoardPage.jsx b/frontend/src/components/ProcessBoardPage.jsx
+index 3141c5f..aa1901e 100644
+--- a/frontend/src/components/ProcessBoardPage.jsx
++++ b/frontend/src/components/ProcessBoardPage.jsx
+@@ -1,7 +1,7 @@
+ import { refusalMessage } from "../lib/refusal";
+ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+ import { useSearchParams } from "react-router-dom";
+-import { Eye, HelpCircle, History, RefreshCw } from "lucide-react";
++import { Eye, RefreshCw } from "lucide-react";
+ import { api } from "../api";
+ import { useAuth } from "../auth";
+ import { formatDateTime } from "../lib/format";
+@@ -9,7 +9,7 @@ import ListExportButtons from "./ListExportButtons";
+ import { nextWithdrawalBatchName } from "../pages/process/WithdrawalExport";
+ import { useConfirm } from "./confirm";
+ import { Button, EmptyState, InlineNotice, Modal, PageHeader, SkeletonBoard, StatusChip } from "./ui/index.js";
+-import PolicyRules from "./PolicyRules";
++import { HelpButton, PageHelpDrawer } from "./PageHelp";
+ import StageBoard, { BoardNotice, BoardSummary, COLUMN_LOCKED_HINT, boardSummaryLine, useBoardNotice } from "./StageBoard";
+ import { GroupCard, StageColumnHeader } from "./process";
+ import { GUIDES, PROCESS_CONFIG } from "./processConfig";
+@@ -226,6 +226,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
+   const [batchResult, setBatchResult] = useState(null);
+   const [signal, setSignal] = useState(null); // an extra window a step opens instead of a confirm box
+   const [support, setSupport] = useState(""); // "guide" | "activity"
++  const [helpOpen, setHelpOpen] = useState(false); // UX-14: the Help panel
+ 
+   // Answers that arrive after the process changed are ignored.
+   const currentSlug = useRef(slug);
+@@ -616,7 +617,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
+   if (state.loading && !data) {
+     return (
+       <div className="page-stack">
+-        <PageHeader title={config.title} description={(role === "dean" && config.deanDescription) || config.description} forms={slug} icon={Icon} badge={headerBadge} />
++        <PageHeader title={config.title} description={(role === "dean" && config.deanDescription) || config.description} icon={Icon} badge={headerBadge} />
+         <SkeletonBoard columns={4} label="Loading requests" />
+       </div>
+     );
+@@ -636,19 +637,11 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
+       <PageHeader
+         title={config.title}
+         description={(role === "dean" && config.deanDescription) || config.description}
+-        forms={slug}
+         icon={Icon}
+         badge={headerBadge}
+-        actions={
+-          <>
+-            <Button variant="secondary" icon={HelpCircle} onClick={() => setSupport("guide")}>How this works</Button>
+-            <Button variant="secondary" icon={History} onClick={() => setSupport("activity")}>View recent activity</Button>
+-          </>
+-        }
++        actions={<HelpButton onClick={() => setHelpOpen(true)} />}
+       />
+ 
+-      <PolicyRules process={config.rulesProcess} />
+-
+       <BoardSummary
+         line={summaryLine}
+         hint={columnLocked ? COLUMN_LOCKED_HINT : ""}
+@@ -675,15 +668,15 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
+               count={filtered.length}
+               total={cases.length}
+               noun={config.noun}
++              extra={<ListExportButtons
++                            title={config.title}
++                            subtitle={`${filtered.length} of ${cases.length} ${config.noun}`}
++                            filename={slug}
++                            columns={["Student ID", "Student name", "Program", "Type", "Status", "Next", "Updated"]}
++                            rows={filtered.map((item) => [item.student.student_number, item.student.name, item.student.program_code, item.kind_label || "", item.status || "", item.owner || "", formatDateTime(item.last_activity_at || item.updated_at)])}
++                />}
+             />
+           </BoardFilterRow>
+-          <ListExportButtons
+-            title={config.title}
+-            subtitle={`${filtered.length} of ${cases.length} ${config.noun}`}
+-            filename={slug}
+-            columns={["Student ID", "Student name", "Program", "Type", "Status", "Next", "Updated"]}
+-            rows={filtered.map((item) => [item.student.student_number, item.student.name, item.student.program_code, item.kind_label || "", item.status || "", item.owner || "", formatDateTime(item.last_activity_at || item.updated_at)])}
+-          />
+ 
+           {selectedItems.length > 0 && (
+             <BatchBar
+@@ -765,6 +758,16 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
+         />
+       )}
+ 
++      {helpOpen && (
++        <PageHelpDrawer
++          title={config.title}
++          forms={slug}
++          rulesProcess={config.rulesProcess}
++          onGuide={() => setSupport("guide")}
++          onActivity={() => setSupport("activity")}
++          onClose={() => setHelpOpen(false)}
++        />
++      )}
+       {support === "guide" && <GuideWindow slug={slug} policyQuestions={data.policy_questions || []} onClose={() => setSupport("")} />}
+       {support === "activity" && <ActivityWindow logs={data.recent_activity || []} onClose={() => setSupport("")} />}
+     </div>
+diff --git a/frontend/src/components/RoleHome.jsx b/frontend/src/components/RoleHome.jsx
+index 1064b66..edac4a5 100644
+--- a/frontend/src/components/RoleHome.jsx
++++ b/frontend/src/components/RoleHome.jsx
+@@ -8,8 +8,7 @@
+ // activity. Built only from the component library; nothing here knows about a role.
+ import { Link } from "react-router-dom";
+ import { Activity, ArrowRight, CheckCircle2, Hourglass, ListChecks } from "lucide-react";
+-import { Button, EmptyState, PageHeader, SectionCard, StatCard } from "./ui/index.js";
+-import { toneOf } from "../lib/tone";
++import { EmptyState, PageHeader, SectionCard, StatCard } from "./ui/index.js";
+ import { useAuth } from "../auth";
+ import { useSeenMarks } from "../lib/seenMarks";
+ 
+@@ -22,7 +21,7 @@ export const MAX_WAITING = 3;
+  * @param header         PageHeader props: { title, description, icon, badge, actions }
+  * @param actions        [{ key, title, detail, meta, tone, chip, to, linkLabel }] - what waits on the viewer.
+  *                       `title` names the item, `detail` is one line under it, `meta` is the due date / age (string),
+- *                       `tone` is success | warning | danger | info | neutral (the dot before the title),
++ *                       `overdue` paints the meta red (it already says "Overdue"),
+  *                       `chip` is a StatusChip (or any node), `to` + `linkLabel` is the button that opens it.
+  * @param actionsTitle   heading of the list (default "Needs your action")
+  * @param actionsSubtitle one short line under the heading
+@@ -173,36 +172,50 @@ export default function RoleHome({
+   );
+ }
+ 
++// The arrow's name for a screen reader and its tooltip: a lone verb ("Review") names the row; a page name ("Defense
++// Schedule") becomes "Open Defense Schedule"; a full phrase ("Open Leave of Absence") is kept.
++const VERB = /^(Open|Review|Answer|Reply|View|Go|Sign|Decide|Request|Upload|File)\b/;
++export function arrowLabel(linkLabel, title) {
++  const label = String(linkLabel || "").trim();
++  if (!label) return `Open ${title}`;
++  if (VERB.test(label)) return label.split(/\s+/).length === 1 ? `${label} ${title}` : label;
++  return `Open ${label}`;
++}
++
+ function ActionRow({ item, fresh = false, onOpen }) {
+-  const { title, detail, meta, tone = "neutral", chip, to, linkLabel } = item;
++  const { title, detail, meta, overdue = false, chip, to, linkLabel } = item;
++  // UX-12 (owner 2026-11-20): a row not opened yet has a small dot - no "New" badge, no green row; the link is an arrow.
++  // UX-13: the due line says "Overdue" itself (in red), so the row carries no second Overdue chip.
+   return (
+     <li
+       data-fresh={fresh ? "true" : undefined}
+-      className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border px-3 py-2.5 ${
+-        fresh ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"
+-      }`}
++      className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5"
+     >
+-      <div className="flex min-w-0 flex-1 basis-56 items-start gap-2.5">
+-        <span aria-hidden="true" className={`mt-2 h-2 w-2 shrink-0 rounded-full ${toneOf(tone).dot}`} />
++      <div className="flex min-w-0 flex-1 items-start gap-2.5">
++        <span className="mt-1.5 flex h-2 w-2 shrink-0">
++          {fresh && <span role="img" aria-label="Not opened yet" title="Not opened yet" className="h-2 w-2 rounded-full bg-brand-600" />}
++        </span>
+         <div className="min-w-0">
+-          <p className="break-words text-sm font-semibold text-ink">
+-            {fresh && <span className="mr-2 inline-block rounded-full bg-emerald-800 px-2 py-0.5 align-middle text-xs font-bold uppercase tracking-wide text-white">New</span>}
+-            {title}
+-          </p>
++          <p className={`break-words text-sm text-ink ${fresh ? "font-bold" : "font-semibold"}`}>{title}</p>
+           {detail && <p className="meta mt-0.5 break-words">{detail}</p>}
+           {(meta || chip) && (
+             <p className="meta mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+               {chip}
+-              {meta && <span>{meta}</span>}
++              {meta && <span className={overdue ? "font-semibold text-red-700" : undefined}>{meta}</span>}
+             </p>
+           )}
+         </div>
+       </div>
+       {to && (
+-        <Button as={Link} to={to} onClick={onOpen} variant="secondary" size="sm" className="shrink-0 gap-1.5 max-sm:w-full max-sm:justify-center">
+-          {linkLabel || "Open"}
+-          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+-        </Button>
++        <Link
++          to={to}
++          onClick={onOpen}
++          aria-label={arrowLabel(linkLabel, title)}
++          title={arrowLabel(linkLabel, title)}
++          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-600 transition-colors duration-200 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 max-sm:h-11 max-sm:w-11"
++        >
++          <ArrowRight className="h-4 w-4" aria-hidden="true" />
++        </Link>
+       )}
+     </li>
+   );
+diff --git a/frontend/src/components/StageBoard.jsx b/frontend/src/components/StageBoard.jsx
+index 94d7944..949393a 100644
+--- a/frontend/src/components/StageBoard.jsx
++++ b/frontend/src/components/StageBoard.jsx
+@@ -601,9 +601,11 @@ export default function StageBoard({
+   return (
+     <div data-testid="stage-board">
+       <BoardNotice notice={activeNotice.notice} onDismiss={activeNotice.dismiss} />
+-      <StatusLegend className="mb-3" />
+-      {(hidden.left > 0 || hidden.right > 0) && (
+-        <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
++      {/* UX-15: the colour key and the "more stages" hint share one line */}
++      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
++        <StatusLegend />
++        {(hidden.left > 0 || hidden.right > 0) && (
++        <div className="flex flex-wrap items-center justify-end gap-2">
+           <p data-testid="board-scroll-hint" className="meta font-medium text-slate-600">
+             {hidden.right > 0
+               ? `${hidden.right} more ${hidden.right === 1 ? "stage" : "stages"} to the right →${
+@@ -614,7 +616,8 @@ export default function StageBoard({
+           <ScrollButton direction="left" disabled={hidden.left === 0} onClick={() => scrollBoard(-1)} />
+           <ScrollButton direction="right" disabled={hidden.right === 0} onClick={() => scrollBoard(1)} />
+         </div>
+-      )}
++        )}
++      </div>
+       <div className="relative">
+       <div
+         ref={regionRef}
+diff --git a/frontend/src/components/ui/StatusLegend.jsx b/frontend/src/components/ui/StatusLegend.jsx
+index 2c8baab..fad2250 100644
+--- a/frontend/src/components/ui/StatusLegend.jsx
++++ b/frontend/src/components/ui/StatusLegend.jsx
+@@ -1,31 +1,56 @@
+-// "What the colours mean" (I-358): the one legend every board and the Reports page show, so a stakeholder never has to
++// The colour key (I-358, UX-15): the one legend every board and the Reports page show, so a stakeholder never has to
+ // guess why Approved (green) and Passed (teal) are different. It reads the same tone map the chips read.
++import { useEffect, useRef, useState } from "react";
++import { Palette } from "lucide-react";
+ import { TONE_NAMES, TONE_MEANING, toneOf } from "../../lib/tone";
+ import { TONE_ICONS } from "./toneIcons.js";
+ 
+ /**
+- * A folded list of the seven colours with an icon, a name and example statuses. Closed by default so it does not push a
+- * board down; the summary line is always visible.
++ * UX-15 (2026-11-20): a small "Colour key" button; the seven colours, each with an icon, a name and example statuses,
++ * open under it. It no longer takes a full-width row above every board.
+  */
+ export function StatusLegend({ className = "" }) {
++  const [open, setOpen] = useState(false);
++  const ref = useRef(null);
++  useEffect(() => {
++    if (!open) return undefined;
++    const onKey = (event) => event.key === "Escape" && setOpen(false);
++    const onDown = (event) => !ref.current?.contains(event.target) && setOpen(false);
++    document.addEventListener("keydown", onKey);
++    document.addEventListener("mousedown", onDown);
++    return () => {
++      document.removeEventListener("keydown", onKey);
++      document.removeEventListener("mousedown", onDown);
++    };
++  }, [open]);
+   return (
+-    <details data-status-legend="" className={`rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm ${className}`}>
+-      <summary className="cursor-pointer select-none font-semibold text-slate-700 max-sm:min-h-11 max-sm:py-2.5">What the colours mean</summary>
+-      <ul className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+-        {TONE_NAMES.map((name) => {
+-          const Icon = TONE_ICONS[name];
+-          const meaning = TONE_MEANING[name];
+-          return (
+-            <li key={name} data-legend-tone={name} className="flex items-start gap-2">
+-              <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${toneOf(name).chip}`}>
+-                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+-                {meaning.title}
+-              </span>
+-              <span className="meta pt-0.5">{meaning.examples}</span>
+-            </li>
+-          );
+-        })}
+-      </ul>
+-    </details>
++    <div ref={ref} data-status-legend="" className={`relative inline-block ${className}`}>
++      <button
++        type="button"
++        aria-expanded={open}
++        onClick={() => setOpen((value) => !value)}
++        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors duration-200 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 max-sm:min-h-11"
++      >
++        <Palette className="h-3.5 w-3.5" aria-hidden="true" />
++        Colour key
++      </button>
++      {open && (
++        <ul className="absolute left-0 top-full z-30 mt-1 grid w-[min(40rem,calc(100vw-2rem))] gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lift sm:grid-cols-2">
++          {TONE_NAMES.map((name) => {
++            const Icon = TONE_ICONS[name];
++            const meaning = TONE_MEANING[name];
++            return (
++              <li key={name} data-legend-tone={name} className="flex items-start gap-2">
++                <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${toneOf(name).chip}`}>
++                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
++                  {meaning.title}
++                </span>
++                <span className="meta pt-0.5">{meaning.examples}</span>
++              </li>
++            );
++          })}
++        </ul>
++      )}
++    </div>
+   );
+ }
+diff --git a/frontend/src/pages/Dashboard.jsx b/frontend/src/pages/Dashboard.jsx
+index ec2487d..774c850 100644
+--- a/frontend/src/pages/Dashboard.jsx
++++ b/frontend/src/pages/Dashboard.jsx
+@@ -1,18 +1,16 @@
+-import { useState } from "react";
+-import { Link } from "react-router-dom";
+-import { FileText, LayoutDashboard, RefreshCw } from "lucide-react";
++import { LayoutDashboard } from "lucide-react";
+ import { api } from "../api";
+ import { useAuth } from "../auth";
+ import { useApi } from "../hooks";
+ import { Button, InlineNotice, Spinner, StatusChip } from "../components/ui/index.js";
+ import RoleHome from "../components/RoleHome.jsx";
+ import { formatDate, relativeDays } from "../lib/format";
+-import { canOpen, firstNameOf, officeActions, officeActivity, officeOf, officeStats, officeWaiting } from "../lib/staffHome.js";
++import { firstNameOf, officeActions, officeActivity, officeOf, officeStats, officeWaiting } from "../lib/staffHome.js";
+ 
+ // IM19 + AD7: the back-office home is action first - what waits on this office, what other offices hold, four key
+ // numbers, recent activity. The charts and the filter bar that used to fill this page are on Reports > Analytics
+ // (IM20). It serves the Graduate School office and the administrator (who also get the dashboard figures and the
+-// activity feed, the analytics and the "Refresh data" button) and, since I-066, the two coordinators too: the same
++// activity feed and the analytics) and, since I-066, the two coordinators too: the same
+ // layout with the figures of their own caseload (the dashboard API answers them with that), their own tasks and the
+ // recent activity of their own students - and no link to a page their role cannot open (the drill-down, the activity
+ // log and the analytics are the Graduate School's).
+@@ -26,19 +24,23 @@ const ROLE_NAMES = {
+ const GS_ROLES = new Set(["staff", "admin"]);
+ const TASK_PAGE = 200; // the most the tasks API returns in one page
+ 
++// UX-13: one line says when it is due, and says "Overdue" itself, so no status chip repeats it.
+ function dueText(item) {
+   if (!item.dueAt) return undefined;
+-  return `${item.overdue ? "Overdue, was due" : "Due"} ${formatDate(item.dueAt)} (${relativeDays(item.dueAt)})`;
++  return item.overdue ? `Overdue since ${formatDate(item.dueAt)}` : `Due ${formatDate(item.dueAt)} (${relativeDays(item.dueAt)})`;
+ }
+ 
++// A chip only when it says something the section heading and the due line do not (not Pending / Overdue / Waiting).
++const QUIET_STATUSES = new Set(["Pending", "Overdue", "Waiting", "Open"]);
++
+ function toRow(item) {
+   return {
+     key: item.key,
+     title: item.title,
+     detail: item.detail,
+     meta: dueText(item),
+-    tone: item.tone,
+-    chip: <StatusChip status={item.status} dot={false} size="sm" />,
++    overdue: Boolean(item.overdue),
++    chip: item.status && !QUIET_STATUSES.has(item.status) ? <StatusChip status={item.status} dot={false} size="sm" /> : null,
+     to: item.target.to,
+     linkLabel: item.target.label,
+   };
+@@ -49,8 +51,6 @@ export default function Dashboard() {
+   const role = user?.role;
+   const office = officeOf(role);
+   const isGraduateSchool = GS_ROLES.has(role);
+-  const [refreshing, setRefreshing] = useState(false);
+-  const [notice, setNotice] = useState(null); // { tone, text } after "Refresh data"
+   const { data, loading, error, refetch } = useApi(
+     () =>
+       Promise.all([
+@@ -61,21 +61,6 @@ export default function Dashboard() {
+     [role]
+   );
+ 
+-  // I-071: the date-driven sweeps no longer run when a page is viewed. This runs them on request, then reads the home again.
+-  async function refreshData() {
+-    setRefreshing(true);
+-    setNotice(null);
+-    try {
+-      const result = await api.maintenanceRefresh();
+-      setNotice({ tone: "success", text: result.message || "Data refreshed." });
+-      refetch();
+-    } catch (err) {
+-      setNotice({ tone: "danger", text: err.message || "Could not refresh the data." });
+-    } finally {
+-      setRefreshing(false);
+-    }
+-  }
+-
+   if (loading && !data) return <Spinner label="Loading your home…" />;
+   if (error) {
+     return (
+@@ -133,26 +118,12 @@ export default function Dashboard() {
+   return (
+     <RoleHome
+       header={{
++        // UX-11 (owner 2026-11-20): the role is in the top bar and the list says what needs you; no second line,
++        // no Refresh data (the date checks run on the first sign-in each day) and no Reports button (it is in the sidebar).
+         title: `Welcome, ${firstName}`,
+-        description: `${ROLE_NAMES[role] || office} · what needs you today`,
+         icon: LayoutDashboard,
+-        actions: (
+-          <>
+-            {isGraduateSchool && (
+-              <Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={refreshData}>
+-                Refresh data
+-              </Button>
+-            )}
+-            {canOpen("/reports", role) && (
+-              <Button as={Link} to="/reports" variant="secondary" icon={FileText}>
+-                Reports
+-              </Button>
+-            )}
+-          </>
+-        ),
+       }}
+       actions={actions.items.map(toRow)}
+-      actionsSubtitle="Your office's open tasks, most urgent first"
+       actionsEmpty={{ title: "Nothing is waiting on you", hint: `New tasks for the ${office} will appear here.` }}
+       actionsAll={
+         researchReady?.total > readyItems.length
+@@ -161,7 +132,6 @@ export default function Dashboard() {
+       }
+       waiting={{
+         title: "Waiting on others",
+-        subtitle: "Another office or the student holds these. Nothing to do here until that office or the student acts.",
+         items: waitingItems.map(toRow),
+         all: { to: researchWaiting?.total ? researchWaiting.view_all : "/work-queue", label: "View all" },
+       }}
+@@ -169,13 +139,6 @@ export default function Dashboard() {
+       activity={activity}
+       activityAll={activity && isGraduateSchool ? { to: "/activity", label: "View all" } : undefined}
+       activityEmpty={{ title: "No activity yet", hint: "Submissions, decisions and replies will appear here." }}
+-      notice={
+-        notice && (
+-          <InlineNotice tone={notice.tone} onDismiss={() => setNotice(null)}>
+-            {notice.text}
+-          </InlineNotice>
+-        )
+-      }
+     />
+   );
+ }
+diff --git a/frontend/src/pages/dean/DeanPages.jsx b/frontend/src/pages/dean/DeanPages.jsx
+index 173b696..4759580 100644
+--- a/frontend/src/pages/dean/DeanPages.jsx
++++ b/frontend/src/pages/dean/DeanPages.jsx
+@@ -80,22 +80,19 @@ function DeanDashboardBody() {
+       <DeanFeedback />
+       <RoleHome
+         header={{
++          // UX-11 (owner 2026-11-20): no second line and no button to a page the sidebar already lists.
+           title: `Welcome, ${firstNameOf(user?.full_name) || "Dean"}`,
+-          description: "Dean · the decisions waiting on you",
+           icon: Gavel,
+-          actions: <Button as={Link} to="/dean/approvals" icon={Inbox}>Open approvals queue</Button>,
+         }}
+         actions={actions.items.map((row) => ({
+           key: row.key,
+           title: row.title,
+           detail: row.detail,
+           meta: waitText(row),
+-          tone: row.tone,
+-          chip: row.status ? <StatusChip status={row.status} dot={false} size="sm" /> : undefined,
++          // UX-13: every row here waits on the Dean, so a "Dean Review" chip says nothing the heading does not
+           to: row.target.to,
+           linkLabel: row.target.label,
+         }))}
+-        actionsSubtitle="Oldest first. Open a case to read the files and history, then decide."
+         actionsEmpty={{ title: "Nothing is waiting for your decision", hint: "Requests routed to the Dean will appear here." }}
+         actionsAll={actions.rows > actions.items.length ? { to: "/dean/approvals", label: `View all ${actions.total}` } : undefined}
+         stats={stats}
+diff --git a/frontend/src/pages/dean/DeanPracticumBoard.jsx b/frontend/src/pages/dean/DeanPracticumBoard.jsx
+index 7165a86..bb43975 100644
+--- a/frontend/src/pages/dean/DeanPracticumBoard.jsx
++++ b/frontend/src/pages/dean/DeanPracticumBoard.jsx
+@@ -1,9 +1,9 @@
+ import { useMemo, useState } from "react";
+ import { Link } from "react-router-dom";
+-import { Briefcase, CheckCircle2, Eye, HelpCircle, History, RotateCcw } from "lucide-react";
++import { Briefcase, CheckCircle2, Eye, RotateCcw } from "lucide-react";
+ import { Button, DataTable, EmptyState, PageHeader, StatusChip } from "../../components/ui/index.js";
+ import StepDialog from "../../components/StepDialog";
+-import PolicyRules from "../../components/PolicyRules";
++import { HelpButton, PageHelpDrawer } from "../../components/PageHelp";
+ import StageBoard, { BoardSummary } from "../../components/StageBoard";
+ import { CaseCardFacts, CaseCardShell, MessageNote, NextOwner, ReadyMark } from "../../components/process";
+ import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
+@@ -161,6 +161,7 @@ export function DeanPracticumBoard() {
+   const [view, setView] = useState("board");
+   const [filters, setFilters] = useState(EMPTY_FILTERS);
+   const [support, setSupport] = useState(""); // "guide" | "activity"
++  const [helpOpen, setHelpOpen] = useState(false); // UX-14: the Help panel
+   const [decision, setDecision] = useState(null); // { item, choice }
+ 
+   const items = useMemo(
+@@ -224,19 +225,21 @@ export function DeanPracticumBoard() {
+       <PageHeader
+         title={PAGE.practicumReports}
+         description={DESCRIPTION}
+-        forms="practicum"
+         icon={Briefcase}
+         badge={<StatusChip status={`${counts.pendingPracticum} waiting`} tone="muted" dot={false} />}
+-        actions={
+-          <>
+-            <Button variant="secondary" icon={HelpCircle} onClick={() => setSupport("guide")}>How this works</Button>
+-            <Button variant="secondary" icon={History} onClick={() => setSupport("activity")}>View recent activity</Button>
+-          </>
+-        }
++        actions={<HelpButton onClick={() => setHelpOpen(true)} />}
+       />
+       <DeanFeedback />
+-
+-      <PolicyRules process="practicum" />
++      {helpOpen && (
++        <PageHelpDrawer
++          title={PAGE.practicumReports}
++          forms="practicum"
++          rulesProcess="practicum"
++          onGuide={() => setSupport("guide")}
++          onActivity={() => setSupport("activity")}
++          onClose={() => setHelpOpen(false)}
++        />
++      )}
+ 
+       <BoardSummary line={summaryLine} windowName="case page" />
+ 
+diff --git a/frontend/src/pages/faculty/FacultyPages.jsx b/frontend/src/pages/faculty/FacultyPages.jsx
+index c1b9343..fb7c410 100644
+--- a/frontend/src/pages/faculty/FacultyPages.jsx
++++ b/frontend/src/pages/faculty/FacultyPages.jsx
+@@ -71,7 +71,6 @@ export function FacultyDashboard() {
+     key: row.key,
+     title: row.title,
+     detail: row.detail,
+-    tone: row.tone,
+     to: row.target.to,
+     linkLabel: row.target.label,
+   });
+@@ -86,11 +85,9 @@ export function FacultyDashboard() {
+           badge: <StatusChip label={faculty?.college || "College"} tone="muted" dot={false} />,
+         }}
+         actions={actions.items.map(toRow)}
+-        actionsSubtitle="Invitations, signatures, verdicts and requests that wait for you"
+         actionsEmpty={{ title: "Nothing is waiting on you", hint: "No signatures, verdicts, invitations or adviser requests need you right now." }}
+         waiting={{
+           title: "Waiting on others",
+-          subtitle: "The student or the Research Coordinator holds these. Nothing to do until that office or the student acts.",
+           items: waiting.items.map(toRow),
+           all: waiting.total > MAX_WAITING ? { to: "/faculty-portal/advisees", label: "View all" } : undefined,
+         }}
+diff --git a/frontend/src/pages/leave/LeaveFilters.jsx b/frontend/src/pages/leave/LeaveFilters.jsx
+index af8082c..9f2f0d9 100644
+--- a/frontend/src/pages/leave/LeaveFilters.jsx
++++ b/frontend/src/pages/leave/LeaveFilters.jsx
+@@ -36,12 +36,16 @@ export function BoardFilterRow({ children, toggle }) {
+   );
+ }
+ 
+-export default function LeaveFilters({ filters, setFilters, programs, statusOptions, reasons = [], kindOptions, count, total, noun = "requests" }) {
++/**
++ * UX-16 (2026-11-20): `extra` (Export CSV / Print) sits on the filter box's bottom line, beside "Showing ...";
++ * `moreFilters` adds a control to the grid (Research Gate's year admitted), so the box is the one filter row.
++ */
++export default function LeaveFilters({ filters, setFilters, programs, statusOptions, reasons = [], kindOptions, count, total, noun = "requests", extra = null, moreFilters = null }) {
+   const active = Object.values(filters).filter(Boolean).length;
+   const set = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
+   const update = (key) => (event) => set(key, event.target.value);
+   return (
+-    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
++    <div data-filter-box="" className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+         <SearchInput
+           value={filters.query}
+@@ -57,6 +61,7 @@ export default function LeaveFilters({ filters, setFilters, programs, statusOpti
+         {kindOptions.length > 1 && (
+           <Select value={filters.kind} onChange={update("kind")} options={kindOptions} placeholder="All types" aria-label="Filter by type of request" />
+         )}
++        {moreFilters}
+       </div>
+       <div className="meta mt-2 flex flex-wrap items-center justify-between gap-2">
+         <span className="inline-flex flex-wrap items-center gap-2">
+@@ -67,11 +72,14 @@ export default function LeaveFilters({ filters, setFilters, programs, statusOpti
+             </Button>
+           )}
+         </span>
+-        {active > 0 && (
+-          <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={() => setFilters(EMPTY_FILTERS)}>
+-            Clear {active} filter{active === 1 ? "" : "s"}
+-          </Button>
+-        )}
++        <span className="inline-flex flex-wrap items-center gap-2">
++          {active > 0 && (
++            <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={() => setFilters(EMPTY_FILTERS)}>
++              Clear {active} filter{active === 1 ? "" : "s"}
++            </Button>
++          )}
++          {extra}
++        </span>
+       </div>
+     </div>
+   );
+diff --git a/frontend/src/pages/student/StudentOverview.jsx b/frontend/src/pages/student/StudentOverview.jsx
+index 758037e..b257e26 100644
+--- a/frontend/src/pages/student/StudentOverview.jsx
++++ b/frontend/src/pages/student/StudentOverview.jsx
+@@ -23,9 +23,12 @@ const PATH_LABELS = {
+ const pathOf = (target) => target?.to || STUDENT_REQUEST_PATHS[target?.view] || "/student/requests";
+ const labelOf = (target) => PATH_LABELS[target?.to] || VIEW_LABELS[target?.view] || "Open";
+ 
++// UX-13: the due line says "Overdue" itself, so no Overdue / Pending chip repeats it.
++const QUIET_STATUSES = new Set(["Pending", "Overdue", "Open", "In progress"]);
+ function dueText(item) {
+   if (!item.dueAt) return undefined;
+   if (item.kind === "reply") return `Asked ${formatDate(item.dueAt)}`;
++  if (item.status === "Overdue") return `Overdue since ${formatDate(item.dueAt)}`;
+   return `Due ${formatDate(item.dueAt)} (${relativeDays(item.dueAt)})`;
+ }
+ 
+@@ -35,8 +38,8 @@ function toActionRow(item) {
+     title: item.title,
+     detail: item.detail,
+     meta: dueText(item),
+-    tone: item.tone,
+-    chip: item.status ? <StatusChip status={item.status} label={item.statusLabel} dot={false} size="sm" /> : null,
++    overdue: item.status === "Overdue",
++    chip: item.status && !QUIET_STATUSES.has(item.status) ? <StatusChip status={item.status} label={item.statusLabel} dot={false} size="sm" /> : null,
+     to: pathOf(item.target),
+     linkLabel: labelOf(item.target),
+   };
+@@ -97,10 +100,8 @@ export default function StudentOverview() {
+         badge: data.progress_status?.level ? <StatusChip status={forStudent(data.progress_status.level)} /> : null,
+       }}
+       actions={actions}
+-      actionsSubtitle="What is waiting on you now, most pressing first"
+       waiting={{
+         title: "Waiting on the Graduate School",
+-        subtitle: "Offices are working on these. Nothing to do on your side unless an office asks.",
+         items: waiting,
+         all: { to: "/student/requests", label: "View all" },
+       }}
+diff --git a/frontend/src/pages/workflow/GraduationRoster.jsx b/frontend/src/pages/workflow/GraduationRoster.jsx
+index 2380d51..162f501 100644
+--- a/frontend/src/pages/workflow/GraduationRoster.jsx
++++ b/frontend/src/pages/workflow/GraduationRoster.jsx
+@@ -910,15 +910,15 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
+           total={batchesOnly ? allBatchCount : rows.length}
+           noun={batchesOnly ? "batches" : "records"}
+           showAdvanced={false}
++          extra={<ListExportButtons
++                    title="Graduation candidates"
++                    subtitle={`${filteredRows.length} of ${rows.length} records`}
++                    filename="graduation-candidates"
++                    columns={["Student ID", "Student name", "Program", "Eligible", "Endorsement status", "Batch"]}
++                    rows={filteredRows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.eligibility?.eligible ? "Yes" : "No", graduationRowStatus(row), row.endorsement?.batch_name || ""])}
++            />}
+         />
+       </BoardFilterRow>
+-      <ListExportButtons
+-        title="Graduation candidates"
+-        subtitle={`${filteredRows.length} of ${rows.length} records`}
+-        filename="graduation-candidates"
+-        columns={["Student ID", "Student name", "Program", "Eligible", "Endorsement status", "Batch"]}
+-        rows={filteredRows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.eligibility?.eligible ? "Yes" : "No", graduationRowStatus(row), row.endorsement?.batch_name || ""])}
+-      />
+       {selectedIds.size > 0 && (tickedReady.length > 0 || tickedBatched.length > 0) && (
+         <GraduationSelectionBar
+           count={tickedReady.length + tickedBatched.length}
+diff --git a/frontend/src/pages/workflow/Practicum.jsx b/frontend/src/pages/workflow/Practicum.jsx
+index d4efa7e..b7d0c95 100644
+--- a/frontend/src/pages/workflow/Practicum.jsx
++++ b/frontend/src/pages/workflow/Practicum.jsx
+@@ -305,15 +305,14 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
+       </ProcessScopeNote>
+       <BoardSummary line={summaryLine} windowName="case window" hint={COLUMN_LOCKED_HINT} />
+       <BoardFilterRow toggle={<ViewToggle value={viewMode} onChange={setViewMode} />}>
+-        <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={filteredRows.length} total={rows.length} noun="students" />
+-      </BoardFilterRow>
+-      <ListExportButtons
++        <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={filteredRows.length} total={rows.length} noun="students" extra={<ListExportButtons
+         title="Practicum students"
+         subtitle={`${filteredRows.length} of ${rows.length} students`}
+         filename="practicum-students"
+         columns={["Student ID", "Student name", "Program", "Eligibility", "MOA", "Documents", "Hours", "Coordinator", "Dean report"]}
+         rows={filteredRows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.eligibility?.status, row.moa_status, row.documents_status, row.record ? hoursText(row.record) : "", row.coordinator_review_status, row.dean_report_status])}
+-      />
++/>} />
++      </BoardFilterRow>
+       {viewMode === "board" ? (
+         <StageBoard
+           ariaLabel="Practicum workflow board"
+diff --git a/frontend/src/pages/workflow/ResearchGateOverview.jsx b/frontend/src/pages/workflow/ResearchGateOverview.jsx
+index 1e2a0af..aad4082 100644
+--- a/frontend/src/pages/workflow/ResearchGateOverview.jsx
++++ b/frontend/src/pages/workflow/ResearchGateOverview.jsx
+@@ -4,7 +4,7 @@ import { api } from "../../api";
+ import StageBoard, { BoardNotice, useBoardNotice } from "../../components/StageBoard";
+ import { useApi } from "../../hooks";
+ import { useAuth } from "../../auth";
+-import { Button, Card, DataTable, InlineNotice, Modal, SectionTitle, Select, SkeletonBoard, StatusChip } from "../../components/ui/index.js";
++import { Button, Card, DataTable, InlineNotice, Modal, Select, SkeletonBoard, StatusChip } from "../../components/ui/index.js";
+ import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
+ import { EMPTY_FILTERS } from "../leave/leaveHelpers";
+ import { CaseCardFacts, CaseCardShell, NextOwner, PanelStamp, StageColumnHeader } from "../../components/process";
+@@ -214,35 +214,33 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
+     refetch();
+   }
+ 
+-  const summary = COLUMNS.map((column) => `${totalOf(column.key)} in ${column.label}`).join(", ");
+-
+   return (
+     <Card pad="lg" id="research-gate-overview" className="min-w-0 overflow-hidden">
+-      <SectionTitle
+-        title="Who is at the Research Gate"
+-        subtitle={canAct
+-          ? "Every active student with research records, in the column of the stage each is at. Graduate School staff and the Research Coordinator can record the panel's verdict from a card if the panel chair cannot."
+-          : "Every active student with research records, in the column of the stage each one is at."}
+-        icon={ClipboardList}
+-      />
++      {/* UX-17 (2026-11-20): the page header names the page; the columns carry the counts, so no second heading or count line. */}
+       {error && !data ? (
+         <InlineNotice tone="danger" className="mt-3">{error}</InlineNotice>
+       ) : (
+         <div className="mt-3 space-y-3">
+-          {data && <p className="meta" data-testid="research-gate-summary">{allRows.length} students: {summary}.</p>}
+           <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
+-            <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={rows.length} total={data ? allRows.length : null} noun="students" />
+-            <div className="w-full sm:w-56">
+-              <Select aria-label="Year admitted" placeholder="All years admitted" value={entry} options={entryOptions} onChange={(e) => setEntry(e.target.value)} />
+-            </div>
++            <LeaveFilters
++              filters={filters}
++              setFilters={setFilters}
++              programs={programs}
++              statusOptions={statusOptions}
++              kindOptions={[]}
++              count={rows.length}
++              total={data ? allRows.length : null}
++              noun="students"
++              moreFilters={<Select aria-label="Year admitted" placeholder="All years admitted" value={entry} options={entryOptions} onChange={(e) => setEntry(e.target.value)} />}
++              extra={<ListExportButtons
++                            title="Research Gate"
++                            subtitle={`${rows.length} of ${allRows.length} students`}
++                            filename="research-gate"
++                            columns={["Student ID", "Student name", "Program", "Stage", "Status", "Waiting on", "Why"]}
++                            rows={rows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.stage || "", STATE_LABEL[row.state] || "", row.waiting_on || "", row.reason || ""])}
++                />}
++            />
+           </BoardFilterRow>
+-          <ListExportButtons
+-            title="Research Gate"
+-            subtitle={`${rows.length} of ${allRows.length} students`}
+-            filename="research-gate"
+-            columns={["Student ID", "Student name", "Program", "Stage", "Status", "Waiting on", "Why"]}
+-            rows={rows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.stage || "", STATE_LABEL[row.state] || "", row.waiting_on || "", row.reason || ""])}
+-          />
+           {view === "board" ? (
+             loading && !data ? <SkeletonBoard columns={COLUMNS.length} label="Loading the Research Gate board" /> : <StageBoard
+               ariaLabel="Research Gate board"
+diff --git a/frontend/src/pages/workflow/WorkflowPage.jsx b/frontend/src/pages/workflow/WorkflowPage.jsx
+index fbd3717..77f39aa 100644
+--- a/frontend/src/pages/workflow/WorkflowPage.jsx
++++ b/frontend/src/pages/workflow/WorkflowPage.jsx
+@@ -14,8 +14,6 @@ import {
+   AlertTriangle,
+   CalendarDays,
+   UserRoundCheck,
+-  History,
+-  HelpCircle,
+ } from "lucide-react";
+ import { api } from "../../api";
+ import { useApi } from "../../hooks";
+@@ -23,7 +21,7 @@ import { Button, Card, EmptyState, InlineNotice, PageHeader, SectionTitle, Skele
+ import StudentPicker from "../../components/StudentPicker";
+ import { useAuth } from "../../auth";
+ import { OnboardingGatePanel } from "../../components/ProcessGates";
+-import PolicyRules from "../../components/PolicyRules";
++import { HelpButton, PageHelpDrawer } from "../../components/PageHelp";
+ import AdviserAppointments from "../AdviserAppointments";
+ import CalendarPage from "../../components/calendar/CalendarPage";
+ import ProcessBoardPage from "../../components/ProcessBoardPage";
+@@ -115,6 +113,7 @@ function SingleWorkflowPage() {
+   const [submitting, setSubmitting] = useState(false);
+   const [submitError, setSubmitError] = useState("");
+   const [supportModal, setSupportModal] = useState("");
++  const [helpOpen, setHelpOpen] = useState(false); // UX-14: the Help panel
+ 
+   // The query string keeps the chosen student for this page and makes the view shareable. Nothing is remembered
+   // across pages: the links that should carry a student (Research Gate list, "Open matching", calendar) say so in the URL.
+@@ -221,17 +220,19 @@ function SingleWorkflowPage() {
+       <PageHeader
+         title={tx.title}
+         description={[tx.short, PAGE_NOTE[slug]].filter(Boolean).join(" ")}
+-        forms={slug === "research-gate" && subview === "adviser" ? "adviser-designation" : slug}
+         icon={Icon}
+-        actions={(
+-          <>
+-            <Button variant="secondary" icon={HelpCircle} onClick={() => setSupportModal("guide")}>How this works</Button>
+-            <Button variant="secondary" icon={History} onClick={() => setSupportModal("activity")}>View recent activity</Button>
+-          </>
+-        )}
++        actions={<HelpButton onClick={() => setHelpOpen(true)} />}
+       />
+-
+-      <PolicyRules process={RULE_PROCESS_BY_SLUG[slug]} />
++      {helpOpen && (
++        <PageHelpDrawer
++          title={tx.title}
++          forms={slug === "research-gate" && subview === "adviser" ? "adviser-designation" : slug}
++          rulesProcess={RULE_PROCESS_BY_SLUG[slug]}
++          onGuide={() => setSupportModal("guide")}
++          onActivity={() => setSupportModal("activity")}
++          onClose={() => setHelpOpen(false)}
++        />
++      )}
+ 
+       {subviewTabs && <Tabs label="Views" tabs={subviewTabs} value={subview} onChange={changeSubview} />}
+ 
+diff --git a/frontend/src/pages/workflow/shared.jsx b/frontend/src/pages/workflow/shared.jsx
+index 61fc24b..3363d78 100644
+--- a/frontend/src/pages/workflow/shared.jsx
++++ b/frontend/src/pages/workflow/shared.jsx
+@@ -359,14 +359,14 @@ export function WorkflowFileHistory({ files = [] }) {
+   );
+ }
+ 
+-export function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel, secondaryOptions = [], count, total, noun = "records", showAdvanced = true }) {
++export function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel, secondaryOptions = [], count, total, noun = "records", showAdvanced = true, extra = null }) {
+   const active = Object.entries(filters).filter(([key, value]) => Boolean(value) && !(key === "sort" && value === "newest")).length;
+   const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
+   const clearFilters = () => setFilters(Object.fromEntries(
+     Object.keys(filters).map((key) => [key, key === "sort" ? "newest" : ""])
+   ));
+   return (
+-    <Card pad="sm" className="bg-slate-50/70">
++    <Card pad="sm" className="bg-slate-50/70" data-filter-box="">
+       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+         <SearchInput
+           value={filters.query}
+@@ -401,11 +401,14 @@ export function RosterFilters({ filters, setFilters, programs, statuses, seconda
+             </Button>
+           )}
+         </span>
+-        {active > 0 && (
+-          <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={clearFilters}>
+-            Clear {active} filter{active === 1 ? "" : "s"}
+-          </Button>
+-        )}
++        <span className="inline-flex flex-wrap items-center gap-2">
++          {active > 0 && (
++            <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={clearFilters}>
++              Clear {active} filter{active === 1 ? "" : "s"}
++            </Button>
++          )}
++          {extra /* UX-16: Export CSV / Print */}
++        </span>
+       </div>
+     </Card>
+   );

@@ -3,7 +3,7 @@
 // Written BEFORE the change and red on the old pages. Through the real UI:
 //   - the notification bell asks the server to make the due reminders (POST /api/notifications/refresh) on mount, and
 //     only then reads the list (GET /api/notifications); one refresh per page load, never two;
-//   - the Graduate School home has a "Refresh data" button (staff and administrator only) that runs the date-driven
+//   - the Graduate School home has a "Run today's checks" button (staff and administrator only; UX-38) that runs the date-driven
 //     sweeps (POST /api/maintenance/refresh), says what came back, and reloads the home;
 //   - the Academic Coordinator and the Research Coordinator get the same action-first home as every other role:
 //     "Dashboard" first in their sidebar, Login sends them to it, "Needs your action", key numbers from their own
@@ -97,18 +97,21 @@ test.describe("notification bell asks for the due reminders first", () => {
 });
 
 // ------------------------------------------------------------------------------------------------ refresh data
-test.describe("Graduate School home: Refresh data", () => {
+// CHANGED BY UX feature check (UX-38, owner 2026-11-22): the button is back, named "Run today's checks", because it runs the
+// date checks (AWOL, leave dates, risk, reviews, reminders) on demand; they still also run on the first sign-in each day.
+test.describe("Graduate School home: Run today's checks", () => {
   for (const key of ["staff", "admin"]) {
     test.describe(key, () => {
       test.use({ storageState: join(AUTH_DIR, `${key}.json`), viewport: { width: 1366, height: 768 } });
 
       test("the button runs the sweeps, shows the result and reloads the home", async ({ page }) => {
-        tracker.where = { role: key, page: "p92 refresh data", viewport: 1366 };
+        tracker.where = { role: key, page: "p92 run checks", viewport: 1366 };
         await page.goto("/");
         await expect(page.locator("main h1")).toBeVisible();
         await page.waitForLoadState("networkidle");
-        const button = page.getByRole("button", { name: "Refresh data" });
+        const button = page.getByRole("button", { name: "Run today's checks" });
         await expect(button).toBeVisible();
+        await expect(page.getByRole("button", { name: "Refresh data" })).toHaveCount(0); // not mistaken for a page reload
         const sweep = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/maintenance/refresh" && r.request().method() === "POST");
         const reload = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/dashboard" && r.request().method() === "GET");
         await button.click();
@@ -118,7 +121,6 @@ test.describe("Graduate School home: Refresh data", () => {
         await reload; // the home is read again after the sweeps
         await expect(main(page).getByRole("status").filter({ hasText: body.message })).toBeVisible();
         await expect(button).toBeEnabled();
-        await shot(page, `${key}-refresh-1366.png`);
       });
     });
   }
@@ -127,12 +129,12 @@ test.describe("Graduate School home: Refresh data", () => {
     test.use({ storageState: join(AUTH_DIR, "staff.json"), viewport: { width: 1366, height: 768 } });
 
     test("says so in words and leaves the home as it was", async ({ page }) => {
-      tracker.where = { role: "staff", page: "p92 refresh data fails", viewport: 1366 };
+      tracker.where = { role: "staff", page: "p92 run checks fails", viewport: 1366 };
       await page.route("**/api/maintenance/refresh", (route) => route.fulfill({ status: 500, json: { error: "The sweeps could not run." } }));
       await page.goto("/");
       await expect(page.locator("main h1")).toBeVisible();
       await page.waitForLoadState("networkidle");
-      await page.getByRole("button", { name: "Refresh data" }).click();
+      await page.getByRole("button", { name: "Run today's checks" }).click();
       await expect(main(page).getByText("The sweeps could not run.")).toBeVisible();
       await expect(sectionOf(page, "Needs your action")).toBeVisible();
       forgetMockedFailure();
@@ -143,16 +145,17 @@ test.describe("Graduate School home: Refresh data", () => {
     test.describe(key, () => {
       test.use({ storageState: join(AUTH_DIR, `${key}.json`), viewport: { width: 1366, height: 768 } });
 
-      test("has no Refresh data button (the sweeps are the Graduate School's)", async ({ page }) => {
-        tracker.where = { role: key, page: "p92 no refresh data", viewport: 1366 };
+      test("the coordinators' home has no such button", async ({ page }) => {
+        tracker.where = { role: key, page: "p92 no run checks", viewport: 1366 };
         await page.goto("/");
         await expect(page.locator("main h1")).toBeVisible();
         await page.waitForLoadState("networkidle");
-        await expect(page.getByRole("button", { name: "Refresh data" })).toHaveCount(0);
+        await expect(page.getByRole("button", { name: "Run today's checks" })).toHaveCount(0);
       });
     });
   }
 });
+
 
 // ------------------------------------------------------------------------------------------------ coordinator homes
 for (const key of ["academic-coordinator", "research-coordinator"]) {

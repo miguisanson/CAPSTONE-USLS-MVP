@@ -1,8 +1,9 @@
+// Data cleanup (2026-11-22): the picker search is "Miguel Yu" - "Miguel" also lists Miguel Torres first, under the guide.
 import { STAFF, NO_CASE } from "./_shared.js";
 
 const PICK = [
-  { type: { css: 'input[placeholder*="Search all students"]' }, text: "Miguel" },
-  { click: { text: "Miguel Yu" } },
+  { type: { css: 'input[placeholder*="Search all students"]' }, text: "Miguel Yu" },
+  { click: { css: "button", text: "2260004" } } /* CHANGED BY owner feedback 2026-11-23 (stage 8): the picker result itself; text "Miguel Yu" could hit another Miguel Yu on the page first */,
   { wait: { text: "Panel recommendation workspace" }, timeout: 30000 },
 ];
 

@@ -13,6 +13,7 @@
 // Students other specs change (Andrea, Bianca, Isabel, Maureen, Daniel, Gabriel, Joshua, Paolo) are not used.
 import { test, expect } from "@playwright/test";
 import { PASSWORD } from "./support/accounts.js";
+import { openSidebarGroups } from "./support/sidebar.js";
 import { attachWatchers, formatProblems, stubExternal } from "./support/checker.js";
 
 const MAYA = "awol.maya@usls.edu.ph";
@@ -63,9 +64,10 @@ test.describe("student home, action first (IM19)", () => {
     await expect(mine.getByText("Review automatic AWOL policy alert"), "an office's task is not a student action").toHaveCount(0);
     await expect(mine.getByText(/With the Academic Coordinator/), "no office-held row under Needs your action").toHaveCount(0);
 
-    // the key number counts only her own tasks: the coordinator's alert is not one of them
+    // the key number counts only what waits on her - the rows of "Needs your action" (UX-01, 2026-11-20; was "0",
+    // which disagreed with the AWOL row listed right beside it): the coordinator's alert is not one of them
     const card = main(page).locator('[data-slot="label"]', { hasText: /^Your open tasks$/i }).locator("xpath=..");
-    await expect(card.locator('[data-slot="value"]')).toHaveText("0");
+    await expect(card.locator('[data-slot="value"]')).toHaveText(String(await mine.locator("li").count()));
 
     // both rows lead to the student page where the case is handled
     const link = mine.locator('a[href$="/student/requests/awol-return"]').first();
@@ -111,19 +113,20 @@ test.describe("student home, action first (IM19)", () => {
     await expect(current).toHaveCount(1);
     await expect(current).toContainText(stage);
 
-    // blocks that left the home are one click away
+    // blocks that left the home are one click away - in the sidebar (UX-06, 2026-11-20: the "Elsewhere" card is gone)
+    const side = page.locator("aside:visible nav");
+    await openSidebarGroups(page); // UX-27 (Phase 5a): the sidebar groups fold; open them first, as a person would
     for (const [name, path] of [
       ["Defense Schedule", "/student/defense-schedule"],
       ["Request Center", "/student/requests"],
       ["Leave of Absence", "/student/requests/leave-of-absence"],
       ["Research Adviser", "/student/adviser"],
     ]) {
-      await expect(m.getByRole("link", { name: new RegExp(name, "i") }).first(), `link to ${name}`).toHaveAttribute("href", path);
+      await expect(side.getByRole("link", { name: new RegExp(name, "i") }).first(), `link to ${name}`).toHaveAttribute("href", path);
     }
-    // one line about the defense, not the whole schedule list
-    await expect(m.getByText(/took place|is booked|No defense/i).first()).toBeVisible();
+    await expect(m.getByRole("heading", { name: "Elsewhere in your portal" })).toHaveCount(0);
     await expect(m.getByRole("heading", { name: /Schedule requests/i })).toHaveCount(0);
-    await m.getByRole("link", { name: /Request Center/i }).first().click();
+    await side.getByRole("link", { name: /Request Center/i }).first().click();
     await expect(page).toHaveURL(/\/student\/requests$/);
   });
 

@@ -14,8 +14,6 @@ import {
   AlertTriangle,
   CalendarDays,
   UserRoundCheck,
-  History,
-  HelpCircle,
 } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
@@ -23,8 +21,8 @@ import { Button, Card, EmptyState, InlineNotice, PageHeader, SectionTitle, Skele
 import StudentPicker from "../../components/StudentPicker";
 import { useAuth } from "../../auth";
 import { OnboardingGatePanel } from "../../components/ProcessGates";
-import PolicyRules from "../../components/PolicyRules";
-import AdviserAppointments from "../AdviserAppointments";
+import { HelpButton, PageHelpDrawer } from "../../components/PageHelp";
+import AdviserAppointments, { ADVISER_PROTOCOL } from "../AdviserAppointments";
 import CalendarPage from "../../components/calendar/CalendarPage";
 import ProcessBoardPage from "../../components/ProcessBoardPage";
 import { PROCESS_SLUGS } from "../../components/processConfig";
@@ -63,6 +61,8 @@ const WAITING_STEP = { "panel-matching": "panel", "defense-scheduling": "schedul
 const BOARD_SLUGS = new Set(["practicum", "graduation"]);
 
 // One more sentence for the page description (it used to be a loose line under the header).
+// UX-22 (IM50, 2026-11-20): one short line under each title, saying what the title does not. The server's longer
+// `short` text and these notes are in the page's Help panel.
 const PAGE_NOTE = {
   practicum: "Practicum applies to Psychology and MSGC students only; other programs are not listed.",
   graduation: "The Academic Coordinator checks coursework, the Research Coordinator validates research evidence, Graduate School staff prepare the list, and the Dean owns the endorsement and export.",
@@ -82,7 +82,7 @@ const NEEDS_STUDENT = {
 // own: they open as tabs inside Research Gate and Defense Scheduling (?view=adviser / ?view=calendar).
 const SUBVIEW_TABS = {
   "research-gate": [
-    { key: "", label: "Research Gate", icon: FileCheck },
+    { key: "", label: "Students", icon: FileCheck }, // CHANGED BY owner feedback 2026-11-23: not the page title again
     { key: "adviser", label: "Adviser designation", icon: UserRoundCheck },
   ],
   "defense-scheduling": [
@@ -115,6 +115,7 @@ function SingleWorkflowPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [supportModal, setSupportModal] = useState("");
+  const [helpOpen, setHelpOpen] = useState(false); // UX-14: the Help panel
 
   // The query string keeps the chosen student for this page and makes the view shareable. Nothing is remembered
   // across pages: the links that should carry a student (Research Gate list, "Open matching", calendar) say so in the URL.
@@ -220,18 +221,21 @@ function SingleWorkflowPage() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={tx.title}
-        description={[tx.short, PAGE_NOTE[slug]].filter(Boolean).join(" ")}
-        forms={slug === "research-gate" && subview === "adviser" ? "adviser-designation" : slug}
         icon={Icon}
-        actions={(
-          <>
-            <Button variant="secondary" icon={HelpCircle} onClick={() => setSupportModal("guide")}>How this works</Button>
-            <Button variant="secondary" icon={History} onClick={() => setSupportModal("activity")}>View recent activity</Button>
-          </>
-        )}
+        actions={<HelpButton onClick={() => setHelpOpen(true)} />}
       />
-
-      <PolicyRules process={RULE_PROCESS_BY_SLUG[slug]} />
+      {helpOpen && (
+        <PageHelpDrawer
+          board={slug === "research-gate" ? "view" : ["practicum", "graduation"].includes(slug) ? "move" : ""}
+          note={slug === "research-gate" && subview === "adviser" ? ADVISER_PROTOCOL : [tx.short, PAGE_NOTE[slug]].filter(Boolean).join(" ")}
+          title={tx.title}
+          forms={slug === "research-gate" && subview === "adviser" ? "adviser-designation" : slug}
+          rulesProcess={RULE_PROCESS_BY_SLUG[slug]}
+          onGuide={() => setSupportModal("guide")}
+          onActivity={() => setSupportModal("activity")}
+          onClose={() => setHelpOpen(false)}
+        />
+      )}
 
       {subviewTabs && <Tabs label="Views" tabs={subviewTabs} value={subview} onChange={changeSubview} />}
 
@@ -241,7 +245,7 @@ function SingleWorkflowPage() {
       <div className="page-stack">
         {subview === "adviser" && <AdviserAppointments role={user?.role} embedded />}
         {subview === "calendar" && (
-          <CalendarPage scope="staff" embedded title="Defense calendar" description="All defenses with stage, status, panel and venue, plus the protocol deadlines. Open a defense to reschedule it in the Scheduling tab." />
+          <CalendarPage scope="staff" embedded title="Defense calendar" />
         )}
         {!subview && slug === "research-gate" && (
           <ResearchGateOverview
@@ -256,7 +260,7 @@ function SingleWorkflowPage() {
         )}
         {!subview && needsStudent && slug !== "research-gate" && ( // the Research Gate opens a record from a board card (F5-03)
           <Card pad="lg" id="workflow-student" className="scroll-mt-24">
-            <SectionTitle title="Choose a student" subtitle="Pick the record this action applies to" icon={Users} />
+            <SectionTitle title="Choose a student" icon={Users} />
             <StudentPicker
               value={studentId}
               selectedLabel={studentLabel}

@@ -162,28 +162,21 @@ const notCut = (locator) => locator.evaluate((el) => el.scrollWidth <= el.client
 
 test.describe("conD: student pages that are alike behave alike", () => {
   // ---------------------------------------------------------------------------------------------- finding 8
-  test("Policy Assistant (8): the student page is the Dean's layout: chat on the left, a 'How this works' rail on the right", async ({ browser }) => {
+  // CHANGED BY owner feedback 2026-11-23: the "How this works" rail is gone; the student's chat is the Dean's, full width
+  test("Policy Assistant (8): the student page is the Dean's layout: the chat across the page, no rail", async ({ browser }) => {
     const student = await ctxFor(browser, STUDENT);
     const dean = await ctxFor(browser, DEAN);
     try {
       const geometry = async (page, path) => {
         await page.goto(path);
-        const rail = main(page).getByRole("heading", { level: 2, name: "How this works" });
-        await expect(rail, `${path}: the rail`).toBeVisible();
-        const log = await page.getByRole("log").boundingBox();
-        const railBox = await rail.boundingBox();
-        return { log, railBox };
+        await expect(page.getByRole("log"), `${path}: the chat`).toBeVisible();
+        await expect(main(page).getByRole("heading", { level: 2, name: "How this works" }), `${path}: no rail`).toHaveCount(0);
+        return { log: await page.getByRole("log").boundingBox() };
       };
       const s = await geometry(student.page, "/student/assistant");
       const d = await geometry(dean.page, "/dean/assistant");
-      expect(s.railBox.x, "the rail sits to the right of the chat").toBeGreaterThan(s.log.x + s.log.width - 1);
       expect(Math.abs(s.log.width - d.log.width), "the chat is as wide as the Dean's").toBeLessThanOrEqual(2);
-      expect(Math.abs(s.railBox.x - d.railBox.x), "the rail starts where the Dean's does").toBeLessThanOrEqual(2);
-      // the 'private and read-only' sentence is a line in the rail, not a blue notice above the chat
-      await expect(main(student.page).getByText("Private and read-only")).toHaveCount(1);
-      await expect(main(student.page).getByRole("status").filter({ hasText: "Private and read-only" })).toHaveCount(0);
-      await expect(main(student.page).getByRole("listitem").filter({ hasText: "Private and read-only" })).toHaveCount(1);
-      await expect(main(student.page).getByRole("listitem").filter({ hasText: "Answers come from the Graduate School Handbook" })).toHaveCount(1);
+      expect(Math.abs(s.log.x - d.log.x), "the chat starts where the Dean's does").toBeLessThanOrEqual(2);
     } finally {
       await student.context.close();
       await dean.context.close();

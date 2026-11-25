@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Bell, CalendarDays, CalendarPlus, Flag, MapPin, UserCheck, Users } from "lucide-react";
+import { AlertTriangle, CalendarDays, CalendarPlus, Flag, MapPin, UserCheck, Users } from "lucide-react";
 import { api } from "../../api";
 import { useApi } from "../../hooks";
-import { Button, Card, EmptyState, InlineNotice, PageHeader, SectionCard, Spinner, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, EmptyState, PageHeader, SectionCard, Spinner, StatusChip } from "../../components/ui/index.js";
 import CalendarView, { CalendarLegend } from "../../components/calendar/CalendarView";
 import CalendarFeedCard from "../../components/calendar/CalendarFeedCard";
 import { LoadError, daysPhrase, fmtDay } from "./shared";
@@ -49,7 +49,6 @@ function NextDefenseCard({ event }) {
         <EmptyState
           icon={CalendarDays}
           title="No defense is booked yet"
-          hint="When the Research Coordinator books your defense, the date, time and panel appear here."
           action={<Button as={Link} to="/student/defense-schedule">Request a defense schedule</Button>}
         />
       </SectionCard>
@@ -127,7 +126,7 @@ function DeadlineList({ deadlines }) {
     [deadlines],
   );
   return (
-    <SectionCard pad="lg" title="Next deadlines" subtitle="Dates you should not miss, earliest concern first" icon={Flag}>
+    <SectionCard pad="lg" title="Next deadlines" icon={Flag}>
       {rows.length ? (
         <ul className="space-y-2.5">
           {rows.map((item) => {
@@ -144,7 +143,7 @@ function DeadlineList({ deadlines }) {
           })}
         </ul>
       ) : (
-        <EmptyState title="No deadlines right now" hint="Due dates such as sending your manuscript to the panel appear here once a defense is booked." />
+        <EmptyState title="No deadlines right now" />
       )}
     </SectionCard>
   );
@@ -152,7 +151,7 @@ function DeadlineList({ deadlines }) {
 
 function SelectedCard({ selected, onClose }) {
   if (!selected) {
-    return <p className="rounded-xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">Select a defense or a deadline in the calendar to see its details.</p>;
+    return null; // CHANGED BY owner feedback 2026-11-23: no "Select a defense..." hint
   }
   const isDefense = selected.kind === "defense";
   return (
@@ -196,7 +195,6 @@ export default function StudentCalendarPage() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.researchCalendar}
-        description="Your defense date, the deadlines that lead to it, and a link to add the dates to your calendar. All times are Philippine time."
         icon={CalendarDays}
       />
       {error && <LoadError title="Could not load your calendar" onRetry={refetch}>{error}</LoadError>}
@@ -208,10 +206,7 @@ export default function StudentCalendarPage() {
             <div className="lg:col-span-7"><NextDefenseCard event={data.next_defense} /></div>
             <div className="lg:col-span-5"><DeadlineList deadlines={data.deadlines || []} /></div>
           </div>
-          <InlineNotice tone="info" icon={Bell}>
-            If your defense is moved, a notice with the old and the new time arrives in the bell at the top of the page.
-          </InlineNotice>
-          <SectionCard title="Calendar" subtitle="Your defenses and deadlines" icon={CalendarDays}>
+          <SectionCard title="Calendar" icon={CalendarDays}>
             <CalendarLegend />
             <CalendarView
               events={data.events || []}

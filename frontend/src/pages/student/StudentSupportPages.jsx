@@ -17,7 +17,6 @@ export function StudentEnrollmentPage() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.enrollment}
-        description="Choose the published subjects you are taking this semester. Subjects already on your record stay locked."
         icon={BookPlus}
         actions={<Button as={Link} to="/student/progress" variant="secondary">View my progress</Button>}
       />
@@ -33,7 +32,6 @@ export function StudentMessagesPage() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.messages}
-        description="Clarification requests, staff replies and questions about your active requests."
         icon={Mail}
       />
       <StudentInbox data={data} onSaved={refetch} onOpenRequest={(view) => navigate(STUDENT_REQUEST_PATHS[view] || "/student/requests")} />
@@ -48,7 +46,6 @@ export function StudentDocumentsPage() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.documents}
-        description="Admission and general records, and the files you have submitted. Research milestone files are managed on the Research page."
         icon={FileUp}
         actions={<Button as={Link} to="/student/research" variant="secondary">Research uploads</Button>}
       />
@@ -69,7 +66,6 @@ export function StudentActivityPage() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.activityLog}
-        description="Every submission, decision and hand-off on your record, with who owns the next step."
         icon={History}
       />
       <ActivityPanel logs={data.logs} />
@@ -97,7 +93,7 @@ export function StudentProfilePage() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.myProfile}
-        description="Your identity and enrollment details as recorded by the Graduate School. Contact the office to correct anything here."
+        description="Contact the Graduate School office to correct anything here."
         icon={UserRound}
       />
       <SectionCard pad="lg" title={student.name} subtitle={`${student.student_number} · ${student.program_name}`} icon={UserRound}>

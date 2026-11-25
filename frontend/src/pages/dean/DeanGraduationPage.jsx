@@ -29,7 +29,7 @@ function DeanGraduationBody() {
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title={PAGE.graduationEndorsement}
-        description="The Academic Coordinator checks coursework, the Research Coordinator validates research evidence, and Graduate School staff prepare the endorsement list. You approve or return it, then export the approved list for the Registrar."
+        helpNote="The Academic Coordinator checks coursework, the Research Coordinator validates research evidence, and Graduate School staff prepare the endorsement list. You approve or return it, then export the approved list for the Registrar."
         forms="graduation"
         icon={GraduationCap}
         badge={<StatusChip status={`${counts.pendingGraduation} waiting`} tone="muted" dot={false} />}

@@ -223,7 +223,6 @@ export default function TermSettings() {
       <PageHeader
         icon={CalendarClock}
         title={PAGE.academicSemesters}
-        description="Maintain the list of academic semesters and mark the current planning term. Enrollment, course adjustments, and reporting use these semesters."
         actions={canManage ? (
           <>
             <Button variant="secondary" icon={Plus} onClick={openForm}>Add semester</Button>
@@ -233,7 +232,7 @@ export default function TermSettings() {
       />
 
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
-      {data && !canManage && <InlineNotice tone="neutral">You can read the semesters and dates here. Only Graduate School staff can change a semester.</InlineNotice>}
+      {data && !canManage && <InlineNotice tone="neutral">Only Graduate School staff can change a semester.</InlineNotice>}
       {notice.text && <InlineNotice tone={notice.tone} onDismiss={() => say("")}>{notice.text}</InlineNotice>}
 
       {loading ? (
@@ -252,7 +251,6 @@ export default function TermSettings() {
       {showForm && (
         <Modal
           title="Add semester"
-          subtitle="Semester dates cannot overlap another semester. The planning window is the period when study plans can be prepared for this semester."
           icon={CalendarClock}
           size="md"
           onClose={closeForm}
@@ -282,7 +280,6 @@ export default function TermSettings() {
       {editing && (
         <Modal
           title={`Edit dates: ${editing.label}`}
-          subtitle="Only the dates change; the semester name stays as it is."
           icon={Pencil}
           size="md"
           onClose={() => setEditing(null)}

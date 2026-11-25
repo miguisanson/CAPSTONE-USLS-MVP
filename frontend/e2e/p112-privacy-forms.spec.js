@@ -103,6 +103,11 @@ test.describe("Forms and Operations Manual line on process pages", () => {
       const page = await context.newPage();
       try {
         await page.goto(path);
+        await expect(page.locator("main h1")).toBeVisible();
+        await page.waitForLoadState("networkidle");
+        // UX-14 (2026-11-20): on a process board the line is in the header's Help panel
+        const help = page.locator("main header").first().getByRole("button", { name: "Help" });
+        if (await help.count()) await help.click();
         await expect(page.locator('[data-slot="forms"]').first()).toHaveText(line);
       } finally {
         await context.close();

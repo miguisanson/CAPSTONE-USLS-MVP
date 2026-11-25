@@ -1,9 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Table2, Download, AlertTriangle, Check, Lock, Flag, ShieldCheck, CheckCircle2, UserPlus, FileSpreadsheet, PencilLine, SquarePen } from "lucide-react";
+import { Table2, Download, AlertTriangle, Check, Flag, CheckCircle2, UserPlus, FileSpreadsheet, SquarePen } from "lucide-react";
 import { api } from "../api";
-import { useApi } from "../hooks";
-import { Button, Card, EmptyState, Field, InlineNotice, Modal, PageHeader, Select, Spinner, StatusChip, Textarea } from "../components/ui/index.js";
+import { useApi, useIsPhone } from "../hooks";
+import { Button, Card, EmptyState, Field, FilterBar, FilterSelect, InlineNotice, Modal, PageHeader, Select, Spinner, StatusChip, Textarea } from "../components/ui/index.js";
 import { csvCell, downloadBlob } from "../lib/format";
 import { toneOf } from "../lib/tone";
 import AddStudentDialog from "../components/monitoring/AddStudentDialog";
@@ -11,32 +11,39 @@ import StudentRecordPanel from "../components/monitoring/StudentRecordPanel";
 import { ayEntryOf } from "../components/monitoring/knownData";
 import { PAGE } from "../lib/labels.js";
 
-// One colour per subject status in the matrix. The colours follow the semantic tones (UI-SPEC section 3): brand
-// green = done, blue = in progress or ahead, red = failed or gone, amber = needs a person, grey = nothing yet.
+// One colour per subject status in the matrix. UX-30 (2026-11-21): five colours you can tell apart, and a letter in
+// every cell so the colour is never the only sign (WCAG 1.4.1): green = done, blue = enrolled or planned, amber = INC,
+// red = failed or withdrawn, grey = dropped or not taken. The letter tells the statuses of one colour apart.
+const DONE = "bg-brand-600 text-white";
+const NOW = "bg-blue-100 text-blue-800";
+const WAIT = "bg-amber-200 text-amber-900";
+const BAD = "bg-red-200 text-red-800";
+const NONE = "bg-slate-100 text-slate-500";
 const CELL_VIEW = {
-  Completed: { cls: "bg-brand-500 text-white", mark: "C" },
-  Taken: { cls: "bg-brand-100 text-brand-800", mark: "T" },
-  Current: { cls: "bg-blue-100 text-blue-700", mark: "R" },
-  Enrolled: { cls: "bg-blue-100 text-blue-700", mark: "R" },
-  Failed: { cls: "bg-red-100 text-red-700", mark: "F" },
-  Dropped: { cls: "bg-slate-200 text-slate-700", mark: "D" },
-  Planned: { cls: "bg-blue-50 text-blue-700", mark: "P" },
-  INC: { cls: "bg-amber-100 text-amber-800", mark: "I" },
-  Withdrawn: { cls: "bg-red-50 text-red-700", mark: "W" },
-  Missing: { cls: "bg-slate-50 text-slate-300", mark: "" },
+  Completed: { cls: DONE, mark: "C" },
+  Taken: { cls: DONE, mark: "T" },
+  Current: { cls: NOW, mark: "E" },
+  Enrolled: { cls: NOW, mark: "E" },
+  Planned: { cls: NOW, mark: "P" },
+  INC: { cls: WAIT, mark: "I" },
+  Failed: { cls: BAD, mark: "F" },
+  Withdrawn: { cls: BAD, mark: "W" },
+  Dropped: { cls: NONE, mark: "D" },
+  Missing: { cls: NONE, mark: "–" },
 };
-// The legend is read from the same table, so a swatch can never disagree with its cells.
+// The legend is read from the same table, so a swatch can never disagree with its cells. Ordered by colour.
 const LEGEND = [
   ["Officially completed", "Completed"],
   ["Taken", "Taken"],
   ["Enrolled", "Enrolled"],
-  ["Failed", "Failed"],
-  ["Dropped", "Dropped"],
   ["Planned", "Planned"],
   ["INC", "INC"],
+  ["Failed", "Failed"],
   ["Withdrawn", "Withdrawn"],
+  ["Dropped", "Dropped"],
   ["Not taken", "Missing"],
 ];
+const DONE_STATUSES = new Set(["Completed", "Taken"]); // what the server counts as done (monitoring_grid)
 const MILES = [
   ["title", "Title"],
   ["proposal", "Proposal"],
@@ -71,6 +78,7 @@ const HEAD = "micro font-semibold uppercase tracking-wide";
 
 export default function MonitoringGrid() {
   const navigate = useNavigate();
+  const phone = useIsPhone(); // UX-31: a card per student below 640 px instead of the grid
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedProgramId = searchParams.get("program_id") || "";
   const selectedProgress = searchParams.get("progress") || "";
@@ -80,7 +88,9 @@ export default function MonitoringGrid() {
   const sortBy = searchParams.get("sort") || "name";
   // Stakeholder UAT (B14): look at one cohort - the students admitted in one academic year - of the program.
   const selectedEntry = searchParams.get("entry") || "";
-  const filtered = Boolean(selectedProgress || selectedRisk || selectedEnrollment || searchParams.get("entry"));
+  const activeFilters = [selectedProgress, selectedRisk, selectedEnrollment, selectedEntry].filter(Boolean).length;
+  const [studentSearch, setStudentSearch] = useState("");
+  const searchTerms = studentSearch.toLowerCase().split(/[\s,]+/).filter(Boolean);
   const { data: meta } = useApi(() => api.meta(), []);
   const [programId, setProgramId] = useState("");
   const [grid, setGrid] = useState(null);
@@ -146,6 +156,11 @@ export default function MonitoringGrid() {
     return rows;
   }, [grid?.students, sortBy, selectedEntry]);
 
+  const visibleStudents = sortedStudents.filter((student) => {
+    const identity = `${displayStudentName(student)} ${student.student_number || ""}`.toLowerCase();
+    return searchTerms.every((term) => identity.includes(term));
+  });
+
   function openFlagDialog(student) {
     setFlagStudent(student);
     setFlagForm({ category: "", note: "", target_label: "" });
@@ -206,7 +221,7 @@ export default function MonitoringGrid() {
     if (!grid) return;
     const header = ["Student", "Student ID", "AY Entry", "YR", "Lifecycle stage", ...flatCourses.map((c) => c.code), "Completed", "Total", "% Complete"];
     const lines = [header.map(csvCell).join(",")];
-    sortedStudents.forEach((s) => {
+    visibleStudents.forEach((s) => {
       lines.push([
         displayStudentName(s), s.student_number, s.academic_year_entry, s.year_level, s.stage || "",
         ...flatCourses.map((c) => s.cells[c.id] || "Missing"),
@@ -249,73 +264,49 @@ export default function MonitoringGrid() {
       <PageHeader
         icon={Table2}
         title={PAGE.monitoringSheet}
-        description={canEdit
-          ? "Curriculum progress for each student. Add students and edit subject rows here, or upload a workbook under Student Handoff."
-          : "Curriculum progress for each student (view only)."}
-        actions={(
-          <>
-            {grid && <Button as="a" variant="secondary" icon={FileSpreadsheet} href={api.monitoringExportUrl(programId)} download>Export workbook</Button>}
-            {canEdit && <Button icon={UserPlus} onClick={() => setAddOpen(true)}>Add student</Button>}
-          </>
-        )}
+        description={grid && !canEdit ? "View only" : undefined}
+        actions={canEdit && <Button icon={UserPlus} onClick={() => setAddOpen(true)}>Add student</Button>}
       />
       {savedNotice && <InlineNotice tone="success" onDismiss={() => setSavedNotice("")}>{savedNotice}</InlineNotice>}
 
-      <Card pad="sm">
-        {/* I-098: the Program select is as wide as its longest option ("MSGC - Master of Science in Guidance and Counseling");
-            the other filters share the rest of the row and wrap under it when the screen is narrower. */}
-        <div className="flex flex-wrap gap-2">
-          <div className="w-full sm:w-[26rem]">
-            <Select aria-label="Program" placeholder="" value={programId} options={programOptions} onChange={(e) => updateFilters({ program_id: e.target.value })} />
-          </div>
-          <div className="w-full sm:w-[19rem]">
-            <Select aria-label="Semester" placeholder="" value={selectedTermId || String(grid?.selected_term?.id || "")} options={termOptions} onChange={(e) => updateFilters({ term_id: e.target.value })} />
-          </div>
-          <div className="w-full sm:w-auto sm:min-w-44 sm:flex-1">
-            <Select aria-label="Year admitted" placeholder="All years admitted" value={selectedEntry} options={entryOptions} onChange={(e) => updateFilters({ entry: e.target.value })} />
-          </div>
-          <div className="w-full sm:w-auto sm:min-w-40 sm:flex-1">
-            <Select aria-label="Progress" placeholder="All progress" value={selectedProgress} options={PROGRESS_OPTIONS} onChange={(e) => updateFilters({ progress: e.target.value })} />
-          </div>
-          <div className="w-full sm:w-auto sm:min-w-40 sm:flex-1">
-            <Select aria-label="Risk" placeholder="All risk" value={selectedRisk} options={RISK_OPTIONS} onChange={(e) => updateFilters({ risk: e.target.value })} />
-          </div>
-          <div className="w-full sm:w-auto sm:min-w-44 sm:flex-1">
-            <Select aria-label="Enrollment status" placeholder="All enrollment" value={selectedEnrollment} options={ENROLLMENT_OPTIONS} onChange={(e) => updateFilters({ enrollment: e.target.value })} />
-          </div>
-          <div className="w-full sm:w-auto sm:min-w-48 sm:flex-1">
-            <Select aria-label="Sort monitoring sheet" placeholder="" value={sortBy} options={SORT_OPTIONS} onChange={(e) => updateFilters({ sort: e.target.value })} />
-          </div>
-          <Button variant="secondary" icon={Download} onClick={exportCsv} disabled={!grid} className="w-full sm:w-auto">Export CSV</Button>
-        </div>
-      </Card>
+      {/* Owner feedback 2026-11-23 (stage 4): the one filter row. The old "Filters" and "Export" disclosures sat in a
+          wrapping row, so opening Filters pushed Sort and Export aside and squeezed the selects into a column. */}
+      <FilterBar
+        search={{ value: studentSearch, onChange: setStudentSearch, placeholder: "Name or student ID", label: "Student", shownLabel: "Student" }}
+        active={activeFilters + (searchTerms.length ? 1 : 0)}
+        onClear={() => { setStudentSearch(""); updateFilters({ progress: "", risk: "", enrollment: "", entry: "" }); }}
+        summary={grid ? `Showing ${visibleStudents.length} of ${grid.students?.length || 0} students` : null}
+        actions={grid && (
+          <>
+            <Button as="a" variant="secondary" size="sm" icon={FileSpreadsheet} href={api.monitoringExportUrl(programId)} download>Export workbook</Button>
+            <Button variant="secondary" size="sm" icon={Download} onClick={exportCsv} disabled={loading || Boolean(error)}>Export CSV</Button>
+          </>
+        )}
+      >
+        <FilterSelect label="Program" aria-label="Program" placeholder="" value={programId} options={programOptions} onChange={(e) => updateFilters({ program_id: e.target.value })} />
+        <FilterSelect label="Semester" aria-label="Semester" placeholder="" value={selectedTermId || String(grid?.selected_term?.id || "")} options={termOptions} onChange={(e) => updateFilters({ term_id: e.target.value })} />
+        <FilterSelect label="Sort" aria-label="Sort monitoring sheet" placeholder="" value={sortBy} options={SORT_OPTIONS} onChange={(e) => updateFilters({ sort: e.target.value })} />
+        <FilterSelect label="Year admitted" aria-label="Year admitted" placeholder="All years admitted" value={selectedEntry} options={entryOptions} onChange={(e) => updateFilters({ entry: e.target.value })} />
+        <FilterSelect label="Progress" aria-label="Progress" placeholder="All progress" value={selectedProgress} options={PROGRESS_OPTIONS} onChange={(e) => updateFilters({ progress: e.target.value })} />
+        <FilterSelect label="Risk" aria-label="Risk" placeholder="All risk" value={selectedRisk} options={RISK_OPTIONS} onChange={(e) => updateFilters({ risk: e.target.value })} />
+        <FilterSelect label="Enrollment status" aria-label="Enrollment status" placeholder="All enrollment" value={selectedEnrollment} options={ENROLLMENT_OPTIONS} onChange={(e) => updateFilters({ enrollment: e.target.value })} />
+      </FilterBar>
 
-      {canEdit ? (
-        <InlineNotice tone="neutral" icon={PencilLine} title="Select a subject cell or the pencil beside a name to add or edit a row.">
-          Everything you type is marked Manual entry with your name and the time, and is kept in the change history. Imported values are never overwritten silently: a later upload that disagrees with a portal entry is held for review. Grades are not entered here.
-        </InlineNotice>
-      ) : (
-        <InlineNotice tone="neutral" icon={Lock} title="View only.">
-          Select a cell to see where a value came from and its change history. Only Graduate School staff and the Academic Coordinator can edit.
-        </InlineNotice>
-      )}
-
-      {grid?.integrity && (
-        <InlineNotice tone={grid.integrity.issue_count ? "warning" : "success"} icon={grid.integrity.issue_count ? AlertTriangle : ShieldCheck}>
-          {grid.integrity.issue_count
-            ? `${grid.integrity.issue_count} record(s) do not match`
-            : `Records match (${grid.integrity.checked_enrollments} checked)`}
+      {grid?.integrity?.issue_count > 0 && (
+        <InlineNotice tone="warning" icon={AlertTriangle}>
+          {`${grid.integrity.issue_count} record(s) do not match`}
         </InlineNotice>
       )}
 
       <ul aria-label="Colour legend" className="meta flex flex-wrap items-center gap-x-3 gap-y-2">
         {LEGEND.map(([label, status]) => (
           <li key={status} className="inline-flex items-center gap-1.5">
-            <span className={`h-3 w-3 rounded ring-1 ring-black/10 ${CELL_VIEW[status].cls}`} aria-hidden="true" /> {label}
+            <span data-swatch="" className={`grid h-5 w-5 place-items-center rounded text-2xs font-bold ring-1 ring-black/10 ${CELL_VIEW[status].cls}`} aria-hidden="true">{CELL_VIEW[status].mark}</span>
+            <span>{label}</span>
           </li>
         ))}
         <li className="inline-flex items-center gap-1.5">
-          <span className="relative h-3 w-3 rounded bg-slate-100 ring-1 ring-black/10" aria-hidden="true"><span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" /></span> Manual entry
+          <span className="relative h-5 w-5 rounded bg-white ring-1 ring-black/10" aria-hidden="true"><span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" /></span> <span>Manual entry</span>
         </li>
       </ul>
 
@@ -323,9 +314,16 @@ export default function MonitoringGrid() {
         <Spinner label="Loading monitoring sheet…" />
       ) : error ? (
         <EmptyState icon={AlertTriangle} title="Could not load the sheet" hint={error} />
-      ) : !grid || sortedStudents.length === 0 ? (
+      ) : !grid || visibleStudents.length === 0 ? (
         <Card>
-          {filtered ? (
+          {searchTerms.length > 0 ? (
+            <EmptyState
+              icon={Table2}
+              title="No students match this search"
+              hint="Search covers the selected program and filters."
+              action={<Button variant="secondary" onClick={() => setStudentSearch("")}>Clear search</Button>}
+            />
+          ) : activeFilters > 0 ? (
             <EmptyState
               icon={Table2}
               title="No students match these filters"
@@ -341,12 +339,23 @@ export default function MonitoringGrid() {
             />
           )}
         </Card>
+      ) : phone ? (
+        <ul aria-label="Students" className="space-y-3">
+          {visibleStudents.map((s) => (
+            <StudentCard
+              key={s.id}
+              student={s}
+              categories={grid.categories}
+              canEdit={canEdit}
+              onFlag={() => openFlagDialog(s)}
+              onEdit={() => setRecordPanel({ studentId: s.id, courseId: null })}
+              onOpen={() => navigate(`/students/${s.id}`)}
+            />
+          ))}
+        </ul>
       ) : (
         <Card pad="none" className="overflow-hidden">
-          <div className="meta border-b border-slate-100 bg-slate-50 px-3 py-2 font-medium sm:hidden">
-            Swipe sideways to review all subject columns.
-          </div>
-          <div className="overflow-auto overscroll-x-contain" style={{ maxHeight: "min(72vh, 760px)" }}>
+          <div data-testid="monitoring-scroll" className="overflow-auto overscroll-x-contain" style={{ maxHeight: "min(72vh, 760px)" }}>
             {/* A bespoke grid, not a DataTable: two header rows (category group + vertical subject codes), three
                 sticky columns and about forty narrow status cells do not fit DataTable's one-row header. */}
             <table className="min-w-max border-collapse text-2xs sm:text-xs">
@@ -355,20 +364,20 @@ export default function MonitoringGrid() {
                 {/* group header row */}
                 <tr>
                   <th
-                    className="sticky left-0 top-0 z-30 min-w-[170px] border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-left sm:min-w-[220px] sm:px-3"
+                    className="sticky left-0 top-0 z-30 w-[240px] min-w-[240px] border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-left"
                     rowSpan={2}
                   >
                     <span className="eyebrow">Student</span>
                   </th>
                   <th
                     rowSpan={2}
-                    className="sticky left-[170px] top-0 z-30 min-w-[72px] border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center sm:left-[220px]"
+                    className="sticky left-[240px] top-0 z-30 min-w-[72px] border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center"
                   >
                     <span className={HEAD}>AY Entry</span>
                   </th>
                   <th
                     rowSpan={2}
-                    className="sticky left-[242px] top-0 z-30 min-w-[48px] border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center sm:left-[292px]"
+                    className="sticky left-[312px] top-0 z-30 min-w-[48px] border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center"
                   >
                     <span className={HEAD}>YR</span>
                   </th>
@@ -421,56 +430,38 @@ export default function MonitoringGrid() {
                 </tr>
               </thead>
               <tbody>
-                {sortedStudents.map((s) => (
+                {visibleStudents.map((s) => (
                   <tr key={s.id} className="hover:bg-brand-50/30">
-                    <td className="sticky left-0 z-10 max-w-[170px] border-b border-r border-slate-200 bg-white px-2 py-1.5 sm:max-w-[240px] sm:px-3">
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => openFlagDialog(s)}
-                          title={`${s.open_flag_count || 0} open flag(s) for ${displayStudentName(s)}`}
-                          aria-label={`Open flags for ${displayStudentName(s)}`}
-                          className={`relative grid h-6 w-6 shrink-0 place-items-center rounded-md cursor-pointer transition-colors ${s.open_flag_count ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "text-slate-400 hover:bg-amber-50 hover:text-amber-600"}`}
-                        >
-                          <Flag className="h-3.5 w-3.5" />
-                          {s.open_flag_count > 0 && <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-amber-600 px-1 text-2xs font-semibold text-white">{s.open_flag_count}</span>}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRecordPanel({ studentId: s.id, courseId: null })}
-                          title={`${canEdit ? "Edit" : "View"} the monitoring record of ${displayStudentName(s)}`}
-                          aria-label={`${canEdit ? "Edit" : "View"} monitoring record of ${displayStudentName(s)}`}
-                          className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-md text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-700"
-                        >
-                          <SquarePen className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/students/${s.id}`)}
-                          className="flex min-w-0 flex-1 items-center text-left cursor-pointer"
-                        >
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs font-semibold text-ink sm:text-sm">{displayStudentName(s)}</span>
-                            <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                              <span className="micro">Student ID {s.student_number}</span>
-                              {s.enrollment_tag && s.enrollment_tag !== "Enrolled" && (
-                                <StatusChip status={s.enrollment_tag} size="sm" dot={false} />
-                              )}
-                              {s.entry_source === "Manual entry" && (
-                                <StatusChip tone="warning" label="Manual" size="sm" dot={false} title="This student was added in the portal rather than imported from a sheet." />
-                              )}
-                              <StatusChip status={s.risk} size="sm" dot={false} />
-                            </span>
-                            {/* Stakeholder UAT: the cohort's research milestone sits beside its coursework, in one sheet. */}
-                            {s.stage && <span className="mt-0.5 block truncate text-2xs font-semibold text-brand-800" title={`Lifecycle stage: ${s.stage}`}>Stage: {s.stage}</span>}
-                          </span>
-                        </button>
-                      </div>
+                    <td className="sticky left-0 z-10 w-[240px] min-w-[240px] max-w-[240px] border-b border-r border-slate-200 bg-white px-3 py-1.5">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/students/${s.id}`)}
+                        className="block w-full min-w-0 cursor-pointer text-left"
+                      >
+                        <span className="block truncate text-sm font-semibold text-ink">{displayStudentName(s)}</span>
+                        <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                          <span className="micro">Student ID {s.student_number}</span>
+                          {s.enrollment_tag && s.enrollment_tag !== "Enrolled" && (
+                            <StatusChip status={s.enrollment_tag} size="sm" dot={false} />
+                          )}
+                          {s.entry_source === "Manual entry" && (
+                            <StatusChip tone="warning" label="Manual" size="sm" dot={false} title="This student was added in the portal rather than imported from a sheet." />
+                          )}
+                          <StatusChip status={s.risk} size="sm" dot={false} />
+                        </span>
+                        {/* Stakeholder UAT: the cohort's research milestone sits beside its coursework, in one sheet. */}
+                        {s.stage && <span className="mt-0.5 block truncate text-2xs font-semibold text-brand-800" title={`Lifecycle stage: ${s.stage}`}>Stage: {s.stage}</span>}
+                      </button>
+                      {/* UX-30: the row actions say what they do */}
+                      <span className="mt-1 flex items-center gap-1">
+                        <FlagButton student={s} onClick={() => openFlagDialog(s)} />
+                        <RecordButton student={s} canEdit={canEdit} onClick={() => setRecordPanel({ studentId: s.id, courseId: null })} />
+                      </span>
                     </td>
-                    <td className="sticky left-[170px] z-10 min-w-[72px] border-b border-r border-slate-200 bg-white px-2 py-1.5 text-center font-semibold text-slate-600 sm:left-[220px]">
+                    <td className="sticky left-[240px] z-10 min-w-[72px] border-b border-r border-slate-200 bg-white px-2 py-1.5 text-center font-semibold text-slate-600">
                       {s.academic_year_entry || "—"}
                     </td>
-                    <td className="sticky left-[242px] z-10 min-w-[48px] border-b border-r border-slate-200 bg-white px-2 py-1.5 text-center font-semibold text-slate-600 sm:left-[292px]">
+                    <td className="sticky left-[312px] z-10 min-w-[48px] border-b border-r border-slate-200 bg-white px-2 py-1.5 text-center font-semibold text-slate-600">
                       {s.year_level || "—"}
                     </td>
                     {flatCourses.map((c) => {
@@ -480,13 +471,13 @@ export default function MonitoringGrid() {
                       const statusSource = s.operational_sources?.[c.id] || "";
                       const manual = (s.manual_cells || []).includes(c.id);
                       return (
-                        <td key={c.id} className="border-b border-r border-slate-100 p-0 text-center">
+                        <td key={c.id} className="h-px border-b border-r border-slate-100 p-0 text-center">
                           <button
                             type="button"
                             onClick={() => setRecordPanel({ studentId: s.id, courseId: c.id })}
                             aria-label={`${c.code} for ${displayStudentName(s)}: ${status === "Missing" ? "not taken" : status}${manual ? ", manual entry" : ""}. ${canEdit ? "Select to edit" : "Select to view"}.`}
                             title={`${c.code} — ${status === "Missing" ? "Not taken" : status}. ${manual ? "Manual entry (hover the record for who and when)." : `Imported/system status: ${officialStatus}.`}${statusSource ? ` Source: ${statusSource}.` : ""}`}
-                            className={`relative flex h-9 w-full min-w-10 cursor-pointer items-center justify-center text-2xs font-semibold transition-shadow hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-brand-400 sm:h-10 ${sty.cls}`}
+                            className={`relative flex h-full min-h-10 w-full min-w-10 cursor-pointer items-center justify-center text-xs font-bold transition-shadow hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-brand-400 ${sty.cls}`}
                           >
                             {sty.mark}
                             {manual && <span aria-hidden="true" className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" />}
@@ -629,6 +620,99 @@ export default function MonitoringGrid() {
         </Modal>
       )}
     </div>
+  );
+}
+
+// UX-30: the flag and record buttons carry words; on a phone card they are full tap targets (UX-31).
+function FlagButton({ student, onClick, large = false }) {
+  const count = student.open_flag_count || 0;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`${count} open flag(s) for ${displayStudentName(student)}`}
+      aria-label={`Open flags for ${displayStudentName(student)}`}
+      className={`inline-flex cursor-pointer items-center gap-1 rounded-md font-semibold transition-colors ${large ? "min-h-11 px-3 text-sm" : "h-7 px-1.5 text-xs"} ${count ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "text-slate-600 hover:bg-amber-50 hover:text-amber-700"}`}
+    >
+      <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+      {count ? `Flags ${count}` : "Flag"}
+    </button>
+  );
+}
+
+function RecordButton({ student, canEdit, onClick, large = false }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`${canEdit ? "Edit" : "View"} the monitoring record of ${displayStudentName(student)}`}
+      aria-label={`${canEdit ? "Edit" : "View"} monitoring record of ${displayStudentName(student)}`}
+      className={`inline-flex cursor-pointer items-center gap-1 rounded-md font-semibold text-slate-600 transition-colors hover:bg-brand-50 hover:text-brand-700 ${large ? "min-h-11 px-3 text-sm" : "h-7 px-1.5 text-xs"}`}
+    >
+      <SquarePen className="h-3.5 w-3.5" aria-hidden="true" />
+      {canEdit ? "Edit" : "View"}
+    </button>
+  );
+}
+
+// UX-31: on a phone one card per student - the name, the risk and stage, a bar per subject group, the comprehensive
+// exam and the research milestones - instead of a grid that has to be swiped sideways.
+function StudentCard({ student: s, categories, canEdit, onFlag, onEdit, onOpen }) {
+  return (
+    <li data-testid="monitoring-card" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <button type="button" onClick={onOpen} className="block min-h-11 w-full cursor-pointer text-left">
+        <span className="block text-base font-semibold text-ink">{displayStudentName(s)}</span>
+        <span className="meta block">Student ID {s.student_number} · AY {s.academic_year_entry || "—"} · Year {s.year_level || "—"}</span>
+      </button>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <StatusChip status={s.risk} size="sm" dot={false} />
+        {s.enrollment_tag && s.enrollment_tag !== "Enrolled" && <StatusChip status={s.enrollment_tag} size="sm" dot={false} />}
+        {s.entry_source === "Manual entry" && <StatusChip tone="warning" label="Manual" size="sm" dot={false} />}
+      </div>
+      {s.stage && <p className="mt-1 text-sm font-semibold text-brand-800">Stage: {s.stage}</p>}
+      <div className="mt-3 space-y-2">
+        {categories.map((cat) => {
+          const total = cat.courses.length;
+          const done = cat.courses.filter((course) => DONE_STATUSES.has(s.cells[course.id])).length;
+          const name = cat.name.charAt(0) + cat.name.slice(1).toLowerCase();
+          return (
+            <div key={cat.name}>
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="font-medium text-ink">{name}</span>
+                <span className="meta">{done} of {total}</span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label={`${name} ${done} of ${total} done`}
+                aria-valuemin={0}
+                aria-valuemax={total}
+                aria-valuenow={done}
+                className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100"
+              >
+                <div className="h-full rounded-full bg-brand-600" style={{ width: `${total ? Math.round((done / total) * 100) : 0}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <span className="inline-flex items-center gap-1.5"><span className="meta">Compre</span> <CompreExamBadge student={s} /></span>
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <span className="meta">Research</span>
+          {MILES.map(([key, label]) => (
+            <span key={key} className={`inline-flex items-center gap-0.5 text-xs font-medium ${s.milestones[key] ? "text-brand-700" : "text-slate-400"}`}>
+              {s.milestones[key] ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" /> : null}
+              {label}
+              <span className="sr-only">{s.milestones[key] ? " done" : " not yet"}</span>
+            </span>
+          ))}
+        </span>
+      </div>
+      <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
+        <FlagButton student={s} onClick={onFlag} large />
+        <RecordButton student={s} canEdit={canEdit} onClick={onEdit} large />
+      </div>
+    </li>
   );
 }
 

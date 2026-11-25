@@ -197,25 +197,41 @@ export function SearchInput({ value, onChange, placeholder = "Search…", label 
 /* ------------------------------------------------------------------------------------------- Pagination */
 
 /**
- * "Showing 21–30 of 95" on the left, Previous / "Page 3 of 10" / Next on the right. Pages count from 1.
+ * The one pager (owner feedback 2026-11-23, stage 4): "Showing 21–30 of 95" on the left; Previous, the page numbers and
+ * Next on the right. Long runs fold into "…" (1 … 4 5 6 … 10). On a phone the numbers give way to "Page 3 of 10".
+ * Pages count from 1.
  * @param page       current page (1-based)
  * @param pageCount  number of pages; the buttons only show when there is more than one
  * @param total      number of items in all pages; shows the "Showing a–b of n" text (with `pageSize`)
  * @param pageSize   items per page; with `shown` (items on this page) it gives the range
  * @param onPage     called with the new page number
+ * @param noun       what is counted ("students"), added after the total
  */
-export function Pagination({ page = 1, pageCount = 1, total, pageSize, shown, onPage, className = "", ...rest }) {
+export function pageList(current, count) {
+  const wanted = new Set([1, count, current - 1, current, current + 1]);
+  if (current <= 3) [2, 3, 4].forEach((n) => wanted.add(n));
+  if (current >= count - 2) [count - 1, count - 2, count - 3].forEach((n) => wanted.add(n));
+  const pages = [...wanted].filter((n) => n >= 1 && n <= count).sort((a, b) => a - b);
+  const out = [];
+  pages.forEach((n, i) => {
+    if (i && n - pages[i - 1] > 1) out.push(n - pages[i - 1] === 2 ? n - 1 : null);
+    out.push(n);
+  });
+  return out;
+}
+
+export function Pagination({ page = 1, pageCount = 1, total, pageSize, shown, onPage, noun = "", className = "", ...rest }) {
   const count = Math.max(1, pageCount || 1);
   const current = Math.min(Math.max(1, page), count);
   let summary = null;
   if (typeof total === "number") {
     if (total === 0) {
-      summary = "Showing 0 of 0";
+      summary = `Showing 0 of 0${noun ? ` ${noun}` : ""}`;
     } else {
       const size = pageSize || Math.ceil(total / count);
       const from = (current - 1) * size + 1;
       const to = Math.min(total, shown ? from + shown - 1 : current * size);
-      summary = `Showing ${from}–${to} of ${total}`;
+      summary = `Showing ${from}–${to} of ${total}${noun ? ` ${noun}` : ""}`;
     }
   }
   return (
@@ -226,11 +242,32 @@ export function Pagination({ page = 1, pageCount = 1, total, pageSize, shown, on
         <span />
       )}
       {count > 1 && (
-        <nav aria-label="Pagination" className="flex items-center gap-2">
+        <nav aria-label="Pagination" className="flex flex-wrap items-center gap-1.5">
           <Button variant="secondary" size="sm" icon={ChevronLeft} disabled={current <= 1} onClick={() => onPage?.(current - 1)}>
             Previous
           </Button>
-          <span className="meta whitespace-nowrap px-1">Page {current} of {count}</span>
+          <span className="meta whitespace-nowrap px-1 sm:hidden">Page {current} of {count}</span>
+          <span className="hidden items-center gap-1 sm:inline-flex">
+            {pageList(current, count).map((n, i) =>
+              n === null ? (
+                <span key={`gap-${i}`} className="meta px-1" aria-hidden="true">…</span>
+              ) : (
+                <button
+                  key={n}
+                  type="button"
+                  aria-label={`Page ${n}`}
+                  aria-current={n === current ? "page" : undefined}
+                  onClick={() => n !== current && onPage?.(n)}
+                  className={cx(
+                    "inline-flex h-8 min-w-8 cursor-pointer items-center justify-center rounded-lg px-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2",
+                    n === current ? "bg-brand-600 text-white" : "text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50",
+                  )}
+                >
+                  {n}
+                </button>
+              ),
+            )}
+          </span>
           <Button variant="secondary" size="sm" disabled={current >= count} onClick={() => onPage?.(current + 1)}>
             Next
             <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />

@@ -187,7 +187,6 @@ export function AvailabilityWorkspace({
       {participants.length > 0 && (
         <SectionCard
           title="Panel availability"
-          subtitle="Detailed source availability for each adviser and panelist."
           action={
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
               <UserRoundCheck className="h-3.5 w-3.5" aria-hidden="true" />
@@ -209,7 +208,6 @@ export function AvailabilityWorkspace({
 
       <SectionCard
         title="Best shared options"
-        subtitle="Select one to prepare the proposed schedule."
         action={<span className="meta rounded-full bg-slate-100 px-2.5 py-1 font-semibold">{filteredSlots.length} conflict-free found</span>}
       >
         {filteredSlots.length ? (

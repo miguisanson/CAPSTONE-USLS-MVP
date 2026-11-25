@@ -1,8 +1,7 @@
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowLeft,
-  ArrowRight,
   CheckCircle2,
   Clock,
   Gavel,
@@ -17,7 +16,8 @@ import RoleHome from "../../components/RoleHome.jsx";
 import { deanActions, deanActivity, deanStats, wordDays } from "../../lib/deanHome.js";
 import { firstNameOf } from "../../lib/staffHome.js";
 import { DEAN_PROCESSES, DeanFeedback, DeanGate, processOfType, useDean } from "./DeanContext";
-import { AgeBadge, CaseTable, casePath, processLabel, useDeanFilters } from "./DeanShared";
+import { AgeBadge, casePath, processLabel, useDeanFilters } from "./DeanShared";
+import { deanItemDate } from "./deanHelpers";
 import { DeanListFilters, WorkflowApprovalCard } from "./DeanParts";
 import { DeanPracticumBoard } from "./DeanPracticumBoard";
 import ProcessBoardPage from "../../components/ProcessBoardPage";
@@ -42,8 +42,6 @@ const PROCESS_COUNT_KEY = {
 function CountChip({ count }) {
   return <StatusChip label={String(count)} tone="muted" size="sm" dot={false} className="ml-1 align-middle" />;
 }
-
-const VIEW_ALL_LINK = "text-xs font-semibold text-brand-700 hover:underline";
 
 // ---------------------------------------------------------------- Dashboard
 // IM19: the Dean home is action first (RoleHome) - the decisions waiting on the Dean, oldest first; four key numbers;
@@ -80,22 +78,19 @@ function DeanDashboardBody() {
       <DeanFeedback />
       <RoleHome
         header={{
+          // UX-11 (owner 2026-11-20): no second line and no button to a page the sidebar already lists.
           title: `Welcome, ${firstNameOf(user?.full_name) || "Dean"}`,
-          description: "Dean · the decisions waiting on you",
           icon: Gavel,
-          actions: <Button as={Link} to="/dean/approvals" icon={Inbox}>Open approvals queue</Button>,
         }}
         actions={actions.items.map((row) => ({
           key: row.key,
           title: row.title,
           detail: row.detail,
           meta: waitText(row),
-          tone: row.tone,
-          chip: row.status ? <StatusChip status={row.status} dot={false} size="sm" /> : undefined,
+          // UX-13: every row here waits on the Dean, so a "Dean Review" chip says nothing the heading does not
           to: row.target.to,
           linkLabel: row.target.label,
         }))}
-        actionsSubtitle="Oldest first. Open a case to read the files and history, then decide."
         actionsEmpty={{ title: "Nothing is waiting for your decision", hint: "Requests routed to the Dean will appear here." }}
         actionsAll={actions.rows > actions.items.length ? { to: "/dean/approvals", label: `View all ${actions.total}` } : undefined}
         stats={stats}
@@ -109,29 +104,6 @@ function DeanDashboardBody() {
 }
 
 // ------------------------------------------------------------ Approvals queue
-function PlanRows({ plans }) {
-  if (!plans.length) return <EmptyState icon={Inbox} title="No course offering plans waiting" />;
-  return (
-    <ul className="divide-y divide-slate-100">
-      {plans.map((plan) => {
-        const offered = plan.offerings.filter((offering) => offering.status === "Offered" || offering.status === "Suggested");
-        return (
-          <li key={plan.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink">Course offerings · {plan.program_code}</p>
-              <p className="meta">{plan.term_label} · {offered.length} subject(s) proposed · submitted {formatDate(plan.submitted_at)}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <AgeBadge value={plan.submitted_at} />
-              <Button as={Link} to="/dean/approvals/course-adjustments" variant="secondary" size="sm">Review</Button>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 export function DeanQueue() {
   return (
     <DeanGate>
@@ -140,58 +112,139 @@ export function DeanQueue() {
   );
 }
 
+// UX-25 (Phase 4): the Approvals Queue is one table - every case and course offering plan waiting on the Dean, oldest
+// wait first - with a chip per process (and its count) to narrow it; ?process=<slug> opens it narrowed. The Dean's
+// sidebar and the per-process boards stay as they are (owner 2026-11-21).
+// IM50: the Student column names the student, so the request leaves out its " · <name>" ending.
+const withoutName = (title, name) => {
+  const text = String(title || "");
+  return name && text.endsWith(` · ${name}`) ? text.slice(0, -(name.length + 3)) : text;
+};
+const waitedSince = (row) => {
+  const t = row.since ? new Date(row.since).getTime() : NaN;
+  return Number.isFinite(t) && t > 0 ? t : Infinity; // no date: last
+};
+const QUEUE_COLUMNS = [
+  {
+    key: "student",
+    header: "Student",
+    sortValue: (row) => row.student,
+    cell: (row) => (
+      <>
+        <span className="block font-semibold text-ink">{row.student}</span>
+        {row.studentMeta && <span className="meta inline-block font-normal">{row.studentMeta}</span>}
+      </>
+    ),
+  },
+  {
+    key: "request",
+    header: "Request",
+    sortValue: (row) => row.request,
+    cell: (row) => (
+      <>
+        <p className="font-medium text-slate-700">{row.request}</p>
+        {row.detail && <p className="meta">{row.detail}</p>}
+      </>
+    ),
+  },
+  { key: "process", header: "Process", sortValue: (row) => row.process },
+  { key: "status", header: "Status", sortValue: (row) => row.status, cell: (row) => <StatusChip status={row.status} dot={false} /> },
+  {
+    key: "waiting",
+    header: "Waiting",
+    sortValue: (row) => -waitedSince(row),
+    cell: (row) => (
+      <div className="space-y-1">
+        <AgeBadge value={row.since} />
+        <p className="meta">{formatDate(row.since)}</p>
+      </div>
+    ),
+  },
+  {
+    key: "open",
+    header: <span className="sr-only">Review</span>,
+    align: "right",
+    cell: (row) => (
+      <Button as={Link} to={row.to} variant="secondary" size="sm" aria-label={`Review ${row.request}`}>
+        Review
+      </Button>
+    ),
+  },
+];
+
 function DeanQueueBody() {
-  const { workflowPending, pendingPlans, counts, refetch } = useDean();
-  const { filters, setFilters, programs, statuses, apply, matches } = useDeanFilters([...workflowPending, ...pendingPlans]);
-  const plans = pendingPlans.filter(matches);
-  // One entry per process, in order; the ones with something waiting get a section, the rest share one line.
-  const entries = PROCESS_ORDER.map((key) => {
-    const items = key === "course-adjustments" ? [] : apply(workflowPending.filter((item) => DEAN_PROCESSES[key].types.includes(item.type)));
-    return { key, items, count: key === "course-adjustments" ? plans.length : items.length };
-  });
-  const sections = entries.filter((entry) => entry.count > 0);
-  const emptyKeys = entries.filter((entry) => entry.count === 0).map((entry) => entry.key);
-  const filtersActive = Object.entries(filters).some(([name, value]) => value && !(name === "sort" && value === "newest"));
+  const { workflowPending, pendingPlans, refetch, counts } = useDean();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { filters, setFilters, programs, statuses, matches } = useDeanFilters([...workflowPending, ...pendingPlans]);
+  const asked = searchParams.get("process") || "";
+  const process = DEAN_PROCESSES[asked] ? asked : "";
+  const rows = [
+    ...workflowPending.filter(matches).map((item) => ({
+      key: `${item.type}-${item.id}`,
+      processKey: processOfType(item.type),
+      student: item.student?.name || item.title,
+      studentMeta: [item.student?.student_number, item.student?.program_code].filter(Boolean).join(" · "),
+      request: withoutName(item.title, item.student?.name),
+      detail: item.subtitle,
+      process: processLabel(item.type),
+      status: item.workflow_status || item.status,
+      since: item.submitted_at || deanItemDate(item),
+      to: casePath(item),
+    })),
+    ...pendingPlans.filter(matches).map((plan) => ({
+      key: `plan-${plan.id}`,
+      processKey: "course-adjustments",
+      student: `Course offerings · ${plan.program_code}`,
+      studentMeta: "",
+      request: `${plan.term_label} offering plan`,
+      detail: `${plan.offerings.filter((o) => o.status === "Offered" || o.status === "Suggested").length} subject(s) proposed`,
+      process: DEAN_PROCESSES["course-adjustments"].label,
+      status: plan.status,
+      since: plan.submitted_at,
+      to: "/dean/approvals/course-adjustments",
+    })),
+  ].sort((a, b) => waitedSince(a) - waitedSince(b));
+  const shown = process ? rows.filter((row) => row.processKey === process) : rows;
+  const chips = PROCESS_ORDER.map((key) => ({ key, label: DEAN_PROCESSES[key].label, count: rows.filter((row) => row.processKey === key).length })).filter((chip) => chip.count > 0 || chip.key === process);
+  const choose = (key) => setSearchParams(key ? { process: key } : {}, { replace: true });
+  const filtersActive = Object.entries(filters).some(([name, value]) => value && name !== "sort");
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title={PAGE.approvalsQueue}
-        description="Everything waiting on the Dean, grouped by process. Open a case to review the files, history and messages before you decide."
         icon={Inbox}
         badge={<StatusChip status={`${counts.pendingTotal} waiting`} tone="muted" dot={false} />}
       />
       <DeanFeedback />
-      <DeanListFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} />
-      {sections.map(({ key, items, count }) => (
-        <SectionCard
-          key={key}
-          title={<>{DEAN_PROCESSES[key].label} <CountChip count={count} /></>}
-          action={
-            <Link to={`/dean/approvals/${key}`} className={`inline-flex shrink-0 items-center gap-1 ${VIEW_ALL_LINK}`}>
-              Open {DEAN_PROCESSES[key].label} <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          }
-        >
-          {key === "course-adjustments" ? <PlanRows plans={plans} /> : <CaseTable items={items} />}
-        </SectionCard>
-      ))}
-      {/* Processes with nothing waiting are one line, not one box each (I-084); each name still opens its page. */}
-      {sections.length === 0 && (
-        <Card pad="lg">
-          <EmptyState icon={Inbox} title="Nothing waiting" hint={filtersActive ? "No request matches these filters." : "No request needs a Dean decision right now."} />
-        </Card>
-      )}
-      {sections.length > 0 && emptyKeys.length > 0 && (
-        <p className="meta px-1">
-          Nothing waiting in:{" "}
-          {emptyKeys.map((key, index) => (
-            <span key={key}>
-              {index > 0 && ", "}
-              <Link to={`/dean/approvals/${key}`} className="font-semibold text-brand-700 hover:underline">{DEAN_PROCESSES[key].label}</Link>
-            </span>
+      {/* UX-25: the table's headers sort, and it opens oldest wait first, so no Sort menu here */}
+      <DeanListFilters filters={filters} setFilters={setFilters} programs={programs} statuses={statuses} showSort={false} />
+      <Card pad="md" data-testid="dean-queue">
+        <div role="group" aria-label="Process" className="mb-3 flex flex-wrap gap-2">
+          {[{ key: "", label: "All", count: rows.length }, ...chips].map((chip) => (
+            <button
+              key={chip.key || "all"}
+              type="button"
+              aria-pressed={process === chip.key}
+              onClick={() => choose(chip.key)}
+              className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm font-semibold transition ${
+                process === chip.key ? "border-brand-600 bg-brand-50 text-brand-800" : "border-slate-200 bg-white text-slate-700 hover:border-brand-300"
+              }`}
+            >
+              {chip.label}
+              <span className="rounded-full bg-slate-100 px-1.5 text-xs text-slate-700">{chip.count}</span>
+            </button>
           ))}
-        </p>
-      )}
+        </div>
+        <DataTable
+          caption="Everything waiting on the Dean, oldest first"
+          columns={QUEUE_COLUMNS}
+          rows={shown}
+          rowKey="key"
+          rowHref={(row) => row.to}
+          pageSize={25}
+          empty={{ icon: Inbox, title: "Nothing waiting", hint: filtersActive ? "No request matches these filters." : "No request needs a Dean decision right now." }}
+        />
+      </Card>
       {/* Adviser designation belongs to the research flow (BPMN 7); the Dean decides it here with the other approvals. */}
       <SectionCard title={<>Adviser Designation <CountChip count={counts.pendingAdviser} /></>}>
         <AdviserAppointments role="dean" embedded onChanged={refetch} />
@@ -306,7 +359,6 @@ function PlanCards() {
   );
 }
 
-const COURSE_ADJUSTMENTS_COPY = "Course offering plans submitted by the Academic Coordinator. Approve each plan or return it for revision.";
 
 export function DeanProcessPage() {
   const { process } = useParams();
@@ -343,7 +395,6 @@ function DeanPlansBody() {
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title={DEAN_PROCESSES["course-adjustments"].label}
-        description={COURSE_ADJUSTMENTS_COPY}
         forms="course-adjustments"
         icon={Gavel}
         badge={<StatusChip status={`${counts[PROCESS_COUNT_KEY["course-adjustments"]]} waiting`} tone="muted" dot={false} />}
@@ -374,7 +425,7 @@ function DeanCaseBody() {
   if (!item) {
     return (
       <div className="space-y-5 animate-fade-up">
-        <PageHeader title="Case not found" description="This request is no longer in your approvals lists. It may already have been decided." icon={SearchX} actions={<Button as={Link} to="/dean/approvals" variant="secondary" icon={ArrowLeft}>Approvals queue</Button>} />
+        <PageHeader title="Case not found" description="It may already have been decided." icon={SearchX} actions={<Button as={Link} to="/dean/approvals" variant="secondary" icon={ArrowLeft}>Approvals queue</Button>} />
         <DeanFeedback />
         <Card pad="lg"><EmptyState icon={AlertTriangle} title="Nothing to show" hint="Go back to the approvals queue to see what is still waiting." /></Card>
       </div>

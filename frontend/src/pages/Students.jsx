@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, SlidersHorizontal, GitMerge, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Search, GitMerge, AlertTriangle, ShieldCheck } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { stageWords } from "../lib/stages";
-import { Button, Card, DataTable, InlineNotice, PageHeader, SearchInput, SectionCard, Select, StatusChip } from "../components/ui/index.js";
+import { Button, DataTable, FilterBar, FilterSelect, InlineNotice, PageHeader, SectionCard, StatusChip } from "../components/ui/index.js";
 import { initials } from "../lib/format";
 import { PAGE } from "../lib/labels.js";
 
@@ -138,65 +138,42 @@ export default function Students() {
   );
 
   const filterControls = [
-    { label: "Student status", value: studentStatus, onChange: setStudentStatus, options: STATUS_FILTER },
-    { label: "Stage", value: stage, onChange: setStage, options: (meta?.stages || []).map((v) => ({ value: v, label: stageWords(v) })) },
-    { label: "Risk", value: risk, onChange: setRisk, options: RISK_FILTER },
-    { label: "Standing", value: standing, onChange: setStanding, options: STANDING_FILTER },
-    { label: "Program", value: programId, onChange: setProgramId, options: (meta?.programs || []).map((p) => ({ value: String(p.id), label: p.code })) },
+    { label: "Program", all: "All programs", value: programId, onChange: setProgramId, options: (meta?.programs || []).map((p) => ({ value: String(p.id), label: p.code })) },
+    { label: "Student status", all: "All statuses", value: studentStatus, onChange: setStudentStatus, options: STATUS_FILTER },
+    { label: "Stage", all: "All stages", value: stage, onChange: setStage, options: (meta?.stages || []).map((v) => ({ value: v, label: stageWords(v) })) },
+    { label: "Risk", all: "All risk levels", value: risk, onChange: setRisk, options: RISK_FILTER },
+    { label: "Standing", all: "All standings", value: standing, onChange: setStanding, options: STANDING_FILTER },
   ];
 
   return (
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.students}
-        description="Search and filter the monitored graduate population, then open a record for the full lifecycle view."
       />
 
-      <Card>
-        <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center">
-          <SearchInput
-            value={q}
-            onChange={setQ}
-            placeholder="Search name, number, or program…"
-            label="Search students"
-            className="flex-1 2xl:min-w-64"
+      <FilterBar
+        search={{ value: q, onChange: setQ, placeholder: "Name, number or program", label: "Search students" }}
+        active={activeFilters}
+        onClear={() => {
+          setQ("");
+          setStage("");
+          setRisk("");
+          setStanding("");
+          setProgramId("");
+          setStudentStatus("");
+        }}
+      >
+        {filterControls.map((f) => (
+          <FilterSelect
+            key={f.label}
+            label={f.label}
+            placeholder={f.all} // the visible label names the control (owner feedback 2026-11-23; was the I-395 aria-label)
+            value={f.value}
+            onChange={(e) => f.onChange(e.target.value)}
+            options={f.options}
           />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-5 2xl:flex-[2]">
-            {filterControls.map((f) => (
-              <Select
-                key={f.label}
-                aria-label={f.value ? f.label : `All ${f.label.toLowerCase()}`} // the name matches what is shown (I-395)
-                placeholder={`All ${f.label.toLowerCase()}`}
-                value={f.value}
-                onChange={(e) => f.onChange(e.target.value)}
-                options={f.options}
-              />
-            ))}
-          </div>
-        </div>
-        {activeFilters > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              setQ("");
-              setStage("");
-              setRisk("");
-              setStanding("");
-              setProgramId("");
-              setStudentStatus("");
-            }}
-            className="mt-3 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800 max-sm:min-h-11"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" /> Clear {activeFilters} filter{activeFilters > 1 ? "s" : ""}
-          </button>
-        )}
-      </Card>
-
-      {data && (
-        <p className="text-sm text-slate-500">
-          Showing <span className="font-semibold text-ink">{data.items.length ? `${(data.page - 1) * PAGE_SIZE + 1}–${(data.page - 1) * PAGE_SIZE + data.items.length}` : 0}</span> of <span className="font-semibold text-ink">{data.total}</span> students
-        </p>
-      )}
+        ))}
+      </FilterBar>
 
       {data?.integrity && (
         <InlineNotice tone={data.integrity.issue_count ? "warning" : "success"} icon={data.integrity.issue_count ? AlertTriangle : ShieldCheck}>
@@ -229,7 +206,7 @@ export default function Students() {
           </div>
         </InlineNotice>
       ) : (
-        <div className="[&_td]:!px-1.5 [&_th]:!px-1.5"> {/* tighter cells so the eight columns fit at 125% zoom (I-406) */}
+        <div className="[&_td]:!px-[5px] [&_th]:!px-[5px]"> {/* tighter cells so the eight columns fit at 125% zoom (I-406); 5px since the plainer status words (IM51, "On leave" for "LOA") */}
         <DataTable
           caption="Monitored graduate students"
           columns={COLUMNS}
@@ -240,7 +217,7 @@ export default function Students() {
           stackOnPhone="md"
           loading={loading}
           empty={{ icon: Search, title: "No students match your filters", hint: "Try clearing a filter or broadening your search." }}
-          pagination={{ page: data?.page || page, pageCount: data?.pages || 1, total: data?.total || 0, pageSize: PAGE_SIZE, onPage: setPage }}
+          pagination={{ page: data?.page || page, pageCount: data?.pages || 1, total: data?.total || 0, pageSize: PAGE_SIZE, onPage: setPage, noun: "students" }}
         />
         </div>
       )}
@@ -255,7 +232,7 @@ function DuplicateReview({ groups, loading, busy, message, onMerge }) {
   return (
     <SectionCard
       title="Duplicate review"
-      subtitle="Verify likely duplicate identities first. Existing verified profile values are kept unless overwrite is selected."
+      subtitle="Verified values are kept unless you choose overwrite."
       icon={AlertTriangle}
     >
       {message && <InlineNotice tone="neutral">{message}</InlineNotice>}

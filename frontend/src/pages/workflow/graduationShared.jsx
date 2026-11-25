@@ -377,7 +377,7 @@ export function GraduationBatchStageCheck({ group }) {
   return (
     <StageCheck
       title={`Graduation stage check for ${group.label}`}
-      subtitle="Follow where this batch is in the graduation endorsement process."
+     
       stages={graduationBatchStageChecks(group)}
     />
   );

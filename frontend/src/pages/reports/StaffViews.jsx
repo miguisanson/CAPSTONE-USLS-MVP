@@ -63,14 +63,13 @@ export function AttentionView({ scope, scopeKey, params, setParam }) {
     <div className="page-stack">
       <ChartCard
         question="What is holding students back?"
-        hint="Start with the longest bar: that cause affects the most students. Select a bar to list those students."
         empty={data.causes.length ? null : { title: "No students need attention for these filters", hint: "Nobody is marked At Risk of Delay or Delayed. Change the program, year started or period to look elsewhere." }}
         chart={chart}
         table={table}
       />
       <ListSection
         title="Students who need attention"
-        hint={chosen ? `Showing only: ${chosen.label}.` : "Most delayed first, then longest in the same stage. The next owner is the office that can move the student on."}
+        hint={chosen ? `Showing only: ${chosen.label}.` : ""}
         count={rows.length}
         action={
           <div className="flex flex-wrap items-center gap-2">
@@ -130,7 +129,6 @@ export function StagesView({ scope, scopeKey }) {
     <>
       <ChartCard
         question="Where do students wait the longest?"
-        hint="Look for stages with slow or stuck students, open each stage, and ask the next owner what is blocking each one."
         empty={rows.length ? null : { title: "No active students for these filters", hint: "Change the program, year started or period to look elsewhere." }}
         chart={
           <>
@@ -192,7 +190,6 @@ export function SpeedView({ scope, scopeKey }) {
     <>
       <ChartCard
         question="Which offices are slow to close requests?"
-        hint="Offices with a long red bar have requests waiting over 30 days: ask those offices first. The table gives the days an office takes to close a request."
         empty={withOpen.length ? null : { title: "No open requests for these filters", hint: "Every request in scope has been closed. Change the program or year started to look elsewhere." }}
         chart={<BarsChart data={withOpen} categoryKey="process_area" series={AGE_SERIES} ariaLabel="Open requests per office, by days waited" />}
         table={table}
@@ -227,7 +224,6 @@ export function RecordsView({ scope, scopeKey, params, setParam }) {
   return (
     <ListSection
       title="Which research students have records missing?"
-      hint="Open each student and add the missing research record or adviser; the student then leaves this list."
       count={rows.length}
       action={
         <div className="flex flex-wrap gap-2">

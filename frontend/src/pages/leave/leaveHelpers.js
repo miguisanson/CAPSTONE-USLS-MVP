@@ -70,7 +70,11 @@ export function restLines(item) {
 
 // ---- Khloe's card (components/process): the same five facts on every board (IM24) -----------------------------------------
 // 1 what it is about (the key fact), 2 its size or period, 3 the status, 4 submitted, 5 updated. Pure text; the card draws them.
-export function caseFacts(item) {
+// UX-19 (IM50): on the board the status line is left out when it only repeats the column the card sits in ("Submitted" in
+// "Submitted"); a column that holds several statuses ("Ended": Closed, Approved, Expired) still shows which one.
+export function caseFacts(item, columnLabel = "") {
+  const status = item.status_label || item.status;
+  const sameAsColumn = Boolean(columnLabel) && String(status).trim().toLowerCase() === String(columnLabel).trim().toLowerCase();
   const second = item.kind === "READMISSION"
     ? (item.linked_case?.period_text ? `Leave: ${item.linked_case.period_text}` : "")
     : restLines(item)[0] || "";
@@ -80,7 +84,7 @@ export function caseFacts(item) {
   return [
     { text: keyFact(item), wide: true, strong: true, testId: "case-key-fact" },
     { text: second, wide: true },
-    { text: item.status_label || item.status, wide: true },
+    { text: sameAsColumn ? "" : status, wide: true },
     { text: submitted ? `Submitted ${short(submitted)}` : "Not submitted yet", wide: true },
     { text: updated ? `Updated ${short(updated)}` : "", wide: true },
   ];
@@ -153,17 +157,14 @@ export function whenDates(item) {
   return `${formatDate(period.start_date)} to ${formatDate(period.end_date)}`;
 }
 
-export function caseFlags(item, role) {
+export function caseFlags(item, _role) {
   const flags = item.flags ? [...item.flags] : [];
-  const hasActions = (item.actions || []).length > 0;
   if (item.flags) {
     // AWOL and Withdrawal: the server already listed what to know; only messages are added here.
     if (item.unresolved_messages > 0) flags.push({ key: "messages", tone: "warn", text: plural(item.unresolved_messages, "open message") });
     return flags;
   }
-  if (role === "staff" && ["Submitted", "Staff Review"].includes(item.status) && hasActions) {
-    flags.push({ key: "review", tone: "info", text: "Awaiting your review" });
-  }
+  // UX-19 (IM50): no "Awaiting your review" flag; "Next: Graduate School Staff" on the card already says it.
   if (item.awol_proposed) flags.push({ key: "awol", tone: "warn", text: "AWOL proposed - confirm or follow up" });
   if (item.overdue_days > 0) {
     flags.push({ key: "overdue", tone: "bad", text: `Overdue ${plural(item.overdue_days, "day")}` });

@@ -98,7 +98,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
   test("Admission & Coursework Reports: the page and its two report panels", async ({ page }) => {
     await page.goto("/dean/gate-reports");
     await expect(page.getByRole("heading", { level: 1, name: "Admission & Coursework Reports" })).toBeVisible();
-    await expect(page.getByText("Reports sent to the Dean for a decision: the admission onboarding report and the coursework status report.")).toBeVisible();
+    await expect(page.getByText("The admission onboarding report and the coursework status report.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByText("Onboarding report & Dean approval")).toBeVisible();
     await expect(page.getByText("Coursework status report to the Dean")).toBeVisible();
     await expect(page.getByRole("button", { name: "Refresh" })).toBeVisible();
@@ -116,7 +116,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
   test("Reports & Analytics: the Dean's four tabs, the waiting decisions per process (graduation batch counted), no sideways scroll", async ({ page }) => {
     await page.goto("/dean/analytics");
     await expect(page.getByRole("heading", { level: 1, name: "Reports & Analytics" })).toBeVisible();
-    await expect(page.getByText("What waits for the Dean's decision, how fast decisions are made, what was decided and where graduation candidates stand.")).toBeVisible();
+    await expect(page.getByText("Your waiting decisions, how fast decisions are made, outcomes and the graduation pipeline.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     const main = page.getByRole("main");
     await expect(main.getByRole("link", { name: /Decisions waiting/ })).toHaveAttribute("href", "/dean/approvals");
     for (const name of ["Waiting for my decision", "How fast decisions are made", "Outcomes", "Graduation pipeline"]) {
@@ -145,7 +145,11 @@ test.describe("P3.3 Dean reports and graduation", () => {
   test("Graduation Endorsement: header, tabs, the roster", async ({ page }) => {
     await page.goto("/dean/approvals/graduation");
     await expect(page.getByRole("heading", { level: 1, name: "Graduation Endorsement" })).toBeVisible();
-    await expect(page.getByText(/^The Academic Coordinator checks coursework, the Research Coordinator validates research evidence, .*export the approved list for the Registrar\.$/)).toBeVisible(); // CHANGED BY p100 (I-146): the page description says who does what
+    // CHANGED BY UX phase 3 (UX-22, IM50): who does what (p100, I-146) is in the Help panel; the page line is one sentence.
+    await expect(page.locator('main [data-slot="description"]')).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
+    await page.getByRole("main").getByRole("button", { name: "Help", exact: true }).click();
+    await expect(page.getByRole("dialog").locator('[data-slot="help-note"]')).toHaveText(/^The Academic Coordinator checks coursework, the Research Coordinator validates research evidence, .*export the approved list for the Registrar\.$/);
+    await page.getByRole("dialog").getByRole("button", { name: "Close help" }).click();
     const waiting = page.getByRole("main").getByText(/^\d+ waiting$/).first();
     expect(await numberIn(waiting), "the batch is waiting for the Dean").toBeGreaterThanOrEqual(1);
     await expect(page.getByRole("main").getByRole("link", { name: "All approvals" })).toHaveAttribute("href", "/dean/approvals");
@@ -213,7 +217,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
     await search.fill("zzzz-no-such-student");
     await expect(boardOf(page)).toBeVisible();
     await expect(cardOf(page)).toHaveCount(0);
-    await expect(boardOf(page).getByText("No candidates here").first()).toBeVisible();
+    await expect(boardOf(page).locator("[data-empty-strip]").first()).toBeVisible(); // CHANGED BY UX phase 5b (UX-28/29): an empty column is a strip
     await search.fill("");
     await expect(cardOf(page)).toHaveCount(1);
 
@@ -239,7 +243,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
   async function expectSharedStageCheck(page, states) {
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading").first()).toHaveText(`Graduation stage check for ${BATCH}`);
-    await expect(dialog.getByText("Follow where this batch is in the graduation endorsement process.")).toBeVisible();
+    // CHANGED BY UX phase 3 (UX-22): the subtitle repeated the heading; removed.
     for (const [index, label] of SHARED_STEPS.entries()) {
       const row = dialog.getByRole("listitem").filter({ hasText: label });
       await expect(row, `step ${index + 1} ${label}`).toHaveCount(1);
@@ -315,7 +319,7 @@ test.describe("P3.3 Dean reports and graduation", () => {
   test("Activity Log and the analytics table pick up the approval", async ({ page }) => {
     await page.goto("/dean/activity");
     await expect(page.getByRole("heading", { level: 1, name: "Activity Log" })).toBeVisible();
-    await expect(page.getByText("Recent decisions recorded against the Dean account, newest first. Each entry keeps its full stage history on the case page.")).toBeVisible();
+    await expect(page.getByText("Your recorded decisions, newest first.") /* CHANGED BY UX phase 3 (UX-22) */).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     const main = page.getByRole("main");
 
     // The approval is the newest entry: a link to the case, its process, the date and its status.

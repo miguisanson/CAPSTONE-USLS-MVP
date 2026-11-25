@@ -3,14 +3,17 @@
 // Layout: the title block and the actions share a row from sm up and wrap when they do not fit; below sm the actions
 // always sit under the title, left-aligned (UI-SPEC section 5, 390 px). Props are a superset of the old
 // components/ui.jsx PageHeader ({ title, description, icon, actions, badge }).
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { formRefLine } from "../../lib/formRefs.js";
+import { HelpButton, PageHelpDrawer } from "../PageHelp.jsx";
 
 /**
  * @param title        the page title
  * @param description  one short line under the title
- * @param forms        a key of lib/formRefs.js; adds the muted line "Forms GS-F-07 · Operations Manual 4.6" under the description
+ * @param forms        a key of lib/formRefs.js. UX-21 (IM50): the "Forms GS-F-07 · Operations Manual 4.6" line is not under the
+ *                     title any more; a "Help" button opens a side panel with it (the same panel as the process pages, IM24)
+ * @param helpNote     a longer explanation for that panel (e.g. the steps of a protocol); also adds the Help button
  * @param icon         a lucide icon component; shown in a 44px tile from sm up
  * @param actions      buttons for the right-hand side (under the title on phones)
  * @param badge        a StatusChip or similar, shown beside the title
@@ -19,8 +22,10 @@ import { formRefLine } from "../../lib/formRefs.js";
  * @param titleProps   extra props for the heading element (e.g. an id)
  * @param className    extra classes on the wrapper
  */
-export function PageHeader({ title, description, icon: Icon, actions = null, badge = null, back = null, forms = null, level = 1, titleProps = {}, className = "", ...rest }) {
+export function PageHeader({ title, description, icon: Icon, actions = null, badge = null, back = null, forms = null, helpNote = "", level = 1, titleProps = {}, className = "", ...rest }) {
   const Heading = level === 2 ? "h2" : level === 3 ? "h3" : "h1";
+  const [helpOpen, setHelpOpen] = useState(false);
+  const help = Boolean(forms || helpNote);
   return (
     <header className={`flex flex-wrap items-start justify-between gap-3 ${className}`.trim()} {...rest}>
       <div className="min-w-0 flex-1 basis-full sm:basis-96">
@@ -52,19 +57,16 @@ export function PageHeader({ title, description, icon: Icon, actions = null, bad
                 {description}
               </p>
             )}
-            {forms && formRefLine(forms) && (
-              <p data-slot="forms" className="meta mt-1">
-                {formRefLine(forms)}
-              </p>
-            )}
           </div>
         </div>
       </div>
-      {actions && (
+      {(actions || help) && (
         <div data-slot="actions" className="flex flex-wrap items-center gap-2 max-sm:w-full">
           {actions}
+          {help && <HelpButton onClick={() => setHelpOpen(true)} />}
         </div>
       )}
+      {helpOpen && <PageHelpDrawer title={typeof title === "string" ? title : "This page"} forms={forms} note={helpNote} onClose={() => setHelpOpen(false)} />}
     </header>
   );
 }

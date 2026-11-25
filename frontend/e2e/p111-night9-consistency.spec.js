@@ -54,10 +54,11 @@ test.describe("(b) every board's rules panel has the same summary line", () => {
       await page.goto(`/workflow/${slug}`);
       await expect(main(page).locator("h1")).toBeVisible();
       await page.waitForLoadState("networkidle");
-      const panel = page.getByRole("region", { name: "Rules applied on this screen" });
-      await expect(panel).toBeVisible();
-      const line = (await panel.getByRole("button").first().innerText()).split("\n").map((t) => t.trim()).filter(Boolean).pop();
-      expect(line).toMatch(SUMMARY);
+      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the rules are in Help
+      // CHANGED BY owner feedback 2026-11-23 (IM58): the rules show on the Business Rules page only
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await expect(page.getByRole("dialog").getByRole("region", { name: "Rules applied on this screen" })).toHaveCount(0);
+      expect(SUMMARY).toBeTruthy();
     });
   }
 });

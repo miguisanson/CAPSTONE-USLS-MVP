@@ -15,11 +15,12 @@ test.describe("lists6 Students", () => {
     await page.goto("/students");
     await expect(page.getByText(/^Showing .* of \d+ students$/).first()).toBeVisible();
     const words = async (name) => (await page.getByRole("combobox", { name, exact: true }).locator("option").allInnerTexts()).slice(1);
-    expect(await words("All student status")).toEqual(["Compre exam eligible"]);
-    const standing = await words("All standing");
+    // CHANGED BY owner feedback 2026-11-23 (stage 4): each filter has a visible label, which is its name
+    expect(await words("Student status")).toEqual(["Compre exam eligible"]);
+    const standing = await words("Standing");
     expect(standing).toContain("On leave");
     expect(standing.join("|")).not.toMatch(/LOA|not completed/);
-    const stage = await words("All stage");
+    const stage = await words("Stage");
     expect(stage).toContain("Leave of Absence");
     expect(stage).not.toContain("LOA");
   });

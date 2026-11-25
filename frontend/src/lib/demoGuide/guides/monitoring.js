@@ -5,7 +5,7 @@ export default {
   process: "monitoring",
   title: "Monitoring Sheet",
   summary: "Add a student, add and edit subject rows, read the change history, see how imported values are protected.",
-  studentNumber: "2260073",
+  studentNumber: "2360006", // IM56 (2026-11-22): Adrian Lim, an imported MAED student (was Katrina Cabrera, MSN)
   walkthrough: "05_monitoring_sheet",
   accounts: { staff: STAFF },
   steps: [
@@ -66,8 +66,8 @@ export default {
       do: "Open the record of an imported student and select Edit on a subject: a reason is required, kept with the staff member's name.",
       actions: [
         { click: { role: "button", name: "Close record panel" } },
-        { select: { label: "Program" }, label: "MSN" },
-        { click: { role: "button", name: "monitoring record of Cabrera, Katrina" } },
+        { select: { label: "Program" }, label: "MAED" },
+        { click: { role: "button", name: "monitoring record of Lim, Adrian" } },
         { click: { css: 'button[aria-label^="Edit "]', in: "dialog" } },
         { pause: 1500, caption: "A reason is required to change an imported value" },
       ],

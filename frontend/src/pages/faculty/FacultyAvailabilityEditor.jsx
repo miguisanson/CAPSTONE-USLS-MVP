@@ -93,7 +93,7 @@ export function WeeklyHours({ data, onSaved, save: saveHours = api.saveFacultyWo
     <Card>
       <SectionTitle
         title="Weekly hours"
-        subtitle="Tick the days you can sit in a defense and set the hours. All times are Philippine time."
+        subtitle="Philippine time"
         icon={Clock3}
       />
       <ul className="space-y-2">
@@ -211,7 +211,7 @@ function SpecificDates({ data, onSaved }) {
     <Card>
       <SectionTitle
         title="Specific dates"
-        subtitle="Vacations, travel or one-off changes. Specific hours on a date replace your weekly hours for that day."
+        subtitle="Hours on a date replace your weekly hours for that day."
         icon={CalendarOff}
       />
       <form onSubmit={add} className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4" aria-label="Add a specific date">
@@ -268,7 +268,7 @@ function SpecificDates({ data, onSaved }) {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-slate-500">No specific dates. Your weekly hours apply. Dates that have passed are not shown.</p>
+          <p className="text-sm text-slate-500">No specific dates.</p>
         )}
       </div>
     </Card>
@@ -329,7 +329,7 @@ function Requests({ data, onSaved }) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-slate-500">No open requests. The Graduate School is not waiting on you.</p>
+        <p className="text-sm text-slate-500">No open requests.</p>
       )}
     </Card>
   );
@@ -366,7 +366,6 @@ export default function FacultyAvailabilityEditor() {
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title="My Availability"
-        description="Tell the Graduate School when you can sit in a defense. All times are Philippine time."
         icon={CalendarDays}
         actions={<Button as={Link} variant="secondary" icon={CalendarDays} to="/faculty-portal/calendar">See your calendar</Button>}
       />
@@ -389,7 +388,7 @@ export default function FacultyAvailabilityEditor() {
         {otherWindows.length > 0 && (
           <div className="lg:col-span-4 lg:col-start-9">
             <Card>
-              <SectionTitle title="Other open windows" subtitle="Read only. Times the Graduate School has on record." icon={Clock3} />
+              <SectionTitle title="Other open windows" icon={Clock3} />
               <ul className="space-y-1.5">
                 {otherWindows.map((slot, index) => (
                   <li key={`${slot.date}-${slot.start}-${index}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">

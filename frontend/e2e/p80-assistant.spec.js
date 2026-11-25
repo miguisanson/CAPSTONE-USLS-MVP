@@ -50,10 +50,8 @@ test.describe("staff", () => {
   test("a covered question: offline label, sources with document and page, then a not-covered question and a personal one", async ({ page }) => {
     await page.goto("/assistant");
     await expect(page.getByRole("heading", { level: 1, name: "Policy Assistant" })).toBeVisible();
-    // 3-4 suggested questions, one of them personal
-    await expect(suggestions(page)).toHaveCount(4);
-    await expect(suggestions(page).filter({ hasText: "What is waiting on me?" })).toHaveCount(1);
-    await expect(page.getByRole("log")).toContainText("Hi! I'm the Policy Assistant.");
+    await expect(suggestions(page)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: no sample questions, no "How this works"
+    await expect(page.getByRole("log")).toContainText("Hi! Ask");
 
     // covered: answered from the Handbook, offline (no key), with a source that names document and page
     await ask(page, COVERED);
@@ -83,7 +81,7 @@ test.describe("staff", () => {
     await shot(page, "staff-not-covered-1366.png");
 
     // personal: from the signed-in user's own queue, not a policy search
-    await suggestions(page).filter({ hasText: "What is waiting on me?" }).click();
+    await ask(page, "What is waiting on me?"); // CHANGED BY owner feedback 2026-11-23: no sample questions, no "How this works"
     await expect(page.getByRole("log")).toContainText(/waiting on you|Nothing is waiting/, { timeout: 30_000 });
     await expect(page.getByTestId("answer-badge").last()).toContainText("From your own record");
     await expect(page.getByTestId("source-list")).toHaveCount(sourceListsBefore);
@@ -94,7 +92,7 @@ test.describe("staff", () => {
   test("the question box takes Enter, shows the input labelled, and keeps the student focus panel", async ({ page }) => {
     await page.goto("/assistant");
     await expect(page.getByRole("heading", { level: 2, name: "Focus on a student" })).toBeVisible();
-    await expect(page.getByRole("heading", { level: 2, name: "How this works" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "How this works" })).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: no sample questions, no "How this works"
     await box(page).fill("Which students need attention right now?");
     await box(page).press("Enter");
     await expect(page.getByRole("log")).toContainText("Students needing attention", { timeout: 60_000 });
@@ -108,13 +106,8 @@ test.describe("student", () => {
   test("at 390 px: suggested questions, a personal answer from the student's own record, a not-covered answer", async ({ page }) => {
     await page.goto("/student/assistant");
     await expect(page.getByRole("heading", { level: 1, name: "Policy Assistant" })).toBeVisible();
-    await expect(page.getByText("Private and read-only")).toBeVisible();
-    await expect(suggestions(page)).toHaveCount(4);
-    for (const button of await suggestions(page).all()) {
-      const { height } = await button.boundingBox();
-      expect(height, "suggestion tap target").toBeGreaterThanOrEqual(43);
-    }
-    await suggestions(page).filter({ hasText: "What is my next step?" }).click();
+    await expect(suggestions(page)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: no sample questions, no "How this works"
+    await ask(page, "What is my next step?");
     await expect(page.getByRole("log")).toContainText("From your record", { timeout: 60_000 });
     await expect(page.getByTestId("answer-badge").last()).toContainText("From your record", { timeout: 60_000 }); // a student reads plain words (I-392)
     await expect(page.getByTestId("answer-badge").last()).not.toContainText("Gemini");
@@ -141,7 +134,7 @@ test.describe("dean and faculty", () => {
       test(`${role}: policy question with sources, no sideways scroll at 390`, async ({ page }) => {
         await page.goto(path);
         await expect(page.getByRole("heading", { level: 1, name: "Policy Assistant" })).toBeVisible();
-        await expect(suggestions(page)).toHaveCount(4);
+        await expect(suggestions(page)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: no sample questions, no "How this works"
         await ask(page, COVERED);
         await expect(page.getByTestId("source-list").last()).toContainText("Handbook", { timeout: FIRST_ANSWER_MS });
         await expect(page.getByTestId("answer-badge").last()).toContainText("Offline answer");

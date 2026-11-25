@@ -1,5 +1,376 @@
 # State
 
+## 2026-11-25 - UX stash integration on v7-uxchanges
+
+- Reconciled the research helper with the current branch eligibility rule and integrated the demo seed helpers.
+- Combined the graduation and practicum board layout changes, shared column header, and board help test.
+- Reconciled the shared board and withdrawal UI with the current branch actions. Board Help describes the actions available on these boards.
+- The two incoming p145/p146 specs still assert the older withdrawal rules. Keep the branch-side deletions when resolving the index. The incoming files remain available for review.
+- Next: finish the test gates and stage the resolutions with write access to the Git index. Review the staged Claude exports and numbered copies before committing.
+
+## 2026-11-23 - Owner feedback list, stage 1 inventory (Claude, cloud session)
+
+- Plan `.planning/FEEDBACK-1123-PLAN.md`, decisions IM58. Stage 1 crawled 101 pages (six roles, every tab, Help panel
+  and first case window) on the new demo data: `.planning/FEEDBACK-1123-INVENTORY.md` - 119 subtitles, ~620 hint
+  lines, 21 notices, 28 views with a heading said twice, business rules on 30 pages, 50 filter layouts, the pagers,
+  "3u" labels, page timings. Found: the Monitoring Sheet "Filters" disclosure pushes Sort and Export aside; slowest calls
+  are the Enrollment class-schedule options, Reports "Needs attention", the Research Gate overview and the Dean's
+  approvals count reloaded on every Dean page. No app change.
+- Stage 2 (words, owner said "stage 2" = take the proposals): about 120 subtitles, page lines, hint lines and empty-state
+  hints cut (static ones the heading or the control already says; kept: counts, states, deadlines, legal/consent lines,
+  field format hints, Help panel text); board column lines gone (title tooltip keeps them); business rules removed from
+  every page, dialog, student request page, Practicum scope note and Help panel (IM58; Business Rules page keeps them);
+  Policy Assistant: no page line, no "How this works", no sample questions, shorter greeting, the chat card names its
+  scope; Course Adjustments: the four lines the owner listed gone, squares = Subjects needed next term, Student seats
+  needed, Delayed if withheld, Selected to offer, the same-suggestion paragraph is one short line ("Suggested faculty
+  for every subject: ..."); "3u" -> "3 units", "15/36u" -> "15 of 36 units"; a Held defense has no "This defense took
+  place" line; second headings gone (student Messages, Documents, Activity Log; Policy Documents; the Research Gate
+  first tab is "Students"). About 40 e2e specs follow (markers "CHANGED BY owner feedback 2026-11-23").
+  Written to the owner's folder (117 files).
+- Stage 3 (student record, IM58): "Outstanding subjects" and the "Show subjects" buttons are gone. Course audit has a
+  Curriculum section with two tabs: Completed (each subject with units, the semester taken and the grade) and
+  Outstanding (current, incomplete and missing subjects with their status). The four counts are buttons: Completed
+  opens Completed, Current/Incomplete/Missing open Outstanding; a zero stays a number. Opens on Outstanding when
+  something is left. Shared Tabs: the selected tab's count badge is solid white with brand text (axe contrast).
+  Data finding: 315 of 900 completed course records (21 students, all "AC Student Monitoring import") have no semester
+  and no grade, so those rows say "Semester not recorded" - nothing invented (official data is read-only). New spec
+  p156-curriculum-tabs; p103, p111-night10, p135 follow. Gate: every spec that opens a student record + p89 a11y + all
+  tab specs pass; p33:320 needs the full run's setup order (passed in the stage 2 full run); check:ui strict all 0.
+- Stage 4 (filters and pager): one shared `FilterBar` (components/ui/FilterBar.jsx): search first, then the selects
+  in one grid, every control with a short visible label above it (`FilterSelect`), then one line - "Showing ..." and
+  chips on the left, "Clear n filters" and the page's actions (Export, Print) on the right. On it now: Monitoring
+  Sheet (bug fixed: the "Filters" and "Export" disclosures are gone - all seven selects sit in the grid, Export workbook
+  / Export CSV on the bar), Students, Faculty, Work Queue, Activity Log (staff and Dean), Policy Documents, Business
+  Rules, Course Adjustments, the defense calendar, every staff board (LeaveFilters, RosterFilters) and the Dean review
+  lists. Left as they are: pickers that choose what a page is about (Enrollment, Class List, Course Audit, faculty
+  semester pickers, the student picker) and the Reports scope card (labelled already, folds on a phone). One pager:
+  Previous, page numbers (1 ... 4 5 6 ... 10, the current one marked), Next, "Showing 21-30 of 95 students"; a phone
+  shows "Page n of m" instead of the numbers. The Students list no longer says "Showing ..." twice. Students filters
+  are named by their labels (was "All program", "All student status"). Gate: full e2e 1142 passed; the 9 new failures
+  were spec wording (fixed, 79/79 rerun green); the rest are the baseline's known ones. check:ui strict all 0; node
+  tests 119 pass.
+- Stage 5 (boards, IM58 staff boards): Leave of Absence, Readmission, AWOL & Residency, Subject Withdrawal, Practicum and
+  Graduation take the Research Gate board's design. Frame: the filters and the board sit in one card (`BoardFrame` in
+  leave/LeaveFilters.jsx). Columns: every column carries its number (Practicum had none, Graduation only 1-2; StageBoard's
+  own header is now StageColumnHeader). Cards: the Research Gate head (`CaseCardHead`: tick box, name, "number · program",
+  one status chip on the right that drops under the name in a narrow column); facts one per line (the two-column grid
+  wrapped badly); the requirement tiles on board cards became the Research Gate's one line (`RequirementLine`: "3 of 4
+  done · Still to do: ...") - the full requirement boxes stay in the case and batch windows. Kept: every move, drag, lock
+  and batch rule; empty columns still fold to a numbered strip (UX-28); horizontal scroll where a board has more stages
+  than fit. The Dean's graduation page shares GraduationRoster, so its cards changed too (frame and columns as staff's).
+  Gate: board specs (1096 tests) 1060 passed; the new failures were p119/p120 asserting the tiles (updated to the line)
+  and gallery-only tests from a build without the gallery (green with --build); remaining failures are baseline ones.
+- Stage 6 (Policy Documents): the list first, one line per document - title (opens the details), status chip with
+  "category · version · date" under it, the Actions menu. The details window holds what the card showed (draft
+  warning, description, file name, size, searchable sections, uploader, version history - always open) and the
+  buttons (View document, Edit details, Replace file, Remove). Cut: the four count tiles (they repeated the list; the
+  filter bar says "Showing n of n documents"), the three sample questions under Test a question, the long "no
+  passage" hint. Test a question moved under the list. The demo guide's steps are unchanged (Actions menu, Question
+  to test, Find passages): the Policy Documents autopilot plays to the end. Specs: p84 and p134 follow. p84:606
+  (Course Adjustments table 72 px wider than its card) fails in the baseline too - not this stage.
+- Stage 7 (speed): the slow calls rebuilt the same per-student picture many times in one request. app.py now has a
+  per-request memo (`request_memo`, end of app.py): within one GET request a function answers once per distinct
+  arguments; any write in the request clears it (after_flush); POST/PUT/DELETE never use it; dict/list answers are
+  shallow-copied per hit; USLS_REQUEST_MEMO=0 turns it off. Applied to compute_course_audit,
+  comprehensive_exam_eligibility, monitoring_curriculum_courses, latest_defense_outcome, active_schedule_for_gate,
+  graduation_eligibility, latest_leave_case, record_edit_marks, get_active_term and the new
+  verified_demo_research_case (the per-requirement demo-case query lifted out of research_requirement_state).
+  Medians of 5 warm calls on the cloud dev box (before -> after): Reports attention 550 -> 290 ms, Research Gate
+  overview 508 -> 340, Dean /api/approvals 525 -> 285, graduation context 412 -> 334, dashboard (research) 488 -> 406,
+  faculty-portal context 296 -> 144; teaching-schedules options ~140 ms warm (no change). Queries per call down 25-45%.
+  Found, not changed (owner decision): the daily maintenance sweep (I-270) runs inside the first signed-in API
+  request after a restart and on each new day, ~1 s (mostly refresh_risk_levels over every student); that is the
+  1.7 s first Enrollment load in the stage 1 table. Running it at server start instead needs a change to how
+  sandboxes are swept. Gate: Python suite no new failures; full e2e 1150 passed in 30.8 min (was ~42); the 2 new
+  failures: p97 (known board flake) and p33:320 (fails the same with USLS_REQUEST_MEMO=0 - it needs Hector Ong's
+  sent-back endorsement from an earlier step; order-dependent).
+- Stage 8 (gate, owner feedback 2026-11-23 done): fixed on the way -
+  * "Move to..." menu (StageBoard MoveMenu) is rendered on <body> (createPortal): the card's hover lift (-translate-y)
+    made the card the containing block of the position:fixed menu, so at 1366 it opened off the right edge under the
+    board (p97 pending-move failed every run after stage 5). p97's two baseline failures pass too.
+  * The memo is narrowed: graduation_eligibility, latest_leave_case, record_edit_marks and get_active_term are no longer
+    memoized. With them, three full runs in a row lost Hector Ong's returned endorsement from the Dean Activity Log
+    (p33:320); with USLS_REQUEST_MEMO=0 and with the narrowed set it passes. The mechanism is NOT found - open item.
+    Still memoized: compute_course_audit, comprehensive_exam_eligibility, monitoring_curriculum_courses,
+    latest_defense_outcome, active_schedule_for_gate, verified_demo_research_case. Medians now (off -> on): Reports
+    attention 588 -> 316 ms, Research Gate overview 480 -> 353, faculty context 232 -> 173; Dean approvals, graduation
+    context and dashboard back to about their old time.
+  * Guides: Course Adjustments waits for "Draft offering plan saved" (the draft note was cut in stage 2); Business Rules
+    loses its last step (the "Rules applied on this screen" panel is gone, IM58); Panel Matching, Defense Scheduling and
+    Proposal/Final pick Miguel by the picker result button (css button + "2260004"), not the first text "Miguel Yu".
+  * Specs: p74 measured the search field with clientWidth, which Chromium already gives without padding for
+    type=search (room 110, not 30) - fixed, the placeholder fits; p146 waits for the export follow-up window before
+    pressing Escape (race).
+  Gate: Python suite no new failures; build; check:ui strict all 0; node tests 119 pass; full e2e on the final code
+  1157 passed, 16 failed - all in the baseline (was 30; 14 baseline failures now pass); journeys 44/44; negative check
+  fails as it must; feature inventory stage 2 -> 8: only intended changes (Monitoring disclosures, Students select
+  names, page numbers, Policy Documents samples / history toggle), no server call changed. All files written to the
+  owner's folder and compared byte for byte.
+- NEXT (owner): keep the old cards on the Dean graduation page?; semesters for the 21 imported students in the seed?;
+  the daily sweep at start-up?; UX-41; the stage-4 data additions; the "Suggested faculty" line.
+
+## 2026-11-25 - Owner answers to the stage 8 questions (Claude, cloud session)
+
+- Owner: keep the narrowed memo (no change); the 1 s daily sweep at start-up is fine (no change); the Dean graduation
+  card question answered with a before/after picture (only the four requirement tiles became one "4 of 4 done" line;
+  the boxes are in View details).
+- Seed semesters (owner "yes add semester data"): new `fill_seed_course_terms()` in build_demo_database. Seed only: a
+  Completed record whose evidence is "Demo seed: coursework complete" or "AC Student Monitoring import" with no
+  semester gets the semester of its curriculum slot for the student's entry year (Year Y - Nth Semester ->
+  AY entry+Y-1, never the active semester or later) and a passing grade (1.25-2.00, fixed by student and subject).
+  A real monitoring upload ("AC Student Monitoring upload #n") is not touched. Reseeded: 0 completed records without
+  a semester (was 315); the Curriculum tab shows "AY 2022-2023 1st Semester · Grade 1.50".
+- Course Adjustments (owner "remove line, autofill faculty"): the "Suggested faculty for every subject" line is gone.
+  While the plan can be edited, an offered subject with no faculty gets its suggested faculty member, once per program
+  and semester (a cleared choice stays cleared); not saved on its own - the next save or submit carries it. Fixed on
+  the way (failed on the old code too, date-dependent): at 1366 the table was 72 px wider than its card once retake
+  notes show; the retake note sits under the number and "Needing next term" / "Not taken yet" headers may wrap
+  (DataTable column `headerWrap`). p84 spec rewritten for the autofill.
+  Found by the Course Adjustments journey: filling every subject with the same top suggestion put Dr. Bautista past
+  the 24-unit limit, the server refused the draft and the refusal replaced the whole page ("Could not load course
+  adjustments"). Now the autofill counts the load (the candidates' current_load + this plan's choices, limit from the
+  rule) and takes the next suggestion with room, or leaves the subject Unassigned; a refused save, submit or publish
+  is a dismissible notice by the plan buttons and the page stays. New p84 test (editable draft forced by the route).
+- RAG and Google Calendar checked (owner "ensure they still work"): live - staff and student assistant answer from the
+  handbook with page citations (local document RAG), Policy Documents test question finds passages (1,670 indexed),
+  /api/calendar, calendar feed create + .ics (9 events), faculty .ics (33 events), Google Calendar authorization
+  (preview mode - no OAuth keys in the cloud workspace), sync refuses before connecting, disconnect. Python:
+  test_calendar_appointments 93 OK, assistant quality/night3/gemini config/patience OK; test_policy_assistant (2) and
+  test_policy_documents (1) failures are the same as on the commit before the owner-feedback work (it had 4). e2e
+  p80-assistant, p96-google-calendar and 9 more files: 151 passed.
+
+## 2026-11-22 - Demo data cleanup, stage 1 (Claude, cloud session)
+
+- Plan `.planning/DATA-CLEANUP-PLAN.md` (IM54); stage 1 inventory `.planning/DATA-CLEANUP-INVENTORY.md` with the seed
+  fingerprint before the cleanup (6deed057...), every seed step that names a student, the tour logins, the test
+  references (`.planning/data-cleanup-test-refs.json`: 56 students) and the proposed 20.
+- Owner IM55: keep a card on every board step, the panel queue and upcoming defenses (about 45 students); practicum
+  stays MSGC; three faculty logins stay for the tours.
+- Stage 2 (local, not yet written to the owner's folder - the e2e and Python tests that name removed students change in
+  stage 4, and the repo stays runnable until then): `panel_demo_data.py` DEMO_KEPT_SHEET_STUDENTS, DEMO_FACULTY,
+  DEMO_FACULTY_LOGINS, STAGE_READY_WITHDRAWAL_STUDENTS (WD-03/04), the panel queue rewritten as MAED education theses,
+  DEMO_ADVISER_FALLBACK Angela Cruz; `app.py` seed-only filters (import_program_monitoring_sheets keep_students and
+  create_logins, import_faculty_sheets keep_names, link_faculty_accounts login_names; the staff import path unchanged),
+  PAST_GRADUATES MAED only, the Withdrawal step students. New `tests/test_demo_data_size.py` 7/7 (red first, 4 of 7).
+  Fresh seed: 57 students (44+2 MAED, 3 MAPSY, 8 MSGC), 32 student logins, 3 faculty logins, 7 faculty, every adviser
+  at 5 or fewer, a card on every Graduation, Practicum and Withdrawal step. test_seed_quality 14/15: the Dean queues
+  (stage 3).
+- Stage 3 (local too): DEAN_DEMO_PERSONAS (DEAN-01..06, 2691301-306, MAED, with a sign-in) hold the leave,
+  readmission, AWOL-return and withdrawal cases with the Dean, the approved leave and the denied withdrawal
+  (`ensure_dean_demo_students`); the practicum report (Isabel Mendoza, MAPSY) and the graduation list (Hector Ong) stay;
+  the MIT and MSN course plans stay (program-level). The Monitoring tour opens Adrian Lim (MAED) instead of Katrina
+  Cabrera. top_up_withdrawal_demo_queue makes new MAED demonstration students on a demo reset when no imported student
+  is free (as the Graduation reset already did). Fresh seed: 63 students (52 MAED, 3 MAPSY, 8 MSGC). Tests:
+  test_demo_data_size 8/8 (the Dean test red first), test_seed_quality 15/15, p115 journeys 18/18 and p146 3/3 on the
+  new data (p146 red first).
+- Stage 4 (local too, Python suite and e2e on the new data): IM57 small history (2691401-418, no sign-in). Claude
+  added, for the owner to review: four MAED title-stage students with no adviser for the adviser walkthrough (Gian
+  Reyes, Daniel Bernardo, Rafael Pang, Marielle Navarro, 2691501-504, Form 1 papers on file), a quiet student for the
+  student home (Ana Chua, 2691505), a sign-in for Elena Mendoza (p63 files her Form 1), a sign-in for all seven faculty
+  (a panel member must have a faculty login: with three, Change panel offered three people and four faculty could sit
+  on no panel; amends IM55), the fallback adviser moved from Dr. Angela Cruz to Dr. Patricia Salvador (56 named advisers,
+  35 seats; the Dean appoints Angela under the limit in p63), the booked defenses Nico Barrientos and Gab Tolentino keep
+  a four-seat thesis panel. App: `default_program()` - a page with no program chosen (Monitoring Sheet, Enrollment,
+  Class List, Course Offerings, Course Adjustments, Curriculum planning, Course Audit) opens on the first program by
+  code that has students, not DBA with none; with students in every program it is the same program as before.
+  Tests: 14 Python files and about 25 specs re-pointed to kept students (markers "CHANGED BY data cleanup"); one test
+  skipped (Camille Bernardo's DBA offering list, test_night5); p108 finds a student in the same situation.
+  Fixed on the way: UX-42 (Enrollment let an older answer overwrite the student just picked). Open: UX-41 (Students
+  list 20 px too wide at 1093 px on the new data, owner's layout call). Result: Python 95 files, no failure that the
+  pre-cleanup run did not have; full e2e 90 failures against 111 before the cleanup (same environment), the only new
+  one left is UX-41 (p133-lists5).
+- Stage 5 (gate): build and check:ui --strict clean, 12 node unit files pass, Python 95 files (no new failure), full e2e
+  with the gallery build 1141 passed / 30 failed - the 25 failures that are not new also failed before the cleanup, the
+  new ones were UX-41 (open), two gallery specs still expecting the 11px micro size from before UX-09 (fixed) and
+  p113 (passes alone); journeys p115, p122, p146 44/44 after the Panel Matching, Defense Scheduling and Proposal tours
+  search "Miguel Yu" (Miguel Torres was listed first, under the guide); e2e:negative fails as it must. Feature
+  inventory old data vs new data, same code: no control is gone except where the data no longer has the case - the
+  Students "Duplicate review" (the old seed had two accidental duplicate students), Reports "Coursework behind the
+  suggested year" (that check only runs for programs with an authoritative curriculum, not MAED), the Dean's practicum
+  status report link in Activity, paging on Panel Matching, and the move buttons of graduation/withdrawal batches
+  (one batch per column now).
+- NEXT: the owner runs `npm run seed` and `npm run build:web`; decides UX-41 and the stage 4 additions.
+
+## 2026-11-22 - UX feature check, stages 1-2 (Claude, cloud session)
+
+- Stage 1: `frontend/scripts/feature-inventory.mjs` listed every control and server call on 99 sidebar pages (6 roles),
+  baseline vs now: no feature lost; 114 moved, renamed or removed on request (hand-over doc, "Feature check").
+- Stage 2: the original e2e suite (baseline commit) against the new code; failures rerun on the baseline (13 already
+  failing) and with the sidebar groups open (82 more passed); gallery built in (81/94). Every remaining failure is an
+  intended look or wording change except UX-38: "Refresh data" ran the date checks. Restored as "Run today's checks"
+  (owner choice), p92 red then green.
+- Stage 3: the autopilot journeys (p115, p122, p146; unchanged since the baseline) run alone (--no-deps) on a fresh
+  seed of each version: baseline 33/36 passed, now 34/36; the two shared failures stop at the same step in both
+  (logged UX-39 Demo Guide Graduation tour, UX-40 p146 two batches). No journey broke.
+- Stage 4: all 94 Python test files, one by one, on both versions: 1,349 tests (baseline) and 1,350 (now, + the Phase 4
+  not_owner test); every file the same result. Six fail on both (forms_pack, operations_manual_content and the policy
+  seed-copy test need files not in the cloud copy; crosscut at-risk count, uat_serving env list, policy_assistant mock
+  were failing before).
+- Result: one feature lost and restored (UX-38); UX-39 and UX-40 found (already failing on the baseline).
+- UX-39 fixed (owner asked): `frontend/src/lib/demoGuide/guides/graduation.js` uses the batch buttons instead of Move to;
+  p115:178 (red on the baseline and before the fix) plays all 7 steps; p114 and p119 unchanged (p114:141 guide order
+  was failing before); node --test 119/119; check:ui 0.
+- UX-40 fixed: p146 names the batch it creates (the seed holds another exported batch); 3/3 on a fresh seed.
+
+## 2026-11-21 - UX audit Phase 7 (Claude, cloud session)
+
+- Measured the baseline commit and the Phase 6 code with one script (`frontend/scripts/measure-ux.mjs`), each on a fresh
+  seed with the same fingerprint: 81 sidebar pages, 5 roles, 1366/1920/390. Raw numbers in `.planning/ux-measure/`.
+  Results and the people-test script with score sheet: the Claude Doc "USLS GS Portal - UX audit results and hand-over".
+- Found one regression from Phase 3 (UX-34, Research Gate heading level): spec p155 seen failing, fixed, green.
+  Logged UX-35 (Research Coordinator open-task figure), UX-36 (older axe items), UX-37 (staff tap targets) as open.
+- 243 screenshots (1366/1920/390) sent to the owner as a zip; not in the repo.
+
+## 2026-11-21 - UX audit Phase 6 (Claude, cloud session)
+
+- Monitoring Sheet (UX-30, UX-31), student pages at 390 px (UX-32), faculty home (UX-33). Spec
+  `frontend/e2e/p154-ux-phase6.spec.js` written first, seen failing (4 of 4), then green. `pages/MonitoringGrid.jsx`
+  (five colours, a code per cell, FlagButton/RecordButton with words, StudentCard below 640 px via useIsPhone),
+  `pages/student/ResearchForms.jsx`, `components/RoleHome.jsx` activityWide, `pages/faculty/FacultyPages.jsx`.
+- Specs updated: p64 (a "not taken" cell shows a dash), p72 (Upcoming defenses under the actions).
+- Gate: full e2e 1060 passed / 111 failed: 86 ui-gallery (gallery build off in this harness) and the rest fail the same
+  on the phase 2 code (p74 placeholder x5, p78:165, p84, p85, p94:272, p97, p98:133, p114, p126:37, p127, p132, p133,
+  p148, p33:320) or depend on load/order (p75, p79, p81 pass alone). UX-32 on the fresh seed found two more small
+  targets (Remove upload, "Show all"), fixed; p154 then 8/8. check:ui:strict 0; node --test 119/119; build clean.
+  No Python changed.
+
+## 2026-11-21 - UX audit Phase 5b (Claude, cloud session)
+
+- Boards: empty columns are strips (UX-28), the final columns fold behind "Closed" (UX-29); drag unchanged (IM48); "My queue"
+  default skipped (owner 2026-11-21: the Work Queue's Mine tab covers it). Spec `frontend/e2e/p153-ux-phase5b.spec.js`
+  written first, seen failing (4 of 4), then green. `components/StageBoard.jsx` renderColumn, `closedKeys`, `numbered`.
+- Specs that read a final column open "Closed" first (`e2e/support/board.js` openClosed: p23, p74, p77, p78, p91, p120,
+  p124, p126, p130, p145); specs that pinned "No ... here" in an empty column now check the strip (p33, p74, p78, p100).
+- Gate: full e2e 1006 passed / 57 failed before these spec updates; after them every Phase 5b-related failure passes.
+  The rest fail the same on the phase 2 code (p74 placeholder x5, p114, p127, p132, p133, p148 UX-01, p51:611, p84,
+  p85, p97, p98:133, ui-gallery) or depend on load/order (p75, p79, p100:108, p128 pass alone). check:ui:strict 0;
+  node --test 119/119; build clean.
+
+## 2026-11-21 - UX audit Phase 5a (Claude, cloud session)
+
+- Sidebar groups fold (UX-27, owner IM46). Spec `frontend/e2e/p152-ux-phase5a.spec.js` written first, seen failing (4 of 4),
+  then green. `components/Layout.jsx` NavGroup; `lib/demoGuide/autopilot.js` unfoldFor.
+- The saved test sessions (`e2e/auth.setup.js`) open every group (a remembered choice), so the specs that reach pages
+  through the sidebar still do; specs that sign in fresh and read the sidebar open the groups first
+  (`e2e/support/sidebar.js` openSidebarGroups: p41, p70, p82, p131). Folding itself: p152 from a fresh browser.
+- Checked: full suite (1,205 tests) then the failing files again: what still fails also fails on the Phase 2 code
+  (p114, p118 I-356, p126-boards5, p127, p132, p133-rc5, p33 analytics, p51 My Availability, p74 x5, p78 and p87 practicum
+  table, p84 height, p85, p97 x4, p98, ui-gallery: the gallery build is off here) or depends on test order (p128, p75).
+
+## 2026-11-21 - UX audit Phase 4 (Claude, cloud session; files written back, NOT committed)
+
+- Owner IM52: Dean sidebar and boards unchanged; only the Approvals Queue is one table. Spec
+  `frontend/e2e/p151-ux-phase4.spec.js` and `tests/test_crosscut.py` test_not_owner_lists_every_other_office written
+  first, seen failing (5 of 5; 1 of 1), then green.
+- Work Queue: Mine / Waiting on others / All (UX-23, `/api/tasks?not_owner=`), sorted like the home (UX-24); Dean
+  Approvals Queue one table (UX-25); Demo Guide business-rules step opens Help first (UX-26, R-038).
+- Work Queue Mine tab has no Owner column (every row is the office's, IM50); the task table stacks into cards on a phone.
+- Checked: full e2e suite (1,093 tests): 1,048 passed; the failures also fail on the Phase 2 code (p114 guide list, p118 I-356,
+  p126-boards5, p127, p132, p133-rc5, p148 UX-01 seed, p51 My Availability, p74 x5, p78 practicum table, p84 page height,
+  p85, p94 busy text, p97 x4, p98, p33 analytics count) or are load timing (p75, p79 pictures). Specs updated on purpose:
+  p32, p33, p61, p71, p79, p95, p148. Python: test_crosscut + test_academic_fixes 79/80 (the at-risk test was failing before
+  Phase 1); the whole discover run is over 25 minutes here - run it locally.
+- Documents that quote changed screen words (carried over from Phase 3): only "Dean decides" (the old Work Queue text for a
+  Dean task) - in `scripts/rebuild_demo_walkthrough.py` and `scripts/docs/proposal_screens.json` /
+  `proposal_text_sync.json` / `proposal_inventory.json`, as prose about the Dean's role, still true. Nothing to regenerate.
+
+## 2026-11-20 - UX audit Phase 3 (Claude, cloud session; files written back, NOT committed)
+
+- Owner IM51: merge status synonyms (screen words only). Spec `frontend/e2e/p150-ux-phase3.spec.js` and the IM51 cases in
+  `scripts/status.test.mjs` written first, seen failing (8 of 15; 1 of 15 unit), then green.
+- `lib/status.js` SAME_MEANING (UX-18); board cards: no status line repeating the column, no "Awaiting your review" (UX-19);
+  board hint in Help (UX-20, BOARD_HELP); PageHeader `forms`/`helpNote` give the Help panel on every page with form numbers
+  (UX-21); every page line one short sentence, repeated subtitles removed (UX-22). Every page listed in
+  `.planning/UX-PAGE-INVENTORY.md`.
+- Checked: targeted run of 72 spec files + sweep (1,152 tests), then the failing files again. Specs updated on purpose
+  (old wording, hint and status words): p32, p33, p41, p42, p51, p61 (Phase 2 Reports link), p62, p63, p64, p78, p82, p83, p84,
+  p90, p91, p95, p100 and p124 (their text is in the Help panel now), p118, p145, p150. Also failing on the Phase 2 code (not
+  Phase 3): ui-gallery (the gallery build is off in this harness), p97, p98, p114 (guide list), p127, p132, p133-rc5, p84 page
+  height, p85 Monitoring Sheet select, p148 UX-01 (seed data), p51 My Availability, p74, p78 practicum table, p118 I-356,
+  p126-boards5. p75 Panel Matching passes alone (order).
+- Still waiting on the owner: the green "Ready for Dean review" mark and green cards, the four Graduation boxes (UX-10).
+
+## 2026-11-20 - UX audit Phase 2 (Claude, cloud session; files written back, NOT committed)
+
+- Owner rule IM50: say a thing once (no repeated subtitles, chips or buttons). Spec `frontend/e2e/p149-ux-phase2.spec.js`
+  written first, seen failing (13 of 20).
+- Homes (RoleHome + Dashboard, DeanPages, FacultyPages, StudentOverview): no header line (staff, Dean), no section
+  subtitles, no Refresh data / Reports / Open approvals queue buttons, unread = dot "Not opened yet", arrow links
+  (`arrowLabel`), "Overdue since <date>" without a chip.
+- Process pages: one Help button (`components/PageHelp.jsx`) holding How this works, Recent activity, the rules and the
+  form line (ProcessBoardPage, WorkflowPage, DeanPracticumBoard). Colour key button (StatusLegend). Export/Print inside
+  the filter box (LeaveFilters `extra`/`moreFilters`, RosterFilters `extra`). Research Gate: no second heading or count line.
+- Specs updated on purpose: p32, p51, p71, p72, p73, p75, p78, p87, p90, p91, p92, p105-fable, p105-sweep2, p111, p112,
+  p118, p121, p126.
+- Checked: 39 related spec files + sweep, 513 passed. Fixed p88 (c) (it compared the Work Queue against every office; Phase 1
+  opens it on the signed-in office, so the test now passes `owner=`). Also failing on unchanged code: p51 My Availability,
+  p78 practicum table, p118 I-356 key fact. p79 pictures and p81 dean timed out under load and pass alone.
+- Noted for Phase 3 (wording): the drag hint above each board, and board cards that repeat their status
+  ("Submitted" / "Submitted Aug 29" / a chip / "Next: ...").
+
+## 2026-11-20 - UX audit Phase 0 + Phase 1 (Claude, cloud session; files written back into the working tree, NOT committed)
+
+- Plan: the UX audit doc, section 5 (owner decisions IM46-IM49). Claude works in a cloud copy of the repo and writes
+  changed files back; the owner commits. Rung 2 of the fallback ladder (no subagents).
+- Phase 0: gate on the unchanged code recorded in the checkpoint report (Python suite, build, check:ui, node tests, e2e).
+- Phase 1 (UX-01..UX-09 in ISSUES.md, spec `frontend/e2e/p148-ux-phase1.spec.js`, written first and seen failing):
+  student "Your open tasks" = rows of "Needs your action"; Work Queue opens on the office's own tasks for staff too
+  (`?owner=` = every owner); board count sentence screen-reader only; board columns scroll inside (`DEFAULT_COLUMN_BODY`);
+  sidebar footer note removed; "Elsewhere in your portal" removed; the Graduation Endorsement card is locked while not
+  eligible (the page stays open with "What is left");
+  Research tile chip wraps; `text-2xs` is 12px. Specs updated on purpose: p41, p70, p82 (Elsewhere card, open-tasks figure),
+  p61 (Work Queue default), p81 (no desktop sidebar footer), p91 (summary line).
+- Seen failing on the UNCHANGED code in the cloud sandbox too (not caused by Phase 1): p74 "search placeholder is not cut
+  off at 1366" (5 boards) and p126 F5-04 (graduation batch "Done - with the Registrar"). Check them on the owner's PC.
+- Not run in the sandbox: the full 1176-test e2e suite (too slow on 2 cores); 25 related spec files + the role sweep ran.
+- Held for the owner (UX-10): the green NEW rows/cards and the four Graduation requirement boxes are earlier owner and
+  stakeholder requests, so Phase 1 did not change them.
+- NEXT: owner reviews the Phase 1 checkpoint; then Phase 2 (Help & policy drawer, one filter row).
+
+## 2026-11-20 - Current Position
+
+- v6.9-khloechanges: Monitoring Sheet now has name and student ID search within the selected program and filters. The toolbar groups search, program, and semester, with a filter count and disclosure, a separate sort control, and grouped exports. CSV follows the visible rows and the workbook keeps the selected program scope. General help was removed for the user manual. Next: review the toolbar before changing row presentation and the shared layout.
+
+## 2026-11-19 — owner requests (Withdrawal, Practicum, Graduation only), branch `v6.8-update`, NOT committed
+
+- Server: Dean cannot deny a subject withdrawal (`standalone_process.py` move removed; `/api/approvals/workflow/withdrawal/.../decide`
+  accepts approve only). Practicum "Record Verified Hours" keeps the case at Documents Under Review (no auto Hours Incomplete);
+  "Additional Certificates Requested" needs saved verified hours; a student resubmission clears the verified hours. The
+  student subject list shows "Withdrawn" for a subject withdrawn this term. Tests: `tests/test_owner_1119.py` + updated
+  expectations in test_v53_backend3, test_standalone_consistency, test_bpm_workflows, test_crosscut, test_im43b.
+- UI: `StageBoard` gained opt-in `columnLocked` (no cross-column moves, reorder inside a column, kept per browser),
+  `freshWhen="needsMe"` (green = new and waiting on me; other cards white) and `getStageKey`/`getItemLabel`. Only the
+  Withdrawal (ProcessBoardPage slug), Practicum and Graduation boards turn them on. Practicum case window: "Request
+  additional certificates" grey until hours are saved, saving keeps the window open, the request shows "...Practicum
+  Document submission has been reopened...". Graduation: "Create graduation batch (n)" under "Select all"; "Mark as
+  acknowledged" button replaces the drag to Acknowledged by Registrar. e2e: new `p145-owner-1119.spec.js`, old specs updated.
+- Second list (same day): green = new and waiting on me, also after my own step moves a card to a new stage (Practicum
+  Completion Review, Graduation Approved ready to export); the stage key includes the filing time. Withdrawal: subject and
+  reason boxes in the student "Send this request?" (confirm `highlights`) and the staff/Dean ActionDialog; red Withdrawn tag
+  on the student enrollment page; automatic batch name derived from the export time (`withdrawal_export_batch_name`, no
+  schema change); new columns "Waiting for Registrar acknowledgement" (Sent to Registrar) and "Registrar acknowledged";
+  per-batch "Mark as sent to the Registrar" / "Registrar acknowledged" buttons. Graduation batch popup: View submitted document.
+- Third list (same day): resetting a Graduation / Withdrawal demo student tops up "Application submitted" / "Excel export"
+  to five other students (`top_up_graduation_demo_queue`, `top_up_withdrawal_demo_queue`; seed helpers factored into
+  `_seed_stage_ready_graduation` / `_seed_stage_ready_withdrawal`, seed determinism tests still pass). Withdrawal: Excel
+  export column has Select all + "Create batch and download Excel list"; columns end "Waiting for Registrar acknowledgement"
+  -> "Acknowledged by Registrar" with per-batch "Mark as acknowledged"; request section (staff, Dean, student read-only)
+  shows subject and reason in green boxes; red Withdrawn tag uses the latest enrollment of the subject in any semester, and
+  the staff Enrollment page shows it red too. e2e `p146-owner-1119-flows` writes data, so it runs in the `autopilot` project.
+- Fourth list (same day): reset-added graduation students get numbers 2799xxx and keep the research baseline
+  (`DEMO_QUEUE_NUMBER_PREFIX`), so they stay eligible and appear in the Dean's CSV (test: full batch flow to the CSV).
+  Withdrawal reason is the student's own words (`student_only` edit rule; staff/Dean 403, no Edit button). Withdrawal board:
+  exported withdrawals are one batch card per batch and stage (`boardItems` in ProcessBoardPage); the Excel export controls
+  and the per-batch "Mark as sent" / "Mark as acknowledged" sit at the top of their columns; the seed stamps one export time
+  per seeded list (without touching updated_at) so older lists group into batches too. RESEED NEEDED (`npm run seed`).
+- Fifth list (same day): columnLocked boards list the newest card first (`getItemTime`; the viewer's own up/down order
+  still wins for cards placed by hand, new ones go above). Withdrawal: no checkbox / Select all in Submitted; "Mark as sent
+  to the Registrar" and "Mark as acknowledged" are buttons inside each batch card (not in the column).
+- Known, not from this work: p97:80 (AWOL Move-to menu: focus before placement can scroll the board; failed 3 of 5 on the
+  original code too; `focus({ preventScroll: true })` in MoveMenu reduces it - not applied, owner said other boards untouched), p97:128, p126-boards5:36,
+  p78:162, p33:316, p98:133, test_crosscut at_risk count, test_policy_assistant off-topic (key=True) and test_uat_serving env example
+  fail on the original code too. Full gate 2026-11-19: 1378 tests, only those pre-existing failures.
+
 ## 2026-11-09 11:10 — FINAL SUBMISSION, FROZEN: `v6.7-fixed` = `main` (content of ee0dd241)
 
 - Owner: no changes after this. `main` was fast-forwarded to `v6.7-fixed` (`git merge -s ours origin/main`, no force

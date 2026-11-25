@@ -11,10 +11,25 @@ import {
 import { PAGE } from "../../lib/labels.js";
 import { defenseScheduleLocked } from "../../lib/studentHome.js";
 
+// The server's own words when it refuses a graduation application from a student who is not yet eligible.
+export const GRADUATION_NOT_ELIGIBLE_REASON =
+  "The graduation application opens only after coursework, research, completion documents, and any required practicum are complete.";
+
+function graduationPracticumLocked(data) {
+  const gate = data.graduation_eligibility?.practicum_gate;
+  return Boolean(gate?.required && !gate.dean_approved && !data.graduation_endorsement);
+}
+
+// An application already on file stays open (it may be returned for clarification); otherwise the server's
+// eligibility decides. Unknown eligibility does not lock the page.
+function graduationNotYetEligible(data) {
+  const eligibility = data.graduation_eligibility;
+  return Boolean(eligibility && eligibility.eligible === false && !data.graduation_endorsement);
+}
+
 export const REQUEST_GROUPS = [
   {
     title: "Research & Defense",
-    description: "Upload your milestone files, submit the files for review, then request scheduling after a panel is assigned.",
     items: [
       { id: "research", label: PAGE.researchProgress, icon: FileCheck },
       {
@@ -28,7 +43,6 @@ export const REQUEST_GROUPS = [
   },
   {
     title: "Requests", // the sidebar's heading for these four pages (I-178)
-    description: "Submit a standalone standing-change or subject-withdrawal request.",
     items: [
       { id: "loa", label: PAGE.leaveOfAbsence, icon: CalendarOff },
       {
@@ -57,7 +71,6 @@ export const REQUEST_GROUPS = [
   },
   {
     title: "Completion",
-    description: "Submit practicum evidence when required and request Graduate School graduation endorsement review.",
     items: [
       {
         id: "practicum",
@@ -72,12 +85,14 @@ export const REQUEST_GROUPS = [
         icon: GraduationCap,
         // Owner 2026-11-08: for a program with a practicum, the application opens only after the Dean approves the
         // practicum completion. An application already on file stays visible.
-        lockedWhen: (data) => {
-          const gate = data.graduation_eligibility?.practicum_gate;
-          return Boolean(gate?.required && !gate.dean_approved && !data.graduation_endorsement);
-        },
+        lockedWhen: graduationPracticumLocked,
         lockedReason: "The graduation application opens after the Dean approves your practicum completion.",
         lockedReasonFrom: (data) => data.graduation_eligibility?.practicum_gate?.message,
+        // UX-07 (2026-11-20): while the student is not yet eligible the server refuses the application
+        // (student_graduation_request), so the Request Center card says so with a lock. The page itself stays open: it
+        // lists what is left and keeps Step 1 locked with the same words.
+        notReadyWhen: graduationNotYetEligible,
+        notReadyReason: GRADUATION_NOT_ELIGIBLE_REASON,
       },
     ],
   },

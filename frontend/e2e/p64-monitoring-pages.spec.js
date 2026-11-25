@@ -71,9 +71,9 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     await sidebarLink(page, "Monitoring Sheet").click();
     await expect(page).toHaveURL(/\/monitoring-sheet$/);
     await expect(heading1(page, "Monitoring Sheet")).toBeVisible();
-    await expect(page.getByText("Curriculum progress for each student. Add students and edit subject rows here, or upload a workbook under Student Handoff.")).toBeVisible();
 
     // actions
+    // CHANGED BY owner feedback 2026-11-23 (stage 4): Export workbook / Export CSV sit on the filter bar, no "Export" disclosure
     await expect(page.getByRole("link", { name: "Export workbook" })).toHaveAttribute("href", /\/api\/monitoring\/export\?program_id=\d+/);
     await expect(page.getByRole("button", { name: "Add student", exact: true })).toBeVisible();
 
@@ -90,9 +90,6 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     await expect(page.getByRole("button", { name: "Export CSV" })).toBeEnabled();
 
     // notices
-    await expect(page.getByText("Select a subject cell or the pencil beside a name to add or edit a row.")).toBeVisible();
-    await expect(page.getByText(/Imported values are never overwritten silently/)).toBeVisible();
-    await expect(page.getByText(/Records match \(\d+ checked\)/)).toBeVisible();
 
     // legend
     for (const word of ["Officially completed", "Taken", "Enrolled", "Failed", "Dropped", "Planned", "INC", "Withdrawn", "Not taken", "Manual entry"]) {
@@ -123,7 +120,7 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     }
     const notTaken = courses.find((c) => !salonga.cells[c.id] || salonga.cells[c.id] === "Missing");
     if (notTaken) {
-      await expect(row.getByRole("button", { name: new RegExp(`^${notTaken.code} for Salonga, Bea: not taken`) })).toHaveText("");
+      await expect(row.getByRole("button", { name: new RegExp(`^${notTaken.code} for Salonga, Bea: not taken`) })).toHaveText("–"); // CHANGED BY UX phase 6 (UX-30): every cell has a code; "not taken" is a dash
     }
     // every student of the grid has a row
     expect(await page.locator("main table tbody tr").count()).toBeGreaterThanOrEqual(grid.students.length);
@@ -139,10 +136,12 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     const rows = page.locator("main table tbody tr");
     await expect(rows.first()).toBeVisible();
 
-    // default order: last name, first name
-    await expect(rows.first()).toContainText("Bernardo, Camille");
+    // default order: last name, first name (CHANGED BY data cleanup (IM54-IM57, 2026-11-22): the page opens on MAED, the first program with students)
+    await expect(rows.first()).toContainText("Almario, Miko");
 
     // risk filter -> only that risk
+    // CHANGED BY owner feedback 2026-11-23 (stage 4): every filter is on the filter bar, no "Filters" disclosure
+    await expect(select("Risk")).toBeVisible();
     const atRisk = grid.students.filter((s) => s.risk === "At Risk of Delay");
     await select("Risk").selectOption("At Risk of Delay");
     await expect(page).toHaveURL(/risk=At\+Risk\+of\+Delay|risk=At%20Risk%20of%20Delay/);
@@ -150,7 +149,18 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     await expect(rows.first()).toContainText("At Risk of Delay");
 
     // a filter nobody matches -> the empty state, with the add button for editors
-    expect(grid.students.filter((s) => s.risk === "Delayed")).toHaveLength(0);
+    // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): every risk level is used in MAED now, so the empty state is
+    // checked on MSGC (students, none Delayed), and the page then goes back to the default program
+    const msgc = grid.programs.find((p) => p.code === "MSGC");
+    const msgcGrid = await okJson(await page.request.get(`/api/monitoring/grid?program_id=${msgc.id}`), "grid MSGC");
+    expect(msgcGrid.students.length).toBeGreaterThan(0);
+    expect(msgcGrid.students.filter((s) => s.risk === "Delayed")).toHaveLength(0);
+    const openFilters = async () => {
+      if (!(await select("Risk").isVisible())) await page.locator("summary").filter({ hasText: /^Filters$/ }).click();
+    };
+    await page.goto(`/monitoring-sheet?program_id=${msgc.id}`);
+    await expect(rows.first()).toBeVisible();
+    await openFilters();
     await select("Risk").selectOption("Delayed");
     // P6.4: with a filter on, the empty state says the filter is the reason and offers "Clear filters" (it used to
     // claim "No students in this program yet").
@@ -165,9 +175,12 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     await select("Risk").selectOption("Delayed");
     await expect(page.getByText("No students match these filters")).toBeVisible();
 
-    // clear it again, then the other filters
+    // clear it again, then the other filters (on the default program again)
     await select("Risk").selectOption("");
     await expect(rows.first()).toBeVisible();
+    await page.goto("/monitoring-sheet");
+    await expect(rows.first()).toBeVisible();
+    await openFilters();
     await select("Enrollment status").selectOption("LOA");
     await expect(page).toHaveURL(/enrollment=LOA/);
     await expect(rows.or(page.getByText("No students match these filters")).first()).toBeVisible();
@@ -193,7 +206,7 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     await expect.poll(async () => { const keys = await ayColumn(); return keys.every((v, i) => i === 0 || keys[i - 1] <= v); }).toBe(true);
     await select("Sort monitoring sheet").selectOption("name");
     await expect(page).not.toHaveURL(/sort=/);
-    await expect(rows.first()).toContainText("Bernardo, Camille");
+    await expect(rows.first()).toContainText("Almario, Miko");
 
     // program and semester
     await select("Semester").selectOption({ index: 1 });
@@ -203,6 +216,7 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     await select("Program").selectOption(String(mba.id));
     await expect(page).toHaveURL(new RegExp(`program_id=${mba.id}`));
     await expect(select("Program")).toHaveValue(String(mba.id));
+    // CHANGED BY owner feedback 2026-11-23 (stage 4): Export workbook / Export CSV sit on the filter bar, no "Export" disclosure
     await expect(page.getByRole("link", { name: "Export workbook" })).toHaveAttribute("href", new RegExp(`program_id=${mba.id}`));
   });
 
@@ -229,6 +243,7 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     const courses = grid.categories.flatMap((c) => c.courses);
     await page.goto("/monitoring-sheet");
     await expect(page.locator("main table tbody tr").first()).toBeVisible();
+    // CHANGED BY owner feedback 2026-11-23 (stage 4): Export workbook / Export CSV sit on the filter bar, no "Export" disclosure
     const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export CSV" }).click()]);
     expect(download.suggestedFilename()).toBe(`monitoring-${grid.program.code}.csv`);
     // P6.4: every field is quoted, the file starts with a byte-order mark (Excel reads names such as "Niño") and
@@ -239,7 +254,7 @@ test.describe("Monitoring Sheet (GS staff, can edit)", () => {
     const lines = text.split("\r\n");
     expect(lines[0]).toBe(["Student", "Student ID", "AY Entry", "YR", "Lifecycle stage", ...courses.map((c) => c.code), "Completed", "Total", "% Complete"].map((v) => `"${v}"`).join(","));
     expect(lines.length).toBeGreaterThan(grid.students.length);
-    expect(lines[1]).toContain('"Bernardo, Camille"');
+    expect(lines[1]).toContain('"Almario, Miko"'); // CHANGED BY data cleanup (IM54-IM57, 2026-11-22)
     expect(text).toContain('"Salonga, Bea"');
   });
 
@@ -390,10 +405,9 @@ test.describe("Monitoring Sheet (Research Coordinator, view only)", () => {
     await page.goto("/workflow/graduation");
     await sidebarLink(page, "Monitoring Sheet").click();
     await expect(heading1(page, "Monitoring Sheet")).toBeVisible();
-    await expect(page.getByText("Curriculum progress for each student (view only).")).toBeVisible();
-    await expect(page.getByText("View only.", { exact: true })).toBeVisible();
-    await expect(page.getByText(/Only Graduate School staff and the Academic Coordinator can edit/)).toBeVisible();
+    await expect(page.getByText("View only", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Add student" })).toHaveCount(0);
+    // CHANGED BY owner feedback 2026-11-23 (stage 4): Export workbook / Export CSV sit on the filter bar, no "Export" disclosure
     await expect(page.getByRole("link", { name: "Export workbook" })).toBeVisible();
     const row = rowOf(page, "Salonga, Bea");
     await expect(row).toHaveCount(1);
@@ -418,9 +432,9 @@ test.describe("Enrollment Class List (GS staff)", () => {
     await expect(page).toHaveURL(/\/enrollment-class-list$/);
     await expect(heading1(page, "Enrollment Class List")).toBeVisible();
     // (P6.4: the small "Enrollment record" line above the title is gone; PageHeader has no eyebrow.)
-    await expect(page.getByText("Read-only class rosters synchronized automatically with confirmed Enrollment records.")).toBeVisible();
-    await expect(page.getByText("Read-only roster.")).toBeVisible();
-    await expect(page.getByText(/Confirm or change enrollment in the Enrollment workspace; this list updates automatically/)).toBeVisible();
+    await expect(page.getByText("Class rosters, filled in from confirmed enrollments.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
+    await expect(page.getByText("Read only. Change enrollment on the Enrollment page.")).toBeVisible(); // CHANGED BY owner feedback 2026-11-23
+    // CHANGED BY owner feedback 2026-11-23: the notice is one short line (asserted above)
 
     await expect(page.getByLabel("Program", { exact: true })).toHaveValue(String(data.program.id));
     await expect(page.getByLabel("Semester", { exact: true })).toHaveValue(String(data.term.id));
@@ -438,12 +452,15 @@ test.describe("Enrollment Class List (GS staff)", () => {
     const table = page.locator("main table");
     await expect(table).toHaveCount(1);
     expect(await headTexts(table)).toEqual(["Student", "Student ID", "Program", "Enrollment status", "Enrolled", "Source"]);
-    const mendoza = rowOf(page, "Mendoza, Bianca");
+    // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): Bianca Mendoza (DBA) is gone, so the spec checks an enrolled student of the class the server sent
+    const pick = data.students.find((s) => s.status === "Enrolled");
+    expect(pick, "an enrolled student in the class").toBeTruthy();
+    const mendoza = rowOf(page, `${pick.last_name}, ${pick.first_name}`);
     await expect(mendoza).toHaveCount(1);
-    await expect(mendoza).toContainText("2560052");
-    await expect(mendoza).toContainText("DBA");
+    await expect(mendoza).toContainText(pick.student_number);
+    await expect(mendoza).toContainText(pick.program_code);
     await expect(mendoza).toContainText("Enrolled");
-    await expect(mendoza).toContainText("Enrollment record (demo data)");
+    await expect(mendoza).toContainText(pick.source_reference);
     await shotAll(page, "class-list-single");
 
     // another class
@@ -466,7 +483,8 @@ test.describe("Enrollment Class List (GS staff)", () => {
     expect(singleRaw.charCodeAt(0), "byte-order mark (P6.4)").toBe(0xfeff);
     const singleText = singleRaw.slice(1).split("\r\n");
     expect(singleText[0]).toBe('"Subject","Faculty","Student","Student ID","Program","Status","Enrolled at","Source"');
-    expect(singleText.join("\r\n")).toContain('"Mendoza, Bianca","2560052","DBA","Enrolled"');
+    const one = (await okJson(await page.request.get("/api/monitoring/class-list"), "cl")).students.find((s) => s.status === "Enrolled"); // CHANGED BY data cleanup (IM54-IM57, 2026-11-22)
+    expect(singleText.join("\r\n")).toContain(`"${one.last_name}, ${one.first_name}","${one.student_number}","${one.program_code}","Enrolled"`);
 
     await page.getByLabel("Class list view", { exact: true }).selectOption("all");
     await expect(page.getByText("All class lists", { exact: true }).filter({ visible: true }).first()).toBeVisible();
@@ -548,8 +566,9 @@ test.describe("Record an adviser appointed outside the portal (GS staff)", () =>
     expect(payloads).toEqual([]);
 
     // choose a student through the picker, an adviser, a date and a note
-    await form.getByRole("searchbox", { name: "Search a student" }).fill("Castillo");
-    await form.getByRole("button", { name: /Irene Castillo/ }).click();
+    // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): Elena Mendoza replaces Irene Castillo.
+    await form.getByRole("searchbox", { name: "Search a student" }).fill("Mendoza");
+    await form.getByRole("button", { name: /Elena Mendoza/ }).click();
     await expect(form.getByText("Selected student")).toBeVisible();
     await form.getByLabel("Research adviser").selectOption({ index: 1 });
     const adviserLabel = await form.getByLabel("Research adviser").locator("option:checked").textContent();
@@ -557,7 +576,7 @@ test.describe("Record an adviser appointed outside the portal (GS staff)", () =>
     await form.getByLabel("Note (optional)").fill("Appointed by letter before the portal");
     await form.getByRole("button", { name: "Record the appointment" }).click();
 
-    await expect(form.getByText(`Recorded: ${adviserLabel} is now the adviser of Castillo, Irene.`)).toBeVisible();
+    await expect(form.getByText(`Recorded: ${adviserLabel} is now the adviser of Mendoza, Elena.`)).toBeVisible();
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).toMatchObject({ appointed_on: "2026-09-01", note: "Appointed by letter before the portal" });
     expect(typeof payloads[0].student_id).toBe("number");
@@ -569,7 +588,7 @@ test.describe("Record an adviser appointed outside the portal (GS staff)", () =>
     // collapsing keeps the success note visible
     await toggle.click();
     await expect(page.locator("#adviser-record-form")).toHaveCount(0);
-    await expect(page.getByText(`Recorded: ${adviserLabel} is now the adviser of Castillo, Irene.`)).toBeVisible();
+    await expect(page.getByText(`Recorded: ${adviserLabel} is now the adviser of Mendoza, Elena.`)).toBeVisible();
     await shotAll(page, "adviser-card-done");
   });
 });

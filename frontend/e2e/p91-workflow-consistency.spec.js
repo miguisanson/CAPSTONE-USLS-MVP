@@ -1,4 +1,5 @@
 // e2e-writes: none
+// CHANGED BY data cleanup (IM54-IM57, 2026-11-22): student ids re-pointed (Miko Almario 125 -> 18, Nico Barrientos 146 -> 39).
 // Packet conC (owner rule IM24; issues I-123, I-126, part of I-128; consistency sweep 2026-10-22, findings 2, 6 and 13).
 // Every page under /workflow/<slug> is one family. Written BEFORE the change; red on the old code. Through the real UI as
 // Graduate School staff, read-only (windows are opened and closed, nothing is saved). Order-independent: no seeded count or
@@ -11,6 +12,7 @@
 //   - finding 13: a card held by the Dean shows a lock on every process board unless the server lists a step for staff
 //     there (Withdrawal: "Return to student"), so the screen matches the server on every board.
 import { test, expect } from "@playwright/test";
+import { openClosed } from "./support/board.js";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { AUTH_DIR, SCREENS_DIR } from "./support/paths.mjs";
@@ -23,9 +25,9 @@ const cardsOf = (scope) => scope.locator("div[draggable]");
 const WORKFLOW_PAGES = [
   "student-handoff",
   "course-audit",
-  "research-gate?student_id=146",
-  "panel-matching?student_id=125",
-  "defense-scheduling?student_id=146",
+  "research-gate?student_id=39",
+  "panel-matching?student_id=18",
+  "defense-scheduling?student_id=39",
   "practicum",
   "graduation",
   "leave-of-absence",
@@ -52,14 +54,16 @@ test.describe("conC: one place for the guide and the activity", () => {
       await page.goto(`/workflow/${path}`);
       await expect(main(page).getByRole("heading", { level: 1 })).toBeVisible();
       const header = main(page).locator("header").filter({ has: page.getByRole("heading", { level: 1 }) }).first();
-      for (const name of ["How this works", "View recent activity"]) {
-        await expect(header.getByRole("button", { name, exact: true }), `${name}: in the page header`).toHaveCount(1);
-        await expect(main(page).getByRole("button", { name, exact: true }), `${name}: once on the page`).toHaveCount(1);
+      // UX-14 (owner 2026-11-20): one "Help" button in the header holds the guide, the activity and the rules.
+      await expect(header.getByRole("button", { name: "Help", exact: true }), "Help: in the page header").toHaveCount(1);
+      for (const name of ["How this works", "View recent activity", "Recent activity"]) {
+        await expect(main(page).getByRole("button", { name, exact: true }), `${name}: not on the page itself`).toHaveCount(0);
       }
       // No second copy of either as a card: not in a side rail, not under the page.
       await expect(main(page).getByRole("heading", { name: /^(How this works|Recent in this workflow|Recent activity)$/ }), "no rail card").toHaveCount(0);
 
-      await header.getByRole("button", { name: "How this works", exact: true }).click();
+      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
+    await page.getByRole("dialog").getByRole("button", { name: "How this works" }).click();
       const guide = page.getByRole("dialog");
       await expect(guide).toBeVisible();
       await expect(guide.getByRole("heading").first()).toContainText(/works/i);
@@ -67,7 +71,8 @@ test.describe("conC: one place for the guide and the activity", () => {
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog")).toHaveCount(0);
 
-      await header.getByRole("button", { name: "View recent activity", exact: true }).click();
+      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
+    await page.getByRole("dialog").getByRole("button", { name: "Recent activity" }).click();
       const activity = page.getByRole("dialog");
       await expect(activity).toBeVisible();
       await expect(activity.getByRole("heading").first()).toContainText(/activity/i);
@@ -91,24 +96,29 @@ test.describe("conC: the six boards have the same parts", () => {
       const summary = page.getByTestId("board-summary");
       await expect(summary, "one summary block").toHaveCount(1);
       const line = summary.locator("[data-summary-line]");
-      await expect(line).toBeVisible();
+      // UX-03 (2026-11-20): the column headers show the counts; the sentence stays for screen readers (aria-live).
+      await expect(line).toHaveCount(1);
+      await expect(line).toHaveAttribute("aria-live", "polite");
       const lineText = ((await line.textContent()) || "").trim();
       expect(lineText, "a count per column, or 'No ... yet'").toMatch(/^\d+ .+$|^No .+ yet$/);
-      await expect(summary).toContainText("Move to");
+      // CHANGED BY UX phase 3 (UX-22, IM50): UX-20: the hint is in the Help panel ("Using the board").
+      await page.getByRole("main").getByRole("button", { name: "Help", exact: true }).click();
+      await expect(page.getByRole("dialog").getByRole("region", { name: "Using the board" })).toContainText("Move to");
+      await page.getByRole("dialog").getByRole("button", { name: "Close help" }).click();
       // The numbers add up to the cards on the board (nothing is filtered at page load).
+      await openClosed(board); // CHANGED BY UX phase 5b (UX-28/29): the final columns' cards too
       const cards = cardsOf(board);
       const total = [...lineText.matchAll(/(?:^|, )(\d+) /g)].reduce((sum, match) => sum + Number(match[1]), 0);
       expect(total, `"${lineText}" adds up to the cards on the board`).toBe(await cards.count());
 
-      // Every column has a one-line description under its title.
+      // CHANGED BY owner feedback 2026-11-23: no column has a description line under its title (the title says it)
       const sections = board.locator(":scope section[aria-label]");
       const columnCount = await sections.count();
       expect(columnCount).toBeGreaterThan(3);
       for (let i = 0; i < columnCount; i++) {
         const label = await sections.nth(i).getAttribute("aria-label");
-        const description = ((await sections.nth(i).locator("header p").first().textContent().catch(() => "")) || "").trim();
-        expect(description.length, `${label}: has a description line`).toBeGreaterThan(0);
-        expect(description.length, `${label}: description is one short line`).toBeLessThanOrEqual(90);
+        const line = await sections.nth(i).evaluate((section) => section.querySelector("header p.meta")?.textContent || "");
+        expect(line, `${label}: no description line`).toBe("");
       }
 
       // A card: "View details" is the only button apart from "Move to...", and there is no inline primary button.

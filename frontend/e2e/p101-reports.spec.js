@@ -145,7 +145,7 @@ test.describe("staff Reports frame", () => {
     expect(data.causes.length, "the demo has causes").toBeGreaterThan(0);
     const card = page.getByRole("region", { name: "What is holding students back?" });
     await expect(card).toBeVisible();
-    await expect(card.getByText(/^Start with the longest bar/)).toBeVisible();
+    await expect(card.getByText(/^Start with the longest bar/)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     // table alternative
     await card.getByRole("button", { name: "Show as table" }).click();
     const alt = card.getByRole("table", { name: /What is holding students back/ });

@@ -12,7 +12,7 @@ const WINDOW_KINDS = [{ value: "available", label: "Available" }, { value: "pref
 const windowName = (kind) => WINDOW_KINDS.find((item) => item.value === kind)?.label || kind;
 
 export function PublishedClasses({ sections = [] }) {
-  if (!sections.length) return <EmptyState size="sm" title="No published classes for this semester" hint="Only finalized class schedules appear here." />;
+  if (!sections.length) return <EmptyState size="sm" title="No published classes for this semester" />;
   return <ul className="space-y-3">{sections.map((section) => (
     <li key={section.id} className="rounded-xl border border-slate-200 p-3">
       <p className="font-semibold text-ink">{section.code} · {section.title}{section.section ? ` · Section ${section.section}` : ""}</p>
@@ -81,7 +81,7 @@ export default function FacultySchedule() {
   }
 
   return <div className="page-stack">
-    <PageHeader title="Schedule" forms="teaching-schedule" icon={CalendarDays} description="Enter teaching availability for each semester. Your defense availability is managed separately in My Availability." />
+    <PageHeader title="Schedule" forms="teaching-schedule" icon={CalendarDays} />
     {error && <InlineNotice tone="danger" title="Could not save or load teaching availability">{error}</InlineNotice>}
     {notice && <InlineNotice tone="success">{notice}</InlineNotice>}
     {loading ? <Skeleton lines={6} /> : data && <>
@@ -96,7 +96,7 @@ export default function FacultySchedule() {
           <Button variant="secondary" onClick={() => save("Submitted")} disabled={busy || dirty || data.availability?.status === "Missing"}>Confirm no changes</Button>
         </div>
       </SectionCard>
-      <SectionCard title="Weekly teaching calendar" subtitle="Select a day to add a time range. Use the editable list below for precise times.">
+      <SectionCard title="Weekly teaching calendar">
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded-full bg-brand-50 px-3 py-1 font-semibold text-brand-800">Available</span>
           <span className="rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-800">Preferred</span>
@@ -111,7 +111,7 @@ export default function FacultySchedule() {
         </div>
       </SectionCard>
       <SectionCard title="Edit time ranges" action={<Button variant="secondary" icon={Plus} onClick={() => add()} disabled={busy}>Add time range</Button>}>
-        {!windows.length && <p className="text-sm text-slate-600">Add your available periods, then optionally mark preferred or unavailable periods.</p>}
+        {/* CHANGED BY owner feedback 2026-11-23: no instruction line on an empty list */}
         {windows.map((window, index) => <div key={index} className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-5">
           <Field label="Day"><Select aria-label={`Day for time range ${index + 1}`} value={window.weekday} placeholder={null} options={TEACHING_DAYS.map((label, value) => ({ label, value }))} onChange={(event) => edit(index, "weekday", Number(event.target.value))} disabled={busy} /></Field>
           <Field label="From"><Input aria-label={`Start for time range ${index + 1}`} type="time" value={window.start} onChange={(event) => edit(index, "start", event.target.value)} disabled={busy} /></Field>

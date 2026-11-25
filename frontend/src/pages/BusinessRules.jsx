@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, FilePenLine, FileText, Lock, Scale, Shield
 import { api } from "../api";
 import { useApi } from "../hooks";
 import {
-  Button, Card, EmptyState, Field, InlineNotice, Input, Modal, PageHeader, SearchInput, SectionCard, Select, Spinner, StatCard, Textarea,
+  Button, Card, EmptyState, Field, FilterBar, InlineNotice, Input, Modal, PageHeader, SectionCard, Select, Spinner, StatCard, Textarea,
 } from "../components/ui/index.js";
 import HistoryDisclosure from "../components/HistoryDisclosure";
 import { RuleBadges, formatRuleValue } from "../components/PolicyRules";
@@ -80,7 +80,9 @@ export default function BusinessRules() {
       <PageHeader
         icon={Scale}
         title={PAGE.businessRules}
-        description={`The rules the workflows follow, each with the handbook or protocol page it comes from. The Graduate School Handbook 2022-2023 is in force; where the system and the handbook disagree, the handbook wins. Rules set by the Handbook or the Research Protocol are locked: those rules change only when the Graduate School issues a new policy (upload it under Policy Documents). ${editNote}`}
+        // UX-22 (IM50): one line here; how the rules are locked and who may adjust them is in the Help panel.
+        description="Each rule with its handbook or protocol page; where the system and the handbook disagree, the handbook wins."
+        helpNote={`The Graduate School Handbook 2022-2023 is in force. Rules set by the Handbook or the Research Protocol are locked: those rules change only when the Graduate School issues a new policy (upload it under Policy Documents). ${editNote}`}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -97,9 +99,12 @@ export default function BusinessRules() {
         </InlineNotice>
       )}
 
-      <Card>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter rules">
+      <FilterBar
+        search={{ value: query, onChange: setQuery, placeholder: "Search rules or pages", label: "Search rules" }}
+        active={[query, filter !== FILTERS[0].id].filter(Boolean).length}
+        onClear={() => { setQuery(""); setFilter(FILTERS[0].id); }}
+        chips={(
+          <span className="flex flex-wrap gap-2" role="group" aria-label="Filter rules">
             {FILTERS.map((item) => (
               <Button
                 key={item.id}
@@ -111,16 +116,9 @@ export default function BusinessRules() {
                 {item.label}
               </Button>
             ))}
-          </div>
-          <SearchInput
-            value={query}
-            onChange={setQuery}
-            placeholder="Search rules or pages"
-            label="Search rules"
-            className="lg:w-80"
-          />
-        </div>
-      </Card>
+          </span>
+        )}
+      />
 
       {loading ? <Spinner label="Loading business rules…" /> : !groups.length ? (
         <Card><EmptyState icon={Scale} title="No rules match" hint="Try another filter or search." /></Card>

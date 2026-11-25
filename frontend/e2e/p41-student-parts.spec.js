@@ -27,6 +27,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { SCREENS_DIR, BASE_URL } from "./support/paths.mjs";
 import { PASSWORD } from "./support/accounts.js";
+import { openSidebarGroups } from "./support/sidebar.js";
 
 const SHOTS = join(SCREENS_DIR, "..", "p41-student-parts");
 const THERESE = "readmission.therese@usls.edu.ph";
@@ -235,17 +236,8 @@ test.describe("P4.1 shared student parts", () => {
       await expect(recent).toContainText("Student - next: Pending");
       await expect(recent.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/student/activity");
 
-      // the blocks that left the home: one line each and a link to the page that holds the full content
-      const elsewhere = sectionOf(page, "Elsewhere in your portal");
-      const line = (label) => elsewhere.locator("li").filter({ has: page.getByRole("link", { name: label, exact: true }) });
-      await expect(elsewhere.getByRole("link", { name: "Defense Schedule", exact: true })).toHaveAttribute("href", "/student/defense-schedule");
-      await expect(line("Defense Schedule")).toContainText("Your Title Defense is booked for Fri, Dec 4, 2026.");
-      await expect(elsewhere.getByRole("link", { name: "Request Center", exact: true })).toHaveAttribute("href", "/student/requests");
-      await expect(line("Request Center")).toContainText("Graduation: Needs verification");
-      await expect(elsewhere.getByRole("link", { name: "Leave of Absence", exact: true })).toHaveAttribute("href", "/student/requests/leave-of-absence");
-      await expect(line("Leave of Absence")).toContainText("Leave of Absence: On leave · Readmission: In staff review");
-      await expect(elsewhere.getByRole("link", { name: "Research Adviser", exact: true })).toHaveAttribute("href", "/student/adviser");
-      await expect(line("Research Adviser")).toContainText("Dr. Liwayway Bautista");
+      // UX-06 (2026-11-20): the "Elsewhere in your portal" card left the home; the sidebar lists those pages.
+      await expect(sectionOf(page, "Elsewhere in your portal")).toHaveCount(0);
     });
   });
 
@@ -253,7 +245,7 @@ test.describe("P4.1 shared student parts", () => {
     await runPage(browser, { email: THERESE, mutate: overviewScenario, path: "/student/progress", shot: "progress-therese" }, async (page) => {
       // My Academic Status: the leave notice, the stage names in order, coursework and research
       const status = panel(page, "My Academic Status");
-      await expect(status).toContainText("Your current stage, requirements, and next step");
+      // CHANGED BY UX phase 3 (UX-22, IM50): the subtitle repeated the heading; removed.
       await expect(status).toContainText("You are on Leave of Absence, so you cannot enroll in subjects.");
       const text = await status.innerText();
       const order = ["Admission", "Coursework", "Comprehensive Exam", "Proposal Development", "Proposal Defense", "Data Collection", "Writing", "Final Defense"];
@@ -272,7 +264,7 @@ test.describe("P4.1 shared student parts", () => {
 
       // Workflow Status: one row per request with chip and detail
       const workflow = panel(page, "Workflow Status");
-      await expect(workflow).toContainText("Administrative and completion requests currently visible to you");
+      // CHANGED BY UX phase 3 (UX-22, IM50): the subtitle repeated the heading; removed.
       for (const [label, chip, detail] of [
         ["Withdrawal", "Not submitted", "No withdrawal request is active."],
         ["Graduation Endorsement", "Needs verification", "Resolve graduation missing coursework"],
@@ -286,8 +278,8 @@ test.describe("P4.1 shared student parts", () => {
 
   test("Activity page (Therese): the logs, their toggle and their entries", async ({ browser }) => {
     await runPage(browser, { email: THERESE, mutate: overviewScenario, path: "/student/activity", shot: "activity-therese" }, async (page) => {
-      const activity = panel(page, "Activity Log");
-      await expect(activity).toContainText("Submissions, decisions, and next owners");
+      const activity = page.locator("main .card").first(); // CHANGED BY owner feedback 2026-11-23: the card has no title
+      // CHANGED BY UX phase 3 (UX-22, IM50): the subtitle repeated the page line; removed.
       const toggle = activity.getByRole("button", { name: /View logs/ });
       await expect(toggle).toContainText("2");
       await toggle.click();
@@ -335,11 +327,11 @@ test.describe("P4.1 shared student parts", () => {
       const recent = sectionOf(page, "Recent activity");
       await expect(recent).toContainText("No activity yet");
       await expect(recent.getByRole("button")).toHaveCount(0);
-      await expect(sectionOf(page, "Elsewhere in your portal")).toContainText("No defense is booked yet.");
+      await expect(sectionOf(page, "Elsewhere in your portal")).toHaveCount(0); // UX-06
     });
     await runPage(browser, { email: MAYA, mutate, path: "/student/activity", shot: "activity-empty" }, async (page) => {
-      await expect(panel(page, "Activity Log")).toContainText("No activity yet");
-      await expect(panel(page, "Activity Log").getByRole("button")).toHaveCount(0);
+      await expect(page.locator("main .card").first()).toContainText("No activity yet"); // CHANGED BY owner feedback 2026-11-23: the card has no title (the page title names it)
+      await expect(page.locator("main .card").first().getByRole("button")).toHaveCount(0);
     });
     await runPage(browser, { email: MAYA, mutate, path: "/student/defense-schedule", shot: "defense-empty" }, async (page) => {
       await expect(panel(page, "Schedule requests")).toContainText("No schedule requests");
@@ -364,6 +356,7 @@ test.describe("P4.1 shared student parts", () => {
     await runPage(browser, { email: THERESE, mutate: (data) => { data.course_audit = null; }, path: "/student/progress", shot: "progress-broken" }, async (page) => {
       await expect(page.getByText("This page could not load", { exact: true })).toBeVisible();
       await expect(page.getByText("Please try another section or refresh the portal. The rest of your student portal is still available.")).toBeVisible();
+      await openSidebarGroups(page); // UX-27 (Phase 5a): the sidebar groups fold; open them first, as a person would
       await expect(page.getByRole("link", { name: /Request Center/ }).first()).toBeVisible(); // the sidebar is still there
     });
   });
@@ -382,8 +375,8 @@ test.describe("P4.1 shared student parts", () => {
       data.logs = [{ id: 5, result: "Document received", actor_role: "Graduate School Staff", next_owner: "Student", created_at: "2026-09-10T09:00:00", notes: "Thank you." }];
     };
     await runPage(browser, { email: THERESE, mutate, path: "/student/documents", shot: "documents" }, async (page) => {
-      const docs = panel(page, "Administrative Documents");
-      await expect(docs).toContainText("Admission and general records outside your research submissions");
+      const docs = page.locator("main .card").first(); // CHANGED BY owner feedback 2026-11-23: the card has no title (the page title names it)
+      // CHANGED BY UX phase 3 (UX-22, IM50): the subtitle repeated the page line; removed.
       await expect(docs).toContainText("Spec Gate");
       await expect(docs).toContainText("Other Gate");
       await expect(docs).not.toContainText("Research hidden item");
@@ -391,8 +384,8 @@ test.describe("P4.1 shared student parts", () => {
       await expect(docs.getByText("Signed form", { exact: true })).toBeVisible();
       await expect(docs.getByText("Clearance slip", { exact: true })).toBeVisible(); // item_name when there is no display name
       await expect(docs.getByText("Missing", { exact: true })).toBeVisible();
-      await expect(docs.getByText("Verified by staff", { exact: true })).toBeVisible();
-      await expect(docs.getByText("Pending Review", { exact: true })).toBeVisible();
+      await expect(docs.getByText("Verified", { exact: true })).toBeVisible(); // UX-18: "Verified by staff" reads "Verified"
+      await expect(docs.getByText("In review", { exact: true })).toBeVisible(); // UX-18: "Pending Review" reads "In review"
       // only the missing document can be uploaded; every other one has a view button
       await expect(docs.getByLabel("Upload PDF")).toHaveCount(1);
       await expect(docs.getByRole("button", { name: "View document" })).toHaveCount(3);
@@ -403,7 +396,7 @@ test.describe("P4.1 shared student parts", () => {
     });
     // the Activity page: the same panel with the same logs
     await runPage(browser, { email: THERESE, mutate, path: "/student/activity", shot: "activity" }, async (page) => {
-      const activity = panel(page, "Activity Log");
+      const activity = page.locator("main .card").first(); // CHANGED BY owner feedback 2026-11-23: the card has no title (the page title names it)
       await activity.getByRole("button", { name: /View logs/ }).click();
       await expect(activity).toContainText("Document received");
       await expect(activity).toContainText("Thank you.");
@@ -452,7 +445,7 @@ test.describe("P4.1 shared student parts", () => {
       await history.click();
       await expect(c.getByRole("button", { name: /Hide stage history/ })).toBeVisible();
       await expect(c.getByText("Request sent back", { exact: true })).toBeVisible();
-      await expect(c).toContainText(/Staff Review\W*Returned/); // from and to status
+      await expect(c).toContainText(/In staff review\W*Returned/); // from and to status (UX-18: one word per meaning)
       await expect(c).toContainText("Missing certificate");
       await expect(c.getByText("Request received", { exact: true })).toBeVisible();
       await expect(c).toContainText(/Sep 1, 2026/);
@@ -617,7 +610,7 @@ test.describe("P4.1 shared student parts", () => {
       await expect(history).toContainText("3");
       await history.click();
       await expect(c.getByText("Return sent back", { exact: true }).first()).toBeVisible();
-      await expect(c).toContainText(/Return Filed\W*Returned for Revision/);
+      await expect(c).toContainText(/Return Filed\W*Returned/); // UX-18: "Returned for Revision" reads "Returned"
       await expect(c).toContainText(/AWOL Declared\W*Return Filed/);
       await expect(c).toContainText("Explain your plan.");
       await expect(c).toContainText("Second line.");
@@ -665,7 +658,7 @@ test.describe("P4.1 shared student parts", () => {
       // the form card (the same card as Leave of Absence, Readmission and Return from AWOL; no numbered stage)
       const stage = page.getByRole("region", { name: "Ask to withdraw from a subject" });
       await expect(stage.getByRole("heading", { level: 3, name: "Ask to withdraw from a subject", exact: true })).toBeVisible();
-      await expect(stage).toContainText("Choose one eligible enrolled subject and state the reason for withdrawing.");
+      await expect(stage).not.toContainText("Choose one eligible enrolled subject and state the reason for withdrawing."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(stage.getByText("Current stage", { exact: true })).toHaveCount(0);
 
       // the discussion panel: a message with a required PDF, and a reply box
@@ -687,7 +680,7 @@ test.describe("P4.1 shared student parts", () => {
       const cards = [
         ["Application / Review Window", "Current stage", "What you need to submit now: the review window and signed graduation application / review-window PDF."],
         ["Staff and Coursework Review", "Locked", "This stage opens after the application is submitted."],
-        ["Requirements Validation", "Locked", "Coursework, research, practicum, and completion records are checked here."],
+        ["Requirements Validation", "Locked", "Monitoring eligibility recommendation"], // CHANGED BY owner feedback 2026-11-23: no helper line
         ["Dean Endorsement", "Locked", "Available after eligibility is confirmed and staff prepares the endorsement."],
         ["The list is saved as a file", "Locked", "Available after Dean approval."],
         ["The Dean sends the list to the Registrar", "Locked", "Available after the endorsed list is exported."],

@@ -1,0 +1,1071 @@
+{
+ "base": "http://127.0.0.1:5101",
+ "roles": {
+  "student": {
+   "pages": [
+    {
+     "href": "/student",
+     "height": 893,
+     "title": "Welcome, Miguel",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1835
+    },
+    {
+     "href": "/student/progress",
+     "height": 1928,
+     "title": "My Progress",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 2872
+    },
+    {
+     "href": "/student/enrollment",
+     "height": 1815,
+     "title": "Enrollment",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 5103
+    },
+    {
+     "href": "/student/class-schedule",
+     "height": 768,
+     "title": "Schedule",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 844
+    },
+    {
+     "href": "/student/graduation",
+     "height": 1298,
+     "title": "Graduation Endorsement",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1999
+    },
+    {
+     "href": "/student/research",
+     "height": 1805,
+     "title": "Research Progress",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 2,
+     "smallInputs390": 0,
+     "height390": 3175
+    },
+    {
+     "href": "/student/adviser",
+     "height": 768,
+     "title": "Research Adviser",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 844
+    },
+    {
+     "href": "/student/defense-schedule",
+     "height": 1478,
+     "title": "Defense Schedule",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1869
+    },
+    {
+     "href": "/student/calendar",
+     "height": 1456,
+     "title": "Research Calendar",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1991
+    },
+    {
+     "href": "/student/requests",
+     "height": 768,
+     "title": "Request Center",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1220
+    },
+    {
+     "href": "/student/requests/leave-of-absence",
+     "height": 815,
+     "title": "Leave of Absence",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1117
+    },
+    {
+     "href": "/student/requests/readmission",
+     "height": 768,
+     "title": "Readmission",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 844
+    },
+    {
+     "href": "/student/requests/awol-return",
+     "height": 768,
+     "title": "Return from AWOL",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 844
+    },
+    {
+     "href": "/student/requests/withdrawal",
+     "height": 768,
+     "title": "Subject Withdrawal",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 844
+    },
+    {
+     "href": "/student/messages",
+     "height": 768,
+     "title": "Messages",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 844
+    },
+    {
+     "href": "/student/documents",
+     "height": 768,
+     "title": "Documents",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 844
+    },
+    {
+     "href": "/student/activity",
+     "height": 768,
+     "title": "Activity Log",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 844
+    },
+    {
+     "href": "/student/assistant",
+     "height": 857,
+     "title": "Policy Assistant",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1287
+    },
+    {
+     "href": "/student/profile",
+     "height": 768,
+     "title": "My Profile",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1264
+    }
+   ],
+   "home_desktop": {
+    "firstWorkY": 251,
+    "height": 893,
+    "actionRows": 1,
+    "openFigure": null,
+    "overflow": 0
+   },
+   "home_phone": {
+    "firstWorkY": 287,
+    "height": 1835,
+    "actionRows": 1,
+    "openFigure": null,
+    "overflow": 0
+   },
+   "sidebar": {
+    "linksShown": 19,
+    "linksInView": 11,
+    "scrolls": false
+   },
+   "navLinks": 19
+  },
+  "staff": {
+   "pages": [
+    {
+     "href": "/",
+     "height": 1184,
+     "title": "Welcome, Grace",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 2590
+    },
+    {
+     "href": "/reports",
+     "height": 2085,
+     "title": "Reports & Analytics",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 10,
+     "smallInputs390": 0,
+     "height390": 3067
+    },
+    {
+     "href": "/term-settings",
+     "height": 813,
+     "title": "Academic Semesters",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1543
+    },
+    {
+     "href": "/students",
+     "height": 2700,
+     "title": "Students",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 25,
+     "smallInputs390": 0,
+     "height390": 12272
+    },
+    {
+     "href": "/faculty",
+     "height": 1364,
+     "title": "Faculty",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 12,
+     "smallInputs390": 0,
+     "height390": 1455
+    },
+    {
+     "href": "/monitoring-sheet",
+     "height": 948,
+     "title": "Monitoring Sheet",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 200,
+     "smallInputs390": 0,
+     "height390": 1392
+    },
+    {
+     "href": "/enrollment-class-list",
+     "height": 768,
+     "title": "Enrollment Class List",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 934
+    },
+    {
+     "href": "/workflow/student-handoff",
+     "height": 1216,
+     "title": "Student Handoff",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1632
+    },
+    {
+     "href": "/course-adjustments",
+     "height": 3068,
+     "title": "Course Adjustments",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 4444
+    },
+    {
+     "href": "/enrollment",
+     "height": 2183,
+     "title": "Enrollment",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 3903
+    },
+    {
+     "href": "/workflow/course-audit",
+     "height": 1060,
+     "title": "Course Audit",
+     "axe": [
+      {
+       "id": "empty-table-header",
+       "impact": "minor",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 6,
+     "smallInputs390": 0,
+     "height390": 1403
+    },
+    {
+     "href": "/workflow/research-gate",
+     "height": 1338,
+     "title": "Research Gate",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 2,
+     "smallInputs390": 0,
+     "height390": 2417
+    },
+    {
+     "href": "/workflow/panel-matching",
+     "height": 1402,
+     "title": "Panel Matching",
+     "axe": [
+      {
+       "id": "empty-table-header",
+       "impact": "minor",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 2,
+     "smallInputs390": 2,
+     "height390": 3456
+    },
+    {
+     "href": "/workflow/defense-scheduling",
+     "height": 895,
+     "title": "Defense Scheduling",
+     "axe": [
+      {
+       "id": "empty-table-header",
+       "impact": "minor",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 2,
+     "smallInputs390": 2,
+     "height390": 1203
+    },
+    {
+     "href": "/workflow/practicum",
+     "height": 3393,
+     "title": "Practicum",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 2,
+     "smallInputs390": 0,
+     "height390": 2583
+    },
+    {
+     "href": "/workflow/graduation",
+     "height": 2761,
+     "title": "Graduation Endorsement",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 9,
+     "smallInputs390": 0,
+     "height390": 5279
+    },
+    {
+     "href": "/workflow/leave-of-absence",
+     "height": 3866,
+     "title": "Leave of Absence",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 9,
+     "smallInputs390": 0,
+     "height390": 4183
+    },
+    {
+     "href": "/workflow/readmission",
+     "height": 3175,
+     "title": "Readmission",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 3,
+     "smallInputs390": 0,
+     "height390": 2123
+    },
+    {
+     "href": "/workflow/awol",
+     "height": 2725,
+     "title": "AWOL & Residency",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 6,
+     "smallInputs390": 0,
+     "height390": 3108
+    },
+    {
+     "href": "/workflow/withdrawal",
+     "height": 3046,
+     "title": "Subject Withdrawal",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 4,
+     "smallInputs390": 0,
+     "height390": 2905
+    },
+    {
+     "href": "/work-queue",
+     "height": 1505,
+     "title": "Work Queue",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 33,
+     "smallInputs390": 0,
+     "height390": 2340
+    },
+    {
+     "href": "/activity",
+     "height": 4565,
+     "title": "Activity Log",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 6716
+    },
+    {
+     "href": "/assistant",
+     "height": 900,
+     "title": "Policy Assistant",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 2,
+     "smallInputs390": 2,
+     "height390": 1479
+    },
+    {
+     "href": "/policy-documents",
+     "height": 1347,
+     "title": "Policy Documents",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 2301
+    },
+    {
+     "href": "/business-rules",
+     "height": 18768,
+     "title": "Business Rules",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 31425
+    }
+   ],
+   "home_desktop": {
+    "firstWorkY": 251,
+    "height": 1184,
+    "actionRows": 5,
+    "openFigure": 50,
+    "overflow": 0
+   },
+   "home_phone": {
+    "firstWorkY": 303,
+    "height": 2590,
+    "actionRows": 5,
+    "openFigure": 50,
+    "overflow": 0
+   },
+   "sidebar": {
+    "linksShown": 25,
+    "linksInView": 12,
+    "scrolls": false
+   },
+   "navLinks": 25
+  },
+  "dean": {
+   "pages": [
+    {
+     "href": "/dean",
+     "height": 1025,
+     "title": "Welcome, Manuel",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 2486
+    },
+    {
+     "href": "/dean/approvals",
+     "height": 2429,
+     "title": "Approvals Queue",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 7,
+     "smallInputs390": 0,
+     "height390": 3532
+    },
+    {
+     "href": "/dean/approvals/course-adjustments",
+     "height": 976,
+     "title": "Course Adjustments",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 2126
+    },
+    {
+     "href": "/dean/approvals/leave-of-absence",
+     "height": 3308,
+     "title": "Leave of Absence",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 3,
+     "smallInputs390": 0,
+     "height390": 1607
+    },
+    {
+     "href": "/dean/approvals/readmission",
+     "height": 2861,
+     "title": "Readmission",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 3,
+     "smallInputs390": 0,
+     "height390": 1721
+    },
+    {
+     "href": "/dean/approvals/awol",
+     "height": 2051,
+     "title": "AWOL & Residency",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 3,
+     "smallInputs390": 0,
+     "height390": 1683
+    },
+    {
+     "href": "/dean/approvals/withdrawal",
+     "height": 2820,
+     "title": "Subject Withdrawal",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 2,
+     "smallInputs390": 0,
+     "height390": 1609
+    },
+    {
+     "href": "/dean/approvals/practicum",
+     "height": 2405,
+     "title": "Practicum Reports",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 2,
+     "smallInputs390": 0,
+     "height390": 1313
+    },
+    {
+     "href": "/dean/approvals/graduation",
+     "height": 2912,
+     "title": "Graduation Endorsement",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 3,
+     "smallInputs390": 0,
+     "height390": 4623
+    },
+    {
+     "href": "/dean/gate-reports",
+     "height": 953,
+     "title": "Admission & Coursework Reports",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1126
+    },
+    {
+     "href": "/dean/analytics",
+     "height": 1341,
+     "title": "Reports & Analytics",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1913
+    },
+    {
+     "href": "/dean/activity",
+     "height": 1157,
+     "title": "Activity Log",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 12,
+     "smallInputs390": 0,
+     "height390": 1578
+    },
+    {
+     "href": "/dean/assistant",
+     "height": 857,
+     "title": "Policy Assistant",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1208
+    },
+    {
+     "href": "/dean/business-rules",
+     "height": 18768,
+     "title": "Business Rules",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 31261
+    }
+   ],
+   "home_desktop": {
+    "firstWorkY": 251,
+    "height": 1025,
+    "actionRows": 7,
+    "openFigure": null,
+    "overflow": 0
+   },
+   "home_phone": {
+    "firstWorkY": 323,
+    "height": 2486,
+    "actionRows": 7,
+    "openFigure": null,
+    "overflow": 0
+   },
+   "sidebar": {
+    "linksShown": 14,
+    "linksInView": 11,
+    "scrolls": false
+   },
+   "navLinks": 14
+  },
+  "faculty": {
+   "pages": [
+    {
+     "href": "/faculty-portal",
+     "height": 768,
+     "title": "Welcome, Liwayway",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 980
+    },
+    {
+     "href": "/faculty-portal/advisees",
+     "height": 974,
+     "title": "My Advisees",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 2094
+    },
+    {
+     "href": "/faculty-portal/signatures",
+     "height": 986,
+     "title": "Signatures & Endorsements",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 4,
+     "smallInputs390": 0,
+     "height390": 1258
+    },
+    {
+     "href": "/faculty-portal/panels",
+     "height": 3687,
+     "title": "Panel Assignments & Papers",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 5588
+    },
+    {
+     "href": "/faculty-portal/invitations",
+     "height": 1023,
+     "title": "Panel Invitations",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1227
+    },
+    {
+     "href": "/faculty-portal/defenses",
+     "height": 768,
+     "title": "Defense Schedule",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 2721
+    },
+    {
+     "href": "/faculty-portal/calendar",
+     "height": 1183,
+     "title": "My Calendar",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 3,
+     "smallInputs390": 0,
+     "height390": 1682
+    },
+    {
+     "href": "/faculty-portal/availability",
+     "height": 1645,
+     "title": "My Availability",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 9,
+     "smallInputs390": 0,
+     "height390": 2980
+    },
+    {
+     "href": "/faculty-portal/verdicts",
+     "height": 2008,
+     "title": "Verdicts",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 2602
+    },
+    {
+     "href": "/faculty-portal/classes",
+     "height": 807,
+     "title": "Assigned Classes",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1502
+    },
+    {
+     "href": "/faculty-portal/schedule",
+     "height": 1232,
+     "title": "Schedule",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 2123
+    },
+    {
+     "href": "/faculty-portal/assistant",
+     "height": 857,
+     "title": "Policy Assistant",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1208
+    },
+    {
+     "href": "/faculty-portal/business-rules",
+     "height": 18768,
+     "title": "Business Rules",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 31261
+    }
+   ],
+   "home_desktop": {
+    "firstWorkY": 251,
+    "height": 768,
+    "actionRows": 1,
+    "openFigure": 1,
+    "overflow": 0
+   },
+   "home_phone": {
+    "firstWorkY": 287,
+    "height": 980,
+    "actionRows": 1,
+    "openFigure": 1,
+    "overflow": 0
+   },
+   "sidebar": {
+    "linksShown": 13,
+    "linksInView": 11,
+    "scrolls": false
+   },
+   "navLinks": 13
+  },
+  "research-coordinator": {
+   "pages": [
+    {
+     "href": "/",
+     "height": 821,
+     "title": "Welcome, Sofia",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1787
+    },
+    {
+     "href": "/reports",
+     "height": 2041,
+     "title": "Reports & Analytics",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 10,
+     "smallInputs390": 0,
+     "height390": 2911
+    },
+    {
+     "href": "/monitoring-sheet",
+     "height": 958,
+     "title": "Monitoring Sheet",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 200,
+     "smallInputs390": 0,
+     "height390": 1360
+    },
+    {
+     "href": "/workflow/research-gate",
+     "height": 1338,
+     "title": "Research Gate",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 2,
+     "smallInputs390": 0,
+     "height390": 2417
+    },
+    {
+     "href": "/workflow/panel-matching",
+     "height": 1402,
+     "title": "Panel Matching",
+     "axe": [
+      {
+       "id": "empty-table-header",
+       "impact": "minor",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 2,
+     "smallInputs390": 2,
+     "height390": 3456
+    },
+    {
+     "href": "/workflow/defense-scheduling",
+     "height": 895,
+     "title": "Defense Scheduling",
+     "axe": [
+      {
+       "id": "empty-table-header",
+       "impact": "minor",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 2,
+     "smallInputs390": 2,
+     "height390": 1203
+    },
+    {
+     "href": "/workflow/graduation",
+     "height": 2761,
+     "title": "Graduation Endorsement",
+     "axe": [
+      {
+       "id": "heading-order",
+       "impact": "moderate",
+       "nodes": 1
+      }
+     ],
+     "overflow390": 0,
+     "small390": 4,
+     "smallInputs390": 0,
+     "height390": 3075
+    },
+    {
+     "href": "/work-queue",
+     "height": 768,
+     "title": "Work Queue",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 1,
+     "smallInputs390": 0,
+     "height390": 844
+    },
+    {
+     "href": "/assistant",
+     "height": 857,
+     "title": "Policy Assistant",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 1208
+    },
+    {
+     "href": "/business-rules",
+     "height": 18768,
+     "title": "Business Rules",
+     "axe": [],
+     "overflow390": 0,
+     "small390": 0,
+     "smallInputs390": 0,
+     "height390": 31261
+    }
+   ],
+   "home_desktop": {
+    "firstWorkY": 190,
+    "height": 821,
+    "actionRows": 3,
+    "openFigure": 0,
+    "overflow": 0
+   },
+   "home_phone": {
+    "firstWorkY": 242,
+    "height": 1787,
+    "actionRows": 3,
+    "openFigure": 0,
+    "overflow": 0
+   },
+   "sidebar": {
+    "linksShown": 10,
+    "linksInView": 10,
+    "scrolls": false
+   },
+   "navLinks": 10
+  }
+ },
+ "deanQueueHeight": 2429,
+ "loaBoard": {
+  "scrollWidth": 2328,
+  "clientWidth": 1062
+ },
+ "monitoring": {
+  "cells": 180,
+  "blankCells": 62,
+  "legendColours": 10
+ }
+}

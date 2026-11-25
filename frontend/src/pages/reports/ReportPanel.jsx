@@ -100,7 +100,7 @@ export default function ReportPanel({ report, params, setParam, clearFilters }) 
   return (
     <div className="page-stack">
       <ReportFilters specs={report.filters} options={data.options} params={params} onChange={setParam} onClear={clearFilters} />
-      <SectionCard title={data.title} subtitle={report.about} action={downloads} aria-busy={loading}>
+      <SectionCard title={data.title} action={downloads} aria-busy={loading}>
         <p className="meta" aria-live="polite">
           {count} {count === 1 ? "row" : "rows"}
           {filtered ? " match the filters" : ""}

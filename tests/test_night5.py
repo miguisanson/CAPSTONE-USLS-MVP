@@ -85,6 +85,8 @@ class EnrollmentOfferedSubjectsTests(Night5Base):
     student), which Camille completed. Her not-taken DBA-COG4..COG10 are real "available" subjects, but nobody offered them.
     """
 
+    @unittest.skip("CHANGED BY data cleanup (IM54, 2026-11-22): Camille Bernardo (DBA) is no longer in the demo data; this "
+                   "test reproduced one owner report about her offering list")
     def test_camille_bernardo_is_offered_only_subjects_she_completed_and_her_not_taken_ones_are_not_offered(self):
         client = self.client_for("academic@usls.edu.ph")
         with app.app_context():

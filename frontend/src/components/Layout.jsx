@@ -16,6 +16,7 @@ import {
   GraduationCap,
   Briefcase,
   ChevronRight,
+  ChevronDown,
   Bot,
   Table2,
   FileText,
@@ -32,7 +33,7 @@ import {
 import { useAuth } from "../auth";
 import { api } from "../api";
 import { Button, Drawer, InlineNotice } from "./ui/index.js";
-import { PORTAL_NAV, PORTAL_FOOTERS, findNavItem, usePortalNav } from "./portalNav";
+import { PORTAL_NAV, findNavItem, usePortalNav } from "./portalNav";
 import NotificationBell from "./NotificationBell";
 import DemoGuide from "./DemoGuide";
 import { PAGE, PORTAL_NAMES, RECORD_LABELS, stepLabel, withoutStep } from "../lib/labels.js";
@@ -162,6 +163,70 @@ const NAV_SCROLL_SHADOW = {
   ].join(", "),
 };
 
+// UX-27 (Phase 5a, owner IM46 "lighter touch"): the sidebar groups fold. With no choice made, only the group holding the
+// page you are on is open; a group you open or close stays that way on this browser (localStorage, wrapped: a private
+// window or a blocked store simply forgets); going to a page in a closed group opens it.
+const itemIsCurrent = (item, pathname) =>
+  pathname === item.to ||
+  (!item.end && item.to !== "/" && pathname.startsWith(`${item.to}/`)) ||
+  (item.matches || []).some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+const groupsKey = (role) => `usls.nav.groups.${role || "guest"}`;
+function readGroups(role) {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(groupsKey(role)) || "{}");
+    return saved && typeof saved === "object" ? saved : {};
+  } catch {
+    return {};
+  }
+}
+function saveGroups(role, value) {
+  try {
+    window.localStorage.setItem(groupsKey(role), JSON.stringify(value));
+  } catch {
+    /* nothing to do: the choice lasts for this page only */
+  }
+}
+
+function NavGroup({ group, open, onToggle, onNavigate, fixed = false }) {
+  const id = `nav-group-${group.label.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+  // the first group (it holds the home page) never folds, and a group of one link has nothing to fold
+  if (fixed || group.items.length < 2) {
+    return (
+      <div data-nav-group={group.label}>
+        <p className="eyebrow px-3 pb-2">{group.label}</p>
+        <div className="space-y-1">
+          {group.items.map((item) => <NavItem key={item.to} {...item} onClick={onNavigate} />)}
+        </div>
+      </div>
+    );
+  }
+  const waiting = group.items.reduce((sum, item) => sum + (item.badge || 0), 0);
+  return (
+    <div data-nav-group={group.label}>
+      <button
+        type="button"
+        data-nav-toggle
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={onToggle}
+        className="eyebrow flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 pb-2 pt-1 text-left transition-colors hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      >
+        <span className="min-w-0 flex-1">{group.label}</span>
+        {/* folded, the group's waiting count stays in sight on its heading */}
+        {!open && waiting > 0 && (
+          <span className="inline-flex min-w-[1.4rem] items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold normal-case tracking-normal text-amber-800" aria-label={`${waiting} waiting`}>
+            {waiting}
+          </span>
+        )}
+        <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-200 ${open ? "" : "-rotate-90"}`} aria-hidden="true" />
+      </button>
+      <div id={id} hidden={!open} className="space-y-1">
+        {group.items.map((item) => <NavItem key={item.to} {...item} onClick={onNavigate} />)}
+      </div>
+    </div>
+  );
+}
+
 function SidebarContent({ onNavigate, onClose, user, identity, onSignOut }) {
   const { counts, flags } = usePortalNav();
   const { pathname } = useLocation();
@@ -177,7 +242,23 @@ function SidebarContent({ onNavigate, onClose, user, identity, onSignOut }) {
         .map((item) => ({ ...item, badge: item.badge ? counts[item.badge] || 0 : 0 })),
     }))
     .filter((group) => group.items.length);
-  const shape = groups.map((group) => group.items.length).join(",");
+  const [chosen, setChosen] = useState(() => readGroups(user?.role));
+  const currentGroup = groups.find((group) => group.items.some((item) => itemIsCurrent(item, pathname)))?.label;
+  // going to a page in a group you closed opens it, so the page you are on is always in the sidebar
+  useEffect(() => {
+    if (currentGroup && chosen[currentGroup] === false) {
+      const next = { ...chosen, [currentGroup]: true };
+      setChosen(next);
+      saveGroups(user?.role, next);
+    }
+  }, [currentGroup]);
+  const isOpen = (group) => chosen[group.label] ?? group.label === currentGroup;
+  const toggle = (group) => {
+    const next = { ...chosen, [group.label]: !isOpen(group) };
+    setChosen(next);
+    saveGroups(user?.role, next);
+  };
+  const shape = `${groups.map((group) => group.items.length).join(",")}|${groups.map((group) => (isOpen(group) ? 1 : 0)).join("")}`;
 
   // I-103: the nav scrolls between the brand and the footer; open it with the page you are on in view (only the nav
   // moves, never the page).
@@ -211,26 +292,18 @@ function SidebarContent({ onNavigate, onClose, user, identity, onSignOut }) {
         </p>
       )}
 
-      <nav ref={navRef} style={NAV_SCROLL_SHADOW} className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 pb-9">
-        {groups.map((group) => (
-          <div key={group.label}>
-            <p className="eyebrow px-3 pb-2">{group.label}</p>
-            <div className="space-y-1">
-              {group.items.map((item) => (
-                <NavItem key={item.to} {...item} onClick={onNavigate} />
-              ))}
-            </div>
-          </div>
+      <nav ref={navRef} style={NAV_SCROLL_SHADOW} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 pb-9">
+        {groups.map((group, index) => (
+          <NavGroup key={group.label} group={group} fixed={index === 0} open={index === 0 || isOpen(group)} onToggle={() => toggle(group)} onNavigate={onNavigate} />
         ))}
       </nav>
 
-      <div className="shrink-0 border-t border-slate-200 px-5 py-4 [@media(max-height:520px)]:py-2">
-        {onSignOut && <Button variant="secondary" icon={LogOut} onClick={onSignOut} className="mb-3 w-full max-sm:min-h-11 [@media(max-height:520px)]:mb-1">Sign out</Button>}
-        <p className="mb-1 text-xs font-semibold text-brand-700">{ROLE_LABELS[user?.role] || "Graduate School Staff"}</p>
-        <p className="micro leading-relaxed [@media(max-height:520px)]:hidden">
-          {PORTAL_FOOTERS[user?.role] || "Figures are computed live from recorded transactions."}
-        </p>
-      </div>
+      {/* UX-05: no footer note under the links (the header already names the role); the phone menu keeps Sign out. */}
+      {onSignOut && (
+        <div className="shrink-0 border-t border-slate-200 px-5 py-4 [@media(max-height:520px)]:py-2">
+          <Button variant="secondary" icon={LogOut} onClick={onSignOut} className="w-full max-sm:min-h-11">Sign out</Button>
+        </div>
+      )}
     </div>
   );
 }

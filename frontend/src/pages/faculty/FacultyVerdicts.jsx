@@ -211,11 +211,11 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
 
       <section aria-label="Needs your verdict">
         <Card>
-          <SectionTitle title="Needs your verdict" subtitle="Defenses where you are the panel chair or lead and no verdict is recorded yet" icon={Gavel} />
+          <SectionTitle title="Needs your verdict" icon={Gavel} />
           {needs.length ? (
             <div className="space-y-4">{needs.map((panel) => card(panel, { papers: true }))}</div>
           ) : (
-            <EmptyState size="sm" icon={CheckCircle2} title="No verdicts are waiting for you" hint="A verdict form appears here once a defense is scheduled for a panel you chair." />
+            <EmptyState size="sm" icon={CheckCircle2} title="No verdicts are waiting for you" />
           )}
         </Card>
       </section>
@@ -223,7 +223,7 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
       {waiting.length > 0 && (
         <section aria-label="Waiting on others">
           <Card>
-            <SectionTitle title="Waiting on others" subtitle="A defense is set, but the chair or lead has not recorded the verdict. Nothing to do yet." icon={Hourglass} />
+            <SectionTitle title="Waiting on others" icon={Hourglass} />
             <div className="space-y-4">{waiting.map((panel) => card(panel))}</div>
           </Card>
         </section>
@@ -233,7 +233,6 @@ export default function FacultyVerdicts({ panels = [], refetch }) {
         <Card>
           <SectionTitle
             title="Verdict history"
-            subtitle="Finished verdicts for the panels you sit on, newest first."
             icon={History}
           />
           {history.length ? (

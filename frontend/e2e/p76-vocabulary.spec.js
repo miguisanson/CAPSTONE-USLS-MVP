@@ -115,9 +115,8 @@ test.describe("P7.6 one name per page: sidebar, breadcrumb and title agree", () 
 
     test("Subject Withdrawal opens with the rules box closed so the form is on the first screen (I-076)", async ({ page }) => {
       await page.goto("/student/requests/withdrawal");
-      const rules = page.locator('section[aria-label="Rules applied on this screen"]');
-      await expect(rules).toBeVisible();
-      await expect(rules.getByRole("button")).toHaveAttribute("aria-expanded", "false");
+      // CHANGED BY owner feedback 2026-11-23 (IM58): there is no rules box, so the form is on the first screen
+      await expect(page.locator('section[aria-label="Rules applied on this screen"]')).toHaveCount(0);
     });
   });
 });

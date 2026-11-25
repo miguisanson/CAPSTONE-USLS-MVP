@@ -9,6 +9,34 @@ entered in the portal. The file holds plain data only; app.py does the seeding.
 
 DEMO_SEED_SOURCE = "demo seed"
 
+# Demo data cleanup (owner 2026-11-22, IM54-IM56; .planning/DATA-CLEANUP-PLAN.md). The seed imports every monitoring
+# sheet (each program keeps its curriculum) but keeps only these imported students; each carries a case on a board, the
+# Research Gate or a Dean screen. Every demo persona below (DEMO_STUDENT_NUMBERS) stays.
+DEMO_KEPT_SHEET_STUDENTS = frozenset({
+    "2260004",  # Miguel Yu (student@): research, panels, defenses, verdicts
+    "2260007",  # Isabel Flores: graduation For Review
+    "2260011",  # Elena Mendoza: residency, Research Gate missing requirements
+    "2360006",  # Adrian Lim: withdrawal for staff; at risk (Monitoring tour)
+    "2360008",  # Hector Ong: graduation list with the Dean
+    "2360010",  # Paulo Garcia: AWOL declared
+    "2460003",  # Benjamin Santos: leave for staff
+    "2460005",  # Clarisse Tan: AWOL return for staff
+    "2460009",  # Maria Dela Cruz: readmission for staff
+    "2560001",  # Daniel Cruz: new admission handoff
+    "2560002",  # Grace Reyes: early coursework
+    "2360101",  # Isabel Mendoza (MAPSY): practicum report with the Dean
+    "2360092",  # Nicole Alvarez (MAPSY): practicum hours check
+})
+# Seven faculty (IM56: the kept students need 33 adviser seats at five each). The tours sign in as the first three.
+DEMO_FACULTY = (
+    "Dr. Liwayway Bautista", "Dr. Angela Cruz", "Dr. Celeste Tan",
+    "Dr. Teodoro Ramos", "Dr. Patricia Salvador", "Dr. Marlon Geronimo", "Dr. Benjamin Reyes",
+)
+# Data cleanup stage 4 (2026-11-22, amends IM55's three logins, for the owner to confirm): every faculty member signs in,
+# because a defense panel member must have an active faculty login (defense_faculty_directory, the panel invitation),
+# so with three logins the four other faculty could sit on no panel and Change panel offered three people.
+DEMO_FACULTY_LOGINS = frozenset(DEMO_FACULTY)
+
 # One mapping table for the seeded demo personas (I-353). Every number is exactly 7 digits and sits in the 269xxxx
 # block, which no imported student uses (the sheets use 226/236/246/256). Tests, e2e specs, walkthroughs and the
 # demo guides name the same numbers; change one here and run: grep -rn <old number> .
@@ -39,6 +67,8 @@ DEMO_STUDENT_NUMBERS = {
     "GRAD-08": "2690308",
     "WD-01": "2690401",
     "WD-02": "2690402",
+    "WD-03": "2690403",  # IM54 (2026-11-22): the two Withdrawal step cards (subject tagging, Excel export), MAED, with a
+    "WD-04": "2690404",  # sign-in, now that the imported students the seed used to pick have no portal login
     "ENR-01": "2690501",
     "ENR-02": "2690502",
     "HO-01": "2690601",
@@ -54,7 +84,54 @@ DEMO_STUDENT_NUMBERS = {
     "UD-01": "2691201",
     "UD-02": "2691202",
     "UD-03": "2691203",
+    # IM56 (2026-11-22): the Dean's cases, held by MAED demo students (they replace imported students of other programs).
+    "DEAN-01": "2691301",
+    "DEAN-02": "2691302",
+    "DEAN-03": "2691303",
+    "DEAN-04": "2691304",
+    "DEAN-05": "2691305",
+    "DEAN-06": "2691306",
 }
+
+# The Dean's demo cases (app.seed_dean_review_cases): MAED students with a sign-in, each holding one case.
+DEAN_DEMO_PERSONAS = {
+    "leave-of-absence": (DEMO_STUDENT_NUMBERS["DEAN-01"], "Rowena", "Gatchalian"),         # LOA with the Dean
+    "readmission": (DEMO_STUDENT_NUMBERS["DEAN-02"], "Joaquin", "Lizares"),                # on leave, readmission with the Dean
+    "awol-return": (DEMO_STUDENT_NUMBERS["DEAN-03"], "Carmela", "Jison"),                  # AWOL, return declaration with the Dean
+    "withdrawal": (DEMO_STUDENT_NUMBERS["DEAN-04"], "Enzo", "Araneta"),                    # subject withdrawal with the Dean
+    "leave-of-absence-decided": (DEMO_STUDENT_NUMBERS["DEAN-05"], "Mariel", "Yulo"),       # LOA the Dean approved
+    "withdrawal-decided": (DEMO_STUDENT_NUMBERS["DEAN-06"], "Kevin", "Locsin"),            # withdrawal the Dean denied
+}
+
+# IM57 (owner 2026-11-22): a small history, so the Reports compare with the two earlier terms (app.seed_report_history).
+# MAED coursework students with no current case and no sign-in; each holds one decided case or one held defense of an
+# earlier term. The two practicum ones are MSGC (MAED has no practicum).
+HISTORY_DEMO_STUDENTS = (
+    ("2691401", "Alyssa", "Bermejo"),
+    ("2691402", "Bryan", "Catalan"),
+    ("2691403", "Christine", "Dumalagan"),
+    ("2691404", "Dennis", "Escalona"),
+    ("2691405", "Ella", "Fuentebella"),
+    ("2691406", "Francis", "Gaston"),
+    ("2691407", "Gemma", "Hilado"),
+    ("2691408", "Harold", "Inocencio"),
+    ("2691409", "Iris", "Jamora"),
+    ("2691410", "Jerome", "Katalbas"),
+    ("2691411", "Karen", "Lopue"),
+    ("2691412", "Lester", "Montinola"),
+    ("2691413", "Monica", "Nolasco"),
+    ("2691414", "Neil", "Ortaliz"),
+)
+HISTORY_PRACTICUM_STUDENTS = (
+    ("2691417", "Pia", "Quisumbing"),
+    ("2691418", "Ronald", "Sarrosa"),
+)
+
+# The Withdrawal step cards (seed_stage_ready_cases), in STAGE_READY_WITHDRAWAL order.
+STAGE_READY_WITHDRAWAL_STUDENTS = (
+    (DEMO_STUDENT_NUMBERS["WD-03"], "Kristine", "Villafuerte"),
+    (DEMO_STUDENT_NUMBERS["WD-04"], "Ramil", "Jalandoni"),
+)
 
 # (kind, text, year) per faculty member. Kinds: research_interest, publication,
 # past_advisee_title, past_panel_title, degree. The roster's own SPECIALIZATION
@@ -178,45 +255,40 @@ FACULTY_EXPERTISE_DEMO = {
     ],
 }
 
-# Demo students in different programs and fields. Each has three concept papers
-# (the title-defense package). "stage" is the Research Gate the student is
-# waiting at: "title" = Form 1 (three concept papers); "proposal" = Form 4
-# (title defense already passed, proposal manuscript uploaded). "title_panel"
-# is the historical title-defense panel for students past the title defense.
+# Demo students waiting at the Research Gate (IM56, 2026-11-22: all MAED, with education theses that the demo faculty's
+# expertise matches). Each has three concept papers (the title-defense package). "stage" is the Research Gate the
+# student is waiting at: "title" = Form 1 (three concept papers); "proposal" = Form 4 (title defense already passed,
+# proposal manuscript uploaded). "title_panel" is the historical title-defense panel for students past the title defense.
 PANEL_MATCHING_DEMO_STUDENTS = [
     {
         "student_number": DEMO_STUDENT_NUMBERS["PM-01"],
         "first_name": "Camille", "last_name": "Dizon",
-        "program_code": "MSN", "adviser": "Dr. Teodoro Ramos", "stage": "title",
-        "field": "nursing and health informatics",
-        "case_title": "Text-Message Reminders and Medication Adherence among Adults with Hypertension",
+        "program_code": "MAED", "adviser": "Dr. Teodoro Ramos", "stage": "title",
+        "field": "teacher well-being and school health",
+        "case_title": "Teacher Burnout, Coping, and Well-Being in Public Senior High Schools",
         "concept_papers": [
             (
-                "Text-Message Reminders and Medication Adherence among Adults with Hypertension",
-                "This concept paper proposes a quasi-experimental study of automated text-message reminders and "
-                "medication adherence among adult patients with hypertension in community health centers. "
-                "Adherence will be measured with a validated questionnaire and pill counts, and blood pressure "
-                "outcomes will be compared using logistic regression.",
+                "Teacher Burnout, Coping, and Well-Being in Public Senior High Schools",
+                "This concept paper measures burnout, coping strategies, and psychological well-being of public "
+                "senior high school teachers using validated scales and a survey of teachers in one division.",
             ),
             (
-                "Nurse-Led Telehealth Follow-Up and Patient Education for Chronic Illness",
-                "This concept paper examines nurse-led telehealth follow-up calls and patient education as ways to "
-                "improve self-management among patients with hypertension and diabetes. A patient survey and "
-                "interviews with staff nurses will describe barriers to treatment adherence in primary care.",
+                "School-Based Health Programs and Student Attendance in Public Elementary Schools",
+                "This concept paper studies how school feeding, health screening, and wellness programs relate to "
+                "student attendance and readiness to learn in public elementary schools.",
             ),
             (
-                "Electronic Health Records and Nursing Documentation Quality in Primary Care Clinics",
-                "This concept paper investigates how an electronic health record system affects the completeness of "
-                "nursing documentation and patient safety reporting in primary care clinics, using a chart audit and "
-                "a staff satisfaction survey.",
+                "Mental Health Literacy and Help-Seeking of Junior High School Students",
+                "This concept paper examines mental health literacy, stigma, and help-seeking behavior among junior "
+                "high school students and the role of guidance services in schools.",
             ),
         ],
     },
     {
         "student_number": DEMO_STUDENT_NUMBERS["PM-02"],
         "first_name": "Rafael", "last_name": "Ocampo",
-        "program_code": "MAPSY", "adviser": "Dr. Liwayway Bautista", "stage": "title",
-        "field": "psychology and student well-being",
+        "program_code": "MAED", "adviser": "Dr. Liwayway Bautista", "stage": "title",
+        "field": "student well-being in graduate education",
         "case_title": "Academic Burnout, Coping, and Psychological Well-Being of Working Graduate Students",
         "concept_papers": [
             (
@@ -242,149 +314,145 @@ PANEL_MATCHING_DEMO_STUDENTS = [
     {
         "student_number": DEMO_STUDENT_NUMBERS["PM-03"],
         "first_name": "Jasper", "last_name": "Lorenzo",
-        "program_code": "MSCS", "adviser": "Dr. Marlon Geronimo", "stage": "title",
-        "field": "engineering systems and predictive maintenance",
-        "case_title": "Vibration-Based Predictive Maintenance of CNC Machine Tools using Machine Learning",
+        "program_code": "MAED", "adviser": "Dr. Marlon Geronimo", "stage": "title",
+        "field": "educational data mining and learning analytics",
+        "case_title": "Early Warning Models for Graduate Student Attrition using Learning Management System Data",
         "concept_papers": [
             (
-                "Vibration-Based Predictive Maintenance of CNC Machine Tools using Machine Learning",
-                "This concept paper develops a predictive maintenance model that uses vibration sensor signals from "
-                "CNC machine tools to predict bearing faults before failure. Machine learning classifiers will be "
-                "trained on labeled sensor data and compared on fault detection accuracy.",
+                "Early Warning Models for Graduate Student Attrition using Learning Management System Data",
+                "This concept paper builds an early warning model with machine learning classifiers on learning "
+                "management system activity and grades to identify graduate students at risk of dropping out.",
             ),
             (
-                "Energy Consumption Optimization of Industrial Motors with IoT Sensors",
-                "This concept paper measures the energy consumption of industrial motors on a production line with "
-                "IoT sensors and builds a data model to identify energy waste and recommend optimization of motor "
-                "operating schedules.",
+                "Predicting Licensure Examination Performance of Education Graduates",
+                "This concept paper applies predictive modeling to academic records of education graduates to "
+                "estimate their performance in the licensure examination for teachers.",
             ),
             (
-                "Anomaly Detection in Conveyor Systems using Sensor Data",
-                "This concept paper applies anomaly detection to condition monitoring data from conveyor systems in "
-                "a manufacturing plant to support automation and reduce unplanned downtime.",
+                "Learning Analytics Dashboards and Course Completion in Blended Graduate Classes",
+                "This concept paper studies whether learning analytics dashboards that show participation and "
+                "progress improve course completion in blended graduate classes.",
             ),
         ],
     },
     {
         "student_number": DEMO_STUDENT_NUMBERS["PM-04"],
         "first_name": "Bea", "last_name": "Fontanilla",
-        "program_code": "MBA", "adviser": "Dr. Angela Cruz", "stage": "title",
-        "field": "financial technology",
-        "case_title": "Trust, Perceived Risk, and E-Wallet Adoption among Young Working Adults",
+        "program_code": "MAED", "adviser": "Dr. Angela Cruz", "stage": "title",
+        "field": "school finance and financial literacy",
+        "case_title": "Financial Literacy Instruction and Savings Behavior of Senior High School Students",
         "concept_papers": [
             (
-                "Trust, Perceived Risk, and E-Wallet Adoption among Young Working Adults",
-                "This concept paper studies how trust and perceived risk influence the adoption of e-wallets and "
-                "digital payment apps among young working adults, using a technology acceptance model and a "
-                "survey of app users.",
+                "Financial Literacy Instruction and Savings Behavior of Senior High School Students",
+                "This concept paper evaluates how a financial literacy module in senior high school, including the "
+                "use of digital wallets, changes the savings behavior and money management of students.",
             ),
             (
-                "Digital Payment Usage and Savings Behavior of Micro-entrepreneurs",
-                "This concept paper examines whether the use of digital payments and mobile banking changes the "
-                "savings behavior and financial record keeping of micro-entrepreneurs in public markets.",
+                "Budgeting and Financial Management Practices of Private School Administrators",
+                "This concept paper examines how administrators of small private schools plan budgets, manage tuition "
+                "collections, and use accounting information systems for decisions.",
             ),
             (
-                "Accounting Information Systems and Financial Reporting Quality in Small Enterprises",
-                "This concept paper investigates how the adoption of cloud accounting information systems affects "
-                "the quality of financial reporting and business analytics in small and medium enterprises.",
+                "Entrepreneurship Education and Entrepreneurial Intention of Technical-Vocational Students",
+                "This concept paper studies the effect of entrepreneurship education on the entrepreneurial intention "
+                "and small business plans of technical-vocational students.",
             ),
         ],
     },
     {
         "student_number": DEMO_STUDENT_NUMBERS["PM-05"],
         "first_name": "Miko", "last_name": "Almario",
-        "program_code": "MBA", "adviser": "Dr. Paolo Navarro", "stage": "proposal",
-        "field": "supply chain and operations",
-        "case_title": "Demand Forecasting and Safety Stock Policy for a Consumer Goods Distributor",
+        "program_code": "MAED", "adviser": "Dr. Marlon Geronimo", "stage": "proposal",
+        "field": "school finance and resource management",
+        "case_title": "Tuition Collection Practices and Financial Sustainability of Small Private Schools",
         "title_panel": [
-            ("Dr. Marco Villanueva", "Panel Chair"),
-            ("Dr. Benjamin Reyes", "Content Specialist"),
+            ("Dr. Angela Cruz", "Panel Chair"),
+            ("Dr. Patricia Salvador", "Content Specialist"),
             ("Dr. Teodoro Ramos", "Method Specialist"),
-            ("Dr. Angela Cruz", "External Panel"),
+            ("Dr. Liwayway Bautista", "External Panel"),
         ],
         "concept_papers": [
             (
-                "Demand Forecasting and Safety Stock Policy for a Consumer Goods Distributor",
-                "This concept paper evaluates demand forecasting methods and safety stock policy for a regional "
-                "consumer goods distributor to reduce stockouts and inventory holding cost in its supply chain.",
+                "Tuition Collection Practices and Financial Sustainability of Small Private Schools",
+                "This concept paper analyzes tuition collection practices, cash flow, and reserves of small private "
+                "schools to explain their financial sustainability and the use of accounting information systems.",
             ),
             (
-                "Warehouse Order Picking Simulation to Reduce Cycle Time",
-                "This concept paper uses discrete-event simulation to test warehouse layout and order picking "
-                "rules and estimate the reduction in order cycle time and logistics cost.",
+                "Resource Allocation and Learning Outcomes in Public Secondary Schools",
+                "This concept paper relates how school maintenance and operating funds are allocated to learning "
+                "materials, facilities, and teacher training with the learning outcomes of students.",
             ),
             (
-                "Lean Six Sigma and Quality Improvement in Food Processing",
-                "This concept paper applies Lean Six Sigma process improvement and quality systems to reduce "
-                "defects and waste in a food processing plant.",
+                "Cost-Effectiveness of Remedial Reading Programs in Elementary Schools",
+                "This concept paper compares the cost and effect of remedial reading programs in elementary schools "
+                "to guide school administrators in choosing interventions.",
             ),
         ],
         "proposal_manuscript": (
-            "The proposal applies demand forecasting and discrete-event simulation to evaluate safety stock and "
-            "reorder policies for a regional consumer goods distributor. Twelve months of inventory and order "
-            "records will be analyzed, forecast error will be compared across methods, and the simulated service "
-            "level and holding cost of each policy will be reported to guide supply chain decisions."
+            "The proposal analyzes five years of tuition collection, cash flow, and reserve records of twelve "
+            "small private schools in Negros Occidental. Collection practices will be compared across schools, "
+            "interviews with administrators will explain the differences, and the financial sustainability of "
+            "each practice will be reported to guide school owners and administrators."
         ),
     },
     {
         "student_number": DEMO_STUDENT_NUMBERS["PM-06"],
         "first_name": "Liza", "last_name": "Marquez",
-        "program_code": "DBA", "adviser": "Dr. Benjamin Reyes", "stage": "proposal",
-        "field": "family business and strategy",
-        "case_title": "Succession Planning and Firm Continuity in Philippine Family Enterprises",
+        "program_code": "MAED", "adviser": "Dr. Benjamin Reyes", "stage": "proposal",
+        "field": "school leadership and succession",
+        "case_title": "Leadership Succession and Continuity in Family-Owned Private Schools",
         "title_panel": [
             ("Dr. Angela Cruz", "Panel Chair"),
-            ("Dr. Marco Villanueva", "Content Specialist 1"),
-            ("Dr. Teresa Lim", "Content Specialist 2"),
+            ("Dr. Celeste Tan", "Content Specialist 1"),
+            ("Dr. Patricia Salvador", "Content Specialist 2"),
             ("Dr. Teodoro Ramos", "Method Specialist"),
-            ("Dr. Paolo Navarro", "External Panel"),
+            ("Dr. Liwayway Bautista", "External Panel"),
         ],
         "concept_papers": [
             (
-                "Succession Planning and Firm Continuity in Philippine Family Enterprises",
+                "Leadership Succession and Continuity in Family-Owned Private Schools",
                 "This concept paper explores how succession planning and next-generation leadership affect the "
-                "continuity of family-owned enterprises, using a multiple case study of three family businesses.",
+                "continuity of family-owned private schools, using a multiple case study of three schools.",
             ),
             (
-                "Governance Structures and Professionalization of Family Firms",
-                "This concept paper studies family business governance, including family councils and boards, and "
-                "how professionalization relates to strategic management and firm performance.",
+                "Governance Structures and Professionalization of Family-Run Schools",
+                "This concept paper studies the governance of family-run schools, including boards and family "
+                "councils, and how professionalization relates to school management and performance.",
             ),
             (
-                "Entrepreneurial Orientation and Organizational Innovation in Second-Generation Firms",
-                "This concept paper examines entrepreneurial orientation and organizational innovation among "
-                "second-generation family firms and the role of strategy in renewing the business.",
+                "Innovation and Strategic Planning in Second-Generation Private Schools",
+                "This concept paper examines how second-generation owners of private schools use strategic planning "
+                "and organizational innovation to renew their schools.",
             ),
         ],
         "proposal_manuscript": (
             "The proposal uses a multiple case study design to examine succession planning and governance in "
-            "three Philippine family-owned enterprises. Interviews with founders, successors, and board members "
-            "will be coded thematically to explain how next-generation leadership, family governance, and "
-            "strategic renewal shape firm continuity across generations."
+            "three family-owned private schools in Bacolod City. Interviews with founders, successors, and school "
+            "board members will be coded thematically to explain how next-generation leadership, family "
+            "governance, and strategic renewal shape the continuity of each school."
         ),
     },
     {
         "student_number": DEMO_STUDENT_NUMBERS["PM-07"],
         "first_name": "Nico", "last_name": "Baltazar",
-        "program_code": "MBA", "adviser": "Dr. Angela Cruz", "stage": "title",
-        "field": "digital marketing and consumer behavior",
-        "case_title": "Influencer Credibility and Purchase Intention on Short-Video Platforms",
+        "program_code": "MAED", "adviser": "Dr. Angela Cruz", "stage": "title",
+        "field": "online pedagogy and instructional design",
+        "case_title": "Instructional Design of Short-Video Lessons and Learner Engagement in Blended Classes",
         "concept_papers": [
             (
-                "Influencer Credibility and Purchase Intention on Short-Video Platforms",
-                "This concept paper studies how influencer credibility and social media engagement shape the "
-                "purchase intention of young consumers on short-video platforms, using an online survey and "
-                "regression analysis.",
+                "Instructional Design of Short-Video Lessons and Learner Engagement in Blended Classes",
+                "This concept paper studies how short-video lessons designed with instructional design principles "
+                "affect learner engagement and participation in blended graduate classes.",
             ),
             (
-                "Brand Equity and Customer Loyalty in Online Retail",
-                "This concept paper examines brand equity, brand positioning, and customer loyalty among "
-                "shoppers of online retail stores and electronic commerce platforms.",
+                "Learning Management System Adoption among Faculty of a Private University",
+                "This concept paper examines the factors that influence the adoption of a learning management system "
+                "by faculty, using a technology acceptance model and a faculty survey.",
             ),
             (
-                "Customer Experience Journey in Online Grocery Shopping",
-                "This concept paper maps the customer experience journey in online grocery shopping and links "
-                "consumer behavior at each touchpoint to repeat purchases and digital marketing decisions.",
+                "Online Discussion Design and Critical Thinking of Graduate Students",
+                "This concept paper compares structured and open online discussion designs and their effect on the "
+                "critical thinking shown in graduate students' posts.",
             ),
         ],
     },
@@ -397,18 +465,32 @@ PANEL_MATCHING_DEMO_STUDENTS = [
 # "days_ahead" days from today. The seeder keeps the date in the future on every start.
 UPCOMING_DEFENSE_DEMO = [
     {
-        "base": DEMO_STUDENT_NUMBERS["PM-05"], "student_number": DEMO_STUDENT_NUMBERS["UD-01"], "first_name": "Nico", "last_name": "Barrientos",
-        "case_title": "Reorder Point Policies and Service Levels for a Regional Hardware Distributor",
+        "base": DEMO_STUDENT_NUMBERS["PM-06"], "student_number": DEMO_STUDENT_NUMBERS["UD-01"], "first_name": "Nico", "last_name": "Barrientos",
+        "case_title": "Budget Planning and Resource Allocation in Small Private Schools",
+        # IM56 (2026-11-22): a master's thesis panel of four seats, as the booked defense had before the cleanup
+        "title_panel": [
+            ("Dr. Angela Cruz", "Panel Chair"),
+            ("Dr. Celeste Tan", "Content Specialist"),
+            ("Dr. Teodoro Ramos", "Method Specialist"),
+            ("Dr. Liwayway Bautista", "External Panel"),
+        ],
         "days_ahead": 6, "start": "09:00", "end": "10:30", "mode": "On-site", "venue": "Graduate School Conference Room",
     },
     {
         "base": DEMO_STUDENT_NUMBERS["PM-06"], "student_number": DEMO_STUDENT_NUMBERS["UD-02"], "first_name": "Bea", "last_name": "Salonga",
-        "case_title": "Governance and Continuity Planning in Second-Generation Family Enterprises",
+        "case_title": "Governance and Succession Planning in Family-Run Basic Education Schools",
         "days_ahead": 11, "start": "13:30", "end": "15:30", "mode": "Online", "venue": "Zoom (link sent by the Graduate School)",
     },
     {
-        "base": DEMO_STUDENT_NUMBERS["PM-05"], "student_number": DEMO_STUDENT_NUMBERS["UD-03"], "first_name": "Gab", "last_name": "Tolentino",
-        "case_title": "Inventory Accuracy and Order Fulfilment Time in a Cold-Chain Warehouse",
+        "base": DEMO_STUDENT_NUMBERS["PM-06"], "student_number": DEMO_STUDENT_NUMBERS["UD-03"], "first_name": "Gab", "last_name": "Tolentino",
+        "case_title": "Fee Collection Practices and Financial Sustainability of Parochial Schools",
+        # IM56 (2026-11-22): a master's thesis panel of four seats, as the booked defense had before the cleanup
+        "title_panel": [
+            ("Dr. Angela Cruz", "Panel Chair"),
+            ("Dr. Celeste Tan", "Content Specialist"),
+            ("Dr. Teodoro Ramos", "Method Specialist"),
+            ("Dr. Liwayway Bautista", "External Panel"),
+        ],
         "days_ahead": 19, "start": "10:00", "end": "11:30", "mode": "On-site", "venue": "Graduate School Conference Room",
     },
 ]
@@ -418,7 +500,10 @@ UPCOMING_DEFENSE_DEMO = [
 # (business rule faculty.max_advisees), so the demo cohort is spread over five faculty members, and
 # an adviser never sits on the panel of their own advisee. Students that panel-matching demo data
 # places (2690101 to 2690107) and the sheet students keep the adviser they were seeded with.
-DEMO_ADVISER_FALLBACK = "Dr. Daniel Uy"
+# IM56: Dr. Daniel Uy is not in the demo roster. Stage 4: the kept students name 56 advisers and seven faculty hold 35
+# seats, so the fallback adviser is over the limit, as Dr. Daniel Uy was; not Dr. Angela Cruz, whom the Dean appoints
+# under the limit in the adviser walkthrough (p63).
+DEMO_ADVISER_FALLBACK = "Dr. Patricia Salvador"
 DEMO_PANEL_REPLACEMENT = "Dr. Celeste Tan"
 DEMO_STUDENT_ADVISERS = {
     # Dr. Liwayway Bautista (5 with 2690102, who is placed by PANEL_MATCHING_DEMO_STUDENTS)
@@ -454,11 +539,33 @@ DEMO_STUDENT_ADVISERS = {
 # short list instead of every research student. The first five are the students the adviser walkthrough works with
 # (frontend/e2e/p63-faculty-pages.spec.js applies for an adviser as Gian, Daniel, Rafael and Marielle, and uploads
 # Form 1 as Elena); the rest are students still at the title stage (Proposal Development).
+# IM57 (2026-11-22): the four students of the adviser walkthrough (p63) are MAED demo students now, with the same names
+# and sign-ins as the imported students they replace (app.ensure_adviser_application_students makes them).
+# (number, first, last, stage, title, the three concept papers' subject)
+ADVISER_APPLICATION_STUDENTS = (
+    ("2691501", "Gian", "Reyes", "Data Collection",
+     "Financial Literacy and Digital Payment Use of Public School Teachers",
+     "teachers' financial literacy, digital wallets and cashless payments in public schools"),
+    ("2691502", "Daniel", "Bernardo", "Proposal Defense",
+     "Strategic Renewal and Innovation in Third-Generation Family-Owned Schools",
+     "governance, succession and program innovation in family-owned private schools"),
+    ("2691503", "Rafael", "Pang", "Proposal Defense",
+     "Instructional Leadership of School Heads and Teacher Morale",
+     "the instructional leadership of school heads and its link to teacher morale and retention"),
+    ("2691504", "Marielle", "Navarro", "Data Collection",
+     "Curriculum Alignment of a Teacher Education Program with National Standards",
+     "mapping a teacher education curriculum against national professional standards for teachers"),
+)
+# The student home's "nothing waiting" case (frontend/e2e/p70): a MAED coursework student with every subject done,
+# nothing enrolled this semester and no request, with a sign-in. Replaces Ana Chua (EDD), with the same name and login.
+QUIET_DEMO_STUDENT = ("2691505", "Ana", "Chua")
+# Imported students the walkthroughs sign in as (p63 files Form 1 for Elena Mendoza); IM54 gave imported students none.
+WALKTHROUGH_LOGIN_STUDENTS = ("2260011",)
 ROSTER_WITHOUT_ADVISER = frozenset({
-    "2360053",  # Gian Reyes
-    "2460055",  # Daniel Bernardo
-    "2260063",  # Rafael Pang
-    "2360061",  # Marielle Navarro
+    "2691501",  # Gian Reyes
+    "2691502",  # Daniel Bernardo
+    "2691503",  # Rafael Pang
+    "2691504",  # Marielle Navarro
     "2260011",  # Elena Mendoza
     "2560025",  # Noel Abad
     "2360041",  # Ben Bautista

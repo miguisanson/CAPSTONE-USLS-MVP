@@ -1,4 +1,5 @@
 // e2e-writes: derive5-dara
+// CHANGED BY data cleanup (IM54-IM57, 2026-11-22): student ids re-pointed (Miko Almario 125 -> 18, Nico Barrientos 146 -> 39).
 // derive5 (I-170, I-174, I-273, I-277, I-284, I-285, I-313, I-326, I-327): the screens stop asking for what the system knows.
 //   1 Defense Scheduling shows the manuscript date read-only (adviser's signed Form 4); no lead-time override wording
 //   2 Add student has no Enrollment status select          3 a Dropped subject has no free-text exception field
@@ -23,7 +24,7 @@ test.describe("derive5 staff screens", () => {
       json.schedulable_types = ["Proposal Defense"];
       await route.fulfill({ response, json });
     });
-    await page.goto("/workflow/defense-scheduling?student_id=146");
+    await page.goto("/workflow/defense-scheduling?student_id=39");
     const field = page.getByLabel("Date the panel received the manuscript");
     await expect(field).toBeVisible({ timeout: 30_000 });
     expect(await field.evaluate((el) => el.tagName)).not.toBe("INPUT");
@@ -75,14 +76,23 @@ test.describe("derive5 staff screens", () => {
     await page.goto("/workflow/awol");
     const cards = page.locator("[data-card-id]").filter({ has: page.getByRole("button", { name: "Move to" }) });
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
+    // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): the card must be a returnee's (the checks are for a student who
+    // filed a return); with fewer AWOL cards the first one that can go to the Dean is not always that one
     let opened = false;
+    const dialog = page.getByRole("dialog");
     for (let i = 0; i < await cards.count() && !opened; i++) {
       await cards.nth(i).getByRole("button", { name: "Move to" }).click();
       const item = page.getByRole("menuitem", { name: "With the Dean" });
-      if (await item.count()) { await item.click(); opened = true; } else await page.keyboard.press("Escape");
+      if (!(await item.count()) || (await item.getAttribute("aria-disabled")) === "true") { await page.keyboard.press("Escape"); continue; }
+      await item.click();
+      const shown = await dialog.waitFor({ state: "visible", timeout: 3_000 }).then(() => true, () => false);
+      if (shown && await dialog.getByText("Clearance from Business Office").count()) opened = true;
+      else {
+        if (shown) { await page.keyboard.press("Escape"); await expect(dialog).toHaveCount(0); }
+        posts.length = 0; // a card that moved without a dialog: not the returnee's forward
+      }
     }
-    expect(opened, "an AWOL card that can go to the Dean").toBeTruthy();
-    const dialog = page.getByRole("dialog");
+    expect(opened, "an AWOL returnee's card that can go to the Dean").toBeTruthy();
     const boxes = dialog.getByRole("checkbox");
     await expect(boxes).toHaveCount(2);
     await expect(dialog.getByText("Clearance from Business Office")).toBeVisible();

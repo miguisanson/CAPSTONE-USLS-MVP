@@ -14,8 +14,8 @@ const cx = (...parts) => parts.filter(Boolean).join(" ").replace(/\s+/g, " ").tr
 const MIN_WIDTH = { sm: "min-w-[640px]", md: "min-w-[760px]", lg: "min-w-[960px]" };
 // stackOnPhone: true stacks below sm (640 px); "md" stacks below 768 px, for a page whose table must not scroll at 200 % zoom (I-390).
 const STACK_BY = {
-  sm: { table: "max-sm:block max-sm:min-w-0", head: "max-sm:sr-only", body: "max-sm:block", row: "max-sm:block max-sm:px-1 max-sm:py-2", cell: "max-sm:block max-sm:!py-1 max-sm:before:block max-sm:before:text-[11px] max-sm:before:font-semibold max-sm:before:uppercase max-sm:before:tracking-wide max-sm:before:text-slate-500 max-sm:before:content-[attr(data-label)]" },
-  md: { table: "max-md:block max-md:min-w-0", head: "max-md:sr-only", body: "max-md:block", row: "max-md:block max-md:px-1 max-md:py-2", cell: "max-md:block max-md:!py-1 max-md:before:block max-md:before:text-[11px] max-md:before:font-semibold max-md:before:uppercase max-md:before:tracking-wide max-md:before:text-slate-500 max-md:before:content-[attr(data-label)]" },
+  sm: { table: "max-sm:block max-sm:min-w-0", head: "max-sm:sr-only", body: "max-sm:block", row: "max-sm:block max-sm:px-1 max-sm:py-2", cell: "max-sm:block max-sm:!py-1 max-sm:before:block max-sm:before:text-xs max-sm:before:font-semibold max-sm:before:uppercase max-sm:before:tracking-wide max-sm:before:text-slate-500 max-sm:before:content-[attr(data-label)]" },
+  md: { table: "max-md:block max-md:min-w-0", head: "max-md:sr-only", body: "max-md:block", row: "max-md:block max-md:px-1 max-md:py-2", cell: "max-md:block max-md:!py-1 max-md:before:block max-md:before:text-xs max-md:before:font-semibold max-md:before:uppercase max-md:before:tracking-wide max-md:before:text-slate-500 max-md:before:content-[attr(data-label)]" },
 };
 // A soft edge on the sides that still have more columns, so a cut-off column shows as scrollable (I-406).
 const SCROLL_SHADOW = {
@@ -119,12 +119,14 @@ export function DataTable({
   searchable = false,
   pageSize,
   pagination,
+  noun = "", // what the pager counts ("students"): "Showing 1–20 of 85 students"
   csv,
   sortable = true,
   stackOnPhone = false,
   sort,
   onSort,
   className = "",
+  rowProps, // (row) => extra props for the row's <tr> (a className and data-* attributes), e.g. a greyed row
   ...rest
 }) {
   const STACK = STACK_BY[stackOnPhone === "md" ? "md" : "sm"];
@@ -323,7 +325,8 @@ export function DataTable({
                       aria-sort={canSort ? (dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none") : undefined}
                       style={col.width ? { width: col.width } : undefined}
                       className={cx(
-                        "eyebrow whitespace-nowrap px-3 py-2.5",
+                        "eyebrow px-3 py-2.5",
+                        !col.headerWrap && "whitespace-nowrap", // headerWrap: a long header may take two lines
                         ALIGN[align],
                         // a sticky <thead> does not stick in every browser, so stick the cells too
                         stickyHeader && "sticky top-0 z-10 bg-slate-50",
@@ -369,7 +372,8 @@ export function DataTable({
                         }
                       : undefined
                   }
-                  className={cx("border-t border-slate-100 hover:bg-slate-50", clickable && "cursor-pointer", stackOnPhone && STACK.row)}
+                  {...(rowProps ? (({ className: _ignored, ...other }) => other)(rowProps(row) || {}) : {})}
+                  className={cx("border-t border-slate-100 hover:bg-slate-50", clickable && "cursor-pointer", stackOnPhone && STACK.row, rowProps?.(row)?.className)}
                 >
                   {columns.map((col, ci) => (
                     <td
@@ -404,6 +408,7 @@ export function DataTable({
           pageSize={size}
           shown={visibleRows.length}
           onPage={serverPaged ? pagination.onPage : setInnerPage}
+          noun={pagination?.noun || noun}
         />
       )}
     </div>

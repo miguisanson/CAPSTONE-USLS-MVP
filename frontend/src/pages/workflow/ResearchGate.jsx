@@ -114,7 +114,6 @@ export function ResearchGateForm({ context, studentId, submit, submitting, resul
     <form id="research-gate-record" onSubmit={onSubmit} className="scroll-mt-24 space-y-5">
       <SectionTitle
         title="Research Gate record"
-        subtitle="The stage and checklist are calculated from uploads, endorsements, and workflow results"
         icon={FileCheck}
       />
 

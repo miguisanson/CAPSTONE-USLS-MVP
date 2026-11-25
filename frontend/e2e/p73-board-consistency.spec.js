@@ -104,8 +104,8 @@ test.describe("P7.3 boards of the same kind behave the same", () => {
     ]) {
       await page.goto(`/workflow/${slug}`);
       await expect(page.getByRole("region", { name: region }), slug).toBeVisible();
-      await expect(page.getByRole("button", { name: "How this works" }), `${slug}: guide`).toBeVisible();
-      await expect(page.getByRole("button", { name: "View recent activity" }), `${slug}: activity`).toBeVisible();
+      await expect(page.locator("main header").first().getByRole("button", { name: "Help" }), `${slug}: guide`).toBeVisible(); // UX-14
+      await expect(page.locator("main header").first().getByRole("button", { name: "Help" }), `${slug}: activity`).toBeVisible(); // UX-14
       await expect(page.getByRole("searchbox", { name: /Search requests by name/ }), `${slug}: search`).toBeVisible();
       await expect(page.getByRole("combobox", { name: "Filter by program" }), `${slug}: program`).toBeVisible();
       await expect(page.getByRole("combobox", { name: "Filter by status" }), `${slug}: status`).toBeVisible();

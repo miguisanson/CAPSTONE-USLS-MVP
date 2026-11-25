@@ -49,7 +49,8 @@ async function unreachableLinks(page) {
 async function footerBelowNav(page) {
   return page.locator("aside:visible").first().evaluate((aside) => {
     const nav = aside.querySelector("nav").getBoundingClientRect();
-    const footer = [...aside.querySelectorAll("div")].find((el) => el.classList.contains("border-t") && /Graduate School Staff|Dean|Student|Faculty|Administrator|Coordinator/.test(el.textContent || ""));
+    // UX-05 (2026-11-20): the role note left the footer; only the phone menu keeps a footer (Sign out).
+    const footer = [...aside.querySelectorAll("div")].find((el) => el.classList.contains("border-t") && /Sign out/.test(el.textContent || ""));
     if (!footer) return { found: false };
     const rect = footer.getBoundingClientRect();
     return { found: true, belowNav: rect.top >= nav.bottom - 1, inWindow: rect.bottom <= window.innerHeight + 1 };
@@ -61,16 +62,15 @@ test.describe("I-103: every sidebar link is reachable at 1366x768", () => {
     test.describe(entry.key, () => {
       test.use({ storageState: authFile(entry.key), viewport: { width: 1366, height: 768 } });
 
-      test(`${entry.key}: each link can be scrolled into view and is not covered; the footer stays below the nav`, async ({ page }) => {
+      test(`${entry.key}: each link can be scrolled into view and is not covered; no footer block under the nav`, async ({ page }) => {
         await page.goto(entry.home);
         await expect(page.locator("aside:visible nav a").first()).toBeVisible();
         await page.waitForLoadState("networkidle").catch(() => {});
         const problems = await unreachableLinks(page);
         expect(problems, problems.join("\n")).toEqual([]);
+        // UX-05 (2026-11-20): the desktop sidebar has no footer; the nav runs to the bottom of the window.
         const footer = await footerBelowNav(page);
-        expect(footer.found, "the role footer block exists").toBe(true);
-        expect(footer.belowNav, "the footer is below the nav area").toBe(true);
-        expect(footer.inWindow, "the footer is inside the window").toBe(true);
+        expect(footer.found, "no footer block on the desktop sidebar").toBe(false);
       });
 
       test(`${entry.key}: the page you are on is visible in the sidebar when it loads`, async ({ page }) => {

@@ -21,6 +21,7 @@
 // and the step button (and Export for the Dean). The same facts are pinned in p119.
 // Demo data read only: Bianca Santos, Carlo Mendoza, Hector Ong (eligible, MAED), Isabel Flores ("Batch 1 October 2026").
 import { test, expect } from "@playwright/test";
+import { openClosed } from "./support/board.js";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { AUTH_DIR, SCREENS_DIR } from "./support/paths.mjs";
@@ -76,12 +77,15 @@ async function measure(board) {
       const box = section.getBoundingClientRect();
       const title = section.querySelector("h3");
       const description = section.querySelector("header p");
+      const strip = section.hasAttribute("data-empty-strip"); // UX-28: an empty column is a strip; its description is its title
       return {
+        strip,
         label: section.getAttribute("aria-label"),
         width: Math.round(box.width),
         fullyVisible: box.left >= view.left - 1 && box.right <= view.right + 1,
         titleClipped: title ? title.scrollWidth > title.clientWidth + 1 || getComputedStyle(title).textOverflow === "ellipsis" : false,
-        description: description ? description.textContent.trim() : "",
+        description: description ? description.textContent.trim() : "", // CHANGED BY owner feedback 2026-11-23: a strip's title is its tooltip, not a line
+        strip,
       };
     });
   });
@@ -110,8 +114,7 @@ for (const [role, path] of ROLES) {
         expect(item.label, `"${item.label}" is a sentence, not a stage name`).not.toMatch(/—/);
         expect(item.titleClipped, `${item.label}: title is cut off`).toBe(false);
         expect(item.width, `${item.label}: column width`).toBeLessThanOrEqual(330); // CHANGED BY khloe-ui: 320 px (was 300) so a batch card has room for its stage strip
-        expect(item.description.length, `${item.label}: one short line, not a paragraph`).toBeGreaterThan(0);
-        expect(item.description.length, `${item.label}: one short line, not a paragraph`).toBeLessThanOrEqual(60);
+        expect(item.description, `${item.label}: no description line`).toBe(""); // CHANGED BY owner feedback 2026-11-23: no description line under a column title
       }
       // A stage out of sight is announced, with how many.
       const hidden = columns.filter((item) => !item.fullyVisible).length;
@@ -319,9 +322,10 @@ test.describe("P7.7 Graduation actions as the Dean", () => {
       await page.goto("/dean/approvals/graduation");
       const board = page.getByRole("region", { name: BOARD });
       await expect(board).toBeVisible();
+      await openClosed(board); // CHANGED BY UX phase 5b (UX-28/29): the Registrar column is behind "Closed"
       await expect(cardsOf(column(board, "Acknowledged by Registrar")).filter({ hasText: BATCH })).toHaveCount(1);
       await expect(cardsOf(column(board, "Approved, ready to export")).filter({ hasText: BATCH })).toHaveCount(0);
-      await expect(column(board, "Acknowledged by Registrar")).toContainText("Moved here by hand once the Registrar confirms.");
+      await expect(column(board, "Acknowledged by Registrar")).not.toContainText("Moved here by hand once the Registrar confirms."); // CHANGED BY owner feedback 2026-11-23: no description line under a column title
     });
   }
 

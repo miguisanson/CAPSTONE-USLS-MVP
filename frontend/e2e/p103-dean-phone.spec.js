@@ -287,21 +287,21 @@ test.describe("Student record Course audit (I-192)", () => {
     const audit = student.course_audit;
     expect(audit.completed.length, "student 1 has completed subjects").toBeGreaterThan(0);
     await page.goto("/students/1");
-    // I-405: the tile is a number; "Show subjects" is a real button under it (Completed is the first tile)
-    const tile = page.getByRole("button", { name: "Show subjects" }).first();
-    await expect(page.getByRole("button", { name: new RegExp(`^Completed ${audit.completed.length}`) })).toHaveCount(0);
+    // CHANGED BY owner feedback 2026-11-23 (IM58): the tile itself is the button; it opens the Completed tab of Curriculum
+    const tile = page.getByRole("button", { name: `Completed ${audit.completed.length}` });
+    await expect(page.getByRole("button", { name: "Show subjects" })).toHaveCount(0);
     await expect(tile).toBeVisible();
-    await expect(tile).toHaveAttribute("aria-expanded", "false");
+    await page.getByRole("tab", { name: /^Outstanding/ }).click();
     await tile.click();
-    await expect(page.getByRole("button", { name: "Hide subjects" }).first()).toHaveAttribute("aria-expanded", "true");
-    const list = page.getByRole("region", { name: `Completed subjects (${audit.completed.length})` });
+    await expect(page.getByRole("tab", { name: /^Completed/ })).toHaveAttribute("aria-selected", "true");
+    const list = page.getByRole("tabpanel", { name: `Completed subjects (${audit.completed.length})` });
     await expect(list).toBeVisible();
     await expect(list.getByRole("listitem")).toHaveCount(audit.completed.length);
     await expect(list).toContainText(audit.completed[0].code);
     await expect(list).toContainText(audit.completed[0].title);
+    // the Completed tab says the semester each subject was taken
+    if (audit.completed[0].term_label) await expect(list).toContainText(audit.completed[0].term_label);
     await shot(page, "student-course-audit-1366.png");
-    await page.getByRole("button", { name: "Hide subjects" }).first().click();
-    await expect(list).toHaveCount(0);
   });
 
   test("a tile with nothing behind it is only a number", async ({ page }) => {

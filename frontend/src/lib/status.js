@@ -50,7 +50,31 @@ export const STATUS_TONE = Object.fromEntries(
 );
 
 /** Server status words that are jargon, shown in words (the tone still follows the original). */
-const STATUS_LABEL = { "noted by ac": "Noted by Academic Coordinator" };
+const JARGON = { "noted by ac": "Noted by Academic Coordinator" };
+
+// UX-18 (owner IM51, 2026-11-20): one word per meaning. Each process named the same state its own way ("Dean Review",
+// "Ready for Dean Review", "Report Sent to Dean"); the screen now shows one word. Only the words change: the server's value
+// still picks the colour, filters and API calls still use it. Words that only look alike stay apart ("For Review" is the
+// Graduate School staff's graduation review; "Needs Review" is a flag for a person to check; "Revisions Required" is a verdict).
+const SAME_MEANING = {
+  "With the Dean": ["Dean Review", "For Dean Review", "Ready for Dean Review", "Report Sent to Dean"],
+  "In review": ["Under Review", "Pending Review", "Awaiting Review"],
+  "In staff review": ["Staff Review", "Pending Staff Action"],
+  Submitted: ["Submitted to GS Staff", "Submitted for review"],
+  Returned: ["Returned for Revision", "Returned for Clarification", "Needs Revision"],
+  "Acknowledged by Registrar": ["Registrar Received"],
+  AWOL: ["AWOL (absent without leave)"], // "AWOL Declared" keeps its word: a history row "AWOL -> AWOL Declared" is a real change
+  Completed: ["Complete"],
+  Verified: ["Verified Complete", "Verified by staff"],
+  Passed: ["Pass"],
+  "On leave": ["On Leave", "LOA", "Leave of Absence"],
+  "Not eligible": ["Not Eligible"],
+  "Not taken": ["Not Taken"],
+};
+const STATUS_LABEL = {
+  ...Object.fromEntries(Object.entries(SAME_MEANING).flatMap(([word, list]) => list.map((status) => [status.toLowerCase(), word]))),
+  ...JARGON,
+};
 /** On a student's own pages the red words read as blame: say them plainly and in amber. */
 const STUDENT_WORDS = { "awol declared": "Absent without leave", awol: "Absent without leave", delayed: "Behind schedule" };
 export const forStudent = (status) => STUDENT_WORDS[String(status || "").trim().toLowerCase()] || status;

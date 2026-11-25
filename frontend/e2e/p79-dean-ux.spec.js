@@ -129,6 +129,13 @@ test.describe("P7.9 Dean pages", () => {
       const leave = (json.workflow_pending || []).filter((item) => item.type === "leave-of-absence").slice(0, 1);
       await route.fulfill({ response, json: { ...json, pending: [], workflow_pending: leave } });
     });
+    // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): nothing else waits, so no adviser application either (the
+    // adviser walkthrough, p63, leaves applications with the Dean; with seven faculty their cards carry limit warnings)
+    await page.route(/\/api\/adviser-appointments(\?|$)/, async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      await route.fulfill({ response, json: { ...json, appointments: [], counts: {} } });
+    });
     const approvals = await openQueue(page);
     const filled = new Set();
     if ((approvals.pending || []).length) filled.add("course-adjustments");
@@ -140,20 +147,19 @@ test.describe("P7.9 Dean pages", () => {
     expect(filled.size, "a leave request waits for the Dean").toBe(1);
     expect(empty.length, "and six processes have nothing waiting").toBe(6);
 
-    const sections = main(page).getByRole("heading", { level: 2, name: /\s\d+$/ });
+    // CHANGED BY UX phase 4 (UX-25): one table; a chip only for a process with something waiting (and All); a process
+    // with nothing waiting stays reachable from the sidebar (owner IM52).
+    const chips = main(page).getByTestId("dean-queue").getByRole("group", { name: "Process" }).getByRole("button");
+    await expect(chips).toHaveCount(1 + filled.size);
     for (const key of filled) {
-      await expect(main(page).getByRole("heading", { level: 2, name: new RegExp(`^${PROCESS_LABELS[key]}\\s*\\d+$`) }), `${PROCESS_LABELS[key]} has its section`).toBeVisible();
+      await expect(chips.filter({ hasText: PROCESS_LABELS[key] }), `${PROCESS_LABELS[key]} has its chip`).toHaveCount(1);
     }
     for (const key of empty) {
-      await expect(main(page).getByRole("heading", { level: 2, name: new RegExp(`^${PROCESS_LABELS[key]}\\s*\\d+$`) }), `${PROCESS_LABELS[key]} has no section`).toHaveCount(0);
+      await expect(chips.filter({ hasText: PROCESS_LABELS[key] }), `${PROCESS_LABELS[key]} has no chip`).toHaveCount(0);
+      await expect(page.locator(`nav a[href="/dean/approvals/${key}"]`).first(), `${PROCESS_LABELS[key]} stays reachable`).toBeVisible();
     }
-    const line = main(page).getByText(/^Nothing waiting in:/);
-    await expect(line, "one line for the processes with nothing waiting").toHaveCount(1);
-    for (const key of empty) {
-      await expect(line.getByRole("link", { name: PROCESS_LABELS[key], exact: true }), `${PROCESS_LABELS[key]} stays reachable`).toHaveAttribute("href", `/dean/approvals/${key}`);
-    }
+    await expect(main(page).getByTestId("dean-queue").getByRole("table")).toHaveCount(1);
     await expect(main(page).getByText("No request of this kind needs a Dean decision right now."), "no stack of empty boxes").toHaveCount(0);
-    expect(await sections.count(), "sections = processes with something waiting (+ Adviser Designation)").toBeGreaterThanOrEqual(filled.size);
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     expect(height, "the queue is not a wall of empty boxes").toBeLessThan(2200);
   });

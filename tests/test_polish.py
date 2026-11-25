@@ -449,9 +449,11 @@ class BusinessRuleMetadataSyncTests(PolishBase):
 
 # =========================================================================== demo: upcoming defenses
 class UpcomingDefenseDemoTests(PolishBase):
+    # CHANGED BY data cleanup (IM56, 2026-11-22): the upcoming defenses are copied from Liza Marquez (MAED): her adviser and
+    # title panel.
     NAMES = [
-        "Dr. Marco Villanueva", "Dr. Benjamin Reyes", "Dr. Teodoro Ramos", "Dr. Angela Cruz",
-        "Dr. Teresa Lim", "Dr. Paolo Navarro",
+        "Dr. Benjamin Reyes", "Dr. Angela Cruz", "Dr. Celeste Tan", "Dr. Patricia Salvador",
+        "Dr. Teodoro Ramos", "Dr. Liwayway Bautista",
     ]
 
     def setUp(self):
@@ -464,7 +466,7 @@ class UpcomingDefenseDemoTests(PolishBase):
             item.start()
             self.addCleanup(item.stop)
         with app.app_context():
-            for code in ("MBA", "DBA"):
+            for code in ("MAED",):
                 program = Program(code=code, name=f"Demo {code}", college="Graduate School")
                 db.session.add(program)
                 db.session.flush()

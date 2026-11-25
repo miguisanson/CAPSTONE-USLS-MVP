@@ -48,11 +48,9 @@ test.describe("ux9 student pages (AWOL)", () => {
     try {
       await page.goto("/student/requests/awol-return");
       await page.waitForLoadState("networkidle");
-      await page.getByRole("button", { name: /Rules applied on this screen/ }).click();
-      const panel = page.getByRole("region", { name: "Rules applied on this screen" });
-      await expect(panel.getByText("Source:").first()).toBeVisible();
-      await expect(panel.getByText(/Not checked by the system|Enforced by the system/)).toHaveCount(0);
-      await expect(panel.getByRole("button", { name: /^Rules for other programs/ })).toHaveCount(0);
+      // CHANGED BY owner feedback 2026-11-23 (IM58): no rules panel on a student request page
+      await expect(page.getByRole("region", { name: "Rules applied on this screen" })).toHaveCount(0);
+      await expect(page.getByText(/Not checked by the system|Enforced by the system/)).toHaveCount(0);
     } finally { await context.close(); }
   });
 

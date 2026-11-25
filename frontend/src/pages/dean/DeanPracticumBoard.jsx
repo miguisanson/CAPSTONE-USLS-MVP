@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Briefcase, CheckCircle2, Eye, HelpCircle, History, RotateCcw } from "lucide-react";
+import { Briefcase, CheckCircle2, Eye, RotateCcw } from "lucide-react";
 import { Button, DataTable, EmptyState, PageHeader, StatusChip } from "../../components/ui/index.js";
 import StepDialog from "../../components/StepDialog";
-import PolicyRules from "../../components/PolicyRules";
+import { HelpButton, PageHelpDrawer } from "../../components/PageHelp";
 import StageBoard, { BoardSummary } from "../../components/StageBoard";
 import { CaseCardFacts, CaseCardShell, MessageNote, NextOwner, ReadyMark } from "../../components/process";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
@@ -14,6 +14,7 @@ import { PAGE } from "../../lib/labels.js";
 import { DeanFeedback, useDean } from "./DeanContext";
 import { casePath } from "./DeanShared";
 import { deanItemDate } from "./deanHelpers";
+import { statusLabel } from "../../lib/status";
 
 // The Dean's Practicum Reports board (I-122, IM24). It is the same board the other Dean pages use: the same header
 // (title, one line, "N waiting", "How this works", "View recent activity"), the same "Rules applied" panel, the same
@@ -24,7 +25,6 @@ import { deanItemDate } from "./deanHelpers";
 // A move is the same decision as the buttons on the case page: it opens one window named after the button, and the
 // server checks it again (api.decideWorkflowApproval via useDean().requestWorkflowDecision).
 
-const DESCRIPTION = "Practicum completion reports sent to the Dean for final review.";
 
 const COLUMNS = [
   { key: "waiting", label: "With the Dean", description: "Reports the Academic Coordinator sent to you.", statuses: ["Report Sent to Dean"] },
@@ -161,6 +161,7 @@ export function DeanPracticumBoard() {
   const [view, setView] = useState("board");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [support, setSupport] = useState(""); // "guide" | "activity"
+  const [helpOpen, setHelpOpen] = useState(false); // UX-14: the Help panel
   const [decision, setDecision] = useState(null); // { item, choice }
 
   const items = useMemo(
@@ -171,7 +172,7 @@ export function DeanPracticumBoard() {
   );
   const filtered = useMemo(() => items.filter((item) => matchesFilters(item, filters)), [items, filters]);
   const programs = useMemo(() => [...new Set(items.map((item) => item.student?.program_code).filter(Boolean))].sort(), [items]);
-  const statusOptions = useMemo(() => [...new Set(items.map((item) => item.status))].map((value) => ({ value, label: value })), [items]);
+  const statusOptions = useMemo(() => [...new Set(items.map((item) => item.status))].map((value) => ({ value, label: statusLabel(value) })), [items]);
   const totals = useMemo(() => {
     const result = {};
     items.forEach((item) => {
@@ -214,7 +215,6 @@ export function DeanPracticumBoard() {
             {filteredOut ? `${columnItems.length} of ${total}` : total}
           </span>
         </div>
-        {column.description && <p className="meta mt-1 leading-relaxed">{column.description}</p>}
       </header>
     );
   };
@@ -223,22 +223,24 @@ export function DeanPracticumBoard() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.practicumReports}
-        description={DESCRIPTION}
-        forms="practicum"
         icon={Briefcase}
         badge={<StatusChip status={`${counts.pendingPracticum} waiting`} tone="muted" dot={false} />}
-        actions={
-          <>
-            <Button variant="secondary" icon={HelpCircle} onClick={() => setSupport("guide")}>How this works</Button>
-            <Button variant="secondary" icon={History} onClick={() => setSupport("activity")}>View recent activity</Button>
-          </>
-        }
+        actions={<HelpButton onClick={() => setHelpOpen(true)} />}
       />
       <DeanFeedback />
+      {helpOpen && (
+        <PageHelpDrawer
+          board="move"
+          title={PAGE.practicumReports}
+          forms="practicum"
+          rulesProcess="practicum"
+          onGuide={() => setSupport("guide")}
+          onActivity={() => setSupport("activity")}
+          onClose={() => setHelpOpen(false)}
+        />
+      )}
 
-      <PolicyRules process="practicum" />
-
-      <BoardSummary line={summaryLine} windowName="case page" />
+      <BoardSummary line={summaryLine} />
 
       <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
         <LeaveFilters

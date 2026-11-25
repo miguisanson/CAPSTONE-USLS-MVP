@@ -66,7 +66,7 @@ export function CourseAuditPanel() {
   return (
     <div className="space-y-6">
       <section>
-        <SectionTitle title="Subject roster" subtitle="Who completed the chosen subject at the end of the term." icon={ClipboardCheck} />
+        <SectionTitle title="Subject roster" icon={ClipboardCheck} />
         <div className="max-w-md">
           <Field label="Subject">
             <Select
@@ -87,7 +87,7 @@ export function CourseAuditPanel() {
       </section>
 
       <section>
-        <SectionTitle title="Students with missing subjects" subtitle="From each student's course audit: subjects not taken yet or failed, in curriculum order. Subjects being taken now are not missing." icon={UserX} />
+        <SectionTitle title="Students with missing subjects" icon={UserX} />
         <div className="mb-3 max-w-md">
           <Field label="Program">
             <Select

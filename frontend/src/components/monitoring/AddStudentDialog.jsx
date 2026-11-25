@@ -80,7 +80,7 @@ export default function AddStudentDialog({ programs = [], defaultProgramId = "",
     <Modal
       title="Add student"
       icon={UserPlus}
-      subtitle="Recorded as a manual entry with your name and the time. A student login is created, like the sheet import does."
+      subtitle="Creates a student login and records a manual entry."
       size="md"
       onClose={onClose}
       closeLabel="Close add student form"

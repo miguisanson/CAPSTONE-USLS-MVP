@@ -91,7 +91,6 @@ export function ResearchRequestForm({ data, onSaved }) {
       )}
       <div>
         <p className="field-label">Files you upload</p>
-        <p className="meta mb-2">Only these items require action from you for this milestone.</p>
         <div className="space-y-2">
           {uploadRequirements.map((requirement) => (
             <ResearchEvidenceUpload
@@ -107,11 +106,10 @@ export function ResearchRequestForm({ data, onSaved }) {
       {managedRequirements.length > 0 && (
         <div>
           <p className="field-label">Completed by staff or the system</p>
-          <p className="meta mb-2">These update automatically after review, panel matching, or scheduling.</p>
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             {managedRequirements.map((requirement) => (
               <div key={requirement.item_name} className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-3.5 py-3 last:border-b-0">
-                <div className="min-w-0 flex-1">
+                <div className="min-w-[12rem] flex-1">{/* UX-32: on a phone the chip wraps under the text instead of squeezing it */}
                   <p className="text-sm font-semibold text-ink">{requirement.label}</p>
                   <p className="meta mt-0.5">
                     {requestDefenseDate && requirement.source_type?.endsWith("_schedule") && requirement.status !== "Complete"
@@ -125,7 +123,7 @@ export function ResearchRequestForm({ data, onSaved }) {
           </div>
         </div>
       )}
-      <Field label="Message to the Research Coordinator" hint="Optional context for this submission.">
+      <Field label="Message to the Research Coordinator">
         <Textarea value={form.submitted_package} onChange={set("submitted_package")} />
       </Field>
       <SubmitState
@@ -134,7 +132,7 @@ export function ResearchRequestForm({ data, onSaved }) {
         message={message}
         disabled={!milestone?.student_uploads_ready || allVerified}
         label={`Submit ${milestone?.short_label || "milestone"} for review`}
-        disabledHint={allVerified ? "Every file for this milestone is already verified. Nothing is left to submit." : !milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : ""}
+        disabledHint={allVerified ? "Every file for this milestone is verified." : !milestone?.student_uploads_ready ? "Upload all required files before submitting this milestone." : ""}
       />
     </form>
   );
@@ -263,7 +261,7 @@ export function ResearchEvidenceUpload({ gate, requirement, panelLocked, onSaved
                       icon={Trash2}
                       onClick={() => removeResearchFile(file)}
                       disabled={titlePackageLocked || removingId === file.id}
-                      className="text-red-700 hover:bg-red-50"
+                      className="text-red-700 hover:bg-red-50 max-sm:min-w-11" /* UX-32: 44 px on a phone */
                       aria-label={`Remove ${file.name}`}
                       title={titlePackageLocked ? "Locked after panel matching" : "Remove upload"}
                     />
@@ -298,7 +296,7 @@ export function ConceptPaperCompliance({ compliance }) {
   const citations = compliance.citations || [];
   return (
     <details className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
-      <summary className="cursor-pointer font-semibold text-slate-700">
+      <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-slate-700">{/* UX-32: a 44 px tap target */}
         {compliance.summary || "View concept paper compliance check"}
       </summary>
       <div className="mt-2 space-y-2">

@@ -110,7 +110,7 @@ test.describe("Dashboard", () => {
     await expect(page.getByText("Learning analytics, online learning, and student engagement in graduate education")).toBeVisible();
     await expect(main(page).getByText("Education", { exact: true }).first()).toBeVisible(); // the college chip
     await expect(page.getByRole("heading", { name: "Needs your action" })).toBeVisible();
-    await expect(page.getByText("Invitations, signatures, verdicts and requests that wait for you")).toBeVisible();
+    await expect(page.getByText("Invitations, signatures, verdicts and requests that wait for you")).toHaveCount(0); // UX-11: no subtitle
     await expect(page.getByRole("link", { name: "Answer invitations" })).toHaveAttribute("href", "/faculty-portal/invitations");
     for (const label of ["Your open items", "Advisees", "Panel committees", "Upcoming defenses"]) {
       await expect(main(page).locator('[data-slot="label"]', { hasText: new RegExp(`^${label}$`, "i") }).first()).toBeVisible();
@@ -149,7 +149,7 @@ test.describe("Dashboard", () => {
 test.describe("My Advisees", () => {
   test("real data: header, adviser panel, ONE advisee table with every column", async ({ page }) => {
     await openFromSidebar(page, "My Advisees", "My Advisees");
-    await expect(page.getByText("Students you advise, the stage of each, and the research documents that need your signature.")).toBeVisible();
+    await expect(page.getByText("The stage of each advisee and the documents waiting for your signature.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByRole("link", { name: "Signatures", exact: true })).toHaveCount(1); // I-079: one Signatures action, in the page header
     await expect(page.getByRole("link", { name: "Signatures", exact: true })).toHaveAttribute("href", "/faculty-portal/signatures");
     // the adviser panel: meter and the empty inbox note
@@ -319,7 +319,7 @@ test.describe("My Advisees", () => {
 test.describe("Signatures, Panels, Verdicts", () => {
   test("Signatures & Endorsements", async ({ page }) => {
     await openFromSidebar(page, "Signatures & Endorsements", "Signatures & Endorsements");
-    await expect(page.getByText("Review and sign the exact manuscript version uploaded by your assigned advisees.").first()).toBeVisible();
+    await expect(page.getByText("Sign the exact manuscript version your advisee uploaded.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByRole("heading", { name: "Adviser paper signatures" })).toBeVisible();
     await expect(main(page).getByText("Isabel Flores").first()).toBeVisible();
     await shots(page, "signatures");
@@ -327,7 +327,7 @@ test.describe("Signatures, Panels, Verdicts", () => {
 
   test("Panel Assignments & Papers", async ({ page }) => {
     await openFromSidebar(page, "Panel Assignments & Papers", "Panel Assignments & Papers");
-    await expect(page.getByText("Students whose committee you sit on, with the papers for the assigned stage. Access is limited to your assigned panels.")).toBeVisible();
+    await expect(page.getByText("The papers for each panel you sit on.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByRole("heading", { name: "Panel papers and defense verdicts" })).toBeVisible();
     await expect(main(page).getByText("Hector Ong").first()).toBeVisible();
     await expect(main(page).getByText("Content Specialist").first()).toBeVisible();
@@ -346,7 +346,7 @@ test.describe("Signatures, Panels, Verdicts", () => {
       finished(5, "Fixture Five", "2026-05-02"), finished(6, "Fixture Six", "2026-11-11"), finished(7, "Fixture Seven", "2026-02-14")];
     await mockJson(page, "**/api/faculty-portal/context", () => context);
     await openFromSidebar(page, "Verdicts", "Verdicts");
-    await expect(page.getByText("The panel chair or panel lead submits the final verdict for a scheduled defense. Graduate School staff can record the same verdict from Research Gate when needed.")).toBeVisible();
+    await expect(page.getByText("The panel chair or lead submits the verdict for each scheduled defense.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     // I-090: the "needs your verdict" group comes first; nothing waits, so it is a clear empty state
     const headings = await main(page).locator("h2").allTextContents();
     expect(headings.slice(0, 2)).toEqual(["Needs your verdict", "Verdict history"]);
@@ -424,7 +424,7 @@ test.describe("Panel invitations", () => {
       }],
     }));
     await openFromSidebar(page, "Panel Invitations", "Panel Invitations");
-    await expect(page.getByText("Research defense panels you have been asked to join.")).toBeVisible();
+    await expect(page.getByText("Accept or decline each panel; tell the Graduate School early if you cannot attend.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByRole("status").filter({ hasText: /invitations? (is|are) waiting for your answer\./ })).toBeVisible();
     await expect(page.getByRole("heading", { name: /^Waiting for your answer \(\d+\)$/ })).toBeVisible();
     const card = page.getByRole("listitem").filter({ hasText: "Miguel Yu" });
@@ -517,7 +517,7 @@ test.describe("Panel invitations", () => {
     await mockJson(page, "**/api/faculty-portal/panel-invitations", () => ({ invitations: [] }));
     await openFromSidebar(page, "Panel Invitations", "Panel Invitations");
     await expect(page.getByText("No panel invitations")).toBeVisible();
-    await expect(page.getByText("When the Research Coordinator puts you on a defense panel, the invitation shows up here.")).toBeVisible();
+    await expect(page.getByText("When the Research Coordinator puts you on a defense panel, the invitation shows up here.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await shots(page, "invitations-empty");
   });
 
@@ -534,7 +534,7 @@ test.describe("Panel invitations", () => {
 test.describe("Defense Schedule", () => {
   test("table: columns, one row in full, calendar links, header links", async ({ page }) => {
     await openFromSidebar(page, "Defense Schedule", "Defense Schedule");
-    await expect(page.getByText("Defenses scheduled for the panels you sit on. Keep your availability current so staff can confirm dates.")).toBeVisible();
+    await expect(page.getByText("Keep your availability current so staff can confirm dates.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     const table = tableWith(page, "Date / time");
     expect(await headerNames(table)).toEqual(["Student", "Status", "Defense", "Date / time", "Mode / venue", "My role", "Calendar"]);
     // CHANGED BY p105 (I-206): upcoming defenses first, then the earlier ones latest first, so the row is found by name
@@ -600,7 +600,7 @@ test.describe("Defense Schedule", () => {
 // ================================================================================================ Calendar
 test("My Calendar: header and the shared calendar view", async ({ page }) => {
   await openFromSidebar(page, "My Calendar", "My Calendar");
-  await expect(page.getByText("Defenses you sit on or advise, your advisees' deadlines, your availability and (when connected) your Google busy times.")).toBeVisible();
+  await expect(page.getByText("Your defenses, your advisees' deadlines and your availability.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
   await expect(page.getByRole("button", { name: "Print" })).toBeVisible();
   await expect(page.getByText("All times are Philippine time (Asia/Manila).")).toBeVisible();
   await shots(page, "calendar");
@@ -614,7 +614,7 @@ test.describe("My Availability", () => {
     const realAvailability = await (await page.request.get("/api/faculty-portal/availability")).json();
     await mockJson(page, "**/api/faculty-portal/availability", () => ({ ...realAvailability, exceptions: [] }));
     await openFromSidebar(page, "My Availability", "My Availability");
-    await expect(page.getByText("Tell the Graduate School when you can sit in a defense. All times are Philippine time.")).toBeVisible();
+    await expect(page.getByText("When you can sit in a defense.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByRole("link", { name: "See your calendar" })).toHaveAttribute("href", "/faculty-portal/calendar");
     await expect(page.getByRole("status").filter({ hasText: /Availability entered\.|Last updated/ })).toBeVisible();
 
@@ -638,7 +638,7 @@ test.describe("My Availability", () => {
     await expect(form.getByText("Leave empty for the whole day.")).toBeVisible();
     await expect(form.getByRole("button", { name: "Add date" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Your dates" })).toBeVisible();
-    await expect(page.getByText("Dates that have passed are not shown.")).toBeVisible();
+    await expect(page.getByText("Dates that have passed are not shown.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23
 
     await expect(page.getByRole("heading", { name: "Requests from the Graduate School" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Google Calendar connection" })).toHaveCount(0);
@@ -774,9 +774,9 @@ test.describe("My Availability", () => {
 test.describe("Assigned Classes", () => {
   test("rosters: header, read-only note, term and subject selects, roster table, print button, empty state", async ({ page }) => {
     const firstCount = await rosterRows(page, () => openFromSidebar(page, "Assigned Classes", "Assigned Classes"));
-    await expect(page.getByText("Class rosters for your assigned subjects.")).toBeVisible();
+    // CHANGED BY UX phase 3 (UX-22, IM50): the page line repeated the title; removed.
     await expect(page.getByRole("heading", { name: "Assigned class rosters" }), "conE: the card title that repeated the page title is gone").toHaveCount(0);
-    await expect(page.getByText("Grades and subject outcomes are encoded and maintained in the authorized source systems. The Monitoring Sheet is a synchronized, read-only view.")).toBeVisible();
+    await expect(page.getByText("Grades and subject outcomes are encoded and maintained in the authorized source systems. The Monitoring Sheet is a synchronized, read-only view.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
 
     const term = page.getByLabel("Semester");
     const subject = page.getByLabel("Subject");
@@ -830,7 +830,7 @@ test.describe("Assigned Classes", () => {
 test.describe("Routes", () => {
   test("Policy Assistant and Business Rules open from the sidebar", async ({ page }) => {
     await openFromSidebar(page, "Policy Assistant", "Policy Assistant");
-    await expect(page.getByText("What is waiting on me?")).toBeVisible();
+    await expect(page.getByText("What is waiting on me?")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await openFromSidebar(page, "Business Rules", /business rules/i);
   });
 

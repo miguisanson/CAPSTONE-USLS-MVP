@@ -104,7 +104,7 @@ test.describe("Faculty profiles (GS staff)", () => {
 
     await page.goto("/faculty");
     await expect(page.getByRole("heading", { level: 1, name: "Faculty" })).toBeVisible();
-    await expect(page.getByText(/Search the faculty directory, then open a profile/)).toBeVisible();
+    await expect(page.getByText("Open a faculty member to see expertise, panel load and availability.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByRole("button", { name: "Add faculty" })).toBeVisible();
 
     const rows = page.locator("main table tbody tr");
@@ -112,7 +112,7 @@ test.describe("Faculty profiles (GS staff)", () => {
     const heads = await page.locator("main table thead th").evaluateAll((els) => els.map((e) => e.textContent.trim()));
     expect(heads).toEqual(["Faculty", "Department / specialization", "Status", "Availability", "Student panels", "Actions"]);
     await expect(page.getByText(new RegExp(`Showing\\s+${all.length}\\s+of\\s+${all.length}\\s+faculty`))).toBeVisible();
-    await expect(page.getByText("Select a faculty member to open the profile")).toBeVisible();
+    await expect(page.getByText("Select a faculty member to open the profile")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
 
     // One row, by content.
     const bautista = rows.filter({ hasText: "Dr. Liwayway Bautista" });
@@ -230,7 +230,8 @@ test.describe("Faculty profiles (GS staff)", () => {
   });
 
   test("expertise records can be added, edited and removed inside the profile", async ({ page }) => {
-    await page.goto("/faculty?faculty=9");
+    // CHANGED BY data cleanup (IM55, 2026-11-22): Dr. Angela Cruz is faculty 7 now.
+    await page.goto("/faculty?faculty=7");
     const dialog = page.getByRole("dialog", { name: "Dr. Angela Cruz" });
     await expect(dialog).toBeVisible();
     const section = dialog.locator("section", { has: page.getByRole("heading", { name: "Expertise records" }) });
@@ -309,12 +310,13 @@ test.describe("Faculty profiles (GS staff)", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
     // Edit: prefilled, new-password rule, Cancel.
-    await page.locator("main table tbody tr").filter({ hasText: "Dr. Paolo Navarro" }).getByRole("button", { name: /Edit/ }).click();
-    const edit = page.getByRole("dialog", { name: "Edit Dr. Paolo Navarro" });
+    // CHANGED BY data cleanup (IM55, 2026-11-22): Dr. Benjamin Reyes (Business) replaces Dr. Paolo Navarro.
+    await page.locator("main table tbody tr").filter({ hasText: "Dr. Benjamin Reyes" }).getByRole("button", { name: /Edit/ }).click();
+    const edit = page.getByRole("dialog", { name: "Edit Dr. Benjamin Reyes" });
     await expect(edit).toBeVisible();
-    await expect(edit.getByLabel("Full name")).toHaveValue("Dr. Paolo Navarro");
+    await expect(edit.getByLabel("Full name")).toHaveValue("Dr. Benjamin Reyes");
     await expect(edit.getByLabel("Department")).toHaveValue("Business");
-    await expect(edit.getByLabel("Email (also the login)")).toHaveValue("paolo.navarro@usls.edu.ph");
+    await expect(edit.getByLabel("Email (also the login)")).toHaveValue("benjamin.reyes@usls.edu.ph");
     await expect(edit.getByLabel("Status")).toHaveValue("Active");
     await edit.getByLabel("New password (leave blank to keep the current one)").fill("short");
     await edit.getByRole("button", { name: "Save changes" }).click();
@@ -326,11 +328,13 @@ test.describe("Faculty profiles (GS staff)", () => {
 });
 
 // ================================================================================================ Adviser appointments
+// CHANGED BY data cleanup (IM55-IM57, 2026-11-22): faculty ids of the 7 kept faculty; Dr. Teresa Lim is gone, so
+// Marielle applies for Dr. Benjamin Reyes (one of two with a free seat).
 const STUDENTS = {
-  gian: { email: "gian.reyes@student.usls.edu.ph", name: "Gian Reyes", faculty: 6, facultyName: "Dr. Benjamin Reyes" }, // the Dean returns it
-  daniel: { email: "daniel.bernardo@student.usls.edu.ph", name: "Daniel Bernardo", faculty: 9, facultyName: "Dr. Angela Cruz" }, // the Dean appoints it
+  gian: { email: "gian.reyes@student.usls.edu.ph", name: "Gian Reyes", faculty: 5, facultyName: "Dr. Benjamin Reyes" }, // the Dean returns it
+  daniel: { email: "daniel.bernardo@student.usls.edu.ph", name: "Daniel Bernardo", faculty: 7, facultyName: "Dr. Angela Cruz" }, // the Dean appoints it
   rafael: { email: "rafael.pang@student.usls.edu.ph", name: "Rafael Pang", faculty: 1, facultyName: "Dr. Liwayway Bautista" }, // adviser at the limit: exception
-  marielle: { email: "marielle.navarro@student.usls.edu.ph", name: "Marielle Navarro", faculty: 11, facultyName: "Dr. Teresa Lim" }, // the Coordinator notes, staff forwards
+  marielle: { email: "marielle.navarro@student.usls.edu.ph", name: "Marielle Navarro", faculty: 5, facultyName: "Dr. Benjamin Reyes" }, // the Coordinator notes, staff forwards
 };
 
 test.describe("Adviser appointments", () => {
@@ -370,7 +374,7 @@ test.describe("Adviser appointments", () => {
 
     test("the card, the tabs and the note form", async ({ page }) => {
       await page.goto("/workflow/research-gate?view=adviser");
-      await expect(page.getByText(/Form 3 → Academic Coordinator notes/)).toBeVisible();
+      await expect(page.getByText("Requests to appoint a research adviser, from Form 3 to the adviser's acceptance.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
       // Tabs.
       const tablist = page.getByRole("tablist", { name: "Appointment lists" });
       await expect(tablist).toBeVisible();
@@ -379,11 +383,11 @@ test.describe("Adviser appointments", () => {
 
       const marielle = card(page, "Marielle Navarro");
       await expect(marielle).toBeVisible();
-      await expect(marielle).toContainText("2360061");
+      await expect(marielle).toContainText("2691504"); // CHANGED BY data cleanup (IM54-IM57, 2026-11-22)
       await expect(marielle).toContainText("New");
       await expect(marielle).toContainText("Applied");
       await expect(marielle).toContainText("Nominated adviser");
-      await expect(marielle).toContainText("Dr. Teresa Lim");
+      await expect(marielle).toContainText("Dr. Benjamin Reyes");
       await expect(marielle).toContainText(/\d+ of 5 advisees/);
       await expect(marielle).toContainText("P63 application of Marielle Navarro.");
       // The progress tracker lists every step of the application.
@@ -598,7 +602,7 @@ test.describe("Form 1 endorsement queue (Academic Coordinator)", () => {
 
     await page.goto("/form1-endorsements");
     await expect(page.getByText("Form 1 Endorsements").first()).toBeVisible();
-    await expect(page.getByText("Academic Coordinator review and in-system signature queue")).toBeVisible();
+    await expect(page.getByText("Review and sign each Form 1.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByText(/The endorsement immediately updates Research Gate progress/)).toBeVisible();
     await expect(page.getByText("Waiting and endorsed")).toBeVisible();
     await expect(page.getByText(/\d+ waiting/)).toBeVisible();

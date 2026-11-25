@@ -315,7 +315,7 @@ export function FacultyAdviserPanel({ portalAdvisees = [] }) {
 
       {inbox.length > 0 && (
         <Card>
-          <SectionTitle title="Research adviser requests" subtitle="A student asks you to be the research adviser. Please accept or decline." icon={UserCheck} />
+          <SectionTitle title="Research adviser requests" icon={UserCheck} />
           <ul className="space-y-3">
             {inbox.map((item) => (
               <RequestCard
@@ -343,7 +343,7 @@ export function FacultyAdviserPanel({ portalAdvisees = [] }) {
 
       {consents.length > 0 && (
         <Card>
-          <SectionTitle title="Change of adviser: your agreement needed" subtitle="One of your advisees asks to move to a new adviser." icon={UserRoundCog} />
+          <SectionTitle title="Change of adviser: your agreement needed" icon={UserRoundCog} />
           <ul className="space-y-3">
             {consents.map((item) => (
               <RequestCard

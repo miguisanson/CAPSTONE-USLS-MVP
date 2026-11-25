@@ -1,6 +1,8 @@
 // e2e-writes: none
+// CHANGED BY data cleanup (IM54-IM57, 2026-11-22): student ids re-pointed (Miko Almario 125 -> 18, Nico Barrientos 146 -> 39).
 // I-006: Defense Scheduling "Change panel" lists each existing member under the role that member holds (not by position).
 import { test, expect } from "@playwright/test";
+import { openClosed } from "./support/board.js";
 import { join } from "node:path";
 import { AUTH_DIR } from "./support/paths.mjs";
 
@@ -16,7 +18,7 @@ test("Change panel shows each member under their own role, whatever order the se
     panel = body.assigned_panel;
     await route.fulfill({ response, json: body });
   });
-  await page.goto("/workflow/defense-scheduling?student_id=146");
+  await page.goto("/workflow/defense-scheduling?student_id=39");
   await page.getByRole("button", { name: "Change panel" }).click();
   expect(panel.length).toBeGreaterThan(1);
   const seats = await page.locator("main label").allTextContents();
@@ -47,6 +49,7 @@ test.describe("I-371 graduation stage check after the Dean's yes", () => {
         await route.fulfill({ response, json: body });
       });
       await page.goto("/dean/approvals/graduation?tab=batches");
+      await openClosed(page.locator("main")); // CHANGED BY UX phase 5b (UX-28/29): a batch with the Registrar is behind "Closed"
       await page.getByRole("button", { name: `View details for ${BATCH}` }).first().click();
       const dialog = page.getByRole("dialog");
       const steps = ["Dean reviews graduation batch", "Export Dean-approved list", "Registrar acknowledged"];

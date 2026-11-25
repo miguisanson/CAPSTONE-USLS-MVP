@@ -19,7 +19,7 @@ export default function WaitingList({ step, onPick }) {
   ];
   return (
     <Card pad="lg">
-      <SectionTitle title={TITLES[step]} subtitle="Students whose documents are in and whose next step is this one" icon={Users} />
+      <SectionTitle title={TITLES[step]} icon={Users} />
       {error ? <InlineNotice tone="danger" title="Could not load the waiting list">{error}</InlineNotice> : <DataTable
         caption={TITLES[step]}
         columns={columns}

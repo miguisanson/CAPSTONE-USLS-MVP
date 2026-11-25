@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Activity, BarChart3, ClipboardCheck, Clock, GraduationCap, Layers, Timer } from "lucide-react";
-import { DataTable, Field, PageHeader, Select, StatusChip } from "../../components/ui/index.js";
+import { DataTable, FilterBar, FilterSelect, PageHeader, StatusChip } from "../../components/ui/index.js";
 import ReportsFrame from "../reports/ReportsFrame.jsx";
 import { OutcomesView, PipelineView, SpeedView as DeanSpeedView, StagesView, WaitingView } from "../reports/DeanViews.jsx";
 import { OnboardingGatePanel, CourseworkReportPanel } from "../../components/ProcessGates";
@@ -21,7 +21,6 @@ export function DeanGateReportsPage() {
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title={PAGE.gateReports}
-        description="Reports sent to the Dean for a decision: the admission onboarding report and the coursework status report."
         icon={ClipboardCheck}
       />
       <OnboardingGatePanel role="dean" />
@@ -45,7 +44,6 @@ export function DeanAnalyticsPage() {
   return (
     <ReportsFrame
       title={PAGE.reportsAnalytics}
-      description="What waits for the Dean's decision, how fast decisions are made, what was decided and where graduation candidates stand."
       icon={BarChart3}
       tabs={DEAN_TABS}
       label="Dean reports"
@@ -117,26 +115,23 @@ function DeanHistoryBody() {
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title={PAGE.activityLog}
-        description="Recent decisions recorded against the Dean account, newest first. Each entry keeps its full stage history on the case page."
         icon={Activity}
       />
+      <FilterBar
+        active={filter ? 1 : 0}
+        onClear={() => setFilter("")}
+        summary={`${visible.length} entr${visible.length === 1 ? "y" : "ies"}`}
+      >
+        <FilterSelect label="Process" value={filter} onChange={(event) => setFilter(event.target.value)} options={processOptions} placeholder="All processes" />
+      </FilterBar>
       <DataTable
         caption="Recent decisions recorded against the Dean account, newest first"
         columns={HISTORY_COLUMNS}
         rows={visible}
         rowKey="key"
         pageSize={25}
+        noun="decisions"
         empty={{ icon: Activity, title: "No decisions recorded yet", hint: "Approvals, returns and denials will be listed here." }}
-        toolbar={
-          <>
-            <div className="w-full sm:w-64">
-              <Field label="Process">
-                <Select value={filter} onChange={(event) => setFilter(event.target.value)} options={processOptions} placeholder="All processes" />
-              </Field>
-            </div>
-            <span className="meta self-end pb-3 sm:ml-auto">{visible.length} entr{visible.length === 1 ? "y" : "ies"}</span>
-          </>
-        }
       />
     </div>
   );

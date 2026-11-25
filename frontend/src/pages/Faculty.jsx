@@ -8,7 +8,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { useApi } from "../hooks";
-import { Button, Card, DataTable, Field, InlineNotice, Input, Modal, PageHeader, SearchInput, Select, Spinner, StatusChip, Textarea } from "../components/ui/index.js";
+import { Button, Card, DataTable, Field, FilterBar, FilterSelect, InlineNotice, Input, Modal, PageHeader, Select, Spinner, StatusChip, Textarea } from "../components/ui/index.js";
 import { formatDate, formatTimeRange, initials } from "../lib/format";
 import { WeeklyHours } from "./faculty/FacultyAvailabilityEditor";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
@@ -121,26 +121,19 @@ export default function Faculty() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.faculty}
-        description="Search the faculty directory, then open a profile to review expertise, login email, panel load, and the availability the faculty member has entered."
         actions={canManage ? <Button icon={Plus} onClick={() => { setNotice(""); setFormFor("new"); }}>Add faculty</Button> : null}
       />
       {notice && <InlineNotice tone="success">{notice}</InlineNotice>}
 
-      <Card>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <SearchInput
-            value={query}
-            onChange={setQuery}
-            label="Search faculty"
-            placeholder="Search by name, department, or specialization…"
-            className="flex-1"
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Select aria-label="Filter by department" placeholder="All departments" value={department} onChange={(event) => setDepartment(event.target.value)} options={departments} />
-            <Select aria-label="Filter by availability" placeholder="All availability" value={availability} onChange={(event) => setAvailability(event.target.value)} options={AVAILABILITY_OPTIONS} />
-          </div>
-        </div>
-      </Card>
+      <FilterBar
+        search={{ value: query, onChange: setQuery, label: "Search faculty", placeholder: "Search by name, department, or specialization…" }}
+        active={[query, department, availability].filter(Boolean).length}
+        onClear={() => { setQuery(""); setDepartment(""); setAvailability(""); }}
+        summary={!loading && !error && faculty.length > 0 ? `Showing ${filtered.length} of ${faculty.length} faculty` : null}
+      >
+        <FilterSelect label="Department" aria-label="Filter by department" placeholder="All departments" value={department} onChange={(event) => setDepartment(event.target.value)} options={departments} />
+        <FilterSelect label="Availability" aria-label="Filter by availability" placeholder="All availability" value={availability} onChange={(event) => setAvailability(event.target.value)} options={AVAILABILITY_OPTIONS} />
+      </FilterBar>
 
       {loading ? (
         <Card><Spinner label="Loading faculty profiles…" /></Card>
@@ -153,12 +146,6 @@ export default function Faculty() {
         </InlineNotice>
       ) : (
         <div className="space-y-3">
-          {filtered.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-slate-500">Showing <span className="font-semibold text-ink">{filtered.length}</span> of <span className="font-semibold text-ink">{faculty.length}</span> faculty</p>
-              <p className="meta">Select a faculty member to open the profile</p>
-            </div>
-          )}
           <DataTable
             caption="Faculty directory"
             columns={columns}

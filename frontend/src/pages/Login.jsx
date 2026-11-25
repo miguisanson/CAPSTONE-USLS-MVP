@@ -305,7 +305,6 @@ export default function Login() {
               className="mt-2"
               title="Graduate School Lifecycle Portal"
               titleProps={{ className: "!text-3xl leading-tight" }}
-              description="Sign in with your Graduate School account. The screens you see depend on the role your account holds."
             />
           </div>
 

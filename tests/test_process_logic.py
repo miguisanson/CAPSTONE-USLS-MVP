@@ -265,14 +265,15 @@ class ProcessLogicTests(unittest.TestCase):
         summary = staff.get("/api/reports/summary").get_json()
         tiles = {tile["key"]: tile for tile in summary["tiles"]}
         self.assertEqual(tiles["active"]["comparison"]["kind"], "previous_term", tiles["active"]["comparison"])
-        self.assertGreater(tiles["active"]["comparison"]["previous"], 50)
+        self.assertGreater(tiles["active"]["comparison"]["previous"], 30)  # CHANGED BY data cleanup (IM54-IM57, 2026-11-22): the smaller demo data
         self.assertEqual(tiles["decide_days"]["comparison"]["kind"], "previous_term", tiles["decide_days"]["comparison"])
         self.assertGreaterEqual(tiles["decide_days"]["count"], 3)  # decisions in the first days of this term
         previous = staff.get("/api/reports/decisions", query_string={"term": "previous"}).get_json()
         overall = previous["speed"]["overall"]
         self.assertIsNotNone(overall["last_term"], "no decisions in the term before the previous one")
-        self.assertGreaterEqual(overall["this_term"]["count"], 15)
-        self.assertGreaterEqual(overall["last_term"]["count"], 12)
+        # CHANGED BY data cleanup (IM57, 2026-11-22): the small history set decides fewer cases per earlier term
+        self.assertGreaterEqual(overall["this_term"]["count"], 6)
+        self.assertGreaterEqual(overall["last_term"]["count"], 5)
         self.assertLess(overall["this_term"]["median_days"], 7)
         self.assertGreater(overall["this_term"]["p90_days"], overall["this_term"]["median_days"])  # a slow tail
         totals = previous["outcomes"]["totals"]

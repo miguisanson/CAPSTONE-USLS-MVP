@@ -32,6 +32,14 @@ for (const entry of wanted) {
     expect(body.user?.role, `signed in as ${email}`).toBe(entry.role);
     await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
     writeFileSync(join(SIGNIN_DIR, `${entry.key}.json`), JSON.stringify(tracker.problems));
+    // UX-27 (Phase 5a): the sidebar groups fold, and a person's open/closed choice is remembered in localStorage. The specs
+    // that reuse this session reach pages through the sidebar, so the saved session has every group opened - the choice a
+    // person makes once. Folding itself is tested from a fresh browser (p152-ux-phase5a).
+    await page.evaluate((role) => {
+      const groups = ["Overview", "Records", "Lifecycle Workflows", "Standalone Processes", "Monitoring & support", "Approvals",
+        "Monitoring & Support", "Advising & Research", "Teaching", "Support", "Academics", "Research", "Requests"];
+      window.localStorage.setItem(`usls.nav.groups.${role}`, JSON.stringify(Object.fromEntries(groups.map((label) => [label, true]))));
+    }, entry.role);
     await page.context().storageState({ path: join(AUTH_DIR, `${entry.key}.json`) });
   });
 }

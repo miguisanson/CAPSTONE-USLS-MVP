@@ -3,14 +3,13 @@ import {
   CheckCircle2,
   RotateCcw,
   AlertTriangle,
-  SlidersHorizontal,
   ArrowUpRight,
   Eye,
   MessageSquare,
 } from "lucide-react";
 import { api } from "../../api";
 import { useApi, useIsPhone } from "../../hooks";
-import { Button, Card, DecisionPanel, EmptyState, HistoryPanel, SearchInput, SkeletonBoard, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, DecisionPanel, EmptyState, Field, FilterBar, FilterSelect, HistoryPanel, Input, Select, SkeletonBoard, StatusChip } from "../../components/ui/index.js";
 import { formatDate } from "../../lib/format";
 import WorkflowTimeline, { graduationTimelineSteps, withdrawalTimelineSteps } from "../../components/WorkflowTimeline";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
@@ -62,29 +61,29 @@ export function deanApproveLabel(item) {
   return standingChange || item.type === "withdrawal" ? "Approve" : "Approve and prepare for export";
 }
 
-export function DeanListFilters({ filters, setFilters, programs, statuses, showAdvanced = true }) {
+export function DeanListFilters({ filters, setFilters, programs, statuses, showAdvanced = true, showSort = showAdvanced }) {
   const active = Object.entries(filters).filter(([key, value]) => {
     if (!showAdvanced && ["dateFrom", "dateTo", "sort"].includes(key)) return false;
     return Boolean(value) && !(key === "sort" && value === "newest");
   }).length;
   const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
   return (
-    <Card pad="sm" className="mb-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SearchInput
-          value={filters.query}
-          onChange={(query) => setFilters((current) => ({ ...current, query }))}
-          placeholder="Search student, ID, or item…"
-          label="Search Dean review lists"
-        />
-        <select value={filters.program} onChange={update("program")} className="field-input cursor-pointer" aria-label="Filter Dean list by program"><option value="">All programs</option>{programs.map((program) => <option key={program}>{program}</option>)}</select>
-        <select value={filters.status} onChange={update("status")} className="field-input cursor-pointer" aria-label="Filter Dean list by stage or status"><option value="">All stages / statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
-        {showAdvanced && <label><span className="eyebrow mb-1 block">Updated from</span><input type="date" value={filters.dateFrom} onChange={update("dateFrom")} className="field-input" /></label>}
-        {showAdvanced && <label><span className="eyebrow mb-1 block">Updated through</span><input type="date" value={filters.dateTo} onChange={update("dateTo")} className="field-input" /></label>}
-        {showAdvanced && <label><span className="eyebrow mb-1 block">Sort</span><select value={filters.sort} onChange={update("sort")} className="field-input cursor-pointer"><option value="newest">Newest updated</option><option value="oldest">Oldest updated</option><option value="student">Student name</option></select></label>}
-      </div>
-      {active > 0 && <div className="mt-2 flex justify-end"><button type="button" onClick={() => setFilters({ query: "", program: "", status: "", dateFrom: "", dateTo: "", sort: "newest" })} className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800"><SlidersHorizontal className="h-3.5 w-3.5" /> Clear {active} filter{active === 1 ? "" : "s"}</button></div>}
-    </Card>
+    <FilterBar
+      className="mb-4"
+      search={{ value: filters.query, onChange: (query) => setFilters((current) => ({ ...current, query })), placeholder: "Search student, ID, or item…", label: "Search Dean review lists" }}
+      active={active}
+      onClear={() => setFilters({ query: "", program: "", status: "", dateFrom: "", dateTo: "", sort: "newest" })}
+    >
+      <FilterSelect label="Program" value={filters.program} onChange={update("program")} aria-label="Filter Dean list by program" placeholder="All programs" options={programs} />
+      <FilterSelect label="Stage or status" value={filters.status} onChange={update("status")} aria-label="Filter Dean list by stage or status" placeholder="All stages / statuses" options={statuses} />
+      {showAdvanced && <Field label="Updated from"><Input type="date" value={filters.dateFrom} onChange={update("dateFrom")} /></Field>}
+      {showAdvanced && <Field label="Updated through"><Input type="date" value={filters.dateTo} onChange={update("dateTo")} /></Field>}
+      {showSort && (
+        <Field label="Sort">
+          <Select value={filters.sort} onChange={update("sort")} placeholder="" options={[{ value: "newest", label: "Newest updated" }, { value: "oldest", label: "Oldest updated" }, { value: "student", label: "Student name" }]} />
+        </Field>
+      )}
+    </FilterBar>
   );
 }
 

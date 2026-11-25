@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Briefcase,
   Mail,
@@ -23,7 +23,7 @@ import {
 import { api } from "../api";
 import { useApi } from "../hooks";
 import { stageWords } from "../lib/stages";
-import { Button, Card, DataTable, EmptyState, HistoryPanel, PageHeader, SectionCard, Skeleton, StatCard, StatusChip, Stepper } from "../components/ui/index.js";
+import { Button, Card, DataTable, EmptyState, HistoryPanel, PageHeader, SectionCard, Skeleton, StatCard, StatusChip, Stepper, Tabs } from "../components/ui/index.js";
 import { ProgressBar } from "../components/ui/ProgressBar.jsx";
 import { formatDate, relativeDays, SEVERITY } from "../lib/format";
 import { activityTitle } from "../lib/staffHome.js";
@@ -56,57 +56,82 @@ const ENROLLMENT_COLUMNS = [
   },
 ];
 
-// The four counts of the course audit. A count with subjects behind it is a button that opens them under the tiles (I-192);
-// a zero is only a number.
+// The four counts of the course audit. Each count is a button that opens the matching Curriculum tab (owner feedback
+// 2026-11-23, IM58): Completed opens Completed; Current, Incomplete and Missing open Outstanding. A zero is only a number.
 const AUDIT_TILES = [
-  { key: "completed", label: "Completed", tone: "success" },
-  { key: "current", label: "Current", tone: "info" },
-  { key: "incomplete", label: "Incomplete", tone: "warning" },
-  { key: "missing", label: "Missing", tone: "danger" },
+  { key: "completed", label: "Completed", tone: "success", tab: "completed" },
+  { key: "current", label: "Current", tone: "info", tab: "outstanding" },
+  { key: "incomplete", label: "Incomplete", tone: "warning", tab: "outstanding" },
+  { key: "missing", label: "Missing", tone: "danger", tab: "outstanding" },
 ];
 
+function CurriculumRow({ row, done }) {
+  const when = done ? row.term_label || "Semester not recorded" : row.term_label || row.recommended_term;
+  const facts = [row.units ? `${row.units} unit${Number(row.units) === 1 ? "" : "s"}` : "", when, done && row.grade_value ? `Grade ${row.grade_value}` : ""];
+  return (
+    <li className="flex items-center justify-between gap-2 py-2 text-sm">
+      <span className="min-w-0 text-slate-700">
+        <span className="font-semibold">{row.code}</span> · {row.title}
+        <span className="meta block">{facts.filter(Boolean).join(" · ")}</span>
+      </span>
+      {!done && <StatusChip status={row.status} dot={false} />}
+    </li>
+  );
+}
+
 function CourseAuditTiles({ audit }) {
-  const [openKey, setOpenKey] = useState("");
-  const chosen = AUDIT_TILES.find((tile) => tile.key === openKey);
-  const rows = chosen ? audit[chosen.key] : [];
-  const toFinish = audit.current.length + audit.incomplete.length + audit.missing.length;
+  const outstanding = [...audit.current, ...audit.incomplete, ...audit.missing];
+  const [tab, setTab] = useState(outstanding.length ? "outstanding" : "completed");
+  const sectionRef = useRef(null);
+  const rows = tab === "completed" ? audit.completed : outstanding;
+  const toFinish = outstanding.length;
+  function openTab(key) {
+    setTab(key);
+    sectionRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    sectionRef.current?.querySelectorAll('[role="tab"]')[key === "completed" ? 0 : 1]?.focus();
+  }
   return (
     <>
       <p data-testid="subjects-to-finish" className="text-sm font-semibold text-slate-700">
         {toFinish} subject{toFinish === 1 ? "" : "s"} to finish ({audit.current.length} current, {audit.missing.length} missing)
       </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {AUDIT_TILES.map((tile) => {
-          const count = audit[tile.key].length;
-          const open = openKey === tile.key;
-          return (
-            <div key={tile.key} className="flex h-full flex-col gap-2">
-              <div className="flex-1"><StatCard size="sm" label={tile.label} value={count} tone={tile.tone} /></div>
-              {count > 0 && (
-                <Button variant="secondary" aria-expanded={open} aria-controls="course-audit-subjects" onClick={() => setOpenKey(open ? "" : tile.key)}>
-                  {open ? "Hide subjects" : "Show subjects"}
-                </Button>
-              )}
-            </div>
-          );
-        })}
+        {AUDIT_TILES.map((tile) => audit[tile.key].length === 0 ? (
+          <StatCard key={tile.key} size="sm" label={tile.label} value={0} tone={tile.tone} />
+        ) : (
+          <button
+            key={tile.key}
+            type="button"
+            aria-controls="curriculum-panel"
+            aria-label={`${tile.label} ${audit[tile.key].length}`}
+            onClick={() => openTab(tile.tab)}
+            className="h-full cursor-pointer rounded-xl text-left transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 motion-safe:active:scale-[0.98] [&_.card]:hover:border-brand-200 [&_.card]:hover:bg-brand-50/30"
+          >
+            <StatCard size="sm" label={tile.label} value={audit[tile.key].length} tone={tile.tone} />
+          </button>
+        ))}
       </div>
-      {chosen && (
-        <section id="course-audit-subjects" aria-label={`${chosen.label} subjects (${rows.length})`} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-          <p className="eyebrow mb-2">{chosen.label} subjects ({rows.length})</p>
-          <ul className="space-y-1.5">
-            {rows.map((row) => (
-              <li key={row.code} className="flex items-center justify-between gap-2 text-sm">
-                <span className="min-w-0 text-slate-700">
-                  <span className="font-semibold">{row.code}</span> · {row.title}
-                  <span className="meta block">{[row.units ? `${row.units} units` : "", row.term_label || row.recommended_term].filter(Boolean).join(" · ")}</span>
-                </span>
-                <StatusChip status={row.status} dot={false} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <section ref={sectionRef} aria-label="Curriculum" className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+        <p className="eyebrow mb-2">Curriculum</p>
+        <Tabs
+          label="Curriculum"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { key: "completed", label: "Completed", count: audit.completed.length },
+            { key: "outstanding", label: "Outstanding", count: outstanding.length },
+          ]}
+        />
+        <div id="curriculum-panel" role="tabpanel" aria-label={tab === "completed" ? `Completed subjects (${rows.length})` : `Outstanding subjects (${rows.length})`} className="mt-2">
+          {rows.length ? (
+            <ul className="divide-y divide-slate-100">
+              {rows.map((row) => <CurriculumRow key={row.code} row={row} done={tab === "completed"} />)}
+            </ul>
+          ) : (
+            <p className="meta py-2">{tab === "completed" ? "No subjects completed yet." : "Nothing left to take."}</p>
+          )}
+        </div>
+      </section>
     </>
   );
 }
@@ -120,11 +145,10 @@ function LeaveHistoryCard({ history }) {
   const used = history.approved_leave_semesters || 0;
   const max = history.max_leave_semesters || 0;
   return (
-    <SectionCard title="Leave history" subtitle="Earlier leave of absence and readmission cases (view only)" icon={CalendarOff}>
+    <SectionCard title="Leave history" icon={CalendarOff}>
       {max > 0 && (
         <div className="mb-3">
           <p className="text-sm font-semibold text-ink">{used} of {max} leave semesters already approved</p>
-          <p className="meta">Earlier leaves count toward the total limit.</p>
           <ProgressBar className="mt-2" value={max ? (used / max) * 100 : 0} />
         </div>
       )}
@@ -233,7 +257,7 @@ export default function StudentDetail() {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         {/* Main column */}
         <div className="page-stack min-w-0">
-          <SectionCard title="Course audit" subtitle="Completed, current, and missing subjects vs curriculum" icon={ClipboardCheck}>
+          <SectionCard title="Course audit" icon={ClipboardCheck}>
             <div className="flex flex-wrap gap-2">
               <Button
                 as={Link}
@@ -270,7 +294,7 @@ export default function StudentDetail() {
                   {course_audit.by_category.map((cat) => (
                     <span key={cat.category} className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
                       {cat.category}
-                      <span className="font-normal text-slate-500">{cat.completed_units}/{cat.total_units}u</span>
+                      <span className="font-normal text-slate-500">{cat.completed_units} of {cat.total_units} units</span>
                     </span>
                   ))}
                 </div>
@@ -292,21 +316,6 @@ export default function StudentDetail() {
                 </div>
               </div>
             )}
-            {(course_audit.missing.length > 0 || course_audit.incomplete.length > 0) && (
-              <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                <p className="eyebrow mb-2">Outstanding subjects</p>
-                <ul className="space-y-1.5">
-                  {[...course_audit.incomplete, ...course_audit.missing].map((row) => (
-                    <li key={row.code} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="min-w-0 text-slate-700">
-                        <span className="font-semibold">{row.code}</span> · {row.title}
-                      </span>
-                      <StatusChip status={row.status} dot={false} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
             {subject_enrollments.length > 0 && (
               <HistoryPanel label="View enrollment history" hideLabel="Hide enrollment history" count={subject_enrollments.length}>
                 <DataTable
@@ -325,7 +334,7 @@ export default function StudentDetail() {
           <ComprehensiveExamSection student={student} exam={data.comprehensive_exam} onChanged={refetch} />
 
           {/* Research case + documents */}
-          <SectionCard title="Research case & evidence" subtitle="Milestone gate and required document checklist" icon={FlaskConical}>
+          <SectionCard title="Research case & evidence" icon={FlaskConical}>
             {research_case ? (
               <div className="rounded-xl border border-brand-100 bg-brand-50/50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -369,7 +378,7 @@ export default function StudentDetail() {
           <LeaveHistoryCard history={data.leave_history} />
 
           {/* Timeline */}
-          <SectionCard title="Activity timeline" subtitle="What happened, by whom, and when" icon={Clock}>
+          <SectionCard title="Activity timeline" icon={Clock}>
             {logs.length ? (
               <HistoryPanel entries={logEntries} label="View logs" hideLabel="Hide logs" />
             ) : (
@@ -388,7 +397,7 @@ export default function StudentDetail() {
             hasPracticum={student.program_has_practicum}
           />
 
-          <SectionCard title="Recommended actions" subtitle="Computed from this record" icon={Lightbulb}>
+          <SectionCard title="Recommended actions" icon={Lightbulb}>
             {recommendations.length ? (
               <ul className="space-y-2.5">
                 {recommendations.map((r, i) => {

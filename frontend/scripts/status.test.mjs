@@ -92,3 +92,43 @@ test("a server status that is jargon is shown in words, the tone follows the ori
   assert.equal(statusTone("Noted by AC"), "info");
   assert.equal(statusLabel("Approved"), "Approved");
 });
+
+// UX-18 (owner IM51, 2026-11-20): one word per meaning. The server keeps its values; the screen shows one word for every
+// synonym, and the colour still follows the server's value.
+test("every way of saying the same thing shows the same word (IM51)", () => {
+  const same = {
+    "With the Dean": ["Dean Review", "For Dean Review", "Ready for Dean Review", "Report Sent to Dean", "ready for dean review"],
+    "In review": ["Under Review", "Pending Review", "Awaiting Review"],
+    "In staff review": ["Staff Review", "Pending Staff Action"],
+    Submitted: ["Submitted", "Submitted to GS Staff", "Submitted for review"],
+    Returned: ["Returned", "Returned for Revision", "Returned for Clarification", "Needs Revision"],
+    "Acknowledged by Registrar": ["Registrar Received", "Acknowledged by Registrar"],
+    AWOL: ["AWOL", "AWOL (absent without leave)"],
+    Completed: ["Complete", "Completed"],
+    Verified: ["Verified", "Verified Complete", "Verified by staff"],
+    Passed: ["Pass", "Passed"],
+    "On leave": ["On Leave", "LOA", "Leave of Absence"],
+    "Not eligible": ["Not Eligible", "Not eligible"],
+    "Not taken": ["Not Taken", "Not taken"],
+  };
+  for (const [word, statuses] of Object.entries(same)) {
+    for (const status of statuses) assert.equal(statusLabel(status), word, `${status} reads ${word}`);
+  }
+});
+
+test("a merged word keeps the colour of the server's value (IM51)", () => {
+  assert.equal(statusTone("Report Sent to Dean"), "info");
+  assert.equal(statusTone("Ready for Dean Review"), "warning");
+  assert.equal(statusTone("Returned for Revision"), "attention");
+});
+
+test("words that only look alike stay apart (IM51)", () => {
+  assert.equal(statusLabel("For Review"), "For Review"); // the Graduate School staff's graduation review, not the Dean's
+  assert.equal(statusLabel("Needs Review"), "Needs Review"); // flagged for a person to check
+  assert.equal(statusLabel("Revisions Required"), "Revisions Required"); // a panel verdict
+  assert.equal(statusLabel("Dean Approved"), "Dean Approved");
+  assert.equal(statusLabel("Documents Submitted"), "Documents Submitted");
+  // a history row "AWOL -> AWOL Declared" (the standing, then the case) must still show a change
+  assert.equal(statusLabel("AWOL Declared"), "AWOL Declared");
+  assert.equal(statusLabel(""), "");
+});

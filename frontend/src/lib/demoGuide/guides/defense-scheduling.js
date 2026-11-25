@@ -1,8 +1,9 @@
+// Data cleanup (2026-11-22): the picker search is "Miguel Yu" - "Miguel" also lists Miguel Torres first, under the guide.
 import { STAFF, NO_CASE } from "./_shared.js";
 
 const PICK = [
-  { type: { css: 'input[placeholder*="Search all students"]' }, text: "Miguel", optional: true },
-  { click: { text: "Miguel Yu" }, optional: true },
+  { type: { css: 'input[placeholder*="Search all students"]' }, text: "Miguel Yu", optional: true },
+  { click: { css: "button", text: "2260004" }, optional: true } /* CHANGED BY owner feedback 2026-11-23 (stage 8): the picker result itself */,
   { wait: { text: "Coordinate the defense schedule" }, timeout: 30000 },
 ];
 

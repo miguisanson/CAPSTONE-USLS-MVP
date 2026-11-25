@@ -209,7 +209,6 @@ export default function RegistrarPanel({ slug, cases, onChanged, focusStudentId 
         {rows.length === 0 ? (
           <EmptyState
             title="Nothing to send to the Registrar yet"
-            hint="Approved requests appear here after the Dean decides."
           />
         ) : (
           <>

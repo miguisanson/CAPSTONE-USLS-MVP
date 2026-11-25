@@ -169,7 +169,7 @@ test.describe("Dean home", () => {
     for (const gone of ["Recently decided", "How long items have waited", "Waiting longest"]) {
       await expect(main(page).getByText(gone, { exact: true }), `no "${gone}" block`).toHaveCount(0);
     }
-    await expect(main(page).getByRole("link", { name: /Open approvals queue/ })).toHaveAttribute("href", "/dean/approvals");
+    await expect(main(page).getByRole("link", { name: /Open approvals queue/ })).toHaveCount(0); // UX-11: the sidebar has the Approvals Queue
     await expect(main(page).getByRole("link", { name: /Decisions waiting/ })).toHaveAttribute("href", "/dean/approvals");
     await expect(main(page).getByRole("link", { name: /Decided this week/ })).toHaveAttribute("href", "/dean/activity");
 
@@ -312,8 +312,10 @@ test.describe("Faculty home", () => {
     const upcoming = sectionOf(page, "Upcoming defenses");
     const a = await actions.boundingBox();
     const r = await upcoming.boundingBox();
-    expect(a.width, "actions are wider than the side column").toBeGreaterThan(r.width);
-    expect(r.x, "upcoming defenses beside the actions at 1366").toBeGreaterThan(a.x + a.width - 2);
+    // CHANGED BY UX phase 6 (UX-33): "Upcoming defenses" is in the wide column, under the actions (was beside them)
+    expect(Math.abs(r.x - a.x), "upcoming defenses in the actions' column at 1366").toBeLessThan(2);
+    expect(Math.round(r.width), "as wide as the actions").toBe(Math.round(a.width));
+    expect(r.y, "upcoming defenses under the actions at 1366").toBeGreaterThan(a.y + a.height - 2);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(300);
     const a2 = await actions.boundingBox();

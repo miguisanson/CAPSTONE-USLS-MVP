@@ -18,6 +18,7 @@
 // Adrian Lim, Maria Dela Cruz and graduation candidates Bianca Santos (no other spec uses them). Only the "Generate report"
 // step writes (one Draft coursework report in the throwaway harness database).
 import { test, expect } from "@playwright/test";
+import { openClosed } from "./support/board.js";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { AUTH_DIR, SCREENS_DIR, BASE_URL } from "./support/paths.mjs";
@@ -86,16 +87,17 @@ test.describe("P2.3 shared process components", () => {
         const board = page.getByRole("region", { name: spec.region });
         await expect(board).toBeVisible();
 
-        // every stage column, in order
-        const names = await board.locator("section > header h3").allTextContents();
-        expect(names).toEqual(spec.columns);
+        // every stage column (// CHANGED BY UX phase 5b (UX-28/29): the final ones are behind "Closed"; an empty one is a strip)
+        await openClosed(board);
+        const names = await board.locator("section[aria-label]").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("aria-label")));
+        expect([...names].sort()).toEqual([...spec.columns].sort());
 
         // each column's count bubble equals the cards under it
         let total = 0;
         for (const name of spec.columns) {
           const col = column(board, name);
           const cards = await col.getByRole("button", { name: /^View details for / }).count();
-          const bubble = col.locator("header").getByLabel(/^\d+ requests?$|^\d+ shown of \d+$/);
+          const bubble = (await col.getAttribute("data-empty-strip")) !== null ? col.getByTestId("stage-count") : col.locator("header").getByLabel(/^\d+ requests?$|^\d+ shown of \d+$/);
           await expect(bubble, `${name}: count bubble`).toHaveText(String(cards));
           total += cards;
         }

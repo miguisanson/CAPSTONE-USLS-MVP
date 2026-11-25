@@ -1,7 +1,7 @@
 import { Eye, MessageSquare } from "lucide-react";
 import { Button, DataTable, StatusChip } from "../../components/ui/index.js";
 import { leaveCaseStatusBadge } from "../../components/leaveStatus";
-import { CaseCardFacts, CaseCardShell, MessageNote, NextOwner, ReadyMark, RequirementBoxes } from "../../components/process";
+import { CaseCardFacts, CaseCardHead, CaseCardShell, MessageNote, NextOwner, ReadyMark, RequirementLine } from "../../components/process";
 import { caseFacts, caseFlags, caseRequirements, cardLines, whenDates } from "./leaveHelpers";
 
 export function FlagList({ item, role }) {
@@ -21,14 +21,17 @@ export function FlagList({ item, role }) {
 // One request on the board, in Khloe's layout (components/process; the same card as Practicum): name and number, a green card with
 // "Ready for Dean review" when the Dean has to decide, the five facts, the requirement boxes, the amber message box, "Next:" and
 // the buttons View and Message. The board adds dragging and the "Move to..." menu around it.
-export default function CaseCard({ item, role, selectable, selected, onToggleSelect, onOpen, onMessage }) {
+export default function CaseCard({ item, role, columnLabel = "", selectable, selected, onToggleSelect, onOpen, onMessage }) {
   const requirements = caseRequirements(item);
   const withDean = item.owner === "Dean";
   const name = item.student.name;
   return (
     <CaseCardShell ready={withDean} selected={selected}>
-      <div className="flex items-start gap-2.5">
-        {selectable && (
+      <CaseCardHead
+        name={name}
+        sub={`${item.student.student_number} · ${item.student.program_code}`}
+        chip={withDean ? <ReadyMark ready /> : null}
+        select={selectable && (
           <input
             type="checkbox"
             checked={selected}
@@ -37,24 +40,22 @@ export default function CaseCard({ item, role, selectable, selected, onToggleSel
             aria-label={`Select ${name} for a batch step`}
           />
         )}
-        <div className="min-w-0 flex-1">
-          <p className="break-words text-sm font-semibold text-ink">{name}</p>
-          <p className="meta break-words">
-            {item.student.student_number} · {item.student.program_code}
-          </p>
-        </div>
-      </div>
-      {(withDean || item.kind === "LOA_EXTENSION" || item.kind === "RESIDENCY") && (
+      />
+      {(item.kind === "LOA_EXTENSION" || item.kind === "RESIDENCY") && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          <ReadyMark ready={withDean} />
           {item.kind === "LOA_EXTENSION" && <StatusChip label="Extension" tone="muted" size="sm" dot={false} />}
           {item.kind === "RESIDENCY" && <StatusChip label="Residency" tone="muted" size="sm" dot={false} />}
         </div>
       )}
 
-      <CaseCardFacts facts={caseFacts(item)} />
+      {/* Owner 2026-11-19: an exported withdrawal shows the batch it was exported in. */}
+      {item.slug === "withdrawal" && item.batch_name && (
+        <div className="mt-2"><StatusChip label={item.batch_name} tone="muted" size="sm" dot={false} /></div>
+      )}
 
-      {requirements.length > 0 && <RequirementBoxes items={requirements} ariaLabel="Requirements for this request" className="mt-3 !grid-cols-1" />}
+      <CaseCardFacts facts={caseFacts(item, columnLabel)} />
+
+      <RequirementLine items={requirements} ariaLabel="Requirements for this request" />
 
       <div className="mt-2">
         <FlagList item={item} role={role} />

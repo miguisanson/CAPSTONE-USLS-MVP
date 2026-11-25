@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock, Eye, FileCheck, Info, RotateCcw, Send, SlidersHorizontal, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Eye, FileCheck, Info, RotateCcw, Send, X, XCircle } from "lucide-react";
 import { api } from "../../api";
-import { Button, Card, EmptyState, Field, HistoryList, HistoryPanel, InlineNotice, Input, Modal, SearchInput, Select, StatCard, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Card, EmptyState, Field, FilterBar, FilterSelect, HistoryList, HistoryPanel, InlineNotice, Input, Modal, Select, StatCard, StatusChip, Textarea } from "../../components/ui/index.js";
 import StepDialog from "../../components/StepDialog";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { formatClock, formatDateTime, formatDay, formatTimeRange } from "../../lib/format";
 import { useAuth } from "../../auth";
+import { statusLabel } from "../../lib/status";
 
 export const WORKFLOW_ROLE_LABELS = {
   staff: "Graduate School Staff",
@@ -158,7 +159,6 @@ export function WorkflowSupportModal({ slug, mode, logs, policyQuestions = [], s
   return (
     <WorkflowCaseModal
       title={title}
-      subtitle={mode === "activity" ? "A timestamped audit trail of recent actions and handoffs" : "A concise guide for students and reviewers"}
       onClose={onClose}
     >
       {mode === "activity" ? (
@@ -208,7 +208,7 @@ export function WorkflowSupportModal({ slug, mode, logs, policyQuestions = [], s
 
 // The workflow audit trail: HistoryPanel entries (newest first), behind a "View logs" toggle unless `collapsible` is off.
 export function WorkflowActivityList({ logs, collapsible = true }) {
-  if (!logs.length) return <EmptyState title="No activity yet" hint="New submissions, messages, and decisions will appear here." />;
+  if (!logs.length) return <EmptyState title="No activity yet" />;
   const entries = logs.map((log) => ({
     id: log.id,
     title: log.result,
@@ -359,55 +359,43 @@ export function WorkflowFileHistory({ files = [] }) {
   );
 }
 
-export function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel, secondaryOptions = [], count, total, noun = "records", showAdvanced = true }) {
+export function RosterFilters({ filters, setFilters, programs, statuses, secondaryLabel, secondaryOptions = [], count, total, noun = "records", showAdvanced = true, extra = null }) {
   const active = Object.entries(filters).filter(([key, value]) => Boolean(value) && !(key === "sort" && value === "newest")).length;
   const update = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
   const clearFilters = () => setFilters(Object.fromEntries(
     Object.keys(filters).map((key) => [key, key === "sort" ? "newest" : ""])
   ));
   return (
-    <Card pad="sm" className="bg-slate-50/70">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SearchInput
-          value={filters.query}
-          onChange={(text) => setFilters((current) => ({ ...current, query: text }))}
-          placeholder="Search students"
-          label="Search list"
-        />
-        <Select value={filters.program} onChange={update("program")} aria-label="Filter by program" placeholder="All programs" options={programs} />
-        <Select value={filters.status} onChange={update("status")} aria-label="Filter by workflow stage or status" placeholder="All stages / statuses" options={statuses} />
-        {secondaryLabel && (
-          <Select value={filters.secondary || ""} onChange={update("secondary")} aria-label={`Filter by ${secondaryLabel}`} placeholder={`All ${secondaryLabel.toLowerCase()}`} options={secondaryOptions} />
-        )}
-        {showAdvanced && <Field label="Updated from"><Input type="date" value={filters.dateFrom || ""} onChange={update("dateFrom")} /></Field>}
-        {showAdvanced && <Field label="Updated through"><Input type="date" value={filters.dateTo || ""} onChange={update("dateTo")} /></Field>}
-        {showAdvanced && (
-          <Field label="Sort">
-            <Select
-              value={filters.sort || "newest"}
-              onChange={update("sort")}
-              placeholder=""
-              options={[{ value: "newest", label: "Newest updated" }, { value: "oldest", label: "Oldest updated" }, { value: "student", label: "Student name" }]}
-            />
-          </Field>
-        )}
-      </div>
-      <div className="meta mt-2 flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex flex-wrap items-center gap-2">
-          Showing {count} of {total} {noun}
-          {filters.open && (
-            <Button variant="secondary" size="sm" icon={X} aria-label="Open requests only: select to show every request" onClick={() => setFilters((current) => ({ ...current, open: false }))}>
-              Open requests only
-            </Button>
-          )}
-        </span>
-        {active > 0 && (
-          <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={clearFilters}>
-            Clear {active} filter{active === 1 ? "" : "s"}
-          </Button>
-        )}
-      </div>
-    </Card>
+    <FilterBar
+      search={{ value: filters.query, onChange: (text) => setFilters((current) => ({ ...current, query: text })), placeholder: "Search students", label: "Search list" }}
+      active={active}
+      onClear={clearFilters}
+      summary={`Showing ${count} of ${total} ${noun}`}
+      chips={filters.open && (
+        <Button variant="secondary" size="sm" icon={X} aria-label="Open requests only: select to show every request" onClick={() => setFilters((current) => ({ ...current, open: false }))}>
+          Open requests only
+        </Button>
+      )}
+      actions={extra /* UX-16: Export CSV / Print */}
+    >
+      <FilterSelect label="Program" value={filters.program} onChange={update("program")} aria-label="Filter by program" placeholder="All programs" options={programs} />
+      <FilterSelect label="Stage or status" value={filters.status} onChange={update("status")} aria-label="Filter by workflow stage or status" placeholder="All stages / statuses" options={statuses.map((status) => (typeof status === "string" ? { value: status, label: statusLabel(status) } : status))} />
+      {secondaryLabel && (
+        <FilterSelect label={secondaryLabel} value={filters.secondary || ""} onChange={update("secondary")} aria-label={`Filter by ${secondaryLabel.toLowerCase()}`} placeholder={`All ${secondaryLabel.toLowerCase()}`} options={secondaryOptions} />
+      )}
+      {showAdvanced && <Field label="Updated from"><Input type="date" value={filters.dateFrom || ""} onChange={update("dateFrom")} /></Field>}
+      {showAdvanced && <Field label="Updated through"><Input type="date" value={filters.dateTo || ""} onChange={update("dateTo")} /></Field>}
+      {showAdvanced && (
+        <Field label="Sort">
+          <Select
+            value={filters.sort || "newest"}
+            onChange={update("sort")}
+            placeholder=""
+            options={[{ value: "newest", label: "Newest updated" }, { value: "oldest", label: "Oldest updated" }, { value: "student", label: "Student name" }]}
+          />
+        </Field>
+      )}
+    </FilterBar>
   );
 }
 

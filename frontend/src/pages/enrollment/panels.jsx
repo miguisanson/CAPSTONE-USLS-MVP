@@ -161,7 +161,7 @@ export function EnrollmentHistory({ rows }) {
     to: row.status,
   }));
   return (
-    <SectionCard title="Enrollment history" subtitle="Durable semester records for this student.">
+    <SectionCard title="Enrollment history">
       {entries.length ? (
         <HistoryPanel label="View enrollment history" hideLabel="Hide enrollment history" entries={entries} />
       ) : (
@@ -169,7 +169,6 @@ export function EnrollmentHistory({ rows }) {
           size="sm"
           icon={BookOpenCheck}
           title="No semester enrollment has been saved yet."
-          hint="Confirm an enrollment draft and its subjects will be listed here."
         />
       )}
     </SectionCard>

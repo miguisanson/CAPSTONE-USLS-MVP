@@ -69,7 +69,8 @@ test.describe("I-205: Research Gate overview", () => {
     expect(overview.items.length).toBeGreaterThan(5);
     await ready(page, "/workflow/research-gate");
     const section = page.locator("#research-gate-overview");
-    await expect(section.getByRole("heading", { name: "Who is at the Research Gate" })).toBeVisible();
+    // UX-17: the page header names it. CHANGED BY UX phase 7 (UX-34): the h2 stays for screen readers only.
+    await expect(section.getByRole("heading", { name: "Who is at the Research Gate" })).toHaveClass(/sr-only/);
     // the filter counts are the server's counts
     const status = section.getByLabel("Filter by status");
     await expect(status.locator("option", { hasText: `Blocked (${overview.counts.blocked})` })).toHaveCount(1);

@@ -193,7 +193,7 @@ function SubjectsTab({ data, canEdit, focusCourseId, termLabels, currentTermLabe
         <>
           <p className="font-semibold text-ink">{row.code}</p>
           <p className="meta">
-            {row.title} · {row.units}u{!row.in_curriculum && <span className="micro ml-1 rounded-md bg-slate-100 px-1.5 py-0.5 font-semibold">Not in curriculum</span>}
+            {row.title} · {row.units} {row.units === 1 ? "unit" : "units"}{!row.in_curriculum && <span className="micro ml-1 rounded-md bg-slate-100 px-1.5 py-0.5 font-semibold">Not in curriculum</span>}
           </p>
           {row.remarks && <p className="meta mt-0.5 italic">{row.remarks}</p>}
           {row.operational_status && row.operational_status !== row.status && (

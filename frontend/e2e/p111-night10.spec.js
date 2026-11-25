@@ -32,11 +32,13 @@ test.describe("night10", () => {
     let longest = 0;
     for (const student of maed) {
       const audit = (await (await context.request.get(`/api/students/${student.id}`)).json()).course_audit;
-      const outstanding = audit.missing.length + audit.incomplete.length;
+      const outstanding = audit.missing.length + audit.incomplete.length + audit.current.length;
       longest = Math.max(longest, outstanding);
       await page.goto(`/students/${student.id}`);
-      const box = main(page).locator("div", { has: page.getByText("Outstanding subjects", { exact: true }) }).last();
+      // CHANGED BY owner feedback 2026-11-23: Outstanding is now a Curriculum tab (current, incomplete and missing subjects)
+      const box = main(page).getByRole("tabpanel", { name: /^Outstanding subjects/ });
       if (!outstanding) continue;
+      await expect(main(page).getByRole("tab", { name: /^Outstanding/ })).toHaveAttribute("aria-selected", "true");
       await expect(box.locator("li"), `${student.name}: every outstanding subject is listed`).toHaveCount(outstanding);
     }
     expect(longest, "one of them has more than eight outstanding subjects").toBeGreaterThan(8);

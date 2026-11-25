@@ -67,7 +67,6 @@ export function WaitingView({ scope, scopeKey }) {
       />
       <ChartCard
         question="Which decisions have waited the longest?"
-        hint="Decide the red and orange bars first: those requests have waited over a week. Select a bar to see the cases."
         empty={total ? null : { title: "No decisions are waiting", hint: "Requests for the Dean's decision appear here as soon as an office sends a request." }}
         chart={
           <BarsChart
@@ -171,7 +170,6 @@ export function OutcomesView({ scope, scopeKey }) {
     <div className="page-stack">
       <ChartCard
         question="What was decided?"
-        hint="Many returns for one process mean its requests reach you incomplete: ask that office to check each request before sending. Select a bar to see the cases."
         empty={rows.length ? null : NO_DECISIONS}
         chart={
           <>
@@ -221,12 +219,10 @@ export function PipelineView({ scope, scopeKey, summary }) {
     <div className="page-stack">
       <ChartCard
         question="How many graduation candidates are at each step?"
-        hint="A step with many students and nothing in the next one is where candidates are stuck: ask that office to move those students on."
         empty={total ? null : { title: "No graduation candidates in this period", hint: "Students appear here once the student is ready to graduate or an endorsement is sent to the Dean." }}
         chart={
           <>
             <BarsChart data={steps} categoryKey="label" series={[{ key: "count", name: "Students", color: BLUE }]} onSelect={(row) => steps.find((s) => s.label === row.label)?.open()} ariaLabel="Graduation candidates per step" />
-            <p className="meta">Hand-off to the Registrar is not part of this view yet.</p>
           </>
         }
         table={table}
@@ -267,7 +263,6 @@ export function StagesView({ scope, scopeKey }) {
     <div className="page-stack">
       <ChartCard
         question="How many active students are at each stage?"
-        hint="Select a bar or a count to see the students. A stage with many students and few in the next one is where students wait."
         empty={stages.length ? null : { title: "No active students for these filters", hint: "Change the program, year started or period to look elsewhere." }}
         chart={<BarsChart data={stages} categoryKey="stage" series={[{ key: "count", name: "Students", color: BLUE }]} onSelect={(row) => setOpen(stages.find((s) => s.stage === row.stage))} ariaLabel="Active students per stage" />}
         table={table}

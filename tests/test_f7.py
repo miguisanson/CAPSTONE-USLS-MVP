@@ -42,7 +42,14 @@ class F7Tests(unittest.TestCase):
             q = UserAccount.query.filter_by(role=role)
             if kw:
                 q = q.filter_by(**kw)
-            account_id = q.first().id
+            account = q.first()
+            if account is None and role == "student" and kw.get("student_id"):  # CHANGED BY data cleanup (IM54): imported students sign in only in tests
+                from app import SIM_STUDENT_PASSWORD, ensure_student_account
+                student = db.session.get(Student, kw["student_id"])
+                account = ensure_student_account(student, student.email, SIM_STUDENT_PASSWORD)
+                account.student_id = student.id
+                db.session.commit()
+            account_id = account.id
         client = app.test_client()
         with client.session_transaction() as session:
             session["account_id"] = account_id

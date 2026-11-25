@@ -69,7 +69,7 @@ test.describe("I-398 panel consent line", () => {
 test.describe("I-405 student record", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 900 } });
 
-  test("no New Student chip at Data Collection; Show subjects is a button", async ({ page }) => {
+  test("no New Student chip at Data Collection; the Completed tile is a button", async ({ page }) => {
     await page.route("**/api/students/1", async (route) => {
       const response = await route.fetch();
       const json = await response.json();
@@ -81,10 +81,11 @@ test.describe("I-405 student record", () => {
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
     await expect(page.getByText("Data Collection").first()).toBeVisible();
     await expect(page.getByText("New Student", { exact: true })).toHaveCount(0);
-    const show = page.getByRole("button", { name: "Show subjects" }).first();
+    // CHANGED BY owner feedback 2026-11-23 (IM58): the Completed tile is the button and opens the Completed tab
+    const show = page.getByRole("button", { name: /^Completed \d+$/ });
     await expect(show).toBeVisible();
     await show.focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("button", { name: "Hide subjects" }).first()).toBeVisible();
+    await expect(page.getByRole("tab", { name: /^Completed/ })).toHaveAttribute("aria-selected", "true");
   });
 });

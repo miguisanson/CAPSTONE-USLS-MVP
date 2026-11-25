@@ -180,7 +180,6 @@ export function PanelMatchingForm({ context, studentId, submit, submitting, refe
     <form onSubmit={onSubmit} className="space-y-5">
       <SectionTitle
         title="Panel recommendation workspace"
-        subtitle="Review why each faculty member ranks where shown, adjust the suggested panel, then finalize it"
         icon={Users}
         action={<Button as={Link} to="/faculty" variant="secondary" icon={Users}>Faculty profiles</Button>}
       />

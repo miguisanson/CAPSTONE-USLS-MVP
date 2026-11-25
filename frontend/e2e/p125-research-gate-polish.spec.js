@@ -1,4 +1,5 @@
 // e2e-writes: none
+// CHANGED BY data cleanup (IM54-IM57, 2026-11-22): student ids re-pointed (Miko Almario 125 -> 18, Nico Barrientos 146 -> 39).
 // Packet P-D (Fable review F5-03, F5-08, F5-09): short Research Gate cards, no second student picker,
 // one verdict form, and a Defense Scheduling reschedule without a free-text "Source reference".
 // The verdict and reschedule POSTs are never sent (nothing is submitted).
@@ -50,7 +51,7 @@ test("F5-03: a card is one short line, the picker is gone, View holds the requir
 test("F5-08: reschedule has no Source reference; Requested by follows what opened it", async ({ browser }) => {
   const { context, page } = await staffPage(browser);
   try {
-    await page.goto("/workflow/defense-scheduling?student_id=146");
+    await page.goto("/workflow/defense-scheduling?student_id=39");
     const main = page.locator("main");
     await expect(main.getByLabel(/Reason for rescheduling/)).toBeVisible();
     await expect(main.getByText("Source reference")).toHaveCount(0);

@@ -34,9 +34,10 @@ export default {
         display: ["Poppins", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       // Phase 5 design contract (.planning/phases/05-design-system/05-UI-SPEC.md sections 1-2).
-      // 2xs = the 11px "micro" step that replaces text-[9px] / [10px] / [11px].
+      // 2xs = the "micro" step that replaces text-[9px] / [10px] / [11px]. UX-09 (2026-11-20): 12px, the smallest
+      // size on screen (it was 11px).
       fontSize: {
-        "2xs": ["0.6875rem", { lineHeight: "1rem" }],
+        "2xs": ["0.75rem", { lineHeight: "1rem" }],
       },
       // Page content never stretches past 1440px on wide screens: max-w-page.
       maxWidth: {

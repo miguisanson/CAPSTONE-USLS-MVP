@@ -95,7 +95,7 @@ test.describe("Enrollment (GS staff): behaviour that must not change", () => {
     await openEnrollment(page);
     const { first } = await readSetup(page);
 
-    await expect(page.getByText("Assign official semester offerings to an individual student.")).toBeVisible();
+    await expect(page.getByText("Confirming runs every check and updates the class list, monitoring sheet and profile at once.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByRole("link", { name: "Offering list" })).toHaveAttribute("href", /course-adjustments\?view=offerings/);
     await expect(page.getByText("Upload class list")).toBeVisible();
 
@@ -190,7 +190,7 @@ test.describe("Enrollment (GS staff): behaviour that must not change", () => {
     await expect(dialog.getByLabel("Effective date")).toBeVisible();
     await expect(dialog.getByLabel(/Unexcused absences/)).toBeVisible();
     await expect(dialog.getByLabel("Coordinator note")).toBeVisible();
-    await expect(dialog.getByText("When a subject can be dropped")).toBeVisible();
+    await expect(dialog.getByText("When a subject can be dropped")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await page.waitForTimeout(400);
     await shotAll(page, "enrollment-drop-dialog", { full: false });
     await page.keyboard.press("Escape");
@@ -410,6 +410,6 @@ test.describe("Enrollment (GS staff): P8.3 changes", () => {
     });
     await openEnrollment(page);
     await expect(page.getByText("No subjects selected yet")).toBeVisible();
-    await expect(page.getByText(/Choose Add on a subject/)).toBeVisible();
+    await expect(page.getByText(/Choose Add on a subject/)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
   });
 });

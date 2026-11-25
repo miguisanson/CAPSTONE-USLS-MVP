@@ -1,4 +1,5 @@
 // e2e-writes: none
+// CHANGED BY data cleanup (IM54-IM57, 2026-11-22): student ids re-pointed (Miko Almario 125 -> 18, Nico Barrientos 146 -> 39).
 // Owner 2026-11-04: "make things automatic, drop down, or make sure people can't make a mistake." Typed fields that have a
 // finite or checkable answer become a pick or get an inline check. Every write is answered by page.route, so nothing is saved.
 //   B-01 School year / AY entry is a pick ("AY 2026-2027", value 26-27)   B-02 Student ID 7 digits (soft)   B-04 email shape
@@ -156,7 +157,7 @@ test.describe("Defense scheduling: venue pick, time slots, mode", () => {
     const today = new Date().toISOString().slice(0, 10);
     const calendar = await okJson(await page.request.get(`/api/calendar?start=${today}&end=${today}`), "calendar");
     const rooms = (calendar.filters?.venues || []).filter((v) => !/^https?:/i.test(v));
-    await page.goto("/workflow/defense-scheduling?student_id=146");
+    await page.goto("/workflow/defense-scheduling?student_id=39");
     const main = page.locator("main");
     const start = main.getByLabel(/Start time/);
     const end = main.getByLabel(/End time/);
@@ -333,7 +334,7 @@ test.describe("Staff pages: sections, years, colleges", () => {
   });
 
   test("B-50: the panel-matching department filter is a pick of the colleges listed", async ({ page }) => {
-    await page.goto("/workflow/panel-matching?student_id=146");
+    await page.goto("/workflow/panel-matching?student_id=39");
     const college = page.locator("main").getByLabel("Department / program");
     await expect(college).toBeVisible();
     expect(await college.evaluate((el) => el.tagName)).toBe("SELECT");

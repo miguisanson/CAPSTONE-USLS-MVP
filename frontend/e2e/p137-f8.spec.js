@@ -23,7 +23,9 @@ test.describe("academic coordinator", () => {
     await rows.first().getByRole("link", { name: "Open record" }).click();
     await expect(page.getByText(new RegExp(`${missing} (more )?subjects?`)).first()).toBeVisible();
     await page.goBack();
-    await program.selectOption({ index: 1 });
+    // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): the page opens on MAED; MSGC is the other program with students
+    const msgc = await program.locator("option").filter({ hasText: "MSGC" }).first().getAttribute("value");
+    await program.selectOption(msgc);
     await expect(main(page).getByRole("table", { name: "Students with missing subjects" })).toBeVisible();
     const subject = main(page).getByRole("combobox", { name: "Subject" });
     await expect(subject.locator("option").nth(1)).toBeAttached();

@@ -1,3 +1,4 @@
+// Data cleanup (2026-11-22): the picker search is "Miguel Yu" - "Miguel" also lists Miguel Torres first, under the guide.
 import { STAFF, RESEARCH, NO_CASE } from "./_shared.js";
 
 // The file input of the card whose description holds `text` (a card's input is disabled while it uploads, so a position would shift).
@@ -32,8 +33,8 @@ const VERIFY = [
   { wait: { text: "Saved." }, timeout: 20000 },
 ];
 const PICK = (page) => [
-  { type: { css: 'input[placeholder*="Search all students"]' }, text: "Miguel", optional: true },
-  { click: { text: "Miguel Yu" }, optional: true },
+  { type: { css: 'input[placeholder*="Search all students"]' }, text: "Miguel Yu", optional: true },
+  { click: { css: "button", text: "2260004" }, optional: true } /* CHANGED BY owner feedback 2026-11-23 (stage 8): the picker result itself */,
   { wait: { text: page }, timeout: 30000 },
 ];
 const BOOK = [

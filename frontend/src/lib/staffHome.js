@@ -38,6 +38,8 @@ const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.
 const isOverdue = (task) => Boolean(task.overdue) || task.status === "Overdue";
 const byUrgency = (a, b) => Number(isOverdue(b)) - Number(isOverdue(a)) || time(a.due_at) - time(b.due_at);
 const sortTasks = (tasks) => [...tasks].sort(byUrgency);
+/** UX-24: the Work Queue sorts its rows like the home's "Needs your action" (overdue first, oldest first, then due soonest). */
+export const sortByUrgency = sortTasks;
 // `search` pre-fills the Work Queue's search box (its ?q= parameter).
 const workQueuePath = (owner, search = "") => `/work-queue?owner=${encodeURIComponent(owner)}${search ? `&q=${encodeURIComponent(search)}` : ""}`;
 

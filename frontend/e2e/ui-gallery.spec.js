@@ -43,7 +43,7 @@ for (const viewport of VIEWPORTS) {
     expect((await type("card-title"))["font-size"]).toBe(px(16));
     expect((await type("body"))["font-size"]).toBe(px(14));
     expect((await type("meta"))["font-size"]).toBe(px(12));
-    expect((await type("micro"))["font-size"]).toBe(px(11));
+    expect((await type("micro"))["font-size"]).toBe(px(12)); // CHANGED BY UX-09 (2026-11-20): the micro step is 12px, the smallest size on screen
     const eyebrow = await type("eyebrow");
     expect(eyebrow["font-size"]).toBe(px(12));
     expect(eyebrow["text-transform"]).toBe("uppercase");

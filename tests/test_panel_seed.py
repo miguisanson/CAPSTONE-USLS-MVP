@@ -76,7 +76,7 @@ class PanelSeedTests(unittest.TestCase):
             pass
 
     def test_there_are_research_stage_students_to_check(self):
-        self.assertGreaterEqual(len(self.students), 30)
+        self.assertGreaterEqual(len(self.students), 12)  # CHANGED BY data cleanup (IM54-IM57, 2026-11-22): the smaller demo data
 
     def test_every_research_stage_student_has_their_own_title_and_paper_text(self):
         titles = {}

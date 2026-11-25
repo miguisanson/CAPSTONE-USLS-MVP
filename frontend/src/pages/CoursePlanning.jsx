@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import { PageHeader, Tabs } from "../components/ui/index.js";
 import { CourseworkReportPanel } from "../components/ProcessGates";
 import { useAuth } from "../auth";
-import PolicyRules from "../components/PolicyRules";
 import CourseAdjustments from "./CourseAdjustments";
 import CourseOfferings from "./CourseOfferings";
 import { PAGE } from "../lib/labels.js";
@@ -26,7 +25,6 @@ export default function CoursePlanning({ initialView = "adjustments" }) {
         icon={ClipboardList}
         title={PAGE.courseAdjustments}
         forms="course-adjustments"
-        description="Review subject demand, decide what to offer, then complete the semester schedule and faculty assignments in one workspace."
       />
 
       <Tabs
@@ -39,8 +37,7 @@ export default function CoursePlanning({ initialView = "adjustments" }) {
         onChange={switchView}
       />
 
-      <PolicyRules process="course_adjustment" title="Adding or changing a subject: rules applied" />
-
+      {/* CHANGED BY owner feedback 2026-11-23 (IM58): the rules show on the Business Rules page only */}
       <div role="tabpanel">
         {view === "adjustments" ? <CourseAdjustments /> : <CourseOfferings />}
       </div>

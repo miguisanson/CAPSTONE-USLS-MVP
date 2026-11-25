@@ -8,7 +8,8 @@ import { useConfirm } from "../components/confirm";
 import { formatDay } from "./faculty/FacultyContext";
 import AdviserRecordCard from "./AdviserRecordCard";
 
-const PROTOCOL =
+// UX-22: the steps are in the Help panel; the page says what it is for in one line.
+export const ADVISER_PROTOCOL =
   "Form 3 → Academic Coordinator notes → Research Coordinator sends to the Dean → Dean, Associate Dean or Research Coordinator approves (Form 3.1) → adviser accepts → student sends Forms 3.2 and 3.3 within 5 days.";
 
 const RECORD_ROLES = ["staff", "research_coordinator", "admin"];
@@ -22,10 +23,10 @@ const awaitingContract = (row) =>
   row.status === "Accepted" && row.contract && !["Received", "Not applicable"].includes(row.contract.status);
 
 const TABS = [
-  { key: "mine", label: "Needs my action", match: needsAction, empty: ["Nothing is waiting on you", "Applications that need your note, forwarding, decision or receipt show up here."] },
-  { key: "progress", label: "In progress", match: (row) => IN_PROGRESS.includes(row.status) && !needsAction(row), empty: ["No applications in progress", "Applications waiting on someone else show up here."] },
-  { key: "contract", label: "Accepted - contract", match: awaitingContract, empty: ["No contracts outstanding", "Accepted advisers whose Forms 3.2 and 3.3 are still to come show up here."] },
-  { key: "all", label: "All", match: () => true, empty: ["No adviser appointments yet", "Applications from students and recorded appointments are listed here."] },
+  { key: "mine", label: "Needs my action", match: needsAction, empty: ["Nothing is waiting on you", ""] },
+  { key: "progress", label: "In progress", match: (row) => IN_PROGRESS.includes(row.status) && !needsAction(row), empty: ["No applications in progress", ""] },
+  { key: "contract", label: "Accepted - contract", match: awaitingContract, empty: ["No contracts outstanding", ""] },
+  { key: "all", label: "All", match: () => true, empty: ["No adviser appointments yet", ""] },
 ];
 
 // Compact progress tracker: done steps get a tick, the current step is marked.
@@ -338,10 +339,8 @@ export default function AdviserAppointments({ role, embedded = false, onChanged 
 
   return (
     <div className="page-stack animate-fade-up">
-      {embedded ? (
-        <p className="text-sm text-slate-600">{PROTOCOL}</p>
-      ) : (
-        <PageHeader title="Research adviser appointments" description={PROTOCOL} forms="adviser-designation" icon={UserRoundCheck} />
+      {!embedded && (
+        <PageHeader title="Research adviser appointments" forms="adviser-designation" helpNote={ADVISER_PROTOCOL} icon={UserRoundCheck} />
       )}
 
       {canRecord && <AdviserRecordCard onRecorded={refetch} />}

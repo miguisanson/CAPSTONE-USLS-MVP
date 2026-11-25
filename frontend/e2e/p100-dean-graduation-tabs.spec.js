@@ -76,8 +76,8 @@ test.describe("Dean Graduation page", () => {
     await expect(theirs).toHaveCount(1);
     await expect(theirs.getByText(/^Waiting for: /)).toBeVisible();
     await expect(theirs.getByRole("button", { name: /Move to/ })).toHaveCount(0);
-    // same empty-column wording as the other boards
-    await expect(board.getByText("No candidates here").first()).toBeVisible();
+    // CHANGED BY UX phase 5b (UX-28/29): an empty column is a narrow strip (its name and 0), as on the other boards
+    await expect(board.locator("[data-empty-strip]").first()).toBeVisible();
     // the table lists the same batches
     await toggle.getByRole("button", { name: "Table" }).click();
     await expect(page.getByRole("table").getByRole("row", { name: /Isabel Flores/ })).toHaveCount(1);
@@ -85,7 +85,10 @@ test.describe("Dean Graduation page", () => {
     await expect(board).toBeVisible();
     await page.screenshot({ path: join(SHOTS, "dean-batches-1366.png"), fullPage: true });
     // the description says who does what
-    await expect(page.locator('[data-slot="description"]')).toContainText(/Academic Coordinator checks coursework.*Research Coordinator.*staff prepare.*You approve or return it/);
+// CHANGED BY UX phase 3 (UX-22, IM50): who does what is in the Help panel; the page line is one sentence.
+    await page.getByRole("main").getByRole("button", { name: "Help", exact: true }).click();
+    await expect(page.getByRole("dialog").locator('[data-slot="help-note"]')).toContainText(/Academic Coordinator checks coursework.*Research Coordinator.*staff prepare.*You approve or return it/);
+    await page.getByRole("dialog").getByRole("button", { name: "Close help" }).click();
   });
 
   test("a skeleton board shows on Endorsement batches while the board request is held", async ({ page }) => {

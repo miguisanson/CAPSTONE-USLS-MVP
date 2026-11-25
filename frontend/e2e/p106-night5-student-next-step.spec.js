@@ -80,7 +80,7 @@ test.describe("night 5: the student's next step", () => {
     try {
       const main = page.locator("main");
       await expect(main.getByRole("button", { name: "Submit Final Defense for review" })).toBeDisabled();
-      await expect(main).toContainText("Every file for this milestone is already verified. Nothing is left to submit.");
+      await expect(main).not.toContainText("Every file for this milestone is already verified. Nothing is left to submit."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(main).not.toContainText("Added automatically after staff confirms");
       await expect(main.getByText(/Request your defense date on/)).toBeVisible();
       await expect(main.getByRole("link", { name: "Defense Schedule", exact: true }).first()).toHaveAttribute("href", "/student/defense-schedule");

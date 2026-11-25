@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
-  BookOpenCheck,
   CheckCircle2,
-  Database,
   Eye,
   FilePenLine,
   FileText,
@@ -25,15 +23,15 @@ import {
   Card,
   EmptyState,
   Field,
+  FilterBar,
+  FilterSelect,
   InlineNotice,
   Input,
   Modal,
   PageHeader,
-  SearchInput,
   SectionCard,
   Select,
   Skeleton,
-  StatCard,
   StatusChip,
   Textarea,
 } from "../components/ui/index.js";
@@ -44,11 +42,6 @@ import { PAGE } from "../lib/labels.js";
 const ACCEPT = "application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,.docx";
 const STATUS_LABELS = { active: "Active", draft: "Pending validation", archived: "Archived" };
 const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }));
-const TEST_QUESTIONS = [
-  "What is the maximum residence period for a master's program?",
-  "When may a student withdraw a subject?",
-  "Who nominates the panel for a title defense?",
-];
 const TAG = "rounded-md bg-slate-100 px-2 py-0.5 text-2xs font-semibold tracking-wide text-slate-600";
 
 function formatBytes(value) {
@@ -77,7 +70,7 @@ export default function PolicyDocuments() {
   const [notice, setNotice] = useState({ tone: "success", text: "" });
   const [working, setWorking] = useState(false);
   const [openMenu, setOpenMenu] = useState(null);
-  const [historyOpen, setHistoryOpen] = useState(() => new Set());
+  const [details, setDetails] = useState(null);
 
   useEffect(() => {
     function closeMenu(event) {
@@ -155,109 +148,128 @@ export default function PolicyDocuments() {
     } catch (err) { say(err.message, "danger"); } finally { setWorking(false); }
   }
 
-  function toggleHistory(id) {
-    setHistoryOpen((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  const summary = data?.summary || {};
+  const detailItem = details ? (data?.items || []).find((item) => `${item.kind}-${item.id}` === details) : null;
   const menuItem = "flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-11";
 
   return <div className="page-stack animate-fade-up">
     <PageHeader
       icon={LibraryBig}
       title={PAGE.policyDocuments}
-      description="Manage the PDF and Word documents the Policy Assistant searches. Every answer names the document and page or section it came from. Documents pending validation are searched but flagged."
       actions={<Button icon={Plus} onClick={() => setEditor({})}>Add document</Button>}
     />
 
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <StatCard icon={Database} label="All sources" value={summary.total || 0} tone="neutral" />
-      <StatCard icon={Upload} label="Staff uploads" value={summary.managed || 0} tone="info" />
-      <StatCard icon={FilePenLine} label="Pending validation" value={summary.draft || 0} tone="warning" />
-      <StatCard icon={BookOpenCheck} label="Ready for assistant" value={summary.ready || 0} tone="success" />
-    </div>
-
+    {/* Owner feedback 2026-11-23 (stage 6): the list first, one line per document; the details open in a window.
+        The four count tiles repeated the list, so they are gone; Test a question sits under the list. */}
     {error && <InlineNotice tone="danger">{error}</InlineNotice>}
     {notice.text && <InlineNotice tone={notice.tone} onDismiss={() => say("")}>{notice.text}</InlineNotice>}
 
+    <h2 className="sr-only">Documents</h2>
+    <FilterBar
+      search={{ value: query, onChange: setQuery, placeholder: "Search documents", label: "Search documents" }}
+      active={[query, categoryFilter, statusFilter].filter(Boolean).length}
+      onClear={() => { setQuery(""); setCategoryFilter(""); setStatusFilter(""); }}
+      summary={data ? `Showing ${items.length} of ${(data.items || []).length} documents` : null}
+    >
+      <FilterSelect label="Category" aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} placeholder="All categories" options={categories} />
+      <FilterSelect label="Status" aria-label="Filter by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} placeholder="All statuses" options={STATUS_OPTIONS} />
+    </FilterBar>
+
+    {loading ? <Skeleton lines={6} /> : !items.length ? <Card><EmptyState icon={FileText} title="No documents found" hint={query || categoryFilter || statusFilter ? "Try a different search or clear the filters." : "Add the first policy document to begin."} /></Card> : <Card pad="sm">
+      <ul className="divide-y divide-slate-100" aria-label="Policy documents">{items.map((item) => {
+        const key = `${item.kind}-${item.id}`;
+        return <li key={key} className={`flex items-center gap-3 px-2 py-3 ${item.status === "archived" ? "opacity-75" : ""}`}>
+          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${item.file_type === "DOCX" ? "bg-blue-50 text-blue-700" : "bg-red-50 text-red-700"}`}><FileText className="h-4 w-4" aria-hidden="true" /></span>
+          <div className="min-w-0 flex-1">
+            <h3 className="card-title break-words text-sm" title={item.title}>
+              <button type="button" onClick={() => setDetails(key)} className="cursor-pointer text-left hover:text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 rounded">{item.title}</button>
+            </h3>
+            <p className="meta mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <StatusPill status={item.status} size="sm" />
+              <span>{[item.category, item.version && `Version ${item.version}`, item.updated_at ? formatDate(item.updated_at) : "Built in"].filter(Boolean).join(" · ")}</span>
+            </p>
+          </div>
+          {(item.url || item.can_edit || item.can_delete) && <div className="relative shrink-0" onClick={(event) => event.stopPropagation()}>
+            <Button
+              variant="icon"
+              icon={MoreVertical}
+              onClick={() => setOpenMenu((current) => current === key ? null : key)}
+              aria-label={`Actions for ${item.title}`}
+              aria-haspopup="menu"
+              aria-expanded={openMenu === key}
+              className="border-transparent text-slate-500"
+            />
+            {openMenu === key && <div role="menu" className="absolute right-0 top-11 z-10 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-lift">
+              {item.url && <a href={item.url} target="_blank" rel="noreferrer" role="menuitem" onClick={() => setOpenMenu(null)} className={`${menuItem} text-slate-700`}><Eye className="h-4 w-4" aria-hidden="true" /> View document</a>}
+              {item.can_edit && <button type="button" role="menuitem" onClick={() => { setOpenMenu(null); setEditor(item); }} className={`${menuItem} text-slate-700`}><FilePenLine className="h-4 w-4" aria-hidden="true" /> Edit details</button>}
+              {item.can_edit && <button type="button" role="menuitem" onClick={() => { setOpenMenu(null); setReplaceTarget(item); }} disabled={working} className={`${menuItem} text-slate-700`}><RefreshCw className="h-4 w-4" aria-hidden="true" /> Replace file</button>}
+              {item.can_delete && <><div className="my-1 border-t border-slate-100" /><button type="button" role="menuitem" onClick={() => { setOpenMenu(null); remove(item); }} disabled={working} className={`${menuItem} text-red-600 hover:bg-red-50`}><Trash2 className="h-4 w-4" aria-hidden="true" /> Remove</button></>}
+            </div>}
+          </div>}
+        </li>;
+      })}</ul>
+    </Card>}
+
     <TestQuestion />
 
-    <Card>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div><h2 className="section-title">Documents</h2><p className="mt-0.5 text-sm text-slate-500">Staff uploads can be edited, replaced, or removed. Built-in sources are view-only.</p></div>
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,18rem)_10rem_9rem]">
-          <SearchInput value={query} onChange={setQuery} placeholder="Search documents" label="Search documents" />
-          <Select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} placeholder="All categories" options={categories} />
-          <Select aria-label="Filter by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} placeholder="All statuses" options={STATUS_OPTIONS} />
-        </div>
-      </div>
-    </Card>
-
-    {loading ? <Skeleton lines={6} /> : !items.length ? <Card><EmptyState icon={FileText} title="No documents found" hint={query || categoryFilter || statusFilter ? "Try a different search or clear the filters." : "Add the first policy document to begin."} /></Card> : <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{items.map((item) =>
-      <Card key={`${item.kind}-${item.id}`} className={item.status === "archived" ? "opacity-75" : ""}>
-        <div className="flex items-start gap-4">
-          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${item.file_type === "DOCX" ? "bg-blue-50 text-blue-700" : "bg-red-50 text-red-700"}`}><FileText className="h-5 w-5" aria-hidden="true" /></span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0"><h3 className="card-title line-clamp-2 break-words" title={item.title}>{item.title}</h3><p className="meta mt-0.5 truncate">{item.original_name}</p></div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <StatusPill status={item.status} />
-                {(item.url || item.can_edit || item.can_delete) && <div className="relative" onClick={(event) => event.stopPropagation()}>
-                  <Button
-                    variant="icon"
-                    icon={MoreVertical}
-                    onClick={() => setOpenMenu((current) => current === `${item.kind}-${item.id}` ? null : `${item.kind}-${item.id}`)}
-                    aria-label={`Actions for ${item.title}`}
-                    aria-haspopup="menu"
-                    aria-expanded={openMenu === `${item.kind}-${item.id}`}
-                    className="border-transparent text-slate-500"
-                  />
-                  {openMenu === `${item.kind}-${item.id}` && <div role="menu" className="absolute right-0 top-11 z-10 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-lift">
-                    {item.url && <a href={item.url} target="_blank" rel="noreferrer" role="menuitem" onClick={() => setOpenMenu(null)} className={`${menuItem} text-slate-700`}><Eye className="h-4 w-4" aria-hidden="true" /> View document</a>}
-                    {item.can_edit && <button type="button" role="menuitem" onClick={() => { setOpenMenu(null); setEditor(item); }} className={`${menuItem} text-slate-700`}><FilePenLine className="h-4 w-4" aria-hidden="true" /> Edit details</button>}
-                    {item.can_edit && <button type="button" role="menuitem" onClick={() => { setOpenMenu(null); setReplaceTarget(item); }} disabled={working} className={`${menuItem} text-slate-700`}><RefreshCw className="h-4 w-4" aria-hidden="true" /> Replace file</button>}
-                    {item.can_delete && <><div className="my-1 border-t border-slate-100" /><button type="button" role="menuitem" onClick={() => { setOpenMenu(null); remove(item); }} disabled={working} className={`${menuItem} text-red-600 hover:bg-red-50`}><Trash2 className="h-4 w-4" aria-hidden="true" /> Remove</button></>}
-                  </div>}
-                </div>}
-              </div>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <span className={TAG}>{item.category}</span>
-              {item.effective_date && <span className="rounded-md bg-brand-50 px-2 py-0.5 text-2xs font-semibold tracking-wide text-brand-700">Effective {formatDate(item.effective_date)}</span>}
-              {item.version && <span className={TAG}>Version {item.version}</span>}
-              {item.index_status === "Unavailable" && <span className="rounded-md bg-red-50 px-2 py-0.5 text-2xs font-semibold tracking-wide text-red-700">File unavailable</span>}
-            </div>
-            {item.status === "draft" && <InlineNotice tone="warning" icon={AlertTriangle} className="mt-3 text-xs">{data?.draft_warning || "Draft — pending Graduate School validation"}. Assistant answers that use this document say so.{item.validation_note ? ` Note: ${item.validation_note}` : ""}</InlineNotice>}
-            {item.status === "archived" && <p className="meta mt-3 font-semibold">Archived: kept for the record, not searched by the assistant.</p>}
-            <p className="mt-3 min-h-10 text-sm leading-relaxed text-slate-600">{item.description || "No description added."}</p>
-            <div className="meta mt-3 flex flex-wrap gap-x-4 gap-y-1"><span>{item.file_type || "Document"}</span><span>{formatBytes(item.file_size)}</span>{item.page_count > 0 && <span>{item.page_count} page{item.page_count === 1 ? "" : "s"}</span>}{item.chunk_count != null && <span>{item.chunk_count} searchable section{item.chunk_count === 1 ? "" : "s"}</span>}</div>
-            <p className="meta mt-2">{item.uploaded_by} · {item.updated_at ? formatDateTime(item.updated_at) : "Bundled source"}</p>
-            {item.versions?.length > 0 && <div className="mt-3 border-t border-slate-100 pt-3">
-              <button type="button" onClick={() => toggleHistory(item.id)} aria-expanded={historyOpen.has(item.id)} className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800 max-sm:min-h-11"><History className="h-4 w-4" aria-hidden="true" /> Version history ({item.versions.length})</button>
-              {historyOpen.has(item.id) && <ol className="mt-2 space-y-2">{item.versions.map((version) =>
-                <li key={version.version} className="flex items-start justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                  <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-2 font-semibold text-ink">Version {version.version}{version.is_current && <StatusChip status="Active" label="Current, searched" size="sm" dot={false} />}</p>
-                    <p className="truncate text-slate-500">{version.original_name} · {formatBytes(version.file_size)}</p>
-                    <p className="text-slate-500">{version.uploaded_by} · {formatDateTime(version.created_at)}</p>
-                    {version.note && <p className="mt-0.5 text-slate-700">“{version.note}”</p>}
-                  </div>
-                  {version.file_exists ? <Button as="a" variant="secondary" size="sm" icon={Eye} href={version.url} target="_blank" rel="noreferrer">View</Button> : <span className="shrink-0 text-slate-500">File missing</span>}
-                </li>
-              )}</ol>}
-            </div>}
-          </div>
-        </div>
-      </Card>
-    )}</div>}
-
+    {detailItem && <DocumentDetails
+      item={detailItem}
+      draftWarning={data?.draft_warning}
+      working={working}
+      onClose={() => setDetails(null)}
+      onEdit={() => { setDetails(null); setEditor(detailItem); }}
+      onReplace={() => { setDetails(null); setReplaceTarget(detailItem); }}
+      onRemove={() => { setDetails(null); remove(detailItem); }}
+    />}
     {editor && <DocumentEditor initial={editor} categories={categories} maxMb={data?.max_upload_mb || 20} busy={working} onClose={() => !working && setEditor(null)} onSave={saveEditor} />}
     {replaceTarget && <ReplaceDialog item={replaceTarget} maxMb={data?.max_upload_mb || 20} busy={working} onClose={() => !working && setReplaceTarget(null)} onSave={replaceFile} />}
   </div>;
+}
+
+// One document, opened from the list: everything the old card showed, plus the version history.
+function DocumentDetails({ item, draftWarning, working, onClose, onEdit, onReplace, onRemove }) {
+  return <Modal
+    title={item.title}
+    onClose={onClose}
+    size="lg"
+    footer={<>
+      {item.can_delete && <Button variant="danger" icon={Trash2} onClick={onRemove} disabled={working} className="mr-auto">Remove</Button>}
+      {item.can_edit && <Button variant="secondary" icon={RefreshCw} onClick={onReplace} disabled={working}>Replace file</Button>}
+      {item.can_edit && <Button variant="secondary" icon={FilePenLine} onClick={onEdit}>Edit details</Button>}
+      {item.url && <Button as="a" icon={Eye} href={item.url} target="_blank" rel="noreferrer">View document</Button>}
+    </>}
+  >
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <StatusPill status={item.status} />
+        <span className={TAG}>{item.category}</span>
+        {item.effective_date && <span className="rounded-md bg-brand-50 px-2 py-0.5 text-2xs font-semibold tracking-wide text-brand-700">Effective {formatDate(item.effective_date)}</span>}
+        {item.version && <span className={TAG}>Version {item.version}</span>}
+        {item.index_status === "Unavailable" && <span className="rounded-md bg-red-50 px-2 py-0.5 text-2xs font-semibold tracking-wide text-red-700">File unavailable</span>}
+      </div>
+      {item.status === "draft" && <InlineNotice tone="warning" icon={AlertTriangle} className="text-xs">{draftWarning || "Draft — pending Graduate School validation"}. Assistant answers that use this document say so.{item.validation_note ? ` Note: ${item.validation_note}` : ""}</InlineNotice>}
+      {item.status === "archived" && <p className="meta font-semibold">Archived: kept for the record, not searched by the assistant.</p>}
+      {item.description && <p className="text-sm leading-relaxed text-slate-600">{item.description}</p>}
+      <div className="meta space-y-1">
+        <p className="break-all">{item.original_name}</p>
+        <p className="flex flex-wrap gap-x-4 gap-y-1"><span>{item.file_type || "Document"}</span><span>{formatBytes(item.file_size)}</span>{item.page_count > 0 && <span>{item.page_count} page{item.page_count === 1 ? "" : "s"}</span>}{item.chunk_count != null && <span>{item.chunk_count} searchable section{item.chunk_count === 1 ? "" : "s"}</span>}</p>
+        <p>{item.uploaded_by} · {item.updated_at ? formatDateTime(item.updated_at) : "Bundled source"}</p>
+      </div>
+      {item.versions?.length > 0 && <section aria-label="Version history">
+        <p className="eyebrow mb-2 flex items-center gap-1.5"><History className="h-3.5 w-3.5" aria-hidden="true" /> Version history ({item.versions.length})</p>
+        <ol className="space-y-2">{item.versions.map((version) =>
+          <li key={version.version} className="flex items-start justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs">
+            <div className="min-w-0">
+              <p className="flex flex-wrap items-center gap-2 font-semibold text-ink">Version {version.version}{version.is_current && <StatusChip status="Active" label="Current, searched" size="sm" dot={false} />}</p>
+              <p className="truncate text-slate-500">{version.original_name} · {formatBytes(version.file_size)}</p>
+              <p className="text-slate-500">{version.uploaded_by} · {formatDateTime(version.created_at)}</p>
+              {version.note && <p className="mt-0.5 text-slate-700">“{version.note}”</p>}
+            </div>
+            {version.file_exists ? <Button as="a" variant="secondary" size="sm" icon={Eye} href={version.url} target="_blank" rel="noreferrer">View</Button> : <span className="shrink-0 text-slate-500">File missing</span>}
+          </li>
+        )}</ol>
+      </section>}
+    </div>
+  </Modal>;
 }
 
 // "Test a question": shows the passages the assistant would retrieve, so staff
@@ -280,17 +292,15 @@ function TestQuestion() {
   return <SectionCard
     icon={FlaskConical}
     title="Test a question"
-    subtitle="Type a question to see which passages the Policy Assistant would use, and from which document. Use it after an upload to confirm the new policy is found."
   >
     <form onSubmit={(event) => { event.preventDefault(); run(); }} className="flex flex-col gap-2 sm:flex-row">
       <Input aria-label="Question to test" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={500} className="flex-1" placeholder="e.g. How many semesters can I take as leave of absence?" />
       <Button type="submit" icon={Search} loading={busy} disabled={!question.trim()}>{busy ? "Searching…" : "Find passages"}</Button>
     </form>
-    <div className="flex flex-wrap gap-2">{TEST_QUESTIONS.map((sample) => <button key={sample} type="button" onClick={() => run(sample)} disabled={busy} className="cursor-pointer rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition-colors duration-200 hover:border-brand-300 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-11">{sample}</button>)}</div>
     {error && <InlineNotice tone="danger">{error}</InlineNotice>}
     {result && <div className="space-y-3" aria-live="polite">
       {result.message && <InlineNotice tone="warning">{result.message}</InlineNotice>}
-      {!result.items.length && !result.message && <EmptyState icon={Search} title="No passage matches this question" hint="The assistant would fall back to its short built-in guidance. If you expected your upload to answer it, check that the wording of the question and of the document share key terms." />}
+      {!result.items.length && !result.message && <EmptyState icon={Search} title="No passage matches this question" hint="Try the words the document uses." />}
       {result.items.length > 0 && <>
         <p className="meta font-semibold">{result.items.length} passage{result.items.length === 1 ? "" : "s"} found by {result.mode === "vector" ? "meaning (AI search)" : "keyword search"} among {result.passages_indexed} indexed sections.</p>
         {result.answer_preview && <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-4"><p className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-700"><CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> Answer preview (extracted from the passages, no AI)</p><p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-ink">{result.answer_preview}</p></div>}

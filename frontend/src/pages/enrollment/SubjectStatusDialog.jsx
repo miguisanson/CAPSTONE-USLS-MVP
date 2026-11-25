@@ -5,7 +5,6 @@
 import { useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { Button, Field, InlineNotice, Input, Modal, StatusChip, Textarea } from "../../components/ui/index.js";
-import PolicyRules from "../../components/PolicyRules";
 import { ErrorSummary } from "../student/shared";
 import { todayISO } from "../../lib/format";
 
@@ -77,8 +76,7 @@ export default function SubjectStatusDialog({ edit, setEdit, error, busy, onClos
           </Field>
         </div>
 
-        <PolicyRules process="dropping" title="When a subject can be dropped" defaultOpen />
-
+        {/* CHANGED BY owner feedback 2026-11-23 (IM58): the rules show on the Business Rules page only */}
         <Field
           label="Unexcused absences (% of class hours)"
           required

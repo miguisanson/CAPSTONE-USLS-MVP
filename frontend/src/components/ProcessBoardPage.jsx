@@ -1,13 +1,13 @@
 import { refusalMessage } from "../lib/refusal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { HelpCircle, History, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { formatDateTime } from "../lib/format";
 import ListExportButtons from "./ListExportButtons";
 import { Button, EmptyState, InlineNotice, Modal, PageHeader, SkeletonBoard } from "./ui/index.js";
-import PolicyRules from "./PolicyRules";
+import { HelpButton, PageHelpDrawer } from "./PageHelp";
 import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "./StageBoard";
 import { StageColumnHeader } from "./process";
 import { GUIDES, PROCESS_CONFIG } from "./processConfig";
@@ -15,7 +15,7 @@ import ActionDialog from "../pages/leave/ActionDialog";
 import BatchBar, { BatchResult } from "../pages/leave/BatchBar";
 import CaseCard, { CaseTable } from "../pages/leave/CaseCard";
 import CaseDetailModal from "../pages/leave/CaseDetailModal";
-import LeaveFilters, { BoardFilterRow, ViewToggle } from "../pages/leave/LeaveFilters";
+import LeaveFilters, { BoardFilterRow, BoardFrame, ViewToggle } from "../pages/leave/LeaveFilters";
 import {
   EMPTY_FILTERS,
   actionsIntoColumn,
@@ -27,6 +27,14 @@ import {
   openCaseOfStudent,
   plural,
 } from "../pages/leave/leaveHelpers";
+
+// UX-29 (Phase 5b): the final columns of each board, folded behind one "Closed" strip at the end of the board.
+const CLOSED_COLUMNS = {
+  "leave-of-absence": ["ended", "not_approved"],
+  readmission: ["approved", "not_approved"],
+  awol: ["back", "not_approved", "residency_closed"],
+  withdrawal: ["acknowledged", "not_approved"],
+};
 
 const getItemId = (item) => item.id;
 const NO_ACTIONS = [];
@@ -43,7 +51,6 @@ function GuideWindow({ slug, policyQuestions, onClose }) {
     <Modal
       size="lg"
       title={`How ${PROCESS_CONFIG[slug].title} works`}
-      subtitle="A short guide for students and reviewers"
       onClose={onClose}
       closeLabel="Close the guide"
       footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
@@ -94,7 +101,6 @@ function ActivityWindow({ logs, onClose }) {
     <Modal
       size="lg"
       title="Recent activity"
-      subtitle="A timestamped trail of the latest steps and handoffs in this process"
       onClose={onClose}
       closeLabel="Close recent activity"
       footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
@@ -171,6 +177,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
   const [batchResult, setBatchResult] = useState(null);
   const [signal, setSignal] = useState(null); // an extra window a step opens instead of a confirm box
   const [support, setSupport] = useState(""); // "guide" | "activity"
+  const [helpOpen, setHelpOpen] = useState(false); // UX-14: the Help panel
 
   // Answers that arrive after the process changed are ignored.
   const currentSlug = useRef(slug);
@@ -354,10 +361,11 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
 
   // ---- board pieces ------------------------------------------------------------------
   const renderCard = useCallback(
-    (item) => (
+    (item, column) => (
       <CaseCard
         item={item}
         role={role}
+        columnLabel={column?.label}
         selectable={batchActionsOf(item).length > 0}
         selected={selected.has(item.id)}
         onToggleSelect={toggleSelect}
@@ -425,7 +433,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
   if (state.loading && !data) {
     return (
       <div className="page-stack">
-        <PageHeader title={config.title} description={(role === "dean" && config.deanDescription) || config.description} forms={slug} icon={Icon} badge={headerBadge} />
+        <PageHeader title={config.title} icon={Icon} badge={headerBadge} />
         <SkeletonBoard columns={4} label="Loading requests" />
       </div>
     );
@@ -444,19 +452,10 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
       {/* Header: the same in every process */}
       <PageHeader
         title={config.title}
-        description={(role === "dean" && config.deanDescription) || config.description}
-        forms={slug}
         icon={Icon}
         badge={headerBadge}
-        actions={
-          <>
-            <Button variant="secondary" icon={HelpCircle} onClick={() => setSupport("guide")}>How this works</Button>
-            <Button variant="secondary" icon={History} onClick={() => setSupport("activity")}>View recent activity</Button>
-          </>
-        }
+        actions={<HelpButton onClick={() => setHelpOpen(true)} />}
       />
-
-      <PolicyRules process={config.rulesProcess} />
 
       <BoardSummary
         line={summaryLine}
@@ -471,7 +470,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
       {cases.length === 0 ? (
         <EmptyState title={config.emptyTitle} hint={config.emptyHint} />
       ) : (
-        <>
+        <BoardFrame>
           <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
             <LeaveFilters
               filters={filters}
@@ -483,15 +482,15 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
               count={filtered.length}
               total={cases.length}
               noun={config.noun}
+              extra={<ListExportButtons
+                            title={config.title}
+                            subtitle={`${filtered.length} of ${cases.length} ${config.noun}`}
+                            filename={slug}
+                            columns={["Student ID", "Student name", "Program", "Type", "Status", "Next", "Updated"]}
+                            rows={filtered.map((item) => [item.student.student_number, item.student.name, item.student.program_code, item.kind_label || "", item.status || "", item.owner || "", formatDateTime(item.last_activity_at || item.updated_at)])}
+                />}
             />
           </BoardFilterRow>
-          <ListExportButtons
-            title={config.title}
-            subtitle={`${filtered.length} of ${cases.length} ${config.noun}`}
-            filename={slug}
-            columns={["Student ID", "Student name", "Program", "Type", "Status", "Next", "Updated"]}
-            rows={filtered.map((item) => [item.student.student_number, item.student.name, item.student.program_code, item.kind_label || "", item.status || "", item.owner || "", formatDateTime(item.last_activity_at || item.updated_at)])}
-          />
 
           {selectedItems.length > 0 && (
             <BatchBar
@@ -508,6 +507,8 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
           {view === "board" ? (
             <StageBoard
               columns={columns}
+              closedKeys={CLOSED_COLUMNS[slug] || []}
+              numbered
               items={filtered}
               getItemId={getItemId}
               getColumnKey={getColumnKey}
@@ -535,7 +536,7 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
           ) : (
             <EmptyState title={`No ${config.noun} match these filters`} hint="Clear a filter to see more." />
           )}
-        </>
+        </BoardFrame>
       )}
 
       {BelowBoard && <BelowBoard ctx={ctx} />}
@@ -568,6 +569,17 @@ export default function ProcessBoardPage({ slug, onChanged = null, headerBadge =
         />
       )}
 
+      {helpOpen && (
+        <PageHelpDrawer
+          board="move"
+          title={config.title}
+          forms={slug}
+          rulesProcess={config.rulesProcess}
+          onGuide={() => setSupport("guide")}
+          onActivity={() => setSupport("activity")}
+          onClose={() => setHelpOpen(false)}
+        />
+      )}
       {support === "guide" && <GuideWindow slug={slug} policyQuestions={data.policy_questions || []} onClose={() => setSupport("")} />}
       {support === "activity" && <ActivityWindow logs={data.recent_activity || []} onClose={() => setSupport("")} />}
     </div>

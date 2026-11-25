@@ -27,7 +27,7 @@ export function StatusChip({ status, tone, label, dot: _dot, size = "md", classN
       className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-semibold ring-1 ring-inset ${SIZES[size] || SIZES.md} ${toneOf(name).chip} ${className}`}
     >
       <Icon data-tone-icon="" className={size === "sm" ? "h-3 w-3 shrink-0" : "h-3.5 w-3.5 shrink-0"} aria-hidden="true" />
-      {label || statusLabel(status)}
+      {label || statusLabel(status) /* UX-18: a status value shows its merged word; a label passed in is the caller's own words */}
     </span>
   );
 }

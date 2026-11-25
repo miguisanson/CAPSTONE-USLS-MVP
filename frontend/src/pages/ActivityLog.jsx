@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, AlertTriangle, SlidersHorizontal } from "lucide-react";
+import { Activity, AlertTriangle } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Card, EmptyState, Field, PageHeader, SearchInput, Select, Spinner } from "../components/ui/index.js";
+import { Card, EmptyState, FilterBar, FilterSelect, PageHeader, Spinner } from "../components/ui/index.js";
 import { PAGE } from "../lib/labels.js";
 import { formatDateTime } from "../lib/format";
 
@@ -45,55 +45,29 @@ export default function ActivityLog() {
       && (!filters.owner || log.next_owner === filters.owner);
   }), [items, filters]);
 
-  const hasFilters = Object.values(filters).some(Boolean);
   const setFilter = (key) => (value) => setFilters((current) => ({ ...current, [key]: value }));
 
   return (
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.activityLog}
-        description="An append-style trail of recorded transactions — the audit basis for accountability and monitoring."
       />
 
-      <Card pad="sm">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <SearchInput
-            value={filters.query}
-            onChange={setFilter("query")}
-            placeholder="Search activity or student…"
-            label="Search"
-            showLabel
-          />
-          <Field label="Workflow">
-            <Select
-              placeholder="All workflows"
-              value={filters.workflow}
-              onChange={(event) => setFilter("workflow")(event.target.value)}
-              options={workflows.map((workflow) => ({ value: workflow, label: workflowLabel(workflow) }))}
-            />
-          </Field>
-          <Field label="Next owner">
-            <Select
-              placeholder="All next owners"
-              value={filters.owner}
-              onChange={(event) => setFilter("owner")(event.target.value)}
-              options={owners}
-            />
-          </Field>
-        </div>
-        <div className="meta mt-2 flex flex-wrap items-center justify-between gap-2">
-          <span>Showing {filtered.length} of {items.length} activities</span>
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={() => setFilters({ query: "", workflow: "", owner: "" })}
-              className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800 max-sm:min-h-11"
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" /> Clear filters
-            </button>
-          )}
-        </div>
-      </Card>
+      <FilterBar
+        search={{ value: filters.query, onChange: setFilter("query"), placeholder: "Search activity or student…", label: "Search" }}
+        active={Object.values(filters).filter(Boolean).length}
+        onClear={() => setFilters({ query: "", workflow: "", owner: "" })}
+        summary={loading ? null : `Showing ${filtered.length} of ${items.length} activities`}
+      >
+        <FilterSelect
+          label="Workflow"
+          placeholder="All workflows"
+          value={filters.workflow}
+          onChange={(event) => setFilter("workflow")(event.target.value)}
+          options={workflows.map((workflow) => ({ value: workflow, label: workflowLabel(workflow) }))}
+        />
+        <FilterSelect label="Next owner" placeholder="All next owners" value={filters.owner} onChange={(event) => setFilter("owner")(event.target.value)} options={owners} />
+      </FilterBar>
 
       <Card pad="lg">
         {loading ? (

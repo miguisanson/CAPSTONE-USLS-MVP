@@ -85,7 +85,6 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
   const all = overview.loa_semester_options || [];
   const rules = overview.rules || {};
   const maxPeriod = Number(rules.max_period_semesters) || 0;
-  const maxTotal = Number(rules.max_total_semesters) || 0;
   const remaining = Number(overview.can_file?.extension?.remaining_semesters) || 0;
   const parentEnd = extension ? parent?.period?.end_date : null;
   // An extension always starts the semester right after the current leave ends.
@@ -139,12 +138,6 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
     return found;
   }
 
-  const rulesText = [
-    maxPeriod > 0 ? `A leave can last up to ${pluralize(maxPeriod, "semester")} at a time.` : "",
-    "It can be renewed once.",
-    maxTotal > 0 ? `All your leave together can never be more than ${pluralize(maxTotal, "semester")}.` : "",
-  ].filter(Boolean).join(" ");
-
   const title = editable ? "Correct your request and send it again" : extension ? "Ask for more time" : "Ask for a leave of absence";
   const label = editable ? "Resubmit leave request" : extension ? "Submit leave extension request" : "Submit leave request";
 
@@ -152,14 +145,12 @@ function LoaForm({ data, overview, mode, editable, parent, submitState }) {
     <RequestFormCard
       title={title}
       description={
-        editable
-          ? "Change what the comment above asks for, then send your request again."
-          : extension
-            ? `Your leave can be renewed once, and never beyond ${maxTotal > 0 ? pluralize(maxTotal, "semester") : "the total the handbook allows"} in all. The extra time starts in the semester after your current leave ends${parentEnd ? ` (${formatDate(parentEnd)})` : ""}.`
-            : "Choose the semesters you want to be away and tell us why. Graduate School staff check your request first, then the Dean decides."
+        !editable && extension
+          ? `The extra time starts in the semester after your current leave ends${parentEnd ? ` (${formatDate(parentEnd)})` : ""}.`
+          : undefined
       }
     >
-      {!(extension && !editable) && <p className="mt-1 text-sm text-slate-600">{rulesText}</p>}
+      {/* CHANGED BY owner feedback 2026-11-23 (IM58): the leave limits show on the Business Rules page only */}
       {extension && !editable && remaining > 0 && <p className="mt-1 text-sm text-slate-600">You can ask for up to {pluralize(span, "more semester")} now.</p>}
 
       <form
@@ -315,7 +306,6 @@ function ReadmissionForm({ data, overview, can, editable, submitState }) {
   return (
     <RequestFormCard
       title={title}
-      description={editable ? "Change what the comment above asks for, then send your request again." : "Graduate School staff check your request first, then the Dean decides."}
     >
 
       <form noValidate onSubmit={onSubmit} className="mt-4 space-y-4">
@@ -422,7 +412,7 @@ export function AwolReturnRequestForm({ data, onSaved }) {
       {locked ? (
         <InlineNotice tone="warning">Your return declaration has already been routed for review. Watch the Inbox for the Dean's decision or a revision request.</InlineNotice>
       ) : (
-        <div id="awol-return-form" className="scroll-mt-24"><RequestFormCard title="Tell us you are coming back" description="Choose the semester you want to return in and tell us why you are ready. The request goes to the Graduate School Dean.">
+        <div id="awol-return-form" className="scroll-mt-24"><RequestFormCard title="Tell us you are coming back">
         <form noValidate onSubmit={onSubmit} className="mt-4 space-y-4">
           <ErrorSummary errors={errors} />
           <InlineNotice tone="info">
@@ -547,7 +537,6 @@ export function WithdrawalRequestForm({ data, onSaved }) {
       </InlineNotice>
       <RequestFormCard
         title={applicationEditable ? "Ask to withdraw from a subject" : "Your withdrawal request"}
-        description={applicationEditable ? "Choose one eligible enrolled subject and state the reason for withdrawing." : "Your selected subject and reason are saved and read-only."}
       >
         {applicationEditable ? (
           <div className="mt-4 space-y-4">

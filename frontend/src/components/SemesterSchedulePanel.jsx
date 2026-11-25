@@ -9,7 +9,7 @@ import { formatDateTime } from "../lib/format";
 // The Academic Coordinator's explicit approve-then-publish step for the whole semester's class schedule (IM38-IM41).
 // Faculty and students see the schedule only once it is published; a published schedule cannot be edited.
 const HELP = {
-  none: "Prepare the semester schedule to collect every offered class and its meeting times in one draft.",
+  none: "",
   Draft: "Approving locks the draft. Faculty and students see nothing until you publish it.",
   Approved: "Publishing shows the schedule to faculty and students and sends a notice to each. A published schedule cannot be edited.",
   Published: "Faculty and students can see this schedule. It cannot be edited.",

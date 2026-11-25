@@ -128,12 +128,34 @@ export function describe(target) {
   return spec.in ? `${base} in ${spec.in === "dialog" ? "the open window" : describe(spec.in)}` : base;
 }
 
+/**
+ * UX-27: a sidebar link can sit in a folded group. When a link the guide needs is not on screen but is in a folded group,
+ * open that group (the way a person would) so the next look finds it.
+ */
+function unfoldFor(spec) {
+  if (spec.role !== "link" || !spec.name) return;
+  const wanted = norm(spec.name);
+  for (const group of document.querySelectorAll("[data-nav-group]")) {
+    const toggle = group.querySelector("[data-nav-toggle]");
+    if (!toggle || toggle.getAttribute("aria-expanded") === "true") continue;
+    const hit = Array.from(group.querySelectorAll("a")).some((a) => {
+      const name = norm(accessibleName(a));
+      return spec.exact ? name === wanted : name.includes(wanted);
+    });
+    if (hit) {
+      toggle.click();
+      return;
+    }
+  }
+}
+
 /** Waits until the target is on the page (and, for `enabled`, not disabled). Rejects with a readable message after `timeout` ms. */
 export function waitFor(target, { signal, timeout = 8000, enabled = false, gone = false } = {}) {
   const spec = asSpec(target);
   const pick = () => {
     const list = find(spec);
     if (gone) return list.length === 0 ? true : null;
+    if (!list.length) unfoldFor(spec);
     const usable = enabled ? list.filter((el) => !el.disabled && el.getAttribute("aria-disabled") !== "true") : list;
     return usable[spec.nth || 0] || null;
   };

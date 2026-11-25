@@ -135,7 +135,7 @@ test.describe("Policy Assistant (staff)", () => {
     await expect(page.locator("main h1")).toHaveText("Policy Assistant");
     await expect(page.locator("main h1")).toHaveCount(1);
     await expect(main(page).getByText("Focus on a student", { exact: true })).toBeVisible();
-    await expect(main(page).getByText("How this works", { exact: true })).toBeVisible();
+    await expect(main(page).getByText("How this works", { exact: true })).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: no sample questions, no "How this works"
     await expect(page.getByRole("textbox", { name: "Your question" })).toBeVisible();
     await shot(page, "assistant-1366.png");
     await page.setViewportSize({ width: 390, height: 844 });
@@ -393,7 +393,8 @@ test.describe("I-116: staff home, Work Queue", () => {
     const all = await (await context.request.get("/api/tasks?page_size=50")).json();
     expect(all.items.length, "the demo data has open tasks").toBeGreaterThan(0);
     const word = all.items[0].title.split(/\s+/).find((w) => w.length > 4) || all.items[0].title;
-    await page.goto(`/work-queue?q=${encodeURIComponent(word)}`);
+    // CHANGED BY UX phase 1 (UX-02): the queue opens on the signed-in office; owner= (empty) asks for every office, which is what `all` holds.
+    await page.goto(`/work-queue?q=${encodeURIComponent(word)}&owner=`);
     await expect(page.locator("main h1")).toBeVisible();
     await page.waitForLoadState("networkidle");
     await expect(main(page).getByLabel("Search work queue")).toHaveValue(word);

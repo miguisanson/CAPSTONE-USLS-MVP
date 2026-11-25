@@ -211,7 +211,7 @@ function ApplyForm({ tracker, onChanged }) {
     await run(() => api.applyForAdviser({ faculty_id: Number(facultyId), note: note.trim() }));
   }
   return (
-    <SectionCard pad="lg" title="Nominate your research adviser (Form 3)" subtitle="Choose the faculty member you want. The Academic Coordinator notes your application, then the Dean decides." icon={UserPlus}>
+    <SectionCard pad="lg" title="Nominate your research adviser (Form 3)" icon={UserPlus}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Find a faculty member">
           <Input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, college or specialization" />

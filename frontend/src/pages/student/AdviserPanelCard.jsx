@@ -15,7 +15,7 @@ export default function AdviserPanelCard({ data, showSpecialization = true, show
     <SectionCard
       pad="lg"
       title="Adviser and panel"
-      subtitle={adviser && panel.length ? undefined : "Assigned after Panel Matching; scheduling opens once a panel is in place"}
+      subtitle={adviser && panel.length ? undefined : "Assigned after Panel Matching."}
       icon={Users}
       action={showScheduleLink ? <Button as={Link} to="/student/defense-schedule" variant="secondary" size="sm">Defense schedule <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Button> : null}
     >

@@ -25,11 +25,11 @@ import ListExportButtons from "../../components/ListExportButtons";
 import ExportFollowUpModal from "../../components/ExportFollowUpModal";
 import ExportHistory from "../../components/ExportHistory";
 import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
-import { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
-import { GroupBadge, GroupCard, GroupOverview, MemberList, StageColumnHeader, selectionWords, stageCheckSummary } from "../../components/process";
+import { BoardFilterRow, BoardFrame, ViewToggle } from "../leave/LeaveFilters";
+import { CaseCardHead, GroupBadge, GroupCard, GroupOverview, MemberList, RequirementLine, StageColumnHeader, selectionWords, stageCheckSummary } from "../../components/process";
 import { GraduationBatchModal } from "./GraduationBatchModal";
 import { useIsPhone } from "../../hooks";
-import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationBatchGroups, graduationBatchStages, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, printGraduationBatch, sortSelectedWorkflowRows } from "./graduationShared";
+import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationRequirementItems, graduationBatchGroups, graduationBatchStages, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, printGraduationBatch, sortSelectedWorkflowRows } from "./graduationShared";
 import { CaseMessageHistory, DemoResetButton, Detail, RosterFilters, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, uniqueValues, useDemoCaseReset } from "./shared";
 
 function graduationBatchSelectionState(group, selectedIds) {
@@ -315,19 +315,16 @@ function GraduationCandidateCard({ row, stage, canSelect, selected, onToggleStud
   const courses = row.eligibility?.completed_courses || [];
   return (
     <article className={`rounded-xl border p-3 shadow-sm transition-colors ${selected ? "border-brand-400 ring-2 ring-brand-100" : awaiting ? "border-slate-200 bg-slate-50/60 hover:border-slate-300" : "border-emerald-200 bg-emerald-50/70 hover:border-emerald-400"}`}>
-      <div>
-        <div className="flex min-w-0 items-start gap-2.5">
-          {canSelect && (
-            <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-ink">{row.student.name}</p>
-            <p className="truncate text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
-          </div>
-        </div>
-      </div>
-      <div className="mt-2"><StatusChip status={row.application_status} dot={false} /></div>
-      <GraduationRequirementBoxes row={row} />
+      {/* Owner feedback 2026-11-23 (stage 5): the Research Gate card - head with the chip, one requirement line, no tiles */}
+      <CaseCardHead
+        name={row.student.name}
+        sub={`${row.student.student_number} · ${row.student.program_code}`}
+        chip={<StatusChip status={row.application_status} size="sm" dot={false} />}
+        select={canSelect && (
+          <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />
+        )}
+      />
+      <RequirementLine items={graduationRequirementItems(row)} ariaLabel="Completed graduation requirements" />
       {courses.length > 0 && (
         <p className="mt-2 text-xs text-slate-500">
           <span className="font-semibold text-slate-700">Completed courses:</span>{" "}
@@ -717,9 +714,9 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
       </GraduationBatchCard>
     );
   }
-  // Khloe's header: the first two columns carry a number in a circle, every column says what it holds and how many cards.
+  // Owner feedback 2026-11-23 (stage 5): every column carries its number, as on the Research Gate board.
   function renderBoardColumnHeader(column, columnItems) {
-    const number = column.kind === "stage" ? Number(column.key.replace("stage-", "")) : null;
+    const number = boardColumns.findIndex((entry) => entry.key === column.key) + 1;
     return (
       <>
         <StageColumnHeader column={column} count={columnItems.length} number={number} />
@@ -860,7 +857,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
   return (
     <div className="flex flex-col gap-4">
       {/* No card title and no loose line under the header: the page header says it all, with who does what in its description (finding 11, I-157). */}
-      <BoardSummary line={summaryLine} windowName="details window" />
+      <BoardSummary line={summaryLine} />
       {accountRole === "dean" && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <Button icon={Download} loading={exportingBatchId === "all"} disabled={!approvedGroups.length} onClick={() => exportApproved(exportGroups, "all")} className="max-sm:w-full">
@@ -875,27 +872,28 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           </p>
         </div>
       )}
+      <BoardFrame>
       <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
         <RosterFilters
           filters={filters}
           setFilters={setFilters}
           programs={programs}
           statuses={statuses}
-          secondaryLabel="completed courses"
+          secondaryLabel="Completed courses"
           secondaryOptions={completedCourseOptions}
           count={batchesOnly ? visibleBatchGroups.length : filteredRows.length}
           total={batchesOnly ? allBatchCount : rows.length}
           noun={batchesOnly ? "batches" : "records"}
           showAdvanced={false}
+          extra={<ListExportButtons
+                    title="Graduation candidates"
+                    subtitle={`${filteredRows.length} of ${rows.length} records`}
+                    filename="graduation-candidates"
+                    columns={["Student ID", "Student name", "Program", "Eligible", "Endorsement status", "Batch"]}
+                    rows={filteredRows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.eligibility?.eligible ? "Yes" : "No", graduationRowStatus(row), row.endorsement?.batch_name || ""])}
+            />}
         />
       </BoardFilterRow>
-      <ListExportButtons
-        title="Graduation candidates"
-        subtitle={`${filteredRows.length} of ${rows.length} records`}
-        filename="graduation-candidates"
-        columns={["Student ID", "Student name", "Program", "Eligible", "Endorsement status", "Batch"]}
-        rows={filteredRows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.eligibility?.eligible ? "Yes" : "No", graduationRowStatus(row), row.endorsement?.batch_name || ""])}
-      />
       {selectedIds.size > 0 && (tickedReady.length > 0 || tickedBatched.length > 0) && (
         <GraduationSelectionBar
           count={tickedReady.length + tickedBatched.length}
@@ -914,6 +912,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           ariaLabel="Graduation workflow Kanban board"
           phoneAriaLabel="Graduation candidates by stage"
           columns={boardColumns}
+          closedKeys={boardColumns.filter((column) => column.label === "Acknowledged by Registrar").map((column) => column.key) /* UX-29 */}
           items={boardItems}
           getItemId={graduationBoardItemId}
           getColumnKey={graduationBoardColumnKey}
@@ -928,6 +927,7 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
           renderColumnFooter={renderColumnFooter}
           renderColumnHeader={renderBoardColumnHeader}
           columnClassName="w-[320px]"
+          numbered
           emptyText="No candidates here"
         />
         </div>
@@ -942,10 +942,10 @@ export function GraduationRoster({ context, submitting, refreshing, clearSubmitF
       ) : (
         <EmptyState title="No candidates match these filters" hint="Clear a filter to see more." />
       )}
+      </BoardFrame>
       {/* Below the board or table, so switching Board / Table changes what is right under the switch. */}
       <GroupOverview
         title="Created graduation batches"
-        hint="Every batch and where it stands. Open the stage check to follow it step by step."
         groups={overviewGroups}
         onOpen={(group) => setStageGroupId(group.id)}
       />

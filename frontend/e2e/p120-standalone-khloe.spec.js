@@ -12,6 +12,7 @@
 //   - a column is as tall as its cards (an empty one is short) and "Select all in this column" sits right under the last card;
 //   - 390 px: the page does not scroll sideways.
 import { test, expect } from "@playwright/test";
+import { openClosed } from "./support/board.js";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { AUTH_DIR, SCREENS_DIR } from "./support/paths.mjs";
@@ -51,17 +52,22 @@ for (const { role, path } of ROLES) {
         const region = page.getByRole("region", { name: board.region });
         await expect(region).toBeVisible();
 
-        // Column headers: 1, 2, 3 ... in board order, and a purpose line under each title.
+        // Column headers: 1, 2, 3 ... and a purpose line under each title.
+        // CHANGED BY UX phase 5b (UX-28/29): the final columns are behind "Closed" at the end and an empty
+        // column is a strip (its number, 0, its name; its purpose is its title): every stage still has its own number once.
+        await openClosed(region);
         const sections = region.locator(":scope section[aria-label]");
         const columns = await sections.count();
         expect(columns, "the board has stages").toBeGreaterThan(3);
+        const numbers = [];
         for (let i = 0; i < columns; i++) {
           const section = sections.nth(i);
           const label = await section.getAttribute("aria-label");
-          await expect(section.getByTestId("stage-number"), `${label}: number ${i + 1}`).toHaveText(String(i + 1));
-          const purpose = ((await section.locator("header p").first().textContent()) || "").trim();
-          expect(purpose.length, `${label}: says what the column holds`).toBeGreaterThan(10);
+          numbers.push(Number(await section.getByTestId("stage-number").textContent()));
+          const line = await section.evaluate((node) => node.querySelector("header p.meta")?.textContent || "");
+          expect(line, `${label}: no description line`).toBe(""); // CHANGED BY owner feedback 2026-11-23: no description line under a column title
         }
+        expect([...numbers].sort((a, b) => a - b), "each stage numbered once, 1 to n").toEqual(Array.from({ length: columns }, (_, i) => i + 1));
 
         // Cards: the shared anatomy.
         const cards = region.locator("article");
@@ -125,17 +131,18 @@ for (const { role, path } of ROLES) {
       const region = page.getByRole("region", { name: "Readmission board" });
       const card = region.locator("article").first();
       await expect(card).toBeVisible();
+      // CHANGED BY owner feedback 2026-11-23 (stage 5): the Research Gate card - one requirement line ("3 of 4 done · Still to do: ..."), no tiles
       const boxes = card.getByLabel("Requirements for this request");
       await expect(boxes).toBeVisible();
-      await expect(boxes.getByText("Written intention")).toBeVisible();
-      await expect(boxes.getByText("Business Office clearance")).toBeVisible();
+      await expect(boxes).toHaveText(/^\d+ of \d+ done · (Nothing left|Still to do: .+)$/);
     });
 
     test("AWOL: an AWOL card shows the residence limit; a Residency card is marked Residency", async ({ page }) => {
       await page.goto(path("awol"));
       const region = page.getByRole("region", { name: "AWOL and residency board" });
       await expect(region.locator("article").first()).toBeVisible();
-      await expect(region.getByLabel("Requirements for this request").first().getByText("Within the residence limits")).toBeVisible();
+      // CHANGED BY owner feedback 2026-11-23 (stage 5): the Research Gate card - one requirement line ("3 of 4 done · Still to do: ..."), no tiles
+      await expect(region.getByLabel("Requirements for this request").first()).toHaveText(/^\d+ of \d+ done · (Nothing left|Still to do: .+)$/);
       const residency = region.locator("article").filter({ has: page.getByText("Residency", { exact: true }) });
       expect(await residency.count(), "the board has a residency card marked with its type").toBeGreaterThan(0);
     });
@@ -144,7 +151,8 @@ for (const { role, path } of ROLES) {
       await page.goto(path("withdrawal"));
       const region = page.getByRole("region", { name: "Subject withdrawal board" });
       await expect(region.locator("article").first()).toBeVisible();
-      await expect(region.getByLabel("Requirements for this request").first().getByText("Within the withdrawal window")).toBeVisible();
+      // CHANGED BY owner feedback 2026-11-23 (stage 5): the Research Gate card - one requirement line ("3 of 4 done · Still to do: ..."), no tiles
+      await expect(region.getByLabel("Requirements for this request").first()).toHaveText(/^\d+ of \d+ done · (Nothing left|Still to do: .+)$/);
     });
 
     test("the amber message box and the Message button (the case window opens on the note box)", async ({ page }) => {
@@ -159,6 +167,7 @@ for (const { role, path } of ROLES) {
       await page.goto(path("leave-of-absence"));
       const region = page.getByRole("region", { name: "Leave of absence board" });
       await expect(region.locator("article").first()).toBeVisible();
+      await openClosed(region); // CHANGED BY UX phase 5b (UX-29): the first case may be in a final column, behind "Closed"
       const card = region.locator("article").filter({ hasText: "2 visible messages" }).first();
       await expect(card).toBeVisible();
       await expect(card).toContainText("Please send the medical certificate");

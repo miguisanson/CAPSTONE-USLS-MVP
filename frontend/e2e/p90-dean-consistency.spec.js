@@ -32,15 +32,15 @@ const shot = async (page, name) => {
 const STANDALONE = [
   {
     slug: "leave-of-absence", title: "Leave of Absence", types: ["leave-of-absence"],
-    description: "Leave of absence requests that Graduate School staff forwarded for your decision. Approve, return or deny each one.",
+    description: "Approve, return or deny each request forwarded to you.", // UX-22
   },
   {
     slug: "readmission", title: "Readmission", types: ["readmission"],
-    description: "Requests to return from a leave that Graduate School staff forwarded for your decision. Approve, return or deny each one.",
+    description: "Approve, return or deny each request forwarded to you.", // UX-22
   },
   {
     slug: "awol", title: "AWOL & Residency", types: ["awol-return"],
-    description: "AWOL return declarations that Graduate School staff forwarded for your decision, and the residency records on file.",
+    description: "Return declarations forwarded to you, and the residency records on file.", // UX-22
   },
   {
     slug: "withdrawal", title: "Subject Withdrawal", types: ["withdrawal"],
@@ -83,9 +83,13 @@ const chip = (page) => page.locator('main [data-slot="badge"]').first();
 
 /** The same parts on a Dean board: header buttons, rules panel, search box, Board/Table toggle (Board pressed). */
 async function expectSharedParts(page, label) {
-  await expect(page.getByRole("button", { name: "How this works" }), `${label}: How this works`).toBeVisible();
-  await expect(page.getByRole("button", { name: "View recent activity" }), `${label}: View recent activity`).toBeVisible();
-  await expect(page.getByRole("region", { name: "Rules applied on this screen" }), `${label}: rules panel`).toBeVisible();
+  // UX-14 (owner 2026-11-20): the guide, the activity and the rules panel are in the header's Help panel.
+  const help = page.locator("main header").first().getByRole("button", { name: "Help" });
+  await expect(help, `${label}: Help`).toBeVisible();
+  await help.click();
+  await expect(page.getByRole("dialog").getByRole("region", { name: "Rules applied on this screen" }), `${label}: no rules panel`).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23 (IM58)
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("searchbox", SEARCH), `${label}: search box`).toBeVisible();
   const toggle = page.getByRole("group", TOGGLE);
   await expect(toggle, `${label}: Board/Table toggle`).toBeVisible();
@@ -138,10 +142,10 @@ test.describe("conA Dean boards share one set of parts (finding 1 and 10)", () =
     test(`${board.title}: Dean words, the "N waiting" chip, header buttons, rules panel, toolbar and toggle`, async ({ page }) => {
       const approvals = await openAs(page, `/dean/approvals/${board.slug}`);
       await expect(page.getByRole("heading", { level: 1, name: board.title })).toBeVisible();
-      await expect(page.getByRole("button", { name: "How this works" })).toBeVisible();
+      await expect(page.locator("main header").first().getByRole("button", { name: "Help" })).toBeVisible(); // UX-14
 
       // finding 10: the description is written for the Dean, the chip counts what waits on the Dean
-      await expect(page.locator('main [data-slot="description"]').first()).toHaveText(board.description);
+      await expect(page.locator('main [data-slot="description"]')).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: no page line
       for (const staffText of STAFF_VOICE) await expect(main(page).getByText(staffText)).toHaveCount(0);
       await expect(chip(page), `${board.title}: the waiting chip`).toHaveText(`${waitingOf(approvals, board.types)} waiting`);
 
@@ -171,7 +175,7 @@ test.describe("conA Dean Practicum Reports is the shared board (finding 1 / I-12
   test("same header, rules panel, toolbar and toggle; the old private board is gone", async ({ page }) => {
     const approvals = await openAs(page, "/dean/approvals/practicum", withPracticum);
     await expect(page.getByRole("heading", { level: 1, name: "Practicum Reports" })).toBeVisible();
-    await expect(page.locator('main [data-slot="description"]').first()).toHaveText("Practicum completion reports sent to the Dean for final review.");
+    await expect(page.locator('main [data-slot="description"]')).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(chip(page)).toHaveText(`${waitingOf(approvals, ["practicum"])} waiting`);
     await expect(chip(page)).toHaveText("1 waiting");
     await expectSharedParts(page, "Practicum Reports");
@@ -181,11 +185,13 @@ test.describe("conA Dean Practicum Reports is the shared board (finding 1 / I-12
     await expect(main(page).getByRole("heading", { name: "Waiting for your decision" })).toHaveCount(0);
 
     // the header buttons open the same windows as the other boards
-    await page.getByRole("button", { name: "How this works" }).click();
+    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
+    await page.getByRole("dialog").getByRole("button", { name: "How this works" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await page.getByRole("button", { name: "View recent activity" }).click();
+    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
+    await page.getByRole("dialog").getByRole("button", { name: "Recent activity" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -203,14 +209,14 @@ test.describe("conA Dean Practicum Reports is the shared board (finding 1 / I-12
     ]) {
       const column = board.getByRole("region", { name: label });
       await expect(column.getByRole("heading", { name: label }), `${label} column`).toBeVisible();
-      await expect(column.getByText(description), `${label} description`).toBeVisible();
+      await expect(column.getByText(description), `${label} description`).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: no column line
     }
 
     const waiting = cardOf(board, "Tess Waitingdean");
     await expect(waiting).toHaveCount(1);
     await expect(wrapperOf(waiting)).toHaveAttribute("draggable", "true");
     await expect(waiting).toContainText("2299101 · MSGC");
-    await expect(waiting).toContainText("Report Sent to Dean");
+    await expect(waiting).toContainText("With the Dean"); // UX-18: "Report Sent to Dean" reads "With the Dean"
     await expect(waiting.getByText("Next: Dean")).toBeVisible();
     await expect(wrapperOf(waiting).getByRole("button", { name: /Move to/ })).toBeVisible();
     await expect(waiting.getByRole("link", { name: "View details for Tess Waitingdean" })).toHaveAttribute("href", "/dean/case/practicum/9101");

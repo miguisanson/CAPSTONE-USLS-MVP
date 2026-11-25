@@ -108,7 +108,10 @@ test.describe("I-001 Enrollment: Record dropped subject dialog", () => {
       });
       return scrollers.map((el) => ({ tag: el.tagName, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
     });
-    expect(scrollInfo.length, "the dialog has its own scrolling area").toBeGreaterThan(0);
+    // CHANGED BY owner feedback 2026-11-23 (IM58): without the rules box the form fits at 1366x768; when it does not fit,
+    // the dialog scrolls inside itself (a scrolling area exists only when the content is taller)
+    const fits = await dialog.evaluate((root) => root.scrollHeight <= root.clientHeight + 1);
+    expect(fits || scrollInfo.length > 0, "the dialog fits or has its own scrolling area").toBe(true);
 
     // 3. Fill the form, then the Save button can be scrolled into view, is inside the viewport and works.
     await dialog.getByLabel("Unexcused absences (% of class hours)").fill("25");

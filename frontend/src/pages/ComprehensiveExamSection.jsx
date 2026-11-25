@@ -78,7 +78,6 @@ export default function ComprehensiveExamSection({ student, exam, onChanged }) {
   return (
     <SectionCard
       title="Comprehensive exam"
-      subtitle="The result decides whether the research steps open"
       icon={GraduationCap}
       action={canRecord ? <Button variant="secondary" onClick={() => setOpen(true)}>Record result</Button> : undefined}
     >

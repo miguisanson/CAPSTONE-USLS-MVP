@@ -4,13 +4,14 @@ import { Button, DataTable, EditableText, EmptyState, Field, InlineNotice, Input
 import StepDialog from "../../components/StepDialog";
 import WorkflowTimeline from "../../components/WorkflowTimeline";
 import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
-import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
+import LeaveFilters, { BoardFilterRow, BoardFrame, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
 import { useOpenFilters } from "../leave/useOpenFilter";
 import { formatDate } from "../../lib/format";
 import ListExportButtons from "../../components/ListExportButtons";
-import { CaseCardFacts, CaseCardShell, MessageNote, NextOwner, ProcessScopeNote, ReadyMark } from "../../components/process";
+import { CaseCardFacts, CaseCardHead, CaseCardShell, MessageNote, NextOwner, ReadyMark } from "../../components/process";
 import { CaseMessageHistory, DemoResetButton, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, uniqueValues, useDemoCaseReset } from "./shared";
+import { statusLabel } from "../../lib/status";
 
 // I-252: the student's hours are a claim; the Academic Coordinator's verified total is what counts.
 function hoursText(record) {
@@ -134,14 +135,12 @@ function PracticumBoardCard({ row, onOpen, onMessage }) {
   const updated = row.last_activity_at || record?.updated_at;
   return (
     <CaseCardShell ready={ready}>
-      {/* The mark sits under the name, not beside it: beside it the name was squeezed to a few letters per line. */}
-      <div className="flex flex-col items-start gap-1.5">
-        <div className="min-w-0 max-w-full">
-          <p className="break-words text-sm font-semibold text-ink">{row.student.name}</p>
-          <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code}</p>
-        </div>
-        <ReadyMark ready={readyForDean} waiting={!ready} waitingLabel={record ? "Waiting for documents" : "Waiting for MOA"} />
-      </div>
+      {/* Owner feedback 2026-11-23 (stage 5): the Research Gate card head - the mark beside the name, under it when narrow */}
+      <CaseCardHead
+        name={row.student.name}
+        sub={`${row.student.student_number} · ${row.student.program_code}`}
+        chip={<ReadyMark ready={readyForDean} waiting={!ready} waitingLabel={record ? "Waiting for documents" : "Waiting for MOA"} />}
+      />
       <CaseCardFacts
         facts={[
           record?.practicum_site || "Site pending",
@@ -180,7 +179,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
   const rows = (context.roster || []).filter((row) => row.eligibility?.eligible === true || Boolean(row.record));
   const [filters, setFilters] = useOpenFilters(EMPTY_FILTERS);
   const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
-  const statusOptions = useMemo(() => uniqueValues(rows.map((row) => row.record?.status || "Not Submitted")).map((value) => ({ value, label: value })), [rows]);
+  const statusOptions = useMemo(() => uniqueValues(rows.map((row) => row.record?.status || "Not Submitted")).map((value) => ({ value, label: statusLabel(value) })), [rows]);
   // Newest activity first, like the other boards.
   const filteredRows = useMemo(() => rows.filter((row) => {
     const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.record?.practicum_site || ""}`.toLowerCase();
@@ -274,24 +273,24 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
 
   return (
     <div className="page-stack">
-      <ProcessScopeNote title="Program scope: Psychology and MSGC only">
-        {context.practicum_program_scope?.description || "This roster includes only Psychology programs and the Master of Science in Guidance and Counseling (MSGC)."} Students from every other program are excluded from the practicum roster and actions.
-      </ProcessScopeNote>
-      <BoardSummary line={summaryLine} windowName="case window" />
+      {/* CHANGED BY owner feedback 2026-11-23 (IM58): the program scope is in Help and on the Business Rules page */}
+      <BoardSummary line={summaryLine} />
+      <BoardFrame>
       <BoardFilterRow toggle={<ViewToggle value={viewMode} onChange={setViewMode} />}>
-        <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={filteredRows.length} total={rows.length} noun="students" />
-      </BoardFilterRow>
-      <ListExportButtons
+        <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={filteredRows.length} total={rows.length} noun="students" extra={<ListExportButtons
         title="Practicum students"
         subtitle={`${filteredRows.length} of ${rows.length} students`}
         filename="practicum-students"
         columns={["Student ID", "Student name", "Program", "Eligibility", "MOA", "Documents", "Hours", "Coordinator", "Dean report"]}
         rows={filteredRows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.eligibility?.status, row.moa_status, row.documents_status, row.record ? hoursText(row.record) : "", row.coordinator_review_status, row.dean_report_status])}
-      />
+/>} />
+      </BoardFilterRow>
       {viewMode === "board" ? (
         <StageBoard
           ariaLabel="Practicum workflow board"
           columns={PRACTICUM_STAGE_COLUMNS}
+          closedKeys={["Completed"] /* UX-29: the Dean has the report or has reviewed it */}
+          numbered
           items={filteredRows}
           getItemId={practicumBoardItemId}
           getColumnKey={practicumBoardColumnKey}
@@ -354,6 +353,7 @@ export function PracticumRoster({ context, submit, submitting, refreshing, clear
         />
         </>
       )}
+      </BoardFrame>
       {selectedRow && (
         <WorkflowCaseModal
           id={`practicum-case-${selectedRow.student.id}`}

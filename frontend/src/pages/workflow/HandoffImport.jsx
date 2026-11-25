@@ -121,11 +121,6 @@ function HandoffImport({ context, onImported }) {
     <div className="space-y-4">
       <SectionTitle
         title={isAudit ? "Update audits from monitoring sheet" : "Import from monitoring sheet"}
-        subtitle={
-          isAudit
-            ? "Upload the latest Academic Coordinator Student Monitoring sheet — each student's completed subjects are updated from it"
-            : "Upload the Academic Coordinator Student Monitoring Excel file — students, programs, and course audits are created automatically"
-        }
         icon={FileSpreadsheet}
         action={<Button as={Link} to="/monitoring-sheet" variant="secondary" icon={Table2} className="shrink-0">Full sheet</Button>}
       />
@@ -202,7 +197,6 @@ function HandoffImport({ context, onImported }) {
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="card-title flex items-center gap-2"><History className="h-4 w-4 text-brand-700" aria-hidden="true" /> Upload history</h3>
-            <p className="meta mt-1">Every uploaded workbook is preserved. Open a version to review conflicts between its values and the current record.</p>
           </div>
           <StatusChip tone="neutral" status={`${uploadHistory?.items?.length || 0} ${uploadHistory?.items?.length === 1 ? "backup" : "backups"}`} dot={false} />
         </div>

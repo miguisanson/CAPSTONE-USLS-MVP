@@ -15,6 +15,7 @@
 // At 390 px no board makes the page scroll sideways.
 // Set E2E_BOARD_SHOTS to a folder to also save full-page screenshots of five boards at 1366, 1920 and 390.
 import { test, expect } from "@playwright/test";
+import { openClosed } from "./support/board.js";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { AUTH_DIR } from "./support/paths.mjs";
@@ -70,7 +71,10 @@ async function measureFilterBar(page) {
       const style = getComputedStyle(search);
       const context = document.createElement("canvas").getContext("2d");
       context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-      const room = search.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      // CHANGED BY owner feedback 2026-11-23 (stage 8): Chromium's clientWidth of an <input type="search"> already leaves
+      // out the padding (192px box: clientWidth 110), so subtracting it again measured 80px too little. Measure the box.
+      const room = search.getBoundingClientRect().width - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth)
+        - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
       placeholderFits = { text: search.placeholder, need: Math.ceil(context.measureText(search.placeholder).width), room: Math.floor(room) };
     }
     return {
@@ -114,7 +118,7 @@ test.describe("P7.4 boards show every stage or say that more exist", () => {
       const board = page.getByRole("region", { name: label });
       await expect(board).toBeVisible();
       const { columns } = await measure(board);
-      expect(columns.length).toBeGreaterThanOrEqual(6);
+      expect(columns.length).toBeGreaterThanOrEqual(4); // CHANGED BY UX phase 5b (UX-29): the final stages fold into "Closed", so fewer show
       for (const column of columns) expect(column.titleClipped, `${column.label}: title is cut off`).toBe(false);
 
       const hidden = columns.filter((column) => !column.fullyVisible).length;
@@ -163,16 +167,18 @@ test.describe("P7.4 boards show every stage or say that more exist", () => {
       await expect.poll(async () => (await measure(board)).scrollLeft, "the left button moved the board back").toBeLessThan(atEnd);
     });
 
-    test(`${slug}: an empty column uses the shared EmptyState, not a dashed box`, async ({ page }) => {
+    // CHANGED BY UX phase 5b (UX-28/29): an empty column is a narrow strip with its name and 0, not a full column
+    test(`${slug}: an empty column is a narrow strip, not a dashed box`, async ({ page }) => {
       await page.goto(`/workflow/${slug}`);
       const board = page.getByRole("region", { name: label });
       await expect(board).toBeVisible();
-      const { columns } = await measure(board);
-      const empty = columns.filter((column) => column.cards === 0);
-      expect(empty.length, "the demo data has at least one empty column here").toBeGreaterThan(0);
-      for (const column of empty) {
-        expect(column.hasEmpty, `${column.label}: shared EmptyState`).toBe(true);
-        expect(column.dashed, `${column.label}: no dashed placeholder`).toBe(false);
+      const strips = board.locator("[data-empty-strip]");
+      expect(await strips.count(), "the demo data has at least one empty column here").toBeGreaterThan(0);
+      for (let i = 0; i < (await strips.count()); i++) {
+        const box = await strips.nth(i).boundingBox();
+        expect(box.width, "a strip is narrow").toBeLessThanOrEqual(64);
+        await expect(strips.nth(i).getByTestId("stage-count")).toHaveText("0");
+        await expect(strips.nth(i).locator("p.border-dashed")).toHaveCount(0);
       }
     });
   }

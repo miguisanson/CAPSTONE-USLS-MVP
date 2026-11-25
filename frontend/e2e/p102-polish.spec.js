@@ -1,4 +1,5 @@
 // e2e-writes: none
+// CHANGED BY data cleanup (IM54-IM57, 2026-11-22): student ids re-pointed (Miko Almario 125 -> 18, Nico Barrientos 146 -> 39).
 // Polish packet (I-180, I-182, I-184, I-185, I-186): small things the walkthrough captures and the integrator review showed.
 // Written BEFORE the fixes. Every write is answered by page.route or never sent; shared state is mocked or read from the API.
 //   - I-180 Dean Graduation "Endorsement batches" tab: the filter line counts batches, not candidates;
@@ -115,7 +116,7 @@ test.describe("I-185 Panel Matching seats", () => {
       roles = body.panel_roles;
       await route.fulfill({ response, json: body });
     });
-    await page.goto("/workflow/panel-matching?student_id=146");
+    await page.goto("/workflow/panel-matching?student_id=39");
     await expect(main(page).getByText("Final panel selected")).toBeVisible();
     expect(roles.length).toBeGreaterThan(1);
     expect(panel.map((member) => member.panel_role), "the mock puts the panel out of seat order").not.toEqual(roles);

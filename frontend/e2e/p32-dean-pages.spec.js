@@ -91,7 +91,10 @@ async function putWorkInFrontOfTheDean(playwright) {
   // The course-offering plan: the Academic Coordinator saves a draft and submits it (a re-run on the same database
   // finds it already submitted, which is fine).
   const coordinator = await apiAs(playwright, "academic@usls.edu.ph");
-  const plan = { program_id: 1, term_label: TERM };
+  // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): the plan is MAED's, the only program whose students make a demand
+  // (MSCS has no students now, so its plan had no subjects)
+  const programs = (await okJson(await coordinator.get("/api/course-adjustments"), "course adjustments")).programs;
+  const plan = { program_id: programs.find((p) => p.code === "MAED").id, term_label: TERM };
   await coordinator.post("/api/course-adjustments/plan", { data: { ...plan, action: "draft" } });
   await coordinator.post("/api/course-adjustments/plan", { data: { ...plan, action: "submit" } });
 
@@ -127,7 +130,7 @@ test.describe("P3.2 Dean pages", () => {
   test("dashboard: key numbers and their links, the waiting decisions with a Review link each, the plan row, recent decisions", async ({ page }) => {
     await page.goto("/dean");
     await expect(page.getByRole("heading", { level: 1, name: /^Welcome, / })).toBeVisible();
-    await expect(page.getByRole("main").getByRole("link", { name: /Open approvals queue/ })).toHaveAttribute("href", "/dean/approvals");
+    await expect(page.getByRole("main").getByRole("link", { name: /Open approvals queue/ })).toHaveCount(0); // UX-11: the sidebar has the Approvals Queue
 
     // The headline number: how many decisions wait and how long the oldest has.
     const waiting = page.getByRole("main").getByRole("link", { name: /Decisions waiting/ });
@@ -175,40 +178,27 @@ test.describe("P3.2 Dean pages", () => {
     await page.screenshot({ path: join(SHOTS, "dashboard-390.png"), fullPage: true });
   });
 
-  test("approvals queue: sections, counts, filters and Clear, plan row, Adviser Designation", async ({ page }) => {
+  // CHANGED BY UX phase 4 (UX-25, owner IM52): one table, oldest wait first, with a chip per process and its count;
+  // the per-process pages stay the sidebar's (and the boards').
+  test("approvals queue: one table, process chips and counts, filters and Clear, plan row, Adviser Designation", async ({ page }) => {
     await page.goto("/dean/approvals");
     await expect(page.getByRole("heading", { level: 1, name: "Approvals Queue" })).toBeVisible();
     await expect(page.getByText(/^\d+ waiting$/).first()).toBeVisible();
 
-    // A process with something waiting has its section with a count and an "Open ..." link; one with nothing waiting
-    // is named, with a link to its page, in the single "Nothing waiting in: ..." line (I-084).
-    const sections = {
-      "Course Adjustments": "course-adjustments",
-      "Leave of Absence": "leave-of-absence",
-      Readmission: "readmission",
-      "AWOL & Residency": "awol",
-      "Subject Withdrawal": "withdrawal",
-      "Practicum Reports": "practicum",
-      "Graduation Endorsement": "graduation",
-    };
-    const nothingLine = page.getByText(/^Nothing waiting in:/);
-    for (const [label, key] of Object.entries(sections)) {
-      const heading = page.getByRole("heading", { level: 2, name: new RegExp(`^${label}\\s*\\d+$`) });
-      if (await heading.count()) {
-        await expect(page.getByRole("link", { name: `Open ${label}` }), `Open ${label}`).toHaveAttribute("href", `/dean/approvals/${key}`);
-      } else {
-        await expect(nothingLine.getByRole("link", { name: label, exact: true }), `${label} is in the nothing-waiting line`).toHaveAttribute("href", `/dean/approvals/${key}`);
-      }
-    }
-    await expect(page.getByRole("heading", { level: 2, name: /^Leave of Absence\s*\d+$/ }), "Leave of Absence has requests waiting").toBeVisible();
-    const leaveHeading = await page.getByRole("heading", { level: 2, name: /^Leave of Absence\s*\d+$/ }).innerText();
-    expect(Number(leaveHeading.match(/(\d+)$/)[1]), "two leave requests wait").toBeGreaterThanOrEqual(2);
+    const queue = page.getByTestId("dean-queue");
+    await expect(queue.getByRole("table"), "one table").toHaveCount(1);
+    const chips = queue.getByRole("group", { name: "Process" });
+    const leaveChip = chips.getByRole("button", { name: /^Leave of Absence\s*\d+$/ });
+    await expect(leaveChip, "Leave of Absence has requests waiting").toBeVisible();
+    expect(Number((await leaveChip.innerText()).match(/(\d+)$/)[1]), "two leave requests wait").toBeGreaterThanOrEqual(2);
     await expect(page.getByRole("heading", { level: 2, name: /^Adviser Designation\s*\d+$/ })).toBeVisible();
+    // the sidebar still opens each process's own page
+    await expect(page.locator('nav a[href="/dean/approvals/leave-of-absence"]').first()).toBeVisible();
 
     // The course-plan row: what it is, how old, and a Review link to the plan page.
-    const planRow = page.getByRole("listitem").filter({ hasText: /Course offerings · MSCS/ });
+    const planRow = caseRow(page, /Course offerings · MAED/);
     await expect(planRow.first()).toContainText(TERM);
-    await expect(planRow.first()).toContainText(/subject\(s\) proposed · submitted/);
+    await expect(planRow.first()).toContainText(/subject\(s\) proposed/);
     await expect(planRow.first().getByText("today")).toBeVisible();
     await expect(planRow.first().getByRole("link", { name: "Review" })).toHaveAttribute("href", "/dean/approvals/course-adjustments");
 
@@ -219,7 +209,7 @@ test.describe("P3.2 Dean pages", () => {
     await expect(caseRow(page, "Daniel Fernandez")).toHaveCount(0);
     await expect(caseRow(page, "Gabriel Domingo")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Clear 1 filter" })).toBeVisible();
-    await expect(page.getByRole("heading", { level: 2, name: /^Leave of Absence\s*1$/ })).toBeVisible();
+    await expect(page.getByTestId("dean-queue").getByRole("button", { name: /^Leave of Absence\s*1$/ })).toBeVisible();
     await page.getByRole("button", { name: "Clear 1 filter" }).click();
     await expect(search).toHaveValue("");
     await expect(caseRow(page, "Daniel Fernandez").first()).toBeVisible();
@@ -245,10 +235,9 @@ test.describe("P3.2 Dean pages", () => {
     await page.getByRole("button", { name: "Clear 1 filter" }).click();
     await expect(caseRow(page, "Maureen Castillo").first()).toBeVisible();
 
-    // Sort by student name: Daniel comes before Gabriel before Maureen in Leave/Readmission order.
-    await page.getByLabel("Sort").selectOption("student");
-    const leaveSection = page.getByRole("heading", { level: 2, name: /^Leave of Absence\s*\d+$/ }).locator("xpath=ancestor::*[contains(@class,'card')][1]");
-    const names = await leaveSection.getByRole("row").allInnerTexts();
+    // Sort by student name (the Student header): Daniel comes before Maureen.
+    await page.getByTestId("dean-queue").getByRole("button", { name: "Student", exact: true }).click();
+    const names = await page.getByTestId("dean-queue").getByRole("row").allInnerTexts();
     const order = ["Daniel Fernandez", "Maureen Castillo"].map((name) => names.findIndex((text) => text.includes(name)));
     expect(order[0], "Daniel row found").toBeGreaterThan(-1);
     expect(order[0], "Daniel sorts before Maureen").toBeLessThan(order[1]);
@@ -269,11 +258,11 @@ test.describe("P3.2 Dean pages", () => {
     await page.goto("/dean/approvals/course-adjustments");
     await expect(page.getByRole("heading", { level: 1, name: "Course Adjustments" })).toBeVisible();
     await expect(page.getByText(/^\d+ waiting$/).first()).toBeVisible();
-    await expect(page.getByText("Course offering plans submitted by the Academic Coordinator. Approve each plan or return it for revision.")).toBeVisible();
+    await expect(page.getByText("Approve each course offering plan or return it for revision.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByRole("main").getByRole("link", { name: "All approvals" })).toHaveAttribute("href", "/dean/approvals");
 
-    // The seed has an MIT plan waiting as well (I-062); this test is about the MSCS plan put in front of the Dean above.
-    const plan = page.getByRole("heading", { level: 2, name: /^Course offerings · MSCS/ }).first();
+    // The seed has an MIT plan waiting as well (I-062); this test is about the MAED plan put in front of the Dean above.
+    const plan = page.getByRole("heading", { level: 2, name: /^Course offerings · MAED/ }).first();
     await expect(plan).toBeVisible();
     const card = plan.locator("xpath=ancestor::*[contains(@class,'card')][1]");
     await expect(card).toContainText(TERM);
@@ -310,7 +299,7 @@ test.describe("P3.2 Dean pages", () => {
     await expect(page.getByRole("status").filter({ hasText: "Offering plan returned by Dean for revision" })).toBeVisible();
     expect(decideCalls).toHaveLength(1);
     expect(decideCalls[0]).toMatchObject({ decision: "return", note: "Please add a second section for the high-demand subjects." });
-    await expect(page.getByRole("heading", { level: 2, name: /^Course offerings · MSCS/ })).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 2, name: /^Course offerings · MAED/ })).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2, name: /^Course offerings · MIT/ })).toBeVisible(); // the seeded plan still waits
     const recent = page.getByRole("listitem").filter({ hasText: TERM });
     await expect(recent.first()).toContainText("Returned");
@@ -334,7 +323,7 @@ test.describe("P3.2 Dean pages", () => {
 
     await page.goto("/dean/case/leave-of-absence/999999");
     await expect(page.getByRole("heading", { level: 1, name: "Case not found" })).toBeVisible();
-    await expect(page.getByText("This request is no longer in your approvals lists. It may already have been decided.")).toBeVisible();
+    await expect(page.getByText("It may already have been decided.")).toBeVisible();
     await expect(page.getByText("Nothing to show")).toBeVisible();
     await expect(page.getByText("Go back to the approvals queue to see what is still waiting.")).toBeVisible();
     await expect(page.getByRole("main").getByRole("link", { name: "Approvals queue" })).toHaveAttribute("href", "/dean/approvals");
@@ -344,7 +333,7 @@ test.describe("P3.2 Dean pages", () => {
     // conA I-122: it is the same board as the other Dean pages now (no second "Waiting for your decision" table).
     await page.goto("/dean/approvals/practicum");
     await expect(page.getByRole("heading", { level: 1, name: "Practicum Reports" })).toBeVisible();
-    await expect(page.getByText("Practicum completion reports sent to the Dean for final review.")).toBeVisible();
+    await expect(page.getByText("Completion reports sent to you for a final review.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByRole("searchbox", { name: "Search requests by name, student number or program" })).toBeVisible();
     await expect(page.getByRole("group", { name: "Choose how to show the requests" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Practicum workflow board" }).or(page.getByText("No practicum reports yet"))).toBeVisible();

@@ -220,12 +220,13 @@ for (const view of VIEWS) {
 test.describe("Dean decision footer on a phone (F-18)", () => {
   test.use({ storageState: authFile("dean"), viewport: { width: 390, height: 844 } });
 
-  // I-220: pinned to the seeded case of Lorenzo Reyes, a Leave of Absence waiting for the Dean that no other spec files,
+  // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): Rowena Gatchalian replaces Lorenzo Reyes.
+  // I-220: pinned to the seeded case of Rowena Gatchalian, a Leave of Absence waiting for the Dean that no other spec files,
   // moves or decides (the old "first leave case" was Martin's or Clarissa's in a full run: p72 / p79 add theirs).
   test("the pinned footer is one compact row and the focused box is in view", async ({ page }) => {
     const res = await page.request.get("/api/approvals");
-    const item = (await res.json()).workflow_pending.find((x) => x.type === "leave-of-absence" && x.student?.name === "Lorenzo Reyes");
-    expect(item, "the seeded Leave of Absence case of Lorenzo Reyes waits for the Dean").toBeTruthy();
+    const item = (await res.json()).workflow_pending.find((x) => x.type === "leave-of-absence" && x.student?.name === "Rowena Gatchalian");
+    expect(item, "the seeded Leave of Absence case of Rowena Gatchalian waits for the Dean").toBeTruthy();
     await page.goto(`/dean/case/${item.type}/${item.id}`);
     const footer = page.getByTestId("decision-footer");
     await expect(footer).toBeVisible();
@@ -267,11 +268,10 @@ test.describe("rule badges for the Dean and the student (F-11)", () => {
     test("no Prototype rule or Needs review wording", async ({ page }) => {
       await page.route("**/api/business-rules*", (route) => route.fulfill({ json: PROTOTYPE_RULES }));
       await page.goto("/student/requests/leave-of-absence");
-      const rules = page.getByRole("region", { name: "Rules applied on this screen" });
-      await expect(rules).toBeVisible();
-      await rules.getByRole("button").first().click();
-      await expect(rules).toContainText("Leave length");
-      await expect(rules).not.toContainText(/Prototype rule|Proposed rule|awaiting sign-off|pending Graduate School validation|Needs review|need review/i);
+      // CHANGED BY owner feedback 2026-11-23 (IM58): the rules show on the Business Rules page only
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Rules applied on this screen" })).toHaveCount(0);
+      await expect(page.getByRole("main")).not.toContainText(/Prototype rule|Proposed rule|awaiting sign-off|Needs review/i);
     });
   });
   test.describe("dean", () => {
@@ -279,11 +279,10 @@ test.describe("rule badges for the Dean and the student (F-11)", () => {
     test("no Prototype rule or Needs review wording", async ({ page }) => {
       await page.route("**/api/business-rules*", (route) => route.fulfill({ json: PROTOTYPE_RULES }));
       await page.goto("/dean/approvals/practicum");
-      const rules = page.getByRole("region", { name: "Rules applied on this screen" });
-      await expect(rules).toBeVisible();
-      await rules.getByRole("button").first().click();
-      await expect(rules).toContainText("Leave length");
-      await expect(rules).not.toContainText(/Prototype rule|Proposed rule|awaiting sign-off|pending Graduate School validation|Needs review|need review/i);
+      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14
+      // CHANGED BY owner feedback 2026-11-23 (IM58): the rules show on the Business Rules page only
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await expect(page.getByRole("dialog").getByRole("region", { name: "Rules applied on this screen" })).toHaveCount(0);
     });
   });
   test.describe("staff keeps them", () => {
@@ -291,11 +290,10 @@ test.describe("rule badges for the Dean and the student (F-11)", () => {
     test("Prototype rule and Needs review stay on staff screens", async ({ page }) => {
       await page.route("**/api/business-rules*", (route) => route.fulfill({ json: PROTOTYPE_RULES }));
       await page.goto("/workflow/leave-of-absence");
-      const rules = page.getByRole("region", { name: "Rules applied on this screen" });
-      await rules.getByRole("button").first().click();
-      await expect(rules).toContainText(/Proposed rule \(agreed with the Graduate School, awaiting sign-off\)/);
-      await expect(rules).toContainText(/Awaiting sign-off/);
-      await expect(rules).not.toContainText(/Prototype rule|pending Graduate School validation/);
+      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14
+      // CHANGED BY owner feedback 2026-11-23 (IM58): the rules show on the Business Rules page only
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await expect(page.getByRole("dialog").getByRole("region", { name: "Rules applied on this screen" })).toHaveCount(0);
     });
   });
 });

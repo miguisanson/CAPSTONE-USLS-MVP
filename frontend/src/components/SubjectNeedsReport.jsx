@@ -33,38 +33,8 @@ export function needGroup(row) {
   return row.needs.notTaken > 0 ? "later" : "none";
 }
 
-/** The two meanings, once, above the table. */
-export function NeedsMeaning() {
-  return (
-    <p className="meta leading-relaxed">
-      <span className="font-semibold text-ink">Needing next term:</span> the subject is in the student&apos;s next semester group, or the student
-      must retake it. This is the number to plan an offering from.{" "}
-      <span className="font-semibold text-ink">Not taken yet:</span> everyone who still has to take it at some point; never smaller than the first number.{" "}
-      One affected student is enough to offer a subject; open Details on a row to see the students, who would be delayed if it is withheld, and who could teach it.
-    </p>
-  );
-}
-
-/** The report's four figures as one line. */
-export function SubjectNeedsSummary({ summary = {} }) {
-  const reviewed = summary.students_reviewed ?? 0;
-  const parts = [
-    [reviewed, reviewed === 1 ? "student reviewed" : "students reviewed"],
-    [summary.subjects_with_need ?? 0, "subjects needed next term"],
-    [summary.student_subject_needs ?? 0, "student seats needed"],
-    [summary.subjects_not_taken ?? 0, "subjects with a backlog"],
-  ];
-  return (
-    <p className="text-sm text-slate-600">
-      {parts.map(([value, label], index) => (
-        <span key={label}>
-          {index > 0 && <span className="text-slate-400"> · </span>}
-          <span className="font-semibold text-ink">{value}</span> {label}
-        </span>
-      ))}
-    </p>
-  );
-}
+// CHANGED BY owner feedback 2026-11-23 (IM58): the meaning paragraph and the summary line are gone; the Course
+// Adjustments squares show the next-term numbers.
 
 /** The students behind a subject: who needs it next term, and everyone who has not taken it. Used in the Details drawer. */
 export function SubjectStudents({ students = [], delayedIds = new Set() }) {

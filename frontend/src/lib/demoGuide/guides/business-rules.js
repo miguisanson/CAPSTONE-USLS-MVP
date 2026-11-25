@@ -52,16 +52,7 @@ export default {
       doneWhen: "manual",
       ifAsked: [{ q: "Why are some rules not enforced?", a: "Where the policy is only described, the portal documents it and does not block the user. Each such rule is labelled so nobody assumes otherwise." }],
     },
-    {
-      id: "br-screen", title: "The same rules on a workflow screen", role: "staff", route: "/workflow/withdrawal", page: "Subject Withdrawal",
-      do: "Open Subject Withdrawal and expand Rules applied on this screen: the same rules, with the same sources, at the place where the rules are used.",
-      actions: [
-        { click: { role: "link", name: "Subject Withdrawal" } },
-        { click: { role: "button", name: "Rules applied on this screen" } },
-        { pause: 1800 },
-      ],
-      doneWhen: "manual",
-      ifAsked: [{ q: "Does the student see the same rule?", a: "Yes. The student's Subject Withdrawal page has the same panel and a plain-words note of the window and the fee." }],
-    },
+    // CHANGED BY owner feedback 2026-11-23 (IM58): rules are shown only on the Business Rules page, so the step that opened
+    // "Rules applied on this screen" on Subject Withdrawal is gone.
   ],
 };

@@ -101,10 +101,10 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
   return <>
     {notice && <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800"><CheckCircle2 className="h-4 w-4" />{notice}</div>}
     {showSignatures && <Card pad="none" className="p-6">
-      <SectionTitle title="Adviser paper signatures" subtitle="Review and sign the exact manuscript version uploaded by your assigned advisees" icon={FileSignature} />
+      <SectionTitle title="Adviser paper signatures" icon={FileSignature} />
       {!papers.length ? <EmptyState icon={FileSignature} title="No adviser documents yet" hint="Proposal manuscripts, proposal/final endorsements, and final manuscripts appear here after an assigned advisee uploads the files." /> : <div className={`mt-4 grid gap-5 ${pendingCount ? "lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]" : ""}`}>
         <div className="space-y-2">
-          {!pendingCount && <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600" role="status">Nothing is waiting for your signature. The documents you signed are listed below.</p>}
+          {!pendingCount && <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600" role="status">Nothing is waiting for your signature.</p>}
           {papers.map((paper) => <div key={paper.id} className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedPaper?.id === paper.id ? "border-brand-300 bg-brand-50" : "border-slate-200 bg-white"}`}><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{paper.student.name}</p><p className="text-xs text-slate-500">{paper.document_type} · {paper.gate}</p></div><StatusChip status={paper.approval?.status || "Needs signature"} dot={false} /></div><p className="mt-2 text-sm text-slate-700">{paper.name}</p><div className="mt-2 flex flex-wrap items-center gap-3"><a href={paper.url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"><Eye className="h-3.5 w-3.5" />Open document</a>{!paper.approval && <button type="button" onClick={() => setSelectedPaper(paper)} aria-pressed={selectedPaper?.id === paper.id} className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"><FileSignature className="h-3.5 w-3.5" />Review and sign</button>}<span className="text-xs text-slate-400">Uploaded {formatDate(paper.uploaded_at)}</span></div>{paper.approval && <p className="mt-2 text-xs font-semibold text-emerald-700">Signed by {paper.approval.adviser_name} · {formatDateTime(paper.approval.signed_at)}</p>}</div>)}
         </div>
         {pendingCount > 0 && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">{selectedPaper ? <><p className="text-sm font-semibold text-ink">Sign {selectedPaper.name}</p><p className="mb-3 mt-1 text-xs text-slate-500">Student: {selectedPaper.student.name}. Review the file before signing this exact version.</p><SignaturePad resetKey={selectedPaper.id} onChange={setSignature} ariaLabel="Faculty adviser signature canvas" /><button type="button" onClick={signPaper} disabled={busy || !signature} className="btn-primary mt-4 w-full cursor-pointer"><FileSignature className="h-4 w-4" />{busy ? "Saving signature…" : "Sign this document"}</button></> : <EmptyState icon={FileSignature} title="Choose a pending document" hint="Select an unsigned document to review and sign it." />}</div>}
@@ -112,7 +112,7 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
     </Card>}
 
     {showSignatures && revisionReviews.length > 0 && <Card pad="none" className="p-6">
-      <SectionTitle title="Revisions to confirm" subtitle="After a pass with minor revisions the student submits the revised manuscript; you confirm it and the stage completes" icon={CheckCircle2} />
+      <SectionTitle title="Revisions to confirm" icon={CheckCircle2} />
       <div className="mt-4 space-y-3">{revisionReviews.map((verdict) => <div key={verdict.id} className="rounded-xl border border-slate-200 p-4">
         <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-ink">{verdict.student.name}</p><p className="text-xs text-slate-500">{verdict.defense_type} · {verdict.label}</p></div><StatusChip status={verdict.revision_status || "Awaiting revisions"} dot={false} /></div>
         <PanelStamp verdict={verdict} />
@@ -125,7 +125,7 @@ export default function FacultyResearchWorkspace({ advisees = [], panels = [], r
     </Card>}
 
     {showPanels && <Card pad="none" className="p-6">
-      <SectionTitle title="Panel papers and defense verdicts" subtitle="Documents and verdict actions are limited to your assigned panel records" icon={Users} />
+      <SectionTitle title="Panel papers and defense verdicts" icon={Users} />
       {!panelRows.length ? <EmptyState icon={Users} title={view === "verdicts" ? "No scheduled defenses" : "No panel assignments"} hint={view === "verdicts" ? "Verdict forms appear here once a defense is scheduled for a panel you chair." : "Assigned student papers and chair actions will appear here."} /> : <div className="mt-4 space-y-4">{panelRows.map((panel) => {
         const scheduleId = panel.defense?.id;
         const draft = drafts[scheduleId] || {};

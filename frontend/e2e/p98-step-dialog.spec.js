@@ -154,7 +154,7 @@ test.describe("one step dialog, staff", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     // the scope note is part of the page description now, not a line of its own under the header
     await expect(page.locator("main p.meta").filter({ hasText: /^Practicum applies to Psychology and MSGC students only/ })).toHaveCount(0);
-    await expect(page.getByText(/Psychology and MSGC/).first()).toBeVisible();
+    await expect(page.getByText(/Psychology and MSGC/)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23 (IM58): the scope is in Help
     await page.goto("/workflow/graduation");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(page.getByText(/AC checks coursework/)).toHaveCount(0);

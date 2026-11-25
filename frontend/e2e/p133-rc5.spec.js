@@ -15,8 +15,8 @@ test.use({ storageState: authFile("research-coordinator"), viewport: { width: 13
 
 async function anaId(page) {
   const overview = await (await page.request.get("/api/research-gate/overview")).json();
-  const ana = overview.items.find((row) => row.student.name === "Ana Abad");
-  expect(ana?.state, "Ana Abad is Ready on the Research Gate").toBe("ready");
+  const ana = overview.items.find((row) => row.student.name === "Nicolas Valdez");
+  expect(ana?.state, "Nicolas Valdez is Ready on the Research Gate").toBe("ready");
   return ana.student.id;
 }
 
@@ -38,8 +38,8 @@ test("I-388: the Research Coordinator home lists Ready students under Needs your
 test("I-387: the student search says Ready for a Ready student", async ({ page }) => {
   await anaId(page);
   await page.goto("/workflow/panel-matching");
-  await page.getByLabel("Search a student").fill("Abad");
-  const option = page.getByRole("button", { name: /Ana Abad/ });
+  await page.getByLabel("Search a student").fill("Valdez");
+  const option = page.getByRole("button", { name: /Nicolas Valdez/ });
   await expect(option).toBeVisible();
   await expect(option).toContainText("Ready");
   await expect(option).not.toContainText("Missing Requirements");

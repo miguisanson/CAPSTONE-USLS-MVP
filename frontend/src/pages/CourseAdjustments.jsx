@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, Check, CheckCircle2, Circle, ClipboardList, Download, Eye, Send, Settings2, Users } from "lucide-react";
 import { api } from "../api";
 import {
@@ -9,9 +9,9 @@ import {
   EmptyState,
   EnrollmentBanner,
   Field,
+  FilterBar,
   InlineNotice,
   Input,
-  SearchInput,
   Select,
   SectionCard,
   Spinner,
@@ -24,8 +24,6 @@ import { useConfirm } from "../components/confirm";
 import { formatDate as formatSharedDate } from "../lib/format";
 import FacultyAssignmentProfile from "../components/FacultyAssignmentProfile";
 import {
-  NeedsMeaning,
-  SubjectNeedsSummary,
   courseMatches,
   downloadSubjectNeedsCsv,
   formatGeneratedAt,
@@ -40,6 +38,7 @@ const STEPS = ["Draft", "Submitted", "Approved", "Published"];
 // The page's title, tabs and rules block belong to CoursePlanning; this is the "Demand & adjustments" screen.
 // No course here runs more than six sections; a larger suggestion from the demand count is still allowed.
 const MOST_SECTIONS = 6;
+const TEACHING_LOAD_LIMIT = 24; // the default of the business rule faculty.teaching_load_limit_units
 
 export default function CourseAdjustments() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -52,6 +51,7 @@ export default function CourseAdjustments() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [actionError, setActionError] = useState(""); // a save, submit or publish the server refused
   const [message, setMessage] = useState("");
   const [sel, setSel] = useState({});
   const [autosave, setAutosave] = useState("idle");
@@ -66,6 +66,7 @@ export default function CourseAdjustments() {
   function load(pid, tid) {
     setLoading(true);
     setError("");
+    setActionError("");
     Promise.all([
       api.courseAdjustments({ program_id: pid || undefined, term_id: tid || undefined }),
       api.subjectNeedsReport({ program_id: pid || undefined, term_id: tid || undefined }),
@@ -107,7 +108,7 @@ export default function CourseAdjustments() {
   async function saveDraft(showMessage = true) {
     if (!programId) return;
     setBusy("draft");
-    setError("");
+    setActionError("");
     if (showMessage) setMessage("");
     try {
       const payload = {
@@ -130,7 +131,7 @@ export default function CourseAdjustments() {
       setAutosave("saved");
       if (showMessage) setMessage(res.message);
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message); // a refused save is said next to the plan buttons; the page stays
       setAutosave("idle");
     } finally {
       setBusy("");
@@ -150,7 +151,7 @@ export default function CourseAdjustments() {
     }[action];
     if (ask && !(await confirm(ask))) return;
     setBusy(action);
-    setError("");
+    setActionError("");
     setMessage("");
     try {
       if (action === "submit" && dirtyRef.current && canEdit) {
@@ -168,7 +169,7 @@ export default function CourseAdjustments() {
       dirtyRef.current = false;
       setAutosave("idle");
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message);
     } finally {
       setBusy("");
     }
@@ -188,6 +189,48 @@ export default function CourseAdjustments() {
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autosave, sel, canEdit]);
+
+  // Owner 2026-11-25: autofill. While the plan can be edited, an offered subject with no faculty chosen gets the first
+  // suggested faculty member who still has room: the teaching-load limit counts this plan's choices too, so one
+  // person is not given every subject (the server refuses a plan past the limit). Not saved on its own: the next save
+  // or submit carries it, and the coordinator can still change or clear it. Runs once per program and semester, so a
+  // cleared choice stays cleared after a save.
+  const autofilledFor = useRef(null);
+  useEffect(() => {
+    const planKey = data ? `${data.program?.id}|${data.term?.id}` : null;
+    if (!planKey || !canEdit || autofilledFor.current === planKey) return;
+    autofilledFor.current = planKey;
+    const known = new Set((data.faculty_profiles || []).map((faculty) => faculty.id));
+    const limit = data.faculty_profiles?.[0]?.teaching_load_limit || TEACHING_LOAD_LIMIT; // the rule's current value
+    let filled = false;
+    setSel((current) => {
+      const next = { ...current };
+      const rows = data.demand || [];
+      const units = (row, choice) => (Number(row.course.units) || 3) * Math.max(Number(choice.sections) || 1, 1);
+      // load outside this plan (the candidates' current_load) plus what this plan already gives each person
+      const outside = {};
+      rows.forEach((row) => (row.faculty_candidates || []).forEach((c) => { outside[c.id] = c.current_load || 0; }));
+      const planned = {};
+      rows.forEach((row) => {
+        const choice = next[row.course.id] || defaultSelection(row);
+        const id = String(choice.facultyId || "");
+        if (choice.offer && id) planned[id] = (planned[id] || 0) + units(row, choice);
+      });
+      rows.forEach((row) => {
+        const existing = next[row.course.id] || defaultSelection(row);
+        if (!existing.offer || existing.facultyId) return;
+        const need = units(row, existing);
+        const pick = (row.faculty_candidates || []).find((c) => (!known.size || known.has(c.id))
+          && (outside[c.id] || 0) + (planned[String(c.id)] || 0) + need <= limit);
+        if (!pick) return; // nobody has room: left Unassigned for the coordinator
+        planned[String(pick.id)] = (planned[String(pick.id)] || 0) + need;
+        next[row.course.id] = { ...existing, facultyId: String(pick.id) };
+        filled = true;
+      });
+      return filled ? next : current;
+    });
+    if (filled) dirtyRef.current = true;
+  }, [data, canEdit]);
 
   function toggleOffer(row) {
     if (!canEdit) return;
@@ -222,12 +265,12 @@ export default function CourseAdjustments() {
 
   const offeredCount = useMemo(() => Object.values(sel).filter((s) => s.offer).length, [sel]);
 
-  // I-069: a suggestion is only worth printing on a row when it tells subjects apart. When every subject has the same
-  // suggested faculty member it is said once above the table instead of on every row.
+  // I-069: a suggestion is only worth printing on a row when it tells subjects apart. Owner 2026-11-25: the suggested
+  // faculty member is filled in for every offered subject that has none (see the effect below), so the old
+  // "Suggested faculty for every subject" line above the table is gone.
   // I-117: the plan's demand rows and the subject-needs report are ONE list of subjects.
   const demandRows = useMemo(() => mergeSubjectNeeds(data?.demand || [], subjectNeedsReport), [data, subjectNeedsReport]);
   const suggestionNames = [...new Set(demandRows.map((row) => row.faculty_candidates?.[0]?.name).filter(Boolean))];
-  const sameSuggestion = suggestionNames.length === 1 ? suggestionNames[0] : "";
   const showRowSuggestions = suggestionNames.length > 1;
   const detailRow = demandRows.find((row) => row.course.id === detailId) || null;
   const reviewed = subjectNeedsReport?.summary?.students_reviewed || 0;
@@ -263,11 +306,13 @@ export default function CourseAdjustments() {
     {
       key: "need",
       header: "Needing next term",
+      headerWrap: true, // two lines, so the table fits its card at 1366
       align: "right",
       sortable: true,
       sortValue: (row) => row.needs.need,
       cell: (row) => (
-        <div className="flex items-center justify-end gap-2" title={`${row.needs.need} of ${reviewed} reviewed students need it next term`}>
+        // the retake note sits under the number so the column stays narrow and the table fits its card at 1366
+        <div className="flex flex-col items-end leading-tight" title={`${row.needs.need} of ${reviewed} reviewed students need it next term`}>
           <span className="font-semibold text-brand-700">{row.needs.need}</span>
           {row.needs.retakes > 0 && <span className="meta">{row.needs.retakes} retake{row.needs.retakes === 1 ? "" : "s"}</span>}
         </div>
@@ -275,6 +320,7 @@ export default function CourseAdjustments() {
     },
     {
       key: "not_taken",
+      headerWrap: true,
       header: "Not taken yet",
       align: "right",
       sortable: true,
@@ -393,7 +439,6 @@ export default function CourseAdjustments() {
 
           <SectionCard
             title="Adjustments and subject demand"
-            subtitle="Demand is recalculated automatically from the current student records. The coordinator remains responsible for every offering and faculty decision."
           >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="Program">
@@ -415,19 +460,13 @@ export default function CourseAdjustments() {
                 />
               </Field>
             </div>
-            <InlineNotice tone="info" title="Subject needs are calculated automatically">
-              Counts below update with the selected program and semester. The counts support the decision; the counts do not publish an offering or assign a faculty member by themselves.
-            </InlineNotice>
           </SectionCard>
 
           <Card className="space-y-4">
             <Stepper steps={planSteps} title="Offering plan progress" />
-            <p className="text-sm text-slate-600">{planStatusNote(data.latest_plan)}</p>
-            <p className="meta">This is the Dean's approval of which subjects are offered. The Academic Coordinator approves and publishes the class schedule on <Link to="/course-adjustments?view=offerings" className="font-semibold text-brand-700 underline">Offering setup</Link>.</p>
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-4">
-              <p className="text-sm text-slate-600">
-                Demand numbers are guidance. Every curriculum subject remains available for a manual offering decision.
-              </p>
+            {/* CHANGED BY owner feedback 2026-11-23: no Draft note, no Dean/Offering setup line, no "Demand numbers are guidance" */}
+            {planStatusNote(data.latest_plan) && <p className="text-sm text-slate-600">{planStatusNote(data.latest_plan)}</p>}
+            <div className="flex flex-wrap items-center justify-end gap-3 rounded-xl bg-slate-50 p-4">
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" loading={busy === "draft"} onClick={() => planAction("draft")} icon={Settings2} disabled={!canEdit} title={period?.closed ? period.reason : undefined}>
                   {status === "Draft" || status === "Returned" ? "Update draft" : "Save draft"} ({offeredCount} offered)
@@ -447,9 +486,10 @@ export default function CourseAdjustments() {
             </div>
             {!canManage && (
               <InlineNotice tone="neutral">
-                Graduate School Staff have read-only access. An Academic Coordinator can change, submit, and publish the offering plan.
+                Read only. An Academic Coordinator changes, submits and publishes the plan.
               </InlineNotice>
             )}
+            {actionError && <InlineNotice tone="danger" onDismiss={() => setActionError("")}>{actionError}</InlineNotice>}
             {message && <InlineNotice tone="success" onDismiss={() => setMessage("")}>{message}</InlineNotice>}
             {autosave !== "idle" && <p className="meta font-semibold" role="status">{autosave === "pending" ? "Draft changes pending…" : autosave === "saving" ? "Saving…" : "Saved"}</p>}
             {data.latest_plan && (
@@ -461,8 +501,9 @@ export default function CourseAdjustments() {
           </Card>
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard icon={ClipboardList} label="Curriculum subjects" value={data.summary.curriculum_subjects ?? data.demand.length} tone="success" />
-            <StatCard icon={Users} label="Affected students" value={data.summary.affected_students ?? 0} tone="info" />
+            {/* IM58: the next-term numbers (the summary line that said them under the table is gone) */}
+            <StatCard icon={ClipboardList} label="Subjects needed next term" value={subjectNeedsReport?.summary?.subjects_with_need ?? 0} tone="success" />
+            <StatCard icon={Users} label="Student seats needed" value={subjectNeedsReport?.summary?.student_subject_needs ?? 0} tone="info" />
             <StatCard icon={AlertTriangle} label="Delayed if withheld" value={data.summary.students_delayed_if_not_offered ?? 0} tone="warning" />
             <StatCard icon={Settings2} label="Selected to offer" value={offeredCount} tone="success" />
           </div>
@@ -482,27 +523,18 @@ export default function CourseAdjustments() {
                 Download CSV
               </Button>
             </div>
-            <SubjectNeedsSummary summary={subjectNeedsReport.summary} />
-            <NeedsMeaning />
-            {sameSuggestion && (
-              <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                <span className="font-semibold text-brand-700">{sameSuggestion}</span> is the same suggested faculty member for every subject (from preferences, availability, specialization and teaching load), so it is not repeated on each row. Choose the faculty member for each subject below.
-              </p>
-            )}
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <SearchInput
-                value={query}
-                onChange={setQuery}
-                placeholder="Search a subject or a student"
-                label="Search subjects or students"
-                className="min-w-0 sm:w-72"
-              />
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Show subjects">
-                <FilterPill active={group === "all"} onClick={() => setGroup("all")}>All subjects ({groupCounts.all})</FilterPill>
-                <FilterPill active={group === "due"} onClick={() => setGroup("due")}>Needed next term ({groupCounts.due})</FilterPill>
-                <FilterPill active={group === "later"} onClick={() => setGroup("later")}>Later in the curriculum ({groupCounts.later})</FilterPill>
-              </div>
-            </div>
+            <FilterBar
+              search={{ value: query, onChange: setQuery, placeholder: "Search a subject or a student", label: "Search subjects or students" }}
+              active={[query, group !== "all"].filter(Boolean).length}
+              onClear={() => { setQuery(""); setGroup("all"); }}
+              chips={(
+                <span className="flex flex-wrap gap-2" role="group" aria-label="Show subjects">
+                  <FilterPill active={group === "all"} onClick={() => setGroup("all")}>All subjects ({groupCounts.all})</FilterPill>
+                  <FilterPill active={group === "due"} onClick={() => setGroup("due")}>Needed next term ({groupCounts.due})</FilterPill>
+                  <FilterPill active={group === "later"} onClick={() => setGroup("later")}>Later in the curriculum ({groupCounts.later})</FilterPill>
+                </span>
+              )}
+            />
             <DataTable
               caption="Course offering decisions: one row per curriculum subject with students needing it, decision, sections and faculty"
               columns={columns}
@@ -577,12 +609,12 @@ function defaultSelection(row) {
 }
 
 function planStatusNote(plan) {
-  if (!plan || plan.status === "Draft") return "Draft saved. Review the demand list and submit when ready.";
+  if (!plan || plan.status === "Draft") return "";
   if (plan.status === "Submitted") return `Submitted to Dean on ${formatDate(plan.submitted_at)}. Awaiting decision.`;
   if (plan.status === "Returned") return `Returned by Dean on ${formatDate(plan.updated_at)}. Revise and resubmit.`;
   if (plan.status === "Approved") return `Approved by ${plan.approved_by || "Dean"} on ${formatDate(plan.approved_at)}.`;
   if (plan.status === "Published") return `Published on ${formatDate(plan.published_at)}.`;
-  return "Review the demand list and submit when ready.";
+  return "";
 }
 
 function formatDate(value) {

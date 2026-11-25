@@ -3,20 +3,22 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ListTodo, AlertTriangle, Flag, CheckCircle2, ShieldCheck, RefreshCw, ArrowRight, ShieldAlert } from "lucide-react";
 import { api } from "../api";
 import { useApi } from "../hooks";
-import { Button, Card, DataTable, EmptyState, Field, InlineNotice, PageHeader, Pagination, SearchInput, SkeletonTable, StatCard, StatusChip, Textarea } from "../components/ui/index.js";
+import { Button, Card, DataTable, EmptyState, Field, FilterBar, FilterSelect, InlineNotice, PageHeader, Pagination, SkeletonTable, StatCard, StatusChip, Textarea } from "../components/ui/index.js";
 import { formatDate, relativeDays, SEVERITY } from "../lib/format";
 import { useAuth } from "../auth";
 import { PAGE, openPageLabel } from "../lib/labels.js";
-import { taskTarget } from "../lib/staffHome.js";
+import { officeOf, sortByUrgency, taskTarget } from "../lib/staffHome.js";
+import { arrowLabel } from "../components/RoleHome.jsx";
 
 const OWNERS = ["Graduate School Staff", "Academic Coordinator", "Research Coordinator", "Dean", "Student"];
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 200; // the most the tasks API returns; the rows are sorted like the home's list (UX-24)
 const CONFLICT_ROLES = ["staff", "academic_coordinator"];
-const ACCOUNT_OWNER = {
-  staff: "Graduate School Staff",
-  academic_coordinator: "Academic Coordinator",
-  research_coordinator: "Research Coordinator",
-};
+// UX-23 (Phase 4): whose tasks. Mine is the default; the home's "Needs your action" is its first rows (UX-24).
+const VIEWS = [
+  { key: "mine", label: "Mine" },
+  { key: "others", label: "Waiting on others" },
+  { key: "all", label: "All" },
+];
 
 export default function WorkQueue() {
   const { user } = useAuth();
@@ -36,7 +38,6 @@ export default function WorkQueue() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.workQueue}
-        description="Everything that needs attention in one place — pending tasks, students at risk of delay with the next step for each, and open monitoring conflicts."
       />
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200">
@@ -161,73 +162,116 @@ const AT_RISK_COLUMNS = [
 
 function TasksPanel({ user }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [owner, setOwner] = useState(searchParams.get("owner") || (user?.role === "staff" ? "" : ACCOUNT_OWNER[user?.role] || ""));
+  const office = officeOf(user?.role);
+  // Old links: ?owner=<this office> is Mine, ?owner= (empty) is All, ?owner=<another office> is Waiting on others for it.
+  const [view, setView] = useState(() => {
+    const asked = searchParams.get("view");
+    if (VIEWS.some((v) => v.key === asked)) return asked;
+    if (!searchParams.has("owner")) return "mine";
+    const owner = searchParams.get("owner");
+    return owner === "" ? "all" : owner === office ? "mine" : "others";
+  });
+  const [owner, setOwner] = useState(() => {
+    const asked = searchParams.get("owner") || "";
+    return asked && asked !== office ? asked : "";
+  });
   const [status, setStatus] = useState(searchParams.get("status") || "");
   // ?q= pre-fills the search box (the staff home's grouped alert row links here with the alert's title)
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [page, setPage] = useState(1);
-  const { data, loading, error } = useApi(() => api.tasks({ owner, status, page, page_size: PAGE_SIZE }), [owner, status, page]);
+  const params = view === "mine" ? { owner: office } : view === "others" ? { not_owner: office, owner } : { owner };
+  const { data, loading, error } = useApi(() => api.tasks({ ...params, status, page, page_size: PAGE_SIZE }), [view, owner, status, page]);
   const items = data?.items || [];
   const total = data?.total ?? items.length;
   const currentPage = data?.page || page;
   const pageSize = data?.page_size || PAGE_SIZE;
   const pages = data?.pages || Math.max(1, Math.ceil(total / pageSize));
-  const filtered = items.filter((task) => `${task.title} ${task.student_name || ""} ${task.owner_role}`.toLowerCase().includes(query.toLowerCase()));
+  const filtered = sortByUrgency(items.filter((task) => `${task.title} ${task.student_name || ""} ${task.owner_role}`.toLowerCase().includes(query.toLowerCase())));
   const canOpenStudent = CONFLICT_ROLES.includes(user?.role);
+  const yours = (task) => String(task.owner_role || "").trim() === office;
 
   const columns = [
-    { key: "title", header: "Task", cell: (task) => <span className="font-semibold text-ink">{task.title}</span> },
-    { key: "owner_role", header: "Owner" },
+    { key: "title", header: "Task", sortValue: (task) => task.title, cell: (task) => <span className={yours(task) ? "font-semibold text-ink" : "font-medium"}>{task.title}</span> },
+    // IM50: on Mine every row is this office's, so the Owner column would say the same thing on every row
+    ...(view === "mine" ? [] : [{ key: "owner_role", header: "Owner" }]),
     {
       key: "student_name",
       header: "Student",
+      sortValue: (task) => task.student_name || "",
       cell: (task) =>
         !task.student_id ? null : canOpenStudent ? (
           <Link to={`/students/${task.student_id}`} className="font-semibold text-brand-700 hover:underline">{task.student_name}</Link>
         ) : (
-          <span className="font-semibold text-ink">{task.student_name}</span>
+          <span className="font-semibold">{task.student_name}</span>
         ),
     },
     {
       key: "due_at",
       header: "Due",
+      sortValue: (task) => task.due_at || "",
       cell: (task) => (
-        <>
-          {formatDate(task.due_at)} <span className="text-slate-500">· {relativeDays(task.due_at)}</span>
-        </>
+        // UX-13: "Overdue since <date>" in red says it once; no second Overdue chip
+        task.overdue
+          ? <span className="font-semibold text-red-700">Overdue since {formatDate(task.due_at)}</span>
+          : <>{formatDate(task.due_at)} <span className="text-slate-500">· {relativeDays(task.due_at)}</span></>
       ),
     },
-    { key: "status", header: "Status", cell: (task) => <StatusChip status={task.overdue ? "Overdue" : task.status} dot={false} /> },
     {
       key: "action",
-      header: "Action",
+      header: <span className="sr-only">Open</span>,
+      align: "right",
       cell: (task) => <ActionCell task={task} role={user?.role} />,
     },
   ];
 
-  function updateFilter(next) {
-    const merged = { owner, status, ...next };
-    setOwner(merged.owner || "");
+  function update(next) {
+    const merged = { view, owner, status, ...next };
+    setView(merged.view);
+    setOwner(merged.view === "mine" ? "" : merged.owner || "");
     setStatus(merged.status || "");
     setPage(1);
-    const params = {};
-    if (merged.owner) params.owner = merged.owner;
-    if (merged.status) params.status = merged.status;
-    if (query) params.q = query;
-    setSearchParams(params, { replace: true });
+    const search = { view: merged.view };
+    if (merged.view !== "mine" && merged.owner) search.owner = merged.owner;
+    if (merged.status) search.status = merged.status;
+    if (query) search.q = query;
+    setSearchParams(search, { replace: true });
   }
+  const ownerChoices = OWNERS.filter((o) => view !== "others" || o !== office);
 
   return (
     <div className="page-stack">
-      <SearchInput value={query} onChange={setQuery} placeholder="Search task, student, or owner…" label="Search work queue" className="max-w-xl" />
-
-      <div className="flex flex-wrap gap-2">
-        <FilterChip active={owner === ""} onClick={() => updateFilter({ owner: "" })}>All owners</FilterChip>
-        {OWNERS.map((o) => (
-          <FilterChip key={o} active={owner === o} onClick={() => updateFilter({ owner: o })}>{o}</FilterChip>
+      <div role="tablist" aria-label="Whose tasks" className="inline-flex w-fit flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+        {VIEWS.map((v) => (
+          <button
+            key={v.key}
+            type="button"
+            role="tab"
+            aria-selected={view === v.key}
+            onClick={() => update({ view: v.key, owner: "" })}
+            className={`min-h-9 cursor-pointer rounded-lg px-3 text-sm font-semibold transition ${view === v.key ? "bg-white text-ink shadow-sm" : "text-slate-600 hover:text-ink"}`}
+          >
+            {v.label}
+          </button>
         ))}
-        <FilterChip active={status === "Overdue"} onClick={() => updateFilter({ status: status === "Overdue" ? "" : "Overdue" })}>Overdue only</FilterChip>
       </div>
+
+      <FilterBar
+        search={{ value: query, onChange: setQuery, placeholder: "Task, student or owner", label: "Search work queue" }}
+        active={[query, view !== "mine" && owner, status].filter(Boolean).length}
+        onClear={() => { setQuery(""); update({ owner: "", status: "" }); }}
+        chips={<FilterChip active={status === "Overdue"} onClick={() => update({ status: status === "Overdue" ? "" : "Overdue" })}>Overdue only</FilterChip>}
+      >
+        {view !== "mine" && (
+          <FilterSelect
+            label="Office"
+            value={owner}
+            onChange={(event) => update({ owner: event.target.value })}
+            aria-label="Filter by office"
+            placeholder={view === "others" ? "Every other office" : "Every office"}
+            options={ownerChoices}
+          />
+        )}
+      </FilterBar>
 
       {error ? (
         <InlineNotice tone="danger" title="Could not load tasks">{error}</InlineNotice>
@@ -239,29 +283,43 @@ function TasksPanel({ user }) {
           rowKey="id"
           loading={loading}
           pageSize={0}
-          empty={{ icon: ListTodo, title: "No tasks match the selected filters", hint: "Clear a filter or broaden the search." }}
+          stackOnPhone // a phone shows each task as a card, the arrow in reach (no sideways scroll)
+          // finding 15: a header click sorts; until then the rows keep the home's order (most urgent first)
+          // UX-23: a task another office holds is greyed; the Owner column says who holds it
+          rowProps={(task) => (yours(task) ? {} : { "data-not-yours": "true", className: "text-slate-500" })}
+          empty={{ icon: ListTodo, title: "No tasks match the selected filters" }}
         />
       )}
 
       {!loading && !error && total > 0 && (
-        <Pagination page={currentPage} pageCount={pages} total={total} pageSize={pageSize} shown={items.length} onPage={setPage} />
+        <Pagination page={currentPage} pageCount={pages} total={total} pageSize={pageSize} shown={items.length} onPage={setPage} noun={total === 1 ? "task" : "tasks"} />
       )}
     </div>
   );
 }
 
-// The Action column always says something (finding 15): the page that handles the task, or who acts when it is not this
-// office's. A Dean task has a Dean-only page the other roles cannot open, so it says who decides.
+// UX-23 (owner 2026-11-20): the task's title says what to do, so the link is an arrow named for screen readers, as on
+// the home. A Dean task has a Dean-only page the other roles cannot open, so it has no arrow; the Owner column says who.
 function ActionCell({ task, role }) {
-  if (task.action_url) {
-    return <Link to={task.action_url} className="font-semibold text-brand-700 hover:underline">{openPageLabel(task.action_url, task.action_label || "Open")}</Link>;
-  }
   const owner = String(task.owner_role || "").trim();
-  if (owner === "Dean") return <span className="text-slate-600">Dean decides</span>;
-  if (owner === "Student") return <span className="text-slate-600">Student acts</span>;
-  const target = taskTarget(task, role);
-  if (target.to.split("?")[0] === "/work-queue") return <span className="text-slate-500">No linked page</span>;
-  return <Link to={target.to} className="font-semibold text-brand-700 hover:underline">{target.label}</Link>;
+  let target = null;
+  if (task.action_url) target = { to: task.action_url, label: openPageLabel(task.action_url, task.action_label || "Open") };
+  else if (owner !== "Dean" && owner !== "Student") {
+    const page = taskTarget(task, role);
+    if (page.to.split("?")[0] !== "/work-queue") target = page;
+  }
+  if (!target) return null;
+  const name = arrowLabel(target.label, task.title);
+  return (
+    <Link
+      to={target.to}
+      aria-label={name}
+      title={name}
+      className="inline-grid h-9 w-9 place-items-center rounded-lg text-brand-700 transition hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 max-sm:h-11 max-sm:w-11"
+    >
+      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+    </Link>
+  );
 }
 
 function ConflictsPanel({ state }) {

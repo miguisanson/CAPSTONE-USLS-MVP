@@ -52,14 +52,16 @@ PROGRAMS = [
 ]
 
 # What each demo paper is about, and who should come out on top.
+# CHANGED BY data cleanup (IM56, 2026-11-22): the panel queue is MAED with education theses and seven faculty; the
+# expected leader is the subject expert who is not the student's own adviser.
 PAPERS = {
-    "2690101": ({"Dr. Adriana Santos"}, {"nursing", "health", "medication", "patient", "telehealth", "hypertension"}),
+    "2690101": ({"Dr. Celeste Tan"}, {"burnout", "well-being", "motivation", "psychological", "health", "coping"}),
     "2690102": ({"Dr. Celeste Tan"}, {"burnout", "well-being", "motivation", "psychology", "psychological"}),
-    "2690103": ({"Dr. Daniel Uy"}, {"maintenance", "sensor", "fault", "energy", "machine learning", "automation"}),
-    "2690104": ({"Dr. Benjamin Reyes"}, {"wallet", "fintech", "financial technology", "savings", "payment", "accounting"}),
-    "2690105": ({"Dr. Marco Villanueva"}, {"supply chain", "inventory", "simulation", "logistics", "forecasting", "quality"}),
+    "2690103": ({"Dr. Liwayway Bautista"}, {"learning analytics", "dashboard", "engagement", "participation", "persistence"}),
+    "2690104": ({"Dr. Benjamin Reyes"}, {"wallet", "savings", "financial", "accounting", "small and medium"}),
+    "2690105": ({"Dr. Benjamin Reyes"}, {"financial", "accounting", "small and medium", "family-owned", "savings"}),
     "2690106": ({"Dr. Angela Cruz"}, {"family business", "succession", "governance", "entrepreneur", "strategic"}),
-    "2690107": ({"Dr. Teresa Lim"}, {"marketing", "consumer", "brand", "purchase intention", "social media", "retail"}),
+    "2690107": ({"Dr. Patricia Salvador"}, {"online", "instructional design", "learning management system", "curriculum"}),
 }
 
 
@@ -127,7 +129,7 @@ class PanelMatchingTests(unittest.TestCase):
             rankings = {}
             for number, (expected_top, field_terms) in PAPERS.items():
                 rows = self._rank(number)
-                self.assertGreaterEqual(len(rows), 8, number)
+                self.assertGreaterEqual(len(rows), 6, number)  # CHANGED BY data cleanup (IM56): seven faculty, less the adviser
                 rankings[number] = rows
                 top_four = rows[:4]
                 scores = [row["score"] for row in top_four]
@@ -186,12 +188,12 @@ class PanelMatchingTests(unittest.TestCase):
 
     def test_expertise_records_change_the_ranking(self):
         with app.app_context():
-            uy = self._faculty("Dr. Daniel Uy")
+            uy = self._faculty("Dr. Marlon Geronimo")  # CHANGED BY data cleanup (IM56): Dr. Daniel Uy left the demo roster
             before = self._rank("2690101")
             before_rank = [r["faculty"].name for r in before].index(uy.name)
             db.session.add(FacultyExpertise(
                 faculty_id=uy.id, kind="publication", year=2025, source="manual entry",
-                text="Text-message reminders and medication adherence among patients with hypertension: telehealth follow-up study",
+                text="Teacher burnout, coping and psychological well-being in public senior high schools: a survey of teachers",
             ))
             db.session.commit()
             after = self._rank("2690101")
@@ -217,7 +219,7 @@ class PanelMatchingTests(unittest.TestCase):
         with app.app_context():
             student = self._student("2690101")
             best = self._rank("2690101")[0]["faculty"]
-            self.assertEqual(best.name, "Dr. Adriana Santos")
+            self.assertEqual(best.name, "Dr. Celeste Tan")  # CHANGED BY data cleanup (IM56)
             app_module.AdviserAssignment.query.filter_by(student_id=student.id).delete()
             student.adviser_name = best.name
             db.session.commit()
@@ -226,20 +228,29 @@ class PanelMatchingTests(unittest.TestCase):
             self.assertEqual([item["faculty_name"] for item in result["excluded"]], [best.name])
             self.assertNotIn(best.id, [seat["faculty_id"] for seat in result["suggested_panel"]])
             # A co-adviser named on the student record is excluded too.
-            student.adviser_name = "Dr. Teodoro Ramos; Dr. Adriana Santos"
+            student.adviser_name = "Dr. Teodoro Ramos; Dr. Celeste Tan"
             db.session.commit()
             result = panel_matching_result(student)
             self.assertEqual(
                 {item["faculty_name"]: item["reason"] for item in result["excluded"]}.keys(),
-                {"Dr. Teodoro Ramos", "Dr. Adriana Santos"},
+                {"Dr. Teodoro Ramos", "Dr. Celeste Tan"},
             )
             self.assertTrue(any("co-adviser" in item["reason"].lower() for item in result["excluded"]))
 
     def test_panel_composition_follows_the_research_protocol(self):
         with app.app_context():
-            project_paper = self._student("2690102")   # MAPSY = project paper
-            thesis = self._student("2690101")          # MSN = thesis
-            dissertation = self._student("2690106")    # DBA = dissertation
+            # CHANGED BY data cleanup (IM56): the panel queue is all MAED (thesis), so the test makes a MAPSY project-paper
+            # student and a DBA dissertation student of its own.
+            thesis = self._student("2690101")          # MAED = thesis
+            project_paper, dissertation = (
+                app_module.Student(student_number=number, first_name="Dana", last_name=last, current_stage="Proposal Development",
+                                   email=f"dana.{last.lower()}@student.usls.edu.ph", entry_year=2025, academic_year_entry="25-26",
+                                   year_level="1st Year",
+                                   program_id=app_module.Program.query.filter_by(code=code).one().id)
+                for number, last, code in (("2699901", "Project", "MAPSY"), ("2699902", "Doctoral", "DBA"))
+            )
+            db.session.add_all([project_paper, dissertation])
+            db.session.flush()
             self.assertEqual(panel_roles_for_student(project_paper), ["Panel Chair", "Content Specialist", "Method Specialist"])
             self.assertEqual(len(panel_roles_for_student(thesis)), 4)
             self.assertEqual(
@@ -361,7 +372,7 @@ class PanelMatchingTests(unittest.TestCase):
                 self.assertEqual(len(papers), 3, number)
                 self.assertEqual(len({p.extracted_text for p in papers}), 3, number)
             self.assertGreaterEqual(len(PAPERS), 6)
-            self.assertGreaterEqual(len(programs), 5)
+            self.assertEqual(programs, {"MAED"})  # CHANGED BY data cleanup (IM56): the panel queue is all MAED now
             # Later-stage students are waiting at the proposal gate with a manuscript.
             proposal_students = [n for n in PAPERS if self._student(n).current_stage == "Proposal Defense"]
             self.assertGreaterEqual(len(proposal_students), 2)

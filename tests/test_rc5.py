@@ -47,7 +47,7 @@ class Rc5Tests(unittest.TestCase):
     # I-387
     def test_student_picker_status_agrees_with_the_research_gate(self):
         with app.app_context():
-            ana = next(s for s in Student.query.all() if s.name == "Ana Abad")
+            ana = next(s for s in Student.query.all() if s.name == "Nicolas Valdez")
             row = next(r for r in research_gate_overview_rows() if r["student"]["id"] == ana.id)
             self.assertEqual(row["state"], "ready")
             self.assertEqual(student_directory_brief(ana)["readiness_status"], "Ready")
@@ -60,13 +60,13 @@ class Rc5Tests(unittest.TestCase):
         # the student picker sends readiness=live (I-387); the plain list keeps the stored status so its query
         # count does not grow with the page size (test_v53_backend2)
         staff = self.client_for("staff@usls.edu.ph", "staff")
-        live = staff.get("/api/students", query_string={"q": "Ana Abad", "readiness": "live"}).get_json()["items"]
-        self.assertEqual([row["readiness_status"] for row in live if row["name"] == "Ana Abad"], ["Ready"])
+        live = staff.get("/api/students", query_string={"q": "Nicolas Valdez", "readiness": "live"}).get_json()["items"]
+        self.assertEqual([row["readiness_status"] for row in live if row["name"] == "Nicolas Valdez"], ["Ready"])
 
     # I-389
     def test_panel_load_is_one_count_on_both_screens(self):
         with app.app_context():
-            ana = next(s for s in Student.query.all() if s.name == "Ana Abad")
+            ana = next(s for s in Student.query.all() if s.name == "Nicolas Valdez")
             rows = {r["faculty"].id: r for r in panel_matching_result(ana)["rows"]}
             checked = 0
             for faculty_id, result_row in rows.items():

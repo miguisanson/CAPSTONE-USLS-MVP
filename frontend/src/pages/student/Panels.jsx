@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Activity,
   Briefcase,
   ClipboardCheck,
   FileText,
@@ -23,7 +22,7 @@ export function ProgressPanel({ data }) {
   const { stages, student, course_audit, research_case } = data;
   return (
     <Card pad="lg">
-      <SectionTitle title="My Academic Status" subtitle="Your current stage, requirements, and next step" icon={ClipboardCheck} />
+      <SectionTitle title="My Academic Status" icon={ClipboardCheck} />
       {student.standing === "On Leave" && (
         <InlineNotice tone="warning" className="mb-4">
           You are on Leave of Absence, so you cannot enroll in subjects. The time on leave still counts toward your maximum residence. Readmission becomes available while this status is active.
@@ -97,7 +96,7 @@ export function WorkflowStatusPanel({ data }) {
 
   return (
     <Card pad="lg">
-      <SectionTitle title="Workflow Status" subtitle="Administrative and completion requests currently visible to you" icon={FileText} />
+      <SectionTitle title="Workflow Status" icon={FileText} />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {rows.map((row) => {
           const Icon = row.icon;
@@ -123,7 +122,7 @@ export function AdministrativeDocumentsPanel({ documentsByGate, onSaved }) {
   if (!entries.length) return null;
   return (
     <Card pad="lg">
-      <SectionTitle title="Administrative Documents" subtitle="Admission and general records outside your research submissions" icon={FileText} />
+      {/* CHANGED BY owner feedback 2026-11-23: the page title already names it */}
       <div className="space-y-4">
         {entries.map(([gate, docs]) => (
           <div key={gate}>
@@ -227,7 +226,7 @@ export function ActivityPanel({ logs }) {
   const visibleLogs = logs || [];
   return (
     <Card pad="lg">
-      <SectionTitle title={PAGE.activityLog} subtitle="Submissions, decisions, and next owners" icon={Activity} />
+      {/* CHANGED BY owner feedback 2026-11-23: the page title already names it */}
       {visibleLogs.length ? (
         <HistoryPanel label="View logs" hideLabel="Hide logs" entries={visibleLogs.map(logEntry)} sort="given" />
       ) : (

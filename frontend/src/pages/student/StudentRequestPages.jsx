@@ -19,22 +19,10 @@ import { Button, Card, HistoryPanel, InlineNotice, PageHeader, StatusChip } from
 import { useStudentPortal } from "./StudentPortalContext";
 import { RequestSentContext, STUDENT_MESSAGE_SLUG_BY_VIEW, StudentClarificationPanel, StudentSchedulePanel, isLiveSchedule } from "./shared";
 import { BOOKABLE_DEFENSES, ResearchRequestForm, ScheduleRequestForm } from "./ResearchForms";
-import PolicyRules from "../../components/PolicyRules";
-import { programLevelOf } from "../../lib/programRules.js";
 import { forStudent } from "../../lib/status.js";
 import AdviserPanelCard from "./AdviserPanelCard";
 
 // Which business-rules process each request page applies (shown as "Rules applied").
-const STUDENT_RULE_PROCESS_BY_VIEW = {
-  research: "research",
-  loa: "loa",
-  readmission: "readmission",
-  awol: "awol_residency",
-  withdrawal: "withdrawal",
-  practicum: "practicum",
-  graduation: "graduation",
-  schedule: "defense",
-};
 import { AwolReturnRequestForm, LoaRequestForm, ReadmissionRequestForm, WithdrawalRequestForm } from "./RequestForms";
 import { GraduationRequestForm, PracticumRequestForm } from "./CompletionForms";
 import { NOT_SUBMITTED, REQUEST_GROUPS, STUDENT_REQUEST_PATHS, findRequestItem, lockedReasonFor, requestStateLabel } from "./requestMeta";
@@ -45,49 +33,41 @@ import { defenseToRequest } from "../../lib/studentHome.js";
 const REQUEST_PAGES = {
   research: {
     title: PAGE.researchProgress,
-    description: "Upload your milestone files, submit the files for review, and follow your title, proposal and final defense requirements.",
     icon: FileCheck,
     render: (data, onSaved) => <ResearchRequestForm data={data} onSaved={onSaved} />,
   },
   schedule: {
     title: PAGE.defenseSchedule,
-    description: "Request a defense date once your panel is matched. The Research Coordinator confirms a time shared by your adviser and panel.",
     icon: CalendarCheck,
     render: (data, onSaved) => <ScheduleRequestForm data={data} onSaved={onSaved} />,
   },
   loa: {
     title: PAGE.leaveOfAbsence,
-    description: "Ask for a leave of absence, or for more time on a leave you are already on. Graduate School staff check your request, then the Dean decides.",
     icon: CalendarOff,
     render: (data, onSaved) => <LoaRequestForm data={data} semesters={data.future_semesters || []} onSaved={onSaved} />,
   },
   readmission: {
     title: PAGE.readmission,
-    description: "Ask to come back to your studies when your leave of absence is ending. Staff check your request, then the Dean decides.",
     icon: UserCheck,
     render: (data, onSaved) => <ReadmissionRequestForm data={data} onSaved={onSaved} />,
   },
   awol: {
     title: PAGE.returnFromAwol,
-    description: "Submit a written intention to resume enrollment when your record is marked AWOL.",
     icon: UserX,
     render: (data, onSaved) => <AwolReturnRequestForm data={data} onSaved={onSaved} />,
   },
   withdrawal: {
     title: PAGE.subjectWithdrawal,
-    description: "Withdraw from one enrolled subject until the end of the second week of classes (fees apply). It never changes your program standing.",
     icon: LogOut,
     render: (data, onSaved) => <WithdrawalRequestForm data={data} onSaved={onSaved} />,
   },
   practicum: {
     title: PAGE.practicum,
-    description: "Submit your MOA and completion evidence for the practicum requirement (Psychology and MSGC programs).",
     icon: Briefcase,
     render: (data, onSaved) => <PracticumRequestForm data={data} onSaved={onSaved} />,
   },
   graduation: {
     title: PAGE.graduationEndorsement,
-    description: "Apply for the Graduate School graduation endorsement once coursework, research and any practicum are complete.",
     icon: GraduationCap,
     render: (data, onSaved) => <GraduationRequestForm data={data} onSaved={onSaved} />,
   },
@@ -189,7 +169,6 @@ export function StudentRequestPage({ id, aside = null }) {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={page.title}
-        description={page.description}
         icon={Icon}
         badge={<StatusChip status={id === "research" && defenseToRequest(data) ? "Waiting on you" : forStudent(requestStateLabel(requestStatus(id, data)))} dot={false} />}
         actions={
@@ -208,7 +187,7 @@ export function StudentRequestPage({ id, aside = null }) {
           </InlineNotice>
         )}
         {messageSlug && <StudentClarificationPanel slug={messageSlug} data={data} onSaved={refetch} />}
-        {STUDENT_RULE_PROCESS_BY_VIEW[id] && <PolicyRules process={STUDENT_RULE_PROCESS_BY_VIEW[id]} programLevel={programLevelOf(data.student)} className="mb-4" />}
+        {/* CHANGED BY owner feedback 2026-11-23 (IM58): the rules show on the Business Rules page only */}
         {locked ? (
           <InlineNotice tone="neutral" icon={Lock}>{lockedReasonFor(item, data)}</InlineNotice>
         ) : (
@@ -247,18 +226,17 @@ export function StudentRequestCenter() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.requestCenter}
-        description="Every request you can file, with its current status. Choose the one that matches your situation."
         icon={Send}
       />
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         {REQUEST_GROUPS.map((group) => (
           <Card key={group.title}>
             <h2 className="card-title">{group.title}</h2>
-            <p className="meta mt-1 leading-relaxed">{group.description}</p>
             <ul className="mt-4 space-y-2">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const locked = item.lockedWhen?.(data);
+                const notReady = !item.lockedWhen?.(data) && item.notReadyWhen?.(data); // UX-07: open page, locked card
+                const locked = item.lockedWhen?.(data) || notReady;
                 return (
                   <li key={item.id}>
                     <Link
@@ -270,7 +248,7 @@ export function StudentRequestCenter() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold">{item.label}</span>
-                        <span className="meta block">{locked ? lockedReasonFor(item, data) : requestStateLabel(requestStatus(item.id, data))}</span>
+                        <span className="meta block">{notReady ? item.notReadyReason : locked ? lockedReasonFor(item, data) : requestStateLabel(requestStatus(item.id, data))}</span>
                       </span>
                       {locked ? <Lock className="h-4 w-4 shrink-0 text-slate-400" aria-label="Locked" /> : <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />}
                     </Link>

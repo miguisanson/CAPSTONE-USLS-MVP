@@ -71,7 +71,6 @@ export function FacultyDashboard() {
     key: row.key,
     title: row.title,
     detail: row.detail,
-    tone: row.tone,
     to: row.target.to,
     linkLabel: row.target.label,
   });
@@ -86,17 +85,16 @@ export function FacultyDashboard() {
           badge: <StatusChip label={faculty?.college || "College"} tone="muted" dot={false} />,
         }}
         actions={actions.items.map(toRow)}
-        actionsSubtitle="Invitations, signatures, verdicts and requests that wait for you"
         actionsEmpty={{ title: "Nothing is waiting on you", hint: "No signatures, verdicts, invitations or adviser requests need you right now." }}
         waiting={{
           title: "Waiting on others",
-          subtitle: "The student or the Research Coordinator holds these. Nothing to do until that office or the student acts.",
           items: waiting.items.map(toRow),
           all: waiting.total > MAX_WAITING ? { to: "/faculty-portal/advisees", label: "View all" } : undefined,
         }}
         stats={stats}
         extra={<CalendarLink calendar={faculty?.calendar} />}
         activityTitle="Upcoming defenses"
+        activityWide /* UX-33: the schedule sits in the main column, under the actions */
         activity={upcoming}
         activityAll={{ to: "/faculty-portal/defenses", label: "View schedule" }}
         activityEmpty={{ title: "No defenses scheduled", hint: "Defenses appear here once the Research Coordinator schedules a panel you sit on." }}
@@ -120,7 +118,6 @@ export function FacultyAdviseesPage() {
       <PageHeader
         title="My Advisees"
         forms="adviser-designation"
-        description="Students you advise, the stage of each, and the research documents that need your signature."
         icon={Users}
         actions={<Button as={Link} variant="secondary" icon={FileSignature} to="/faculty-portal/signatures">Signatures</Button>}
       />
@@ -135,7 +132,6 @@ export function FacultySignaturesPage() {
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title="Signatures & Endorsements"
-        description="Review and sign the exact manuscript version uploaded by your assigned advisees."
         icon={FileSignature}
       />
       <FacultyResearchWorkspace advisees={data.advisees || []} panels={data.panels || []} refetch={refetch} view="signatures" />
@@ -149,7 +145,6 @@ export function FacultyPanelsPage() {
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title="Panel Assignments & Papers"
-        description="Students whose committee you sit on, with the papers for the assigned stage. Access is limited to your assigned panels."
         icon={FileText}
       />
       <FacultyResearchWorkspace advisees={data.advisees || []} panels={data.panels || []} refetch={refetch} view="papers" />
@@ -236,7 +231,6 @@ export function FacultyDefensesPage() {
       <PageHeader
         title="Defense Schedule"
         forms="defense-scheduling"
-        description="Defenses scheduled for the panels you sit on. Keep your availability current so staff can confirm dates."
         icon={CalendarClock}
         actions={
           <>
@@ -265,7 +259,6 @@ export function FacultyVerdictsPage() {
     <div className="space-y-5 animate-fade-up">
       <PageHeader
         title="Verdicts"
-        description="The panel chair or panel lead submits the final verdict for a scheduled defense. Graduate School staff can record the same verdict from Research Gate when needed."
         icon={Scale}
       />
       <FacultyVerdicts panels={data.panels || []} refetch={refetch} />
@@ -277,7 +270,7 @@ export function FacultyClassesPage() {
   const { data } = useFaculty();
   return (
     <div className="space-y-5 animate-fade-up">
-      <PageHeader title="Assigned Classes" description="Class rosters for your assigned subjects." icon={BookOpenCheck} />
+      <PageHeader title="Assigned Classes" icon={BookOpenCheck} />
       <Card>
         <FacultyClasses subjects={data.subjects || []} terms={data.terms || []} />
       </Card>

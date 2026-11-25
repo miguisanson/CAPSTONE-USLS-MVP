@@ -1,0 +1,1062 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  FileCheck,
+  FileText,
+  Briefcase,
+  ArrowUpRight,
+  Eye,
+  Download,
+  MessageSquare,
+  CheckSquare,
+  BookOpenCheck,
+  Printer,
+  Send,
+  Users,
+  Plus,
+} from "lucide-react";
+import { api } from "../../api";
+import { useConfirm } from "../../components/confirm";
+import { formatDate, formatDateTime } from "../../lib/format";
+import { refusalMessage, exportCountText } from "../../lib/refusal";
+import { openGmailDraft, registrarDraft } from "../../lib/mailDraft";
+import { useOpenFilters } from "../leave/useOpenFilter";
+import { Button, DataTable, EmptyState, HistoryPanel, StatusChip } from "../../components/ui/index.js";
+import WorkflowTimeline, { graduationTimelineSteps } from "../../components/WorkflowTimeline";
+import ListExportButtons from "../../components/ListExportButtons";
+import ExportFollowUpModal from "../../components/ExportFollowUpModal";
+import ExportHistory from "../../components/ExportHistory";
+import StageBoard, { BoardNotice, BoardSummary, boardSummaryLine, useBoardNotice } from "../../components/StageBoard";
+import { BoardFilterRow, BoardFrame, ViewToggle } from "../leave/LeaveFilters";
+import { CaseCardHead, GroupBadge, GroupCard, GroupOverview, MemberList, RequirementLine, StageColumnHeader, selectionWords, stageCheckSummary } from "../../components/process";
+import { GraduationBatchModal } from "./GraduationBatchModal";
+import { useIsPhone } from "../../hooks";
+import { GraduationBatchStageCheck, GraduationCompletedCourseworkView, GraduationPracticumCompletionView, GraduationRequirementBoxes, GraduationResearchRequirementsView, graduationBatchActionLabel, graduationRequirementItems, graduationBatchGroups, graduationBatchStages, graduationRowStatus, graduationStageActionForRow, graduationStageSelection, printGraduationBatch, sortSelectedWorkflowRows } from "./graduationShared";
+import { CaseMessageHistory, DemoResetButton, Detail, RosterFilters, WORKFLOW_ROLE_LABELS, WorkflowActivityList, WorkflowCaseModal, WorkflowFileHistory, WorkflowMessageModal, uniqueValues, useDemoCaseReset } from "./shared";
+
+function graduationBatchSelectionState(group, selectedIds) {
+  const selectedCount = group.rows.filter((row) => selectedIds.has(row.student.id)).length;
+  return {
+    selectedCount,
+    allSelected: selectedCount > 0 && selectedCount === group.rows.length,
+    partiallySelected: selectedCount > 0 && selectedCount < group.rows.length,
+  };
+}
+
+// Which completion details a role may open for each student of a batch.
+function graduationBatchDetailMode(group, accountRole) {
+  if (accountRole === "academic_coordinator" && group.boardStatus === "Coursework Review") return "coursework";
+  if (group.boardStatus === "Research Review") return "research-practicum";
+  if (["Eligibility Confirmed", "Endorsement Prepared", "Returned for Revision", "Ready for Dean Review", "Dean Approved"].includes(group.boardStatus)) return "all-completion";
+  return "";
+}
+
+// The students of one batch as the shared member list: requirement boxes, discussion count, View, the detail toggles the
+// signed-in role may open, and Message / Return.
+function GraduationBatchStudentList({ rows, onOpenStudent, onMessageStudent, detailMode = "" }) {
+  const showCoursework = ["coursework", "all-completion"].includes(detailMode);
+  const showResearchPracticum = ["research-practicum", "all-completion"].includes(detailMode);
+  const members = rows.map((row) => ({
+    id: row.student.id,
+    title: row.student.name,
+    subtitle: `${row.student.student_number} · ${row.student.program_code}`,
+    chip: <StatusChip status={graduationRowStatus(row)} dot={false} />,
+    badges: !row.has_submitted_documents ? <GroupBadge>Waiting for documents</GroupBadge> : null,
+    ready: Boolean(row.has_submitted_documents),
+    boxes: <GraduationRequirementBoxes row={row} />,
+    messageCount: row.messages?.length || 0,
+    onView: () => onOpenStudent(row.student.id),
+    onMessage: row.endorsement ? () => onMessageStudent(row) : null,
+    details: [
+      showCoursework && { key: "coursework", icon: BookOpenCheck, label: "View coursework completed", hideLabel: "Hide coursework completed", render: (id) => <GraduationCompletedCourseworkView id={id} row={row} /> },
+      showResearchPracticum && { key: "research", icon: FileCheck, label: "View research completion details", hideLabel: "Hide research completion details", render: (id) => <GraduationResearchRequirementsView id={id} row={row} /> },
+      showResearchPracticum && { key: "practicum", icon: Briefcase, label: "View practicum completion details", hideLabel: "Hide practicum completion details", render: (id) => <GraduationPracticumCompletionView id={id} row={row} /> },
+    ].filter(Boolean),
+  }));
+  return <MemberList members={members} />;
+}
+
+// "View details" on a batch card: the stage check and, below it, every student of the batch.
+// The batch's step (and the Dean's Export) are buttons in this window, not on the card, like the process boards.
+function GraduationBatchDetailsModal({ group, accountRole, onClose, onOpenStudent, onMessageStudent, onProcessBatch, onExportBatch, onAcknowledgeBatch = null, onPrintBatch = null, exporting = false }) {
+  const currentStage = stageCheckSummary(graduationBatchStages(group)).current;
+  const modalId = `graduation-stage-${String(group.id).replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
+  const stageSelection = graduationStageSelection(group.rows, accountRole);
+  const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
+  const alreadyExported = graduationGroupExported(group);
+  return (
+    <WorkflowCaseModal
+      id={modalId}
+      title={`Graduation stage check for ${group.label}`}
+      subtitle={`${group.rows.length} candidate${group.rows.length === 1 ? "" : "s"} · Step ${currentStage.number}: ${currentStage.label}`}
+      onClose={onClose}
+      size="wide"
+      footer={(
+        <>
+          {onPrintBatch && <Button variant="secondary" icon={Printer} onClick={() => onPrintBatch(group)}>Print endorsement</Button>}
+          {onAcknowledgeBatch && graduationAwaitingAcknowledgement(group) && graduationCanAcknowledge(accountRole) && (
+            <Button variant={canExport ? "secondary" : "primary"} icon={CheckSquare} onClick={() => onAcknowledgeBatch(group)}>Mark as acknowledged</Button>
+          )}
+          {canExport ? (
+            <Button icon={Download} loading={exporting} onClick={() => onExportBatch(group)}>
+              {exporting ? "Exporting…" : alreadyExported ? "Export approved list again" : "Export approved list"}
+            </Button>
+          ) : stageSelection.action ? (
+            <Button icon={CheckSquare} onClick={() => onProcessBatch(group)}>{graduationBatchActionLabel(stageSelection.action)}</Button>
+          ) : (
+            <span className="meta self-center font-semibold">{graduationWaitingNote(group)}</span>
+          )}
+        </>
+      )}
+    >
+      <div className="space-y-5">
+        {group.boardStatus === "Dean Approved" && (
+          <p data-testid="graduation-export-summary" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <span className="font-semibold">Registrar list: </span>{graduationExportSummary(group)}
+          </p>
+        )}
+        <GraduationBatchStageCheck group={group} />
+        <div>
+          <h3 className="section-title">Students in this batch</h3>
+          <div className="mt-3">
+            <GraduationBatchStudentList
+              rows={group.rows}
+              onOpenStudent={onOpenStudent}
+              onMessageStudent={onMessageStudent}
+              detailMode={graduationBatchDetailMode(group, accountRole)}
+            />
+          </div>
+        </div>
+      </div>
+    </WorkflowCaseModal>
+  );
+}
+
+// The Graduation staged board, the same shape as the process boards (Leave of Absence...): stage name, a count and one
+// short line in each column header, default column width. Two candidate stages come first, then one column per batch step.
+const GRADUATION_STAGE_COLUMNS = [
+  {
+    key: "stage-1",
+    kind: "stage",
+    selectable: false,
+    label: "Academically eligible",
+    description: "Waiting for the student's signed application.",
+  },
+  {
+    key: "stage-2",
+    kind: "stage",
+    selectable: true,
+    label: "Application submitted",
+    description: "Staff can now create a graduation batch.",
+  },
+];
+
+const GRADUATION_BOARD_COLUMNS = [
+  {
+    label: "Batch created",
+    description: "Staff forward it for coursework review.",
+    statuses: ["For Review"],
+  },
+  {
+    label: "Coursework review",
+    description: "The Academic Coordinator checks coursework.",
+    statuses: ["Coursework Review"],
+  },
+  {
+    label: "Research and practicum check",
+    description: "The Research Coordinator checks the evidence.",
+    statuses: ["Research Review"],
+  },
+  {
+    label: "Endorsement prep or revision",
+    description: "Staff prepare the list or revise it.",
+    statuses: ["Eligibility Confirmed", "Endorsement Prepared", "Returned for Revision"],
+  },
+  {
+    label: "Dean review",
+    description: "The Dean approves or returns the list.",
+    statuses: ["Ready for Dean Review"],
+  },
+  {
+    label: "Approved, ready to export",
+    description: "The Dean exports; staff then mark it sent.",
+    statuses: ["Dean Approved"],
+  },
+  {
+    // Owner 2026-11-08: an exported batch is moved here BY HAND (drag or Move to) by staff or the Dean once the Registrar
+    // confirms receipt of the emailed list. Nothing moves here by itself.
+    label: "Acknowledged by Registrar",
+    description: "Moved here by hand once the Registrar confirms.",
+    statuses: ["Sent to Registrar", "Registrar Received"], // lists sent before the hand-off was recorded by hand still show
+    acknowledged: true,
+  },
+  {
+    label: "Exceptions",
+    description: "Missing requirements to correct.",
+    statuses: ["Coursework Incomplete", "Research Incomplete", "Practicum Incomplete", "Not Eligible", "Returned for Clarification"],
+  },
+];
+
+const GRADUATION_BATCH_COLUMNS = GRADUATION_BOARD_COLUMNS.map((column, index) => ({ ...column, key: `batch-${index + 3}`, kind: "batch" }));
+const GRADUATION_ALL_BOARD_COLUMNS = [...GRADUATION_STAGE_COLUMNS, ...GRADUATION_BATCH_COLUMNS];
+
+// The batch status each step leads to, so a drop is only allowed on the column the step really moves to.
+// Steps that keep the batch in the same column (prepare endorsement, mark not eligible) are left out.
+const GRADUATION_STEP_DESTINATION_STATUS = {
+  compile_to_ac: "Coursework Review",
+  check_coursework: "Research Review",
+  validate_research: "Eligibility Confirmed",
+  send_to_dean: "Ready for Dean Review",
+  approve: "Dean Approved",
+};
+
+function graduationReadyForDeanReview(group) {
+  return group.boardStatus === "Ready for Dean Review";
+}
+
+function graduationBoardItemId(item) {
+  return item.kind === "student" ? `student:${item.row.student.id}` : `batch:${item.group.id}`;
+}
+
+// The stage a card is at, for the green "New for you" mark (owner 2026-11-19): the column, and for a batch its status.
+function graduationStageKey(item) {
+  return item.kind === "student" ? `${item.stage}|${item.row.endorsement?.submitted_at || ""}` : `${graduationBoardColumnKey(item)}|${item.group.boardStatus}`;
+}
+
+function graduationBoardColumnKey(item) {
+  if (item.kind === "student") return item.stage;
+  if (item.group.boardStatus === "Dean Approved" && graduationGroupAcknowledged(item.group)) return GRADUATION_ACK_COLUMN().key;
+  return GRADUATION_ALL_BOARD_COLUMNS.find((column) => column.kind === "batch" && column.statuses.includes(item.group.boardStatus))?.key || "";
+}
+
+function graduationBoardCanDrag(item, accountRole) {
+  if (item.kind === "student") return item.stage === "stage-2" && accountRole === "staff";
+  if (graduationAwaitingAcknowledgement(item.group)) return graduationCanAcknowledge(accountRole);
+  const selection = graduationStageSelection(item.group.rows, accountRole);
+  return Boolean(selection.action) || (graduationReadyForDeanReview(item.group) && accountRole === "dean");
+}
+
+// The short reason a graduation card sits still (StageBoard's lockReason), same wording as the process boards.
+const GRADUATION_ACKNOWLEDGED = "Acknowledged by Registrar";
+// Exported at least once (an acknowledged list was exported first).
+const graduationGroupExported = (group) => group.rows.every((row) => ["Exported - Ready to Send", GRADUATION_ACKNOWLEDGED].includes(row.endorsement?.registrar_status));
+const graduationGroupAcknowledged = (group) => group.rows.every((row) => row.endorsement?.registrar_status === GRADUATION_ACKNOWLEDGED);
+// Exported and waiting for staff or the Dean to record the Registrar's acknowledgement.
+const graduationAwaitingAcknowledgement = (group) => group.boardStatus === "Dean Approved" && graduationGroupExported(group) && !graduationGroupAcknowledged(group);
+const graduationCanAcknowledge = (accountRole) => accountRole === "staff" || accountRole === "dean";
+// lists sent before the hand-off was recorded by hand (IM45) are closed
+const graduationGroupSent = (group) => ["Sent to Registrar", "Registrar Received"].includes(group.boardStatus);
+const GRADUATION_ACK_COLUMN = () => GRADUATION_ALL_BOARD_COLUMNS.find((column) => column.acknowledged);
+
+// How often the Dean downloaded this batch's list, and the latest download: "Exported twice. Last: Nov 8, 2026, 10:46 AM by Dean · Name".
+// The server counts every download (one activity row each), so a repeat download is visible and nothing is exported silently.
+function graduationExportSummary(group) {
+  const exports = group.rows.map((row) => row.endorsement).filter(Boolean);
+  const count = Math.max(0, ...exports.map((item) => item.export_count || 0));
+  if (!count) return "Not exported yet";
+  const latest = exports.filter((item) => item.last_exported_at).sort((left, right) => new Date(right.last_exported_at) - new Date(left.last_exported_at))[0];
+  return `${exportCountText(count)}${latest ? `. Last: ${formatDateTime(latest.last_exported_at)}${latest.last_exported_by ? ` by ${latest.last_exported_by}` : ""}` : ""}`;
+}
+
+function graduationAcknowledgedText(group) {
+  const at = group.rows.map((row) => row.endorsement?.registrar_acknowledged_at).filter(Boolean).sort().pop();
+  return at ? `Acknowledged ${formatDateTime(at)}` : "Acknowledged";
+}
+
+// What a role sees on a batch when no step is theirs yet, e.g. the Academic Coordinator before staff have forwarded it.
+function graduationWaitingNote(group) {
+  const owners = (group.nextOwners || []).filter(Boolean);
+  if (!owners.length) return "Nothing to do yet.";
+  const verb = owners.every((owner) => /staff/i.test(owner)) ? "forward this batch" : owners.every((owner) => /dean/i.test(owner)) ? "decide on this batch" : "act on this batch";
+  return `Nothing to do yet \u2013 waiting for ${owners.join(" and ")} to ${verb}.`;
+}
+
+function graduationBoardLockReason(item, accountRole) {
+  if (item.kind === "student") {
+    if (item.stage === "stage-1") return "Waiting for: Student (signed application)";
+    return "Only Graduate School Staff create a graduation batch.";
+  }
+  const group = item.group;
+  // lists sent before the hand-off was recorded by hand (IM45): closed, nothing left to do
+  if (group.boardStatus === "Registrar Received") return "Finished - the Registrar acknowledged the list";
+  if (group.boardStatus === "Sent to Registrar") return "Finished - sent to the Registrar";
+  if (group.boardStatus === "Dean Approved" && graduationGroupAcknowledged(group)) return "Acknowledged by the Registrar. Nothing else to do.";
+  if (graduationAwaitingAcknowledgement(group)) return "Exported. Waiting for: Graduate School Staff or Dean (Registrar acknowledgement)";
+  if (group.boardStatus === "Dean Approved") return accountRole === "dean" ? "Approved. Export it from this card." : "Waiting for: Dean (export)";
+  const owners = (group.nextOwners || []).filter(Boolean);
+  return owners.length ? `Waiting for: ${owners.join(", ")}` : "No step is open right now";
+}
+
+function graduationBoardCheckMove(item, toColumn, accountRole) {
+  if (item.kind === "student") {
+    if (item.stage === "stage-1") return { allowed: false, reason: "Waiting for the student to submit the signed graduation application in the student portal." };
+    if (toColumn.kind === "batch" && toColumn.statuses.includes("For Review")) {
+      return accountRole === "staff" ? { allowed: true } : { allowed: false, reason: "Only Graduate School Staff create a graduation batch." };
+    }
+    return { allowed: false, reason: "A submitted application moves to 'Batch created' when staff create the batch." };
+  }
+  const group = item.group;
+  if (group.boardStatus === "Dean Approved" && graduationGroupAcknowledged(group)) {
+    return { allowed: false, reason: "The Registrar already acknowledged this list; nothing else to do." };
+  }
+  if (graduationAwaitingAcknowledgement(group)) {
+    if (!graduationCanAcknowledge(accountRole)) return { allowed: false, reason: "Only Graduate School Staff or the Dean record the Registrar's acknowledgement." };
+    if (toColumn.acknowledged) return { allowed: true };
+    return { allowed: false, reason: "The list is exported. Once the Registrar confirms receipt, move it to 'Acknowledged by Registrar'." };
+  }
+  const selection = graduationStageSelection(group.rows, accountRole);
+  if (!selection.action) {
+    if (group.boardStatus === "Dean Approved") return { allowed: false, reason: graduationGroupExported(group) ? "The list is already exported; it is ready to send to the Registrar." : "Export is a button on the batch card." };
+    return { allowed: false, reason: `No step is due on this batch for your role; waiting for: ${group.nextOwners.join(", ")}.` };
+  }
+  const actionLabel = graduationBatchActionLabel(selection.action);
+  const destinationStatus = GRADUATION_STEP_DESTINATION_STATUS[selection.action.id];
+  const destination = destinationStatus ? GRADUATION_ALL_BOARD_COLUMNS.find((column) => column.kind === "batch" && column.statuses.includes(destinationStatus)) : null;
+  if (!destination) return { allowed: false, reason: `This step does not move the batch to another column. Open View details to: ${actionLabel}.` };
+  if (toColumn.key === destination.key) return { allowed: true };
+  return { allowed: false, reason: `Move this batch one step at a time, to '${destination.label}': ${actionLabel}.` };
+}
+
+// The candidate card in Khloe's layout: name, number, application status, the four requirement boxes, the completed courses,
+// the application PDF, "Next:" and View details.
+function GraduationCandidateCard({ row, stage, canSelect, selected, onToggleStudent, onOpenStudent }) {
+  const applicationFile = row.endorsement?.request_attachment;
+  const awaiting = stage === "stage-1";
+  const courses = row.eligibility?.completed_courses || [];
+  return (
+    <article className={`rounded-xl border p-3 shadow-sm transition-colors ${selected ? "border-brand-400 ring-2 ring-brand-100" : awaiting ? "border-slate-200 bg-slate-50/60 hover:border-slate-300" : "border-emerald-200 bg-emerald-50/70 hover:border-emerald-400"}`}>
+      {/* Owner feedback 2026-11-23 (stage 5): the Research Gate card - head with the chip, one requirement line, no tiles */}
+      <CaseCardHead
+        name={row.student.name}
+        sub={`${row.student.student_number} · ${row.student.program_code}`}
+        chip={<StatusChip status={row.application_status} size="sm" dot={false} />}
+        select={canSelect && (
+          <input type="checkbox" checked={selected} onChange={() => onToggleStudent(row.student.id)} className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500" aria-label={`Select ${row.student.name} for batch creation`} />
+        )}
+      />
+      <RequirementLine items={graduationRequirementItems(row)} ariaLabel="Completed graduation requirements" />
+      {courses.length > 0 && (
+        <p className="mt-2 text-xs text-slate-500">
+          <span className="font-semibold text-slate-700">Completed courses:</span>{" "}
+          {courses.slice(0, 4).map((course) => course.code).join(", ")}
+          {courses.length > 4 ? ` +${courses.length - 4} more` : ""}
+        </p>
+      )}
+      {row.has_submitted_documents && applicationFile?.file_exists !== false && applicationFile?.url && (
+        <a
+          href={applicationFile.url}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          aria-label={`View submitted graduation application PDF for ${row.student.name}`}
+        >
+          <FileText className="h-3.5 w-3.5" aria-hidden="true" /> View PDF <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+        </a>
+      )}
+      {row.has_submitted_documents && applicationFile?.file_exists === false && <p className="mt-2 text-xs font-semibold text-red-700">PDF unavailable</p>}
+      {row.messages?.length > 0 && <GraduationNote>{row.messages.length} discussion message{row.messages.length === 1 ? "" : "s"}</GraduationNote>}
+      <p className="mt-3 border-t border-slate-100 pt-2 text-xs font-semibold text-brand-700">Next: {row.next_action_owner || (awaiting ? "Student" : "Graduate School Staff")}</p>
+      <ViewDetailsButton onClick={() => onOpenStudent(row.student.id)} label={row.student.name} />
+    </article>
+  );
+}
+
+function GraduationNote({ icon: Icon = MessageSquare, children }) {
+  return (
+    <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-amber-800">
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+// The one button under a candidate card: "View details", full width, like the process boards.
+function ViewDetailsButton({ onClick, label }) {
+  return (
+    <Button variant="secondary" size="sm" icon={Eye} onClick={onClick} className="mt-3 w-full" aria-label={`View details for ${label}`}>
+      View details
+    </Button>
+  );
+}
+
+// F5-04: once the Dean has approved a batch its application documents were checked, so the document badge goes, and
+// "Next" names the one step left: the Dean's export, then the hand-off to the Registrar.
+const graduationNextText = (group, accountRole) => {
+  if (group.boardStatus === "Sent to Registrar") return "Registrar (optional acknowledgement)";
+  if (group.boardStatus === "Registrar Received") return "Done - the Registrar has it";
+  if (group.boardStatus !== "Dean Approved") return group.nextOwners.join(", ");
+  if (!graduationGroupExported(group)) return "Dean (export)";
+  return accountRole === "staff" ? "Graduate School Staff (email the list)" : "Done - with the Registrar";
+};
+
+function graduationBatchBadges(group) {
+  const applicationComplete = group.rows.length > 0 && group.rows.every((row) => row.has_submitted_documents);
+  const messageCount = group.rows.reduce((total, row) => total + (row.messages?.length || 0), 0);
+  return [
+    graduationReadyForDeanReview(group) && <GroupBadge key="dean" tone="ready">Ready for Dean review</GroupBadge>,
+    !applicationComplete && group.boardStatus !== "Dean Approved" && !graduationGroupSent(group) && <GroupBadge key="docs" tone="warning">Application document issue</GroupBadge>,
+    messageCount > 0 && <GroupBadge key="msg" tone="warning">{messageCount} message{messageCount === 1 ? "" : "s"}</GroupBadge>,
+  ].filter(Boolean);
+}
+
+// What a batch says about itself, shared by its card and its row in the overview.
+function graduationBatchFacts(group) {
+  const names = group.rows.map((row) => row.student.name).slice(0, 3).join(", ");
+  const hiddenCount = group.rows.length - Math.min(group.rows.length, 3);
+  const alreadyExported = graduationGroupExported(group);
+  return {
+    students: `${names}${hiddenCount > 0 ? ` +${hiddenCount} more` : ""}`,
+    count: `${group.rows.length} candidate${group.rows.length === 1 ? "" : "s"}`,
+    chip: <StatusChip status={group.boardStatus === "Dean Approved" && graduationGroupAcknowledged(group) ? GRADUATION_ACKNOWLEDGED : group.boardStatus === "Dean Approved" && alreadyExported ? "Exported - Ready to Send" : group.boardStatus} dot={false} />,
+    badges: graduationBatchBadges(group),
+  };
+}
+
+// The batch card in Khloe's layout: GroupCard with Students, Next, the stage strip, and View students / Select batch / the step.
+function GraduationBatchCard({ group, accountRole, selectedIds, expanded, onToggleBatch, onToggleExpanded, onViewBatch, onProcessBatch, onExportBatch, onAcknowledgeBatch = null, exporting, children }) {
+  const selection = graduationBatchSelectionState(group, selectedIds);
+  const stageSelection = graduationStageSelection(group.rows, accountRole);
+  const facts = graduationBatchFacts(group);
+  const canExport = accountRole === "dean" && group.boardStatus === "Dean Approved" && Boolean(onExportBatch);
+  const alreadyExported = graduationGroupExported(group);
+  return (
+    <GroupCard
+      ready={Boolean(stageSelection.action) || canExport}
+      selected={selection.selectedCount > 0}
+      checkbox={onToggleBatch && (
+        <input
+          type="checkbox"
+          checked={selection.allSelected}
+          aria-checked={selection.partiallySelected ? "mixed" : selection.allSelected}
+          onChange={() => onToggleBatch(group)}
+          className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+          aria-label={`Select ${group.label}`}
+        />
+      )}
+      title={group.label}
+      count={facts.count}
+      selection={onToggleBatch ? selectionWords(selection.selectedCount, group.rows.length) : ""}
+      chip={facts.chip}
+      badges={facts.badges}
+      facts={[
+        { label: "Students", value: facts.students },
+        { label: "Next", value: group.nextOwners.join(", ") },
+        ...(group.boardStatus === "Dean Approved" ? [{ label: "Registrar list", value: graduationExportSummary(group) }] : []),
+        ...(graduationGroupAcknowledged(group) ? [{ label: "Registrar", value: graduationAcknowledgedText(group) }] : []),
+      ]}
+      stages={graduationBatchStages(group)}
+      onOpenStages={() => onViewBatch(group)}
+      openStagesLabel={`View details for ${group.label}`}
+      actions={(
+        <>
+          <Button variant="secondary" size="sm" icon={Users} onClick={() => onToggleExpanded(group.id)} aria-expanded={expanded}>{expanded ? "Hide students" : "View students"}</Button>
+          {onToggleBatch && <Button variant="secondary" size="sm" onClick={() => onToggleBatch(group)}>Select batch</Button>}
+          {/* Owner 2026-11-19: cards no longer move to another column by hand, so the Registrar's acknowledgement is a button. */}
+          {onAcknowledgeBatch && graduationAwaitingAcknowledgement(group) && graduationCanAcknowledge(accountRole) && (
+            <Button size="sm" icon={CheckSquare} onClick={() => onAcknowledgeBatch(group)}>Mark as acknowledged</Button>
+          )}
+          {canExport ? (
+            <Button size="sm" icon={Download} loading={exporting} onClick={() => onExportBatch(group)}>{alreadyExported ? "Export batch again" : "Export batch"}</Button>
+          ) : stageSelection.action ? (
+            <Button size="sm" icon={CheckSquare} onClick={() => onProcessBatch(group)}>{graduationBatchActionLabel(stageSelection.action)}</Button>
+          ) : group.boardStatus !== "Dean Approved" ? (
+            <p className="meta w-full">{graduationWaitingNote(group)}</p>
+          ) : null}
+        </>
+      )}
+    >
+      {expanded ? children : null}
+    </GroupCard>
+  );
+}
+
+// Appears when candidates are ticked, like the process boards' group-step bar.
+function GraduationSelectionBar({ count, onCreateBatch, stepLabel, onStep, note, onClear }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50/60 p-3" role="group" aria-label="Apply a step to the selected candidates">
+      <span className="mr-auto text-sm font-semibold text-ink" aria-live="polite">{count} candidate{count === 1 ? "" : "s"} selected</span>
+      {note && <span className="meta">{note}</span>}
+      {onCreateBatch && <Button icon={CheckSquare} onClick={onCreateBatch}>Create graduation batch</Button>}
+      {onStep && <Button icon={CheckSquare} onClick={onStep}>{stepLabel}</Button>}
+      <Button variant="secondary" onClick={onClear}>Clear selection</Button>
+    </div>
+  );
+}
+
+// `batchesOnly` (the Dean's "Endorsement batches" tab) is the same board without the two candidate columns.
+export function GraduationRoster({ context, submitting, refreshing, clearSubmitFeedback, refetch, accountRole, batchesOnly = false }) {
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [messageRow, setMessageRow] = useState(null);
+  const [replyTo, setReplyTo] = useState(null);
+  const boardNotice = useBoardNotice(); // the one place this board says what happened
+  const confirm = useConfirm();
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [view, setView] = useState("board");
+  const phone = useIsPhone(); // the board shows plain stage headings on a phone
+  const [stageGroupId, setStageGroupId] = useState(null);
+  const [expandedBatchIds, setExpandedBatchIds] = useState(() => new Set());
+  const [exportingBatchId, setExportingBatchId] = useState("");
+  const [exportNotice, setExportNotice] = useState(null);
+  const [exportHistoryKey, setExportHistoryKey] = useState(0); // bumped after an export so the history reloads
+  const reset = useDemoCaseReset("graduation", refetch);
+  // A reset answers in the board notice too. The case window closes so the notice is not hidden behind it.
+  useEffect(() => {
+    if (!reset.resetMessage && !reset.resetError) return;
+    boardNotice.show(reset.resetError ? "error" : "success", reset.resetError || reset.resetMessage);
+    setSelectedStudentId(null);
+  }, [reset.resetMessage, reset.resetError]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rows = context.roster || [];
+  const canTickBatches = ["staff", "academic_coordinator", "research_coordinator"].includes(accountRole); // the Dean uses the step buttons
+  // `secondary` is the completed-course filter (one more control in the shared toolbar).
+  const [filters, setFilters] = useOpenFilters({ query: "", program: "", status: "", secondary: "", sort: "newest" });
+  const programs = useMemo(() => uniqueValues(rows.map((row) => row.student.program_code)), [rows]);
+  const statuses = useMemo(() => uniqueValues(rows.map(graduationRowStatus)), [rows]);
+  const completedCourseOptions = useMemo(() => {
+    const coursesByCode = new Map();
+    rows.forEach((row) => {
+      (row.eligibility?.completed_courses || []).forEach((course) => {
+        if (course.code && !coursesByCode.has(course.code)) coursesByCode.set(course.code, course);
+      });
+    });
+    return [...coursesByCode.values()]
+      .sort((left, right) => left.code.localeCompare(right.code))
+      .map((course) => ({ value: course.code, label: `${course.code} — ${course.title}` }));
+  }, [rows]);
+  const filteredRows = useMemo(() => rows.filter((row) => {
+    const courseText = (row.eligibility?.completed_courses || []).map((course) => `${course.code} ${course.title}`).join(" ");
+    const haystack = `${row.student.name} ${row.student.student_number} ${row.student.program_code} ${row.student.program_name} ${row.endorsement?.batch_name || ""} ${courseText}`.toLowerCase();
+    return (!filters.query || haystack.includes(filters.query.toLowerCase()))
+      && (!filters.program || row.student.program_code === filters.program)
+      && (!filters.status || graduationRowStatus(row) === filters.status)
+      && (!filters.open || !["Not Eligible", "Sent to Registrar", "Registrar Received"].includes(graduationRowStatus(row))) // open: every candidate still on the way to the Dean
+      && (!filters.secondary || (row.eligibility?.completed_courses || []).some((course) => course.code === filters.secondary));
+  }).sort((left, right) => left.student.name.localeCompare(right.student.name)), [rows, filters]);
+  const visibleRows = useMemo(
+    () => sortSelectedWorkflowRows(filteredRows, selectedIds, (row) => row.student.name, (row) => row.student.id),
+    [filteredRows, selectedIds],
+  );
+  const awaitingApplicationRows = useMemo(
+    () => (batchesOnly ? [] : visibleRows.filter((row) => row.eligibility?.eligible && !row.endorsement?.batch_name && !row.has_submitted_documents)),
+    [visibleRows, batchesOnly],
+  );
+  const readyForBatchRows = useMemo(
+    () => (batchesOnly ? [] : visibleRows.filter((row) => row.eligibility?.eligible && !row.endorsement?.batch_name && row.has_submitted_documents)),
+    [visibleRows, batchesOnly],
+  );
+  const visibleBatchedRows = useMemo(
+    () => visibleRows.filter((row) => Boolean(row.endorsement?.batch_name)),
+    [visibleRows],
+  );
+  const selectedRows = useMemo(
+    () => sortSelectedWorkflowRows(rows.filter((row) => selectedIds.has(row.student.id)), selectedIds, (row) => row.student.name, (row) => row.student.id),
+    [rows, selectedIds],
+  );
+  const visibleBatchGroups = useMemo(
+    () => graduationBatchGroups(visibleBatchedRows, selectedIds),
+    [visibleBatchedRows, selectedIds],
+  );
+  const allBatchGroups = useMemo(() => graduationBatchGroups(rows.filter((row) => Boolean(row.endorsement?.batch_name))), [rows]);
+  const allBatchCount = allBatchGroups.length;
+  const approvedGroups = useMemo(() => allBatchGroups.filter((group) => group.boardStatus === "Dean Approved"), [allBatchGroups]);
+  // The Dean's "Export approved list" sends the approved batches not exported yet; with none waiting it downloads them all again.
+  const pendingExportGroups = useMemo(() => approvedGroups.filter((group) => !graduationGroupExported(group)), [approvedGroups]);
+  const exportGroups = pendingExportGroups.length ? pendingExportGroups : approvedGroups;
+  const boardColumns = batchesOnly ? GRADUATION_BATCH_COLUMNS : GRADUATION_ALL_BOARD_COLUMNS;
+  const boardItems = useMemo(
+    () => [
+      ...awaitingApplicationRows.map((row) => ({ kind: "student", stage: "stage-1", row })),
+      ...readyForBatchRows.map((row) => ({ kind: "student", stage: "stage-2", row })),
+      ...visibleBatchGroups.map((group) => ({ kind: "batch", group })),
+    ],
+    [awaitingApplicationRows, readyForBatchRows, visibleBatchGroups],
+  );
+  // The line above the filters: how many cards sit in each column, over every candidate (the filters narrow the board only).
+  const summaryLine = useMemo(() => {
+    const totals = {};
+    const bump = (key) => { if (key) totals[key] = (totals[key] || 0) + 1; };
+    if (!batchesOnly) {
+      rows.forEach((row) => {
+        if (row.eligibility?.eligible && !row.endorsement?.batch_name) bump(row.has_submitted_documents ? "stage-2" : "stage-1");
+      });
+    }
+    graduationBatchGroups(rows.filter((row) => Boolean(row.endorsement?.batch_name))).forEach((group) => bump(graduationBoardColumnKey({ kind: "batch", group })));
+    return boardSummaryLine(boardColumns, totals, "candidates");
+  }, [rows, boardColumns, batchesOnly]);
+  // The table lists the same students as the board, one row each, with the batch under the stage.
+  const columnLabelByKey = useMemo(() => Object.fromEntries(GRADUATION_ALL_BOARD_COLUMNS.map((column) => [column.key, column.label])), []);
+  const tableRows = useMemo(
+    () => [
+      ...awaitingApplicationRows.map((row) => ({ row, stage: "stage-1", batch: "", status: row.application_status })),
+      ...readyForBatchRows.map((row) => ({ row, stage: "stage-2", batch: "", status: row.application_status })),
+      ...visibleBatchGroups.flatMap((group) => group.rows.map((row) => ({
+        row,
+        stage: graduationBoardColumnKey({ kind: "batch", group }),
+        batch: group.label,
+        // the same words as the batch card: an exported list is "Exported - Ready to Send", not still "Dean Approved"
+        status: ["Exported - Ready to Send", GRADUATION_ACKNOWLEDGED].includes(row.endorsement?.registrar_status) ? row.endorsement.registrar_status : graduationRowStatus(row),
+      }))),
+    ].map((item) => ({
+      ...item,
+      id: item.row.student.id,
+      stageLabel: columnLabelByKey[item.stage] || "",
+      waitingOn: item.row.next_action_owner || (item.stage === "stage-2" ? "Graduate School Staff" : "Student"),
+      updatedAt: item.row.last_activity_at || item.row.endorsement?.updated_at || "",
+    })),
+    [awaitingApplicationRows, readyForBatchRows, visibleBatchGroups, columnLabelByKey],
+  );
+
+  // What the ticked candidates can do: students with a signed application create a batch; students already in a batch
+  // share one step when the signed-in role has the same step due for all of them.
+  const readyIds = useMemo(() => new Set(readyForBatchRows.map((row) => row.student.id)), [readyForBatchRows]);
+  const tickedReady = readyForBatchRows.filter((row) => selectedIds.has(row.student.id));
+  const tickedBatched = visibleBatchedRows.filter((row) => selectedIds.has(row.student.id));
+  const tickedStep = tickedBatched.length ? graduationStageSelection(tickedBatched, accountRole) : null;
+
+  function toggleInGroup(studentId, groupIds) {
+    setSelectedIds((current) => {
+      const next = new Set([...current].filter((id) => groupIds.has(id)));
+      if (next.has(studentId)) next.delete(studentId); else next.add(studentId);
+      return next;
+    });
+  }
+  function toggleReadyStudent(studentId) {
+    toggleInGroup(studentId, readyIds);
+  }
+  function toggleBatchedStudent(studentId) {
+    toggleInGroup(studentId, new Set(visibleBatchedRows.map((row) => row.student.id)));
+  }
+  function createPreBatch() {
+    const candidateIds = readyForBatchRows.filter((row) => selectedIds.has(row.student.id)).map((row) => row.student.id);
+    if (!candidateIds.length) return;
+    setSelectedIds(new Set(candidateIds));
+    setBatchOpen(true);
+  }
+  function toggleBatchGroup(group) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      const allSelected = group.rows.every((row) => next.has(row.student.id));
+      group.rows.forEach((row) => {
+        if (allSelected) next.delete(row.student.id); else next.add(row.student.id);
+      });
+      return next;
+    });
+  }
+  function processBatchGroup(group) {
+    setSelectedIds(new Set(group.rows.map((row) => row.student.id)));
+    setBatchOpen(true);
+  }
+  function processTickedStep() {
+    if (!tickedStep?.action) return;
+    setSelectedIds(new Set(tickedStep.processableRows.map((row) => row.student.id)));
+    setBatchOpen(true);
+  }
+  // A drop (or the "Move to..." menu) only opens the same confirmation dialog the card buttons open.
+  // The dialog posts to the guarded endpoint and the server checks every rule again.
+  function moveGraduationBoardItem(item) {
+    if (item.kind === "student") {
+      if (selectedIds.has(item.row.student.id)) createPreBatch();
+      else {
+        setSelectedIds(new Set([item.row.student.id]));
+        setBatchOpen(true);
+      }
+    } else if (graduationAwaitingAcknowledgement(item.group)) {
+      acknowledgeBatch(item.group);
+    } else {
+      processBatchGroup(item.group);
+    }
+    return undefined; // the dialog is open; the card says "Moving to ..." until it closes
+  }
+  // Owner 2026-11-08: the Registrar's acknowledgement is recorded by hand (never automatic), after a yes in the window.
+  async function acknowledgeBatch(group) {
+    const sure = await confirm({
+      title: "Registrar acknowledged this list?",
+      message: [
+        `${group.label}: ${group.rows.map((row) => row.student.name).join(", ")}`,
+        "Move it to 'Acknowledged by Registrar' only after the Registrar has confirmed receipt of the emailed list.",
+      ].join("\n"),
+      confirmLabel: "Mark as acknowledged",
+    });
+    if (!sure) return;
+    try {
+      const result = await api.graduationRegistrarAcknowledged(group.rows.map((row) => row.endorsement?.id).filter(Boolean));
+      boardNotice.show("success", result.message || `${group.label}: acknowledged by the Registrar.`);
+      await refetch();
+    } catch (error) {
+      boardNotice.show("error", refusalMessage(error.message, "Could not record the Registrar's acknowledgement."));
+    }
+  }
+  function toggleExpandedBatch(groupId) {
+    setExpandedBatchIds((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
+      return next;
+    });
+  }
+  function renderGraduationBoardCard(item) {
+    if (item.kind === "student") {
+      return (
+        <GraduationCandidateCard
+          row={item.row}
+          stage={item.stage}
+          canSelect={item.stage === "stage-2" && accountRole === "staff"}
+          selected={selectedIds.has(item.row.student.id)}
+          onToggleStudent={toggleReadyStudent}
+          onOpenStudent={openCase}
+        />
+      );
+    }
+    return (
+      <GraduationBatchCard
+        group={item.group}
+        accountRole={accountRole}
+        selectedIds={selectedIds}
+        expanded={expandedBatchIds.has(item.group.id)}
+        onToggleBatch={canTickBatches ? toggleBatchGroup : null}
+        onToggleExpanded={toggleExpandedBatch}
+        onViewBatch={(group) => setStageGroupId(group.id)}
+        onProcessBatch={processBatchGroup}
+        onExportBatch={accountRole === "dean" ? (group) => exportApproved([group]) : null}
+        onAcknowledgeBatch={acknowledgeBatch}
+        exporting={exportingBatchId === item.group.id}
+      >
+        <GraduationBatchStudentList
+          rows={item.group.rows}
+          onOpenStudent={openCase}
+          onMessageStudent={setMessageRow}
+          detailMode={graduationBatchDetailMode(item.group, accountRole)}
+        />
+      </GraduationBatchCard>
+    );
+  }
+  // Owner feedback 2026-11-23 (stage 5): every column carries its number, as on the Research Gate board.
+  function renderBoardColumnHeader(column, columnItems) {
+    const number = boardColumns.findIndex((entry) => entry.key === column.key) + 1;
+    return (
+      <>
+        <StageColumnHeader column={column} count={columnItems.length} number={number} />
+        {/* Owner 2026-11-08: "Select all" sits at the top of Application submitted, above the cards, so it is seen first. */}
+        {selectAllButton(column, columnItems, "mb-3 -mt-1")}
+      </>
+    );
+  }
+  // The row of each batch in the overview above the board: the same facts as its card, with the stage check.
+  const overviewGroups = visibleBatchGroups.map((group) => {
+    const facts = graduationBatchFacts(group);
+    return {
+      id: group.id,
+      label: group.label,
+      count: facts.count,
+      updated: group.updatedAt ? formatDate(group.updatedAt) : "",
+      students: facts.students,
+      next: graduationNextText(group, accountRole),
+      chip: facts.chip,
+      badges: facts.badges,
+      stages: graduationBatchStages(group),
+      ready: Boolean(graduationStageSelection(group.rows, accountRole).action),
+    };
+  });
+  function selectAllButton(column, columnItems, place) {
+    if (column.key !== "stage-2" || accountRole !== "staff" || !columnItems.length) return null;
+    const allOn = columnItems.every((item) => selectedIds.has(item.row.student.id));
+    const ticked = columnItems.filter((item) => selectedIds.has(item.row.student.id)).length;
+    return (
+      <div className={`${place} flex flex-wrap items-center gap-2`}>
+        <button
+          type="button"
+          onClick={() => setSelectedIds(allOn ? new Set() : new Set(readyForBatchRows.map((row) => row.student.id)))}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors duration-200 hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-500 max-sm:min-h-11"
+        >
+          <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
+          {allOn ? "Clear selection in this column" : "Select all in this column"}
+        </button>
+        {/* Owner 2026-11-19: the step that makes the batch sits right here, as soon as a candidate is ticked. */}
+        {ticked > 0 && (
+          <Button size="sm" icon={Plus} onClick={createPreBatch}>
+            {`Create graduation batch (${ticked})`}
+          </Button>
+        )}
+      </div>
+    );
+  }
+  // A phone shows plain stage headings (no custom header), so there the button stays under the column's cards.
+  function renderColumnFooter(column, columnItems) {
+    return phone ? selectAllButton(column, columnItems, "mt-3") : null;
+  }
+  // One file for the batches it is given: the batch window passes its own batch, the page's button passes every approved one.
+  async function exportApproved(groups, busyKey = groups[0]?.id) {
+    setExportingBatchId(busyKey);
+    const what = groups.length === 1 ? groups[0].label : `${groups.length} approved batches`;
+    try {
+      const endorsementIds = groups.flatMap((group) => group.rows.map((row) => row.endorsement?.id)).filter(Boolean);
+      const exportResult = await api.exportGraduationCsv("", endorsementIds);
+      // Owner 2026-11-08: open a pre-filled Gmail draft to the Registrar right after the download.
+      const draft = registrarDraft({ to: exportResult.registrarEmail, fileLabel: "endorsed graduation list", filename: exportResult.filename, what });
+      openGmailDraft(draft);
+      setExportNotice({ filename: exportResult.filename, batchLabel: what, draft });
+      setExportHistoryKey((key) => key + 1);
+      boardNotice.show("success", `${what} exported as ${exportResult.filename}. The Dean must email the file to the Registrar and wait for acknowledgement.`);
+      await refetch();
+    } catch (error) {
+      boardNotice.show("error", error.message || "Could not export the Dean-approved graduation list.");
+    } finally {
+      setExportingBatchId("");
+    }
+  }
+  const selectedRow = rows.find((row) => row.student.id === selectedStudentId) || null;
+  const selectedStageAction = selectedRow ? graduationStageActionForRow(selectedRow, accountRole) : null;
+  const selectedEndorsement = selectedRow?.endorsement || null;
+  const graduationSteps = selectedRow ? graduationTimelineSteps(selectedEndorsement?.endorsement_status, selectedRow.eligibility) : [];
+  const stageGroup = stageGroupId ? visibleBatchGroups.find((group) => group.id === stageGroupId) || graduationBatchGroups(rows.filter((row) => row.endorsement?.batch_name === stageGroupId))[0] || null : null;
+
+  function openCase(studentId) {
+    clearSubmitFeedback();
+    reset.clearResetFeedback();
+    setSelectedStudentId(studentId);
+  }
+
+  const tableColumns = [
+    {
+      key: "select",
+      header: <span className="sr-only">Select</span>,
+      width: "2.5rem",
+      cell: ({ row, stage }) => {
+        const selectable = stage === "stage-2" ? accountRole === "staff" : canTickBatches && Boolean(row.endorsement?.batch_name) && Boolean(graduationStageActionForRow(row, accountRole));
+        if (!selectable) return <span aria-hidden="true" />;
+        return (
+          <input
+            type="checkbox"
+            checked={selectedIds.has(row.student.id)}
+            onChange={() => (stage === "stage-2" ? toggleReadyStudent(row.student.id) : toggleBatchedStudent(row.student.id))}
+            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            aria-label={stage === "stage-2" ? `Select ${row.student.name} for batch creation` : `Select ${row.student.name} for a group step`}
+          />
+        );
+      },
+    },
+    {
+      key: "student",
+      header: "Student",
+      sortable: true,
+      sortValue: ({ row }) => row.student.name,
+      cell: ({ row }) => (
+        <>
+          <p className="font-semibold text-ink">{row.student.name}</p>
+          <p className="meta whitespace-nowrap">{row.student.student_number}</p>
+        </>
+      ),
+    },
+    { key: "program", header: "Program", sortable: true, sortValue: ({ row }) => row.student.program_code, cell: ({ row }) => row.student.program_code },
+    {
+      key: "stage",
+      header: "Stage",
+      sortable: true,
+      sortValue: (item) => GRADUATION_ALL_BOARD_COLUMNS.findIndex((column) => column.key === item.stage),
+      cell: (item) => (
+        <>
+          <p className="font-medium text-slate-700">{item.stageLabel}</p>
+          {item.batch && <p className="meta">{item.batch}</p>}
+        </>
+      ),
+    },
+    { key: "status", header: "Status", sortable: true, sortValue: (item) => item.status, cell: (item) => <StatusChip status={item.status} dot={false} /> },
+    { key: "waitingOn", header: "Waiting on", sortable: true, sortValue: (item) => item.waitingOn, cell: (item) => item.waitingOn },
+    {
+      key: "updated",
+      header: "Updated",
+      sortable: true,
+      sortValue: (item) => (item.updatedAt ? new Date(item.updatedAt) : null),
+      hideBelow: "sm",
+      cell: (item) => (item.updatedAt ? formatDate(item.updatedAt) : "—"),
+    },
+    {
+      key: "open",
+      header: <span className="sr-only">Open</span>,
+      cell: ({ row }) => (
+        <Button variant="secondary" size="sm" icon={Eye} onClick={() => openCase(row.student.id)} aria-label={`View details for ${row.student.name}`}>View</Button>
+      ),
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* No card title and no loose line under the header: the page header says it all, with who does what in its description (finding 11, I-157). */}
+      <BoardSummary line={summaryLine} />
+      {accountRole === "dean" && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Button icon={Download} loading={exportingBatchId === "all"} disabled={!approvedGroups.length} onClick={() => exportApproved(exportGroups, "all")} className="max-sm:w-full">
+            Export approved list
+          </Button>
+          <p className="meta">
+            {!approvedGroups.length
+              ? "No batch is approved yet. Approve a batch, then export the list here."
+              : pendingExportGroups.length
+                ? `${pendingExportGroups.length} approved ${pendingExportGroups.length === 1 ? "batch is" : "batches are"} waiting to be exported for the Registrar${approvedGroups.length > pendingExportGroups.length ? ` (${approvedGroups.length - pendingExportGroups.length} already exported)` : ""}.`
+                : `Every approved batch has been exported (${approvedGroups.length}). Export again to download the list once more.`}
+          </p>
+        </div>
+      )}
+      <BoardFrame>
+      <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
+        <RosterFilters
+          filters={filters}
+          setFilters={setFilters}
+          programs={programs}
+          statuses={statuses}
+          secondaryLabel="Completed courses"
+          secondaryOptions={completedCourseOptions}
+          count={batchesOnly ? visibleBatchGroups.length : filteredRows.length}
+          total={batchesOnly ? allBatchCount : rows.length}
+          noun={batchesOnly ? "batches" : "records"}
+          showAdvanced={false}
+          extra={<ListExportButtons
+                    title="Graduation candidates"
+                    subtitle={`${filteredRows.length} of ${rows.length} records`}
+                    filename="graduation-candidates"
+                    columns={["Student ID", "Student name", "Program", "Eligible", "Endorsement status", "Batch"]}
+                    rows={filteredRows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.eligibility?.eligible ? "Yes" : "No", graduationRowStatus(row), row.endorsement?.batch_name || ""])}
+            />}
+        />
+      </BoardFilterRow>
+      {selectedIds.size > 0 && (tickedReady.length > 0 || tickedBatched.length > 0) && (
+        <GraduationSelectionBar
+          count={tickedReady.length + tickedBatched.length}
+          onCreateBatch={tickedReady.length > 0 && accountRole === "staff" ? createPreBatch : null}
+          stepLabel={tickedStep?.action ? graduationBatchActionLabel(tickedStep.action) : ""}
+          onStep={tickedStep?.action && tickedReady.length === 0 ? processTickedStep : null}
+          note={tickedBatched.length > 0 && !tickedStep?.action ? "These candidates do not share a step that is due to you." : ""}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      )}
+      {view !== "board" && <BoardNotice notice={boardNotice.notice} onDismiss={boardNotice.dismiss} />}
+      {view === "board" ? (
+        <div className="max-sm:-order-1">{/* I-399: on a phone the board and its Needs my action chips come first, like the other process boards */}
+        <StageBoard
+          boardNotice={boardNotice}
+          ariaLabel="Graduation workflow Kanban board"
+          phoneAriaLabel="Graduation candidates by stage"
+          columns={boardColumns}
+          closedKeys={boardColumns.filter((column) => column.label === "Acknowledged by Registrar").map((column) => column.key) /* UX-29 */}
+          items={boardItems}
+          getItemId={graduationBoardItemId}
+          getColumnKey={graduationBoardColumnKey}
+          renderCard={renderGraduationBoardCard}
+          canDrag={(item) => graduationBoardCanDrag(item, accountRole)}
+          needsMe={(item) => graduationBoardCanDrag(item, accountRole) || (item.kind !== "student" && accountRole === "dean" && item.group.boardStatus === "Dean Approved" && !graduationGroupExported(item.group))}
+          isFinished={(item) => item.kind !== "student" && (graduationGroupSent(item.group) || graduationGroupAcknowledged(item.group))}
+          lockReason={(item) => graduationBoardLockReason(item, accountRole)}
+          showMoveMenu={(item) => !(item.kind === "student" && item.stage === "stage-1")}
+          checkMove={(item, toColumn) => graduationBoardCheckMove(item, toColumn, accountRole)}
+          onMove={moveGraduationBoardItem}
+          renderColumnFooter={renderColumnFooter}
+          renderColumnHeader={renderBoardColumnHeader}
+          columnClassName="w-[320px]"
+          numbered
+          emptyText="No candidates here"
+          columnLocked
+          freshWhen="needsMe"
+          getStageKey={graduationStageKey}
+          getItemLabel={(item) => (item.kind === "student" ? item.row.student.name : item.group.label)}
+          getItemTime={(item) => (item.kind === "student" ? item.row.last_activity_at || item.row.endorsement?.updated_at || "" : item.group.updatedAt || "")}
+        />
+        </div>
+      ) : tableRows.length ? (
+        <DataTable
+          caption="Graduation candidates, one row per student"
+          columns={tableColumns}
+          rows={tableRows}
+          rowKey={(item) => item.id}
+          minWidth="lg"
+        />
+      ) : (
+        <EmptyState title="No candidates match these filters" hint="Clear a filter to see more." />
+      )}
+      </BoardFrame>
+      {/* Below the board or table, so switching Board / Table changes what is right under the switch. */}
+      <GroupOverview
+        title="Created graduation batches"
+        groups={overviewGroups}
+        onOpen={(group) => setStageGroupId(group.id)}
+      />
+      <section aria-label="Exported graduation batches" className="card p-4">
+        <HistoryPanel label="Exported batches (history)" hideLabel="Hide exported batches">
+          <ExportHistory key={exportHistoryKey} slug="graduation" detailsHeader="Batches" countHeader="Students" caption="Graduation lists downloaded" />
+        </HistoryPanel>
+      </section>
+      {stageGroup && (
+        <GraduationBatchDetailsModal
+          group={stageGroup}
+          accountRole={accountRole}
+          onClose={() => setStageGroupId(null)}
+          onOpenStudent={openCase}
+          onMessageStudent={setMessageRow}
+          onProcessBatch={processBatchGroup}
+          onExportBatch={accountRole === "dean" ? (group) => { setStageGroupId(null); exportApproved([group]); } : null}
+          onPrintBatch={accountRole === "dean" ? printGraduationBatch : null}
+          onAcknowledgeBatch={(group) => { setStageGroupId(null); acknowledgeBatch(group); }}
+          exporting={exportingBatchId === stageGroup.id}
+        />
+      )}
+      {selectedRow && (
+        <WorkflowCaseModal
+          id={`graduation-case-${selectedRow.student.id}`}
+          title={selectedRow.student.name}
+          subtitle={`${selectedRow.student.student_number} · ${selectedRow.student.program_code} · Graduation endorsement`}
+          status={selectedEndorsement?.endorsement_status || selectedRow.eligibility.status}
+          onClose={() => setSelectedStudentId(null)}
+          size="wide"
+          footer={(
+            <>
+              {accountRole === "staff" && selectedEndorsement && <DemoResetButton student={selectedRow.student} resettingId={reset.resettingId} onReset={reset.resetCase} />}
+              {selectedEndorsement && <Button variant="danger" icon={MessageSquare} onClick={() => setMessageRow(selectedRow)}>Message / Return</Button>}
+              {selectedStageAction ? (
+                <Button disabled={submitting || refreshing} onClick={() => { setSelectedIds(new Set([selectedRow.student.id])); setBatchOpen(true); }}>
+                  {submitting ? "Saving…" : refreshing ? "Updating…" : selectedStageAction.label}
+                </Button>
+              ) : selectedEndorsement?.endorsement_status === "Dean Approved" ? (
+                <StatusChip status="Approved" label="Awaiting Dean export" dot={false} className="self-center" />
+              ) : (
+                <span className="meta self-center font-semibold">{graduationWaitingNote({ nextOwners: [selectedRow.next_action_owner] })}</span>
+              )}
+            </>
+          )}
+        >
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2"><Detail label="Program" value={selectedRow.student.program_name} /><Detail label="Batch" value={selectedEndorsement?.batch_name || "No batch assigned"} /></div>
+            {selectedEndorsement?.request_attachment?.file_exists !== false && selectedEndorsement?.request_attachment?.url && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-brand-900">Student graduation application PDF</p>
+                  <p className="meta truncate text-brand-700">{selectedEndorsement.request_attachment.name}</p>
+                </div>
+                <a href={selectedEndorsement.request_attachment.url} target="_blank" rel="noreferrer" className="btn-primary cursor-pointer px-3 py-2">
+                  <Eye className="h-4 w-4" /> View submitted PDF <ArrowUpRight className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            )}
+            {selectedEndorsement?.request_attachment?.file_exists === false && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">The submitted graduation application PDF is unavailable.</div>
+            )}
+            <GraduationRequirementBoxes row={selectedRow} />
+            <WorkflowTimeline steps={graduationSteps} title="Graduation endorsement timeline" />
+            <CaseMessageHistory messages={selectedRow.messages} onReply={(message) => { setReplyTo(message); setMessageRow(selectedRow); }} />
+            <WorkflowActivityList logs={selectedRow.history || []} />
+            <WorkflowFileHistory files={selectedEndorsement?.attachments || []} />
+          </div>
+        </WorkflowCaseModal>
+      )}
+      {messageRow && <WorkflowMessageModal slug="graduation" row={messageRow} context={context} replyTo={replyTo} onClose={() => { setMessageRow(null); setReplyTo(null); }} onSaved={async (message) => { boardNotice.show("success", message || "Message sent."); setSelectedStudentId(null); await refetch(); }} />}
+      {batchOpen && selectedRows.length > 0 && <GraduationBatchModal rows={selectedRows} allRows={rows} accountRole={accountRole} reviewWindows={context.graduation_review_windows || []} defaultReviewWindow={context.graduation_default_review_window || ""} onClose={() => setBatchOpen(false)} onSaved={async (batchResult) => { boardNotice.show(Array.isArray(batchResult.updated) && batchResult.updated.length === 0 ? "error" : "success", batchResult.message || "Saved."); setSelectedIds(new Set()); setStageGroupId(null); setSelectedStudentId(null); await refetch(); }} />}
+      {exportNotice && (
+        <ExportFollowUpModal
+          id="graduation-export-follow-up"
+          title="Graduation CSV export complete"
+          filename={exportNotice.filename}
+          actorLabel="The Dean"
+          fileLabel="endorsed graduation list"
+          draft={exportNotice.draft}
+          onClose={() => setExportNotice(null)}
+        />
+      )}
+    </div>
+  );
+}

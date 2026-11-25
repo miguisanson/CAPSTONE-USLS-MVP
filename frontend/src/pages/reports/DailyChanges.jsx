@@ -134,7 +134,6 @@ export default function DailyChanges() {
   return (
     <SectionCard
       title="Daily changes"
-      subtitle="Every change made in this system on the selected date. Export or print the list for the Registrar, then mark each change as sent."
       icon={RefreshCw}
       action={
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -165,7 +164,6 @@ export default function DailyChanges() {
           empty={{
             icon: FileText,
             title: "No changes on this date",
-            hint: "Pick another date, or make changes in Enrollment, Withdrawal, or the standing-change workflows.",
           }}
         />
       )}

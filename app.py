@@ -2451,6 +2451,19 @@ def term_date_problem(term: AcademicTerm, exclude_id: int | None = None) -> tupl
     return None
 
 
+def default_program() -> "Program | None":
+    """The program a page opens on when none is chosen: the first by code that has students, else the first by code.
+
+    Data cleanup (IM54, 2026-11-22): the demo keeps every program's definition but only MAED (and the MSGC practicum
+    student) has students, so the first program by code (DBA) would open every page on an empty list. With students
+    in every program this is the same program as before.
+    """
+    with_students = (
+        Program.query.join(Student, Student.program_id == Program.id).order_by(Program.code).first()
+    )
+    return with_students or Program.query.order_by(Program.code).first()
+
+
 def get_active_term() -> AcademicTerm | None:
     active = AcademicTerm.query.filter_by(is_active_planning_term=True).first()
     if active:
@@ -16794,10 +16807,14 @@ def register_routes(app: Flask) -> None:
     @require_api_login(*BACKOFFICE_ROLES)
     def tasks_list():
         owner = request.args.get("owner", "").strip()
+        # UX-23 (Phase 4): the Work Queue's "Waiting on others" tab asks for every task this office does not own.
+        not_owner = request.args.get("not_owner", "").strip()
         status = request.args.get("status", "").strip()
         query = Task.query.filter(Task.status.in_(["Pending", "Overdue"]))
         if owner:
             query = query.filter(owner_task_clause(owner))
+        if not_owner:
+            query = query.filter(~owner_task_clause(not_owner))
         if status == "Overdue":
             query = query.filter(Task.due_at < ph_today(), Task.status != "Done")
         page, page_size = page_arguments(request.args, default_size=50, max_size=200)
@@ -16810,6 +16827,9 @@ def register_routes(app: Flask) -> None:
         )
         # Derived reminders (e.g. "publish the approved offering plan") have no Task row; show them on page 1.
         derived = plan_publish_task_items(owner, status) if page == 1 else []
+        if not_owner:
+            excluded = normalize_owner_label(not_owner)
+            derived = [item for item in derived if normalize_owner_label(item["owner_role"]) != excluded]
         return jsonify({
             "items": derived + [task_dict(t) for t in tasks],
             "total": total + len(derived),
@@ -18510,7 +18530,7 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "academic_coordinator")
     def curriculum_planning():
         program_id = request.args.get("program_id", type=int)
-        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
+        program = Program.query.get(program_id) if program_id else default_program()
         if not program:
             return jsonify({"error": "No program found."}), 404
         term_id = request.args.get("term_id", type=int)
@@ -18662,7 +18682,7 @@ def register_routes(app: Flask) -> None:
         program = (
             Program.query.get(program_id)
             if program_id
-            else Program.query.order_by(Program.code).first()
+            else default_program()
         )
         if not program:
             return jsonify({"error": "No program found."}), 404
@@ -19499,7 +19519,7 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "academic_coordinator", "admin")
     def course_offerings_list():
         program_id = request.args.get("program_id", type=int)
-        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
+        program = Program.query.get(program_id) if program_id else default_program()
         if not program:
             return jsonify({"error": "No program found."}), 404
         term_id = request.args.get("term_id", type=int)
@@ -19701,7 +19721,7 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "academic_coordinator")
     def course_adjustments():
         program_id = request.args.get("program_id", type=int)
-        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
+        program = Program.query.get(program_id) if program_id else default_program()
         if not program:
             return jsonify({"error": "No program found."}), 404
         term_id = request.args.get("term_id", type=int)
@@ -19712,7 +19732,7 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "academic_coordinator")
     def course_adjustments_subject_needs_report():
         program_id = request.args.get("program_id", type=int)
-        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
+        program = Program.query.get(program_id) if program_id else default_program()
         if not program:
             return jsonify({"error": "No program found."}), 404
         term_id = request.args.get("term_id", type=int)
@@ -20444,7 +20464,7 @@ def register_routes(app: Flask) -> None:
         (never taken or failed; subjects being taken now are not missing), in curriculum order. Read-only."""
         programs = Program.query.order_by(Program.code).all()
         program_id = request.args.get("program_id", type=int)
-        program = next((p for p in programs if p.id == program_id), None) or (programs[0] if programs else None)
+        program = next((p for p in programs if p.id == program_id), None) or default_program()
         term = get_active_term()
         if not program:
             return jsonify({"programs": [], "program_id": None, "term_label": term.label if term else "", "items": []})
@@ -20480,7 +20500,7 @@ def register_routes(app: Flask) -> None:
         term_id = request.args.get("term_id", type=int)
         course_id = request.args.get("course_id", type=int)
         view = (request.args.get("view") or "").strip().lower()
-        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
+        program = Program.query.get(program_id) if program_id else default_program()
         if not program:
             return jsonify({"error": "No program found."}), 404
         term = AcademicTerm.query.get(term_id) if term_id else get_active_term()
@@ -20895,7 +20915,7 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
     def monitoring_export():
         program_id = request.args.get("program_id", type=int)
-        program = db.session.get(Program, program_id) if program_id else Program.query.order_by(Program.code).first()
+        program = db.session.get(Program, program_id) if program_id else default_program()
         if not program:
             return jsonify({"error": "No program found."}), 404
         return Response(
@@ -20918,7 +20938,7 @@ def register_routes(app: Flask) -> None:
     @require_api_login("staff", "academic_coordinator", "research_coordinator", "dean")
     def monitoring_grid():
         program_id = request.args.get("program_id", type=int)
-        program = Program.query.get(program_id) if program_id else Program.query.order_by(Program.code).first()
+        program = Program.query.get(program_id) if program_id else default_program()
         if not program:
             return jsonify({"error": "No program found."}), 404
 
@@ -30233,7 +30253,7 @@ def standing_from_sheet_note(note: str | None) -> tuple[str, str, str] | None:
     return None
 
 
-def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, overwrite_completed=False, upload=None):
+def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, overwrite_completed=False, upload=None, create_login=True):
     student_number = str(row.get("idno") or "").strip()
     first_name = clean_person_name(row.get("first_name", ""))
     last_name = clean_person_name(row.get("last_name", ""))
@@ -30333,7 +30353,8 @@ def _apply_monitoring_row(row, program, course_by_code, term, *, student=None, o
         db.session.add(TermEnrollment(student_id=student.id, term_id=term.id, status="Confirmed", source_reference="AC Student Monitoring import"))
         for item in onboarding_requirements():
             db.session.add(DocumentCheck(student_id=student.id, gate="Admission Handoff", item_name=item, status="Complete", evidence_reference="AC Student Monitoring import"))
-    account = ensure_student_account(student, student.email) if is_new else None
+    # IM54: the demo seed imports its kept students without portal logins (only student@ and the demo personas sign in).
+    account = ensure_student_account(student, student.email) if is_new and create_login else None
     if standing_imported:
         add_log(
             "student-handoff",
@@ -30398,7 +30419,7 @@ def accounts_message(created_accounts: list[dict]) -> str:
     return f" {len(created_accounts)} new student portal account(s) created" + (f" (password: {hint})." if hint else ".")
 
 
-def import_ac_monitoring(parsed: dict, upload: MonitoringSheetUpload | None = None) -> dict:
+def import_ac_monitoring(parsed: dict, upload: MonitoringSheetUpload | None = None, *, create_logins: bool = True) -> dict:
     program = Program.query.filter_by(code=parsed["program_code"]).first()
     if not program:
         program = Program(code=parsed["program_code"], name=f"{parsed['program_code']} (imported)", college="Imported")
@@ -30465,7 +30486,7 @@ def import_ac_monitoring(parsed: dict, upload: MonitoringSheetUpload | None = No
             continue
 
         existing_before = _monitoring_existing_snapshot(student, course_by_code) if student else {}
-        applied = _apply_monitoring_row(row, program, course_by_code, term, student=student, upload=upload)
+        applied = _apply_monitoring_row(row, program, course_by_code, term, student=student, upload=upload, create_login=create_logins)
         student = applied["student"]
         row_subject_changes = applied["subject_changes"]
         completed = applied["completed"]
@@ -37841,6 +37862,21 @@ def research_exam_eligibility(student: Student) -> dict:
     return memo[student.id]
 
 
+def verified_demo_research_case(student: Student) -> ResearchCase | None:
+    """The verified-complete research case of a workflow-demo or seeded-complete student, else None. Asked once per
+    requirement row (about 18 per student), so it is remembered for the request (owner feedback 2026-11-23, stage 7)."""
+    _, demo_config = workflow_demo_config_for_student(student)
+    if not (
+        demo_config or student.student_number in SEEDED_RESEARCH_COMPLETE_NUMBERS
+    ):
+        return None
+    return ResearchCase.query.filter_by(
+        student_id=student.id,
+        current_gate="Completion Evidence",
+        status="Verified Complete",
+    ).first()
+
+
 def research_requirement_state(
     student: Student | None,
     gate: str,
@@ -37854,15 +37890,7 @@ def research_requirement_state(
     if exam and not exam["research_allowed"]:
         return {"status": "Locked", "status_label": research_lock_status(exam)}
     if student:
-        _, demo_config = workflow_demo_config_for_student(student)
-        verified_demo_case = (
-            ResearchCase.query.filter_by(
-                student_id=student.id,
-                current_gate="Completion Evidence",
-                status="Verified Complete",
-            ).first()
-            if demo_config or student.student_number in SEEDED_RESEARCH_COMPLETE_NUMBERS else None
-        )
+        verified_demo_case = verified_demo_research_case(student)
         if verified_demo_case:
             # Practicum and Graduation workflow-demo students begin after research completion.
             # Treat their explicit verified baseline as the authoritative source
@@ -40373,10 +40401,13 @@ def migrate_research_vocabulary() -> None:
 MONITORING_SHEET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Documents", "Sample_Data", "Monitoring_Sheets")
 
 
-def import_program_monitoring_sheets() -> int:
+def import_program_monitoring_sheets(keep_students: frozenset | None = None, create_logins: bool = True) -> int:
     """Seed the student roster by importing the per-program registrar monitoring
     sheets in Documents/Sample_Data/Monitoring_Sheets. These .xlsx files are the single source
-    of truth for who is enrolled and their coursework completion."""
+    of truth for who is enrolled and their coursework completion.
+
+    keep_students (demo seed, IM54): import only these student numbers; every sheet is still read, so every program
+    keeps its curriculum. create_logins=False imports them without portal logins."""
     if not os.path.isdir(MONITORING_SHEET_DIR):
         return 0
     created = 0
@@ -40390,7 +40421,9 @@ def import_program_monitoring_sheets() -> int:
     for workbook_path in workbook_paths:
         with workbook_path.open("rb") as fh:
             parsed = parse_ac_monitoring(fh)
-        result = import_ac_monitoring(parsed)
+        if keep_students is not None:
+            parsed["rows"] = [row for row in parsed["rows"] if str(row.get("idno") or "").strip() in keep_students]
+        result = import_ac_monitoring(parsed, create_logins=create_logins)
         created += result.get("created", 0)
     return created
 
@@ -40398,10 +40431,12 @@ def import_program_monitoring_sheets() -> int:
 FACULTY_SHEET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Documents", "Sample_Data", "Faculty_Sheet")
 
 
-def import_faculty_sheets() -> int:
+def import_faculty_sheets(keep_names: tuple | frozenset | None = None) -> int:
     """Create the faculty roster from the imported faculty sheet(s) in
     Documents/Sample_Data/Faculty_Sheet. Faculty are a real, sheet-sourced roster and are never
-    randomly generated. Header columns: NAME, COLLEGE, ROLE, EMAIL, SPECIALIZATION."""
+    randomly generated. Header columns: NAME, COLLEGE, ROLE, EMAIL, SPECIALIZATION.
+
+    keep_names (demo seed, IM56): import only these faculty."""
     import openpyxl
     if not os.path.isdir(FACULTY_SHEET_DIR):
         return 0
@@ -40430,6 +40465,8 @@ def import_faculty_sheets() -> int:
 
         for row in grid[header_idx + 1:]:
             name = value(row, "NAME")
+            if keep_names is not None and name not in keep_names:
+                continue
             if not name:
                 continue
             faculty = Faculty.query.filter_by(name=name).first()
@@ -40901,7 +40938,9 @@ def ensure_upcoming_defense_demo() -> int:
         base = bases.get(item["base"])
         if not base:
             continue
-        spec = {**base, **{key: item[key] for key in ("student_number", "first_name", "last_name", "case_title")}}
+        # IM56: an entry may name its own panel (a thesis panel of four seats on a base with a dissertation panel)
+        spec = {**base, **{key: item[key] for key in ("student_number", "first_name", "last_name", "case_title", "title_panel")
+                           if key in item}}
         student = Student.query.filter_by(student_number=spec["student_number"]).first()
         if student is None:
             program = Program.query.filter_by(code=spec["program_code"]).first()
@@ -41985,9 +42024,12 @@ def seed_database() -> None:
     # Curriculum, faculty, and students all come from imported source sheets — nothing
     # is randomly generated. Program curriculum arrives with each monitoring sheet, the
     # faculty roster from the faculty sheet, and students from the monitoring sheets.
-    import_faculty_sheets()
+    # IM54-IM56 (2026-11-22): the demo keeps seven faculty and the imported students that carry a case; every
+    # program still gets its curriculum from its sheet.
+    from panel_demo_data import DEMO_FACULTY, DEMO_KEPT_SHEET_STUDENTS
+    import_faculty_sheets(keep_names=DEMO_FACULTY)
     db.session.flush()
-    import_program_monitoring_sheets()
+    import_program_monitoring_sheets(keep_students=DEMO_KEPT_SHEET_STUDENTS, create_logins=False)
     ensure_practicum_program_policy()
     db.session.commit()
     ensure_business_rules()
@@ -42007,17 +42049,39 @@ def seed_database() -> None:
 
 
 # Cases that wait for (or already have) a Dean decision, so the Dean's screens are not empty on a
-# fresh seed (I-062). Students come from the monitoring sheets and belong to no other demo.
+# fresh seed (I-062). IM56 (2026-11-22): six MAED demo students (panel_demo_data.DEAN_DEMO_PERSONAS) hold the leave,
+# readmission, AWOL and withdrawal cases; the practicum report (MAPSY) and the graduation list stay with imported students.
+from panel_demo_data import DEAN_DEMO_PERSONAS  # noqa: E402
+
 DEAN_DEMO_STUDENTS = {
-    "leave-of-absence": "2360074",      # Lorenzo Reyes, MSN: LOA with the Dean
-    "readmission": "2360031",           # Hazel Castillo, MIT: on leave, readmission with the Dean
-    "awol-return": "2560085",           # Noel Navarro, MAN: AWOL, return declaration with the Dean
-    "withdrawal": "2360087",            # Hazel Flores, MAN: subject withdrawal with the Dean
+    **{key: number for key, (number, _first, _last) in DEAN_DEMO_PERSONAS.items()},
     "practicum": "2360101",             # Isabel Mendoza, MAPSY: practicum report sent to the Dean
     "graduation": "2360008",            # Hector Ong, MAED: graduation endorsement ready for the Dean
-    "leave-of-absence-decided": "2460017",   # Olivia Cabrera, MSCS: LOA the Dean approved
-    "withdrawal-decided": "2460068",    # Gian Lacson, MSN: withdrawal the Dean denied
 }
+
+
+def ensure_dean_demo_students() -> int:
+    """The six MAED demo students of the Dean's cases (IM56): enrolled MAED coursework students with a sign-in.
+    Returns the students made."""
+    maed = Program.query.filter(func.upper(Program.code) == "MAED").first()
+    if not maed:
+        return 0
+    made = 0
+    for number, first, last in DEAN_DEMO_PERSONAS.values():
+        if Student.query.filter_by(student_number=number).first():
+            continue
+        student = Student(
+            student_number=number, first_name=first, last_name=last, email=f"{first}.{last}@student.usls.edu.ph".lower(),
+            program_id=maed.id, entry_year=2025, academic_year_entry="25-26", year_level="1st Year",
+        )
+        db.session.add(student)
+        db.session.flush()
+        ensure_workflow_demo_student_baseline(student, "withdrawal", program_code="MAED")
+        student.standing, student.enrollment_tag = "Active", "Enrolled"
+        ensure_student_account(student, student.email, SIM_STUDENT_PASSWORD)
+        db.session.flush()
+        made += 1
+    return made
 DEAN_DEMO_PLANS = (("MIT", "Submitted"), ("MSN", "Returned"))
 
 
@@ -42036,6 +42100,7 @@ def seed_dean_review_cases() -> int:
         return 0
     next_term = leave_term(upcoming[0])
     made = 0
+    ensure_dean_demo_students()
 
     def student_for(key: str) -> Student | None:
         return Student.query.filter_by(student_number=DEAN_DEMO_STUDENTS[key]).first()
@@ -42593,30 +42658,145 @@ HISTORY_LOG_SLUGS = {
     "practicum": "practicum", "graduation": "graduation",
 }
 # Held defenses of the two earlier terms: (defense type, result). Only students with no other story sit in them.
+# IM57 (2026-11-22): a small history - two held defenses per earlier term.
 HISTORY_DEFENSES = {
-    "older": [("Title Defense", VERDICT_PASSED), ("Title Defense", VERDICT_PASSED), ("Proposal Defense", VERDICT_MINOR),
-              ("Proposal Defense", VERDICT_FAILED)],
-    "recent": [("Title Defense", VERDICT_PASSED), ("Proposal Defense", VERDICT_PASSED), ("Proposal Defense", VERDICT_MINOR),
-               ("Final Defense", VERDICT_PASSED), ("Final Defense", VERDICT_FAILED)],
+    "older": [("Title Defense", VERDICT_PASSED), ("Proposal Defense", VERDICT_MINOR)],
+    "recent": [("Proposal Defense", VERDICT_PASSED), ("Final Defense", VERDICT_PASSED)],
 }
 # (process, outcomes) per term; A = approved, D = denied, R = returned.
+# IM57 (2026-11-22): a small history on the HISTORY_DEMO_STUDENTS - a few decided cases of each kind per term.
 HISTORY_PLAN = {
-    "older": [("leave", "AADA"), ("readmission", "AA"), ("awol", "A"), ("withdrawal", "AADAA"), ("practicum", "AA"),
-              ("graduation", "AA"), ("adviser", "AADA")],
-    "recent": [("leave", "AAADA"), ("readmission", "AAD"), ("awol", "AA"), ("withdrawal", "AAAADA"), ("practicum", "AAA"),
-               ("graduation", "AAA"), ("adviser", "AAADA")],
-    "current": [("leave", "A"), ("withdrawal", "AD"), ("practicum", "A"), ("adviser", "AA")],
+    "older": [("leave", "AD"), ("withdrawal", "AD"), ("practicum", "A"), ("graduation", "A"), ("adviser", "A")],
+    "recent": [("leave", "AD"), ("readmission", "A"), ("awol", "A"), ("withdrawal", "A"), ("practicum", "A"),
+               ("graduation", "A"), ("adviser", "A")],
+    "current": [("leave", "A")],
 }
+
+
+def ensure_adviser_application_students() -> int:
+    """IM57 (2026-11-22): four MAED students at the title stage with no research adviser and a sign-in, for the adviser
+    walkthrough (frontend/e2e/p63) and the Reports "Records to fix" list, and sign-ins for the imported students a
+    walkthrough uses. Returns the students made."""
+    from panel_demo_data import ADVISER_APPLICATION_STUDENTS, WALKTHROUGH_LOGIN_STUDENTS
+    program = Program.query.filter(func.upper(Program.code) == "MAED").first()
+    if not program:
+        return 0
+    made = 0
+    title_gate = RESEARCH_GATE_TITLE
+    for number, first, last, stage, title, subject in ADVISER_APPLICATION_STUDENTS:
+        if Student.query.filter_by(student_number=number).first():
+            continue
+        student = Student(
+            student_number=number, first_name=first, last_name=last, program_id=program.id,
+            email=f"{first}.{last}@student.usls.edu.ph".lower(), entry_year=2023, academic_year_entry="23-24",
+            year_level="3rd Year", current_stage=stage, standing="Active", enrollment_tag="Enrolled",
+            comprehensive_exam_status="Passed", risk_level="On Track",
+        )
+        db.session.add(student)
+        db.session.flush()
+        for course in monitoring_curriculum_courses(program):
+            db.session.add(CourseRecord(
+                student_id=student.id, course_id=course.id, status="Completed", term_label="AY 2025-2026 1st Semester",
+                grade_status="Passed", grade_value="1.50", evidence_reference="Seeded history (AIMS grades)",
+            ))
+        db.session.add(ResearchCase(
+            student_id=student.id, case_type=research_case_type(student), title=title,
+            current_gate=title_gate, status="Missing Requirements",
+        ))
+        db.session.flush()
+        # the Form 1 papers are on file, as for the roster students (seed_roster_research_papers, I-145)
+        _panel_demo_evidence(
+            student, title_gate, "Form 1 - Application for Title Defense", 1, "Form 1 Application for Title Defense",
+            f"Application for Title Defense submitted by {student.name} (MAED) with three concept papers. "
+            "Demonstration document.", True,
+        )
+        papers = (
+            (title, f"This study examines {subject}. It describes the setting, states the research questions, and "
+                    "proposes a mixed-methods design with a survey of teachers and interviews of school leaders."),
+            (f"{title}: A Survey of Practice", f"A descriptive survey of {subject}, reporting current practice and "
+                                                "the gaps that school leaders and teachers name."),
+            (f"{title}: Implications for School Policy", f"A policy paper on {subject}, drawing implications for "
+                                                         "school heads, division offices and teacher education."),
+        )
+        for paper_number, (paper_title, paper_body) in enumerate(papers, start=1):
+            _panel_demo_evidence(student, title_gate, "Three concept papers", paper_number, paper_title, paper_body, True)
+        db.session.add(Form1Endorsement(
+            student_id=student.id, coordinator_name="Academic Coordinator (demo seed)", signature_data="demo-seed",
+            status="Endorsed", endorsed_at=now_utc() - timedelta(days=30),
+        ))
+        ensure_student_account(student, student.email, SIM_STUDENT_PASSWORD)
+        made += 1
+    for number in WALKTHROUGH_LOGIN_STUDENTS:
+        student = Student.query.filter_by(student_number=number).first()
+        if student and student.email:
+            ensure_student_account(student, student.email, SIM_STUDENT_PASSWORD)
+    db.session.flush()
+    return made
+
+
+def ensure_quiet_demo_student() -> bool:
+    """IM57: the student home's "nothing waiting" student (frontend/e2e/p70), made after the history and the board
+    cases so no seeder gives them a case. Returns True when made."""
+    from panel_demo_data import QUIET_DEMO_STUDENT
+    program = Program.query.filter(func.upper(Program.code) == "MAED").first()
+    number, first, last = QUIET_DEMO_STUDENT
+    made = False
+    if program and not Student.query.filter_by(student_number=number).first():
+        student = Student(
+            student_number=number, first_name=first, last_name=last, program_id=program.id,
+            email=f"{first}.{last}@student.usls.edu.ph".lower(), entry_year=2023, academic_year_entry="23-24",
+            year_level="3rd Year", current_stage="Coursework", standing="Active", enrollment_tag="Enrolled",
+            comprehensive_exam_status="Not Taken", risk_level="On Track",
+        )
+        db.session.add(student)
+        db.session.flush()
+        for course in monitoring_curriculum_courses(program):
+            db.session.add(CourseRecord(
+                student_id=student.id, course_id=course.id, status="Completed", term_label="AY 2024-2025 2nd Semester",
+                grade_status="Passed", grade_value="1.50", evidence_reference="Seeded history (AIMS grades)",
+            ))
+        ensure_student_account(student, student.email, SIM_STUDENT_PASSWORD)
+        made = True
+    db.session.flush()
+    return made
+
+
+def ensure_history_demo_students() -> int:
+    """The students of the small history (IM57): MAED coursework students (MSGC for practicum) with a few completed
+    subjects, no case and no sign-in. Returns the students made."""
+    from panel_demo_data import HISTORY_DEMO_STUDENTS, HISTORY_PRACTICUM_STUDENTS
+    made = 0
+    for rows, code in ((HISTORY_DEMO_STUDENTS, "MAED"), (HISTORY_PRACTICUM_STUDENTS, "MSGC")):
+        program = Program.query.filter(func.upper(Program.code) == code).first()
+        if not program:
+            continue
+        for number, first, last in rows:
+            if Student.query.filter_by(student_number=number).first():
+                continue
+            student = Student(
+                student_number=number, first_name=first, last_name=last, program_id=program.id,
+                email=f"{first}.{last}@student.usls.edu.ph".lower(), entry_year=2024, academic_year_entry="24-25",
+                year_level="2nd Year", current_stage="Coursework", standing="Active", enrollment_tag="Enrolled",
+                comprehensive_exam_status="Not Taken", risk_level="On Track",
+            )
+            db.session.add(student)
+            db.session.flush()
+            for course in monitoring_curriculum_courses(program)[:4]:
+                db.session.add(CourseRecord(
+                    student_id=student.id, course_id=course.id, status="Completed", term_label="AY 2025-2026 1st Semester",
+                    grade_status="Passed", grade_value="1.75", evidence_reference="Seeded history (AIMS grades)",
+                ))
+            made += 1
+    db.session.flush()
+    return made
 
 
 # F8-04: past graduates, so the graduation history in the earlier terms holds only students who finished everything.
 PAST_GRADUATES = (  # (student number, first name, last name, program code)
-    ("2260901", "Ramon", "Villareal", "MSCS"),
-    ("2260902", "Maricel", "Dizon", "MIT"),
-    ("2260903", "Joselito", "Bernardo", "MBA"),
+    # IM54/IM57 (2026-11-22): three past graduates, all MAED (the pool of the graduation history).
     ("2260904", "Angelica", "Pascual", "MAED"),
-    ("2260905", "Liza", "Magbanua", "MSN"),
-    ("2260906", "Rodrigo", "Alcantara", "EDD"),
+    ("2260907", "Teodora", "Valencia", "MAED"),
+    ("2260908", "Wilfredo", "Yanson", "MAED"),
 )
 
 
@@ -42668,6 +42848,7 @@ def seed_report_history(today: date | None = None) -> int:
     if not (active and recent_term and older_term):
         return 0
     terms = {"older": older_term, "recent": recent_term, "current": active}
+    ensure_history_demo_students()
 
     busy: set[int] = set()
     for model in (LeaveCase, AwolCase, WithdrawalApplication, GraduationEndorsement, PracticumRecord, AdviserAppointment,
@@ -42989,6 +43170,147 @@ def _seed_current_subject(student: Student, term: AcademicTerm, added_by: str) -
     return enrollment
 
 
+def _seed_stage_ready_withdrawal(student: Student, active_term: AcademicTerm, status: str, registrar_status: str,
+                                 reason: str = "The workload clashes with my full-time job.") -> WithdrawalApplication | None:
+    """One Dean-approved withdrawal at `status` for a student with a subject this semester (seed and demo reset)."""
+    enrollment = _seed_current_subject(student, active_term, "Panel demo enrollment")
+    if not enrollment or not enrollment.course:
+        return None
+    ensure_term_enrollment(student, active_term, "Enrolled", "Panel demo enrollment")
+    decided = now_utc() - timedelta(days=1, hours=2)
+    form = _seed_request_pdf(student, "withdrawal", f"Withdrawal_Request_{student.student_number}.pdf", "Request", days_ago=4)
+    application = WithdrawalApplication(
+        student_id=student.id, reason=reason, effective_term=active_term.label,
+        subject_enrollment_id=enrollment.id, withdrawal_scope="Subject", request_attachment_id=form.id,
+        fee_status="Pending", requirement_status="Not Applicable", dean_decision="Approved",
+        dean_remarks="Approved within the withdrawal window.", registrar_status=registrar_status, status=status,
+        created_at=decided - timedelta(days=3), decided_at=decided, updated_at=decided,
+    )
+    db.session.add(application)
+    db.session.flush()
+    form.workflow_request_id = application.id
+    if status == "Subject Tagged - Registrar Preparation":
+        apply_approved_subject_withdrawal(application)
+    add_log("withdrawal", student.id, "Dean" if status.startswith("Approved") else "Graduate School Staff", "Withdrawal request",
+            "Withdrawal approved by the Dean" if status.startswith("Approved") else "Subject tagged as Withdrawn",
+            "Graduate School Staff", f"Subject: {enrollment.course.code}. Effective semester: {active_term.label}.",
+            previous_status="Dean Review" if status.startswith("Approved") else "Approved - Awaiting Subject Tag", new_status=status)
+    return application
+
+
+def _seed_stage_ready_graduation(student: Student, status: str = "For Review") -> GraduationEndorsement:
+    """One graduation application at `status` with the signed application on file (seed and demo reset)."""
+    application = _seed_request_pdf(student, "graduation", f"Graduation_Application_{student.student_number}.pdf", "For Review")
+    endorsement = GraduationEndorsement(
+        student_id=student.id, review_window=default_graduation_school_year() or "Current review window",
+        batch_name=None if status == "For Review" else default_graduation_batch_name(),
+        endorsement_status=status, registrar_status="Pending", request_attachment_id=application.id,
+        submitted_at=now_utc() - timedelta(days=5),
+    )
+    db.session.add(endorsement)
+    db.session.flush()
+    application.workflow_request_id = endorsement.id
+    apply_graduation_eligibility(endorsement, graduation_eligibility(student))
+    endorsement.endorsement_status = status
+    student.current_stage = "Final Defense"
+    owner, actor = STAGE_READY_GRADUATION_OWNER[status]
+    add_log("graduation", student.id, actor, "Graduation endorsement list", f"Graduation endorsement: {status}", owner,
+            "Seeded for the panel demo.", new_status=status)
+    return endorsement
+
+
+# Owner 2026-11-19: resetting a Graduation or Withdrawal demo student also fills "Application submitted" (Graduation) and
+# "Excel export" (Withdrawal) up to five other students, so "Select all" and "Create batch" can be shown with a group.
+DEMO_QUEUE_SIZE = 5
+# Students the reset adds for Graduation get numbers 2799xxx: like the seeded graduation students they begin after research
+# completion, so research_requirement_state keeps their verified baseline and the Dean's export includes them.
+DEMO_QUEUE_NUMBER_PREFIX = "2799"
+DEMO_QUEUE_FIRST_NAMES = ("Andrea", "Bea", "Carlo", "Dana", "Elijah", "Faye", "Gino", "Hannah", "Ivan", "Jessa",
+                          "Kyle", "Lia", "Mark", "Nico", "Olive", "Paolo", "Rica", "Sam", "Tina", "Vince")
+DEMO_QUEUE_LAST_NAMES = ("Aguilar", "Belleza", "Cuenca", "Dizon", "Escalante", "Fuentes", "Gaston", "Hilado", "Infante",
+                         "Jalandoni", "Lacson", "Mirasol", "Ojeda", "Puentevella", "Quiros", "Ramos", "Sarabia", "Tan")
+
+
+def top_up_graduation_demo_queue(target: int = DEMO_QUEUE_SIZE) -> int:
+    """Fill "Application submitted" up to `target` students besides the demo accounts. Returns the applications made."""
+    demo_numbers = set(DEMO_STUDENT_NUMBERS.values())
+    waiting = [
+        item for item in GraduationEndorsement.query.filter(
+            GraduationEndorsement.batch_name.is_(None), GraduationEndorsement.request_attachment_id.isnot(None),
+            GraduationEndorsement.endorsement_status.in_(["Not Prepared", "For Review", "Returned for Clarification"]),
+        ).all()
+        if item.student and item.student.student_number not in demo_numbers
+    ]
+    made = 0
+    rng = random.SystemRandom()
+    attempts = 0
+    while len(waiting) + made < target and attempts < 50:
+        attempts += 1
+        number = f"{DEMO_QUEUE_NUMBER_PREFIX}{rng.randint(100, 999)}"
+        if Student.query.filter_by(student_number=number).first():
+            continue
+        student = _seed_eligible_graduation_student(number, rng.choice(DEMO_QUEUE_FIRST_NAMES), rng.choice(DEMO_QUEUE_LAST_NAMES))
+        if not student:
+            continue
+        db.session.flush()
+        _seed_stage_ready_graduation(student, "For Review")
+        made += 1
+    return made
+
+
+def top_up_withdrawal_demo_queue(target: int = DEMO_QUEUE_SIZE) -> int:
+    """Fill "Excel export" (tagged, not exported) up to `target` students besides the demo accounts, picked at random
+    from enrolled students with no other case. Returns the withdrawals made."""
+    active_term = get_active_term()
+    if not active_term:
+        return 0
+    demo_numbers = set(DEMO_STUDENT_NUMBERS.values())
+    waiting = [
+        item for item in WithdrawalApplication.query.filter_by(status="Subject Tagged - Registrar Preparation").all()
+        if item.student and item.student.student_number not in demo_numbers
+    ]
+    busy: set[int] = set()
+    for model in (LeaveCase, AwolCase, WithdrawalApplication, GraduationEndorsement, PracticumRecord):
+        busy |= {sid for (sid,) in db.session.query(model.student_id).distinct().all() if sid}
+    pool = [
+        student for student in Student.query.filter(Student.standing == "Active", Student.enrollment_tag == "Enrolled").all()
+        if student.id not in busy and student.student_number not in demo_numbers and not program_allows_practicum(student.program)
+    ]
+    random.SystemRandom().shuffle(pool)
+    reasons = ("The workload clashes with my full-time job.", "My work schedule changed this semester.",
+               "A family matter needs my time this term.", "I need to focus on my thesis this semester.")
+    made = 0
+    for student in pool:
+        if len(waiting) + made >= target:
+            break
+        if _seed_stage_ready_withdrawal(student, active_term, "Subject Tagged - Registrar Preparation", "Pending Excel Export",
+                                        reason=random.SystemRandom().choice(reasons)):
+            made += 1
+    # IM56 (2026-11-22): the trimmed demo data has no free imported student, so the queue is topped up with new MAED
+    # demonstration students, the way top_up_graduation_demo_queue does (only on a demo reset, never in the seed).
+    rng = random.SystemRandom()
+    maed = Program.query.filter(func.upper(Program.code) == "MAED").first()
+    attempts = 0
+    while maed and len(waiting) + made < target and attempts < 50:
+        attempts += 1
+        number = f"{DEMO_QUEUE_NUMBER_PREFIX}{rng.randint(100, 999)}"
+        if Student.query.filter_by(student_number=number).first():
+            continue
+        first, last = rng.choice(DEMO_QUEUE_FIRST_NAMES), rng.choice(DEMO_QUEUE_LAST_NAMES)
+        student = Student(
+            student_number=number, first_name=first, last_name=last, email=f"{first}.{last}.{number}@student.usls.edu.ph".lower(),
+            program_id=maed.id, entry_year=2025, academic_year_entry="25-26", year_level="1st Year",
+        )
+        db.session.add(student)
+        db.session.flush()
+        ensure_workflow_demo_student_baseline(student, "withdrawal", program_code="MAED")
+        student.standing, student.enrollment_tag = "Active", "Enrolled"
+        if _seed_stage_ready_withdrawal(student, active_term, "Subject Tagged - Registrar Preparation", "Pending Excel Export",
+                                        reason=rng.choice(reasons)):
+            made += 1
+    return made
+
+
 def seed_stage_ready_cases() -> int:
     """Records waiting at each step (STAGE_READY_*). Practicum and Withdrawal use roster students with no other case;
     Graduation uses its own eligible demo students. Returns the records made."""
@@ -43052,7 +43374,26 @@ def seed_stage_ready_cases() -> int:
         made += 1
 
     # Withdrawal: a Dean-approved request at subject tagging, and one already tagged (Excel export next).
+    # IM54 (2026-11-22): two MAED demo students with a sign-in hold these steps; a free imported student with a sign-in
+    # (none in the trimmed demo data) still comes first, as before.
+    from panel_demo_data import STAGE_READY_WITHDRAWAL_STUDENTS
+    maed = Program.query.filter(func.upper(Program.code) == "MAED").first()
+    for number, first, last in STAGE_READY_WITHDRAWAL_STUDENTS:
+        if maed and not Student.query.filter_by(student_number=number).first():
+            persona = Student(
+                student_number=number, first_name=first, last_name=last, email=f"{first}.{last}@student.usls.edu.ph".lower(),
+                program_id=maed.id, entry_year=2025, academic_year_entry="25-26", year_level="1st Year",
+            )
+            db.session.add(persona)
+            db.session.flush()
+            ensure_workflow_demo_student_baseline(persona, "withdrawal", program_code="MAED")
+            persona.standing, persona.enrollment_tag = "Active", "Enrolled"
+            ensure_student_account(persona, persona.email, SIM_STUDENT_PASSWORD)
+            db.session.flush()
+    withdrawal_numbers = [row[0] for row in STAGE_READY_WITHDRAWAL_STUDENTS]
     pool = [s for s in Student.query.order_by(Student.id).all() if free(s) and not program_allows_practicum(s.program)]
+    pool += [s for s in Student.query.filter(Student.student_number.in_(withdrawal_numbers)).order_by(Student.student_number).all()
+             if s.id not in busy and s not in pool]
     used = 0
     for student in pool:
         if used >= len(STAGE_READY_WITHDRAWAL) or not active_term:
@@ -44487,8 +44828,10 @@ def ensure_demo_request_submission_logs() -> int:
     return created
 
 
-def link_faculty_accounts() -> None:
-    """Give every faculty profile an email, eligible roles and one login, and link advisers to their students."""
+def link_faculty_accounts(login_names: frozenset | None = None) -> None:
+    """Give every faculty profile an email, eligible roles and one login, and link advisers to their students.
+
+    login_names (demo seed, IM54): only these faculty get a login; the others keep an email and no login."""
     default_roles = json.dumps(["Faculty Adviser", "Panel Member", "Panel Chair"])
     for faculty in Faculty.query.order_by(Faculty.id).all():
         if faculty_email_needs_generation(faculty.email):
@@ -44496,6 +44839,8 @@ def link_faculty_accounts() -> None:
         faculty.email = faculty.email.strip().lower()
         if not faculty.eligible_roles:
             faculty.eligible_roles = default_roles
+        if login_names is not None and faculty.name not in login_names:
+            continue
         # Only a NEW account gets the initial password; never overwrite one a person has chosen.
         primary = ensure_faculty_user_account(faculty, SIM_STUDENT_PASSWORD)
         # A brand-new account has no id until it is flushed; without this the duplicate filter below
@@ -44579,6 +44924,89 @@ def ensure_demo_accounts() -> None:
 
 from teaching_backend import install_models as install_teaching_models
 globals().update(install_teaching_models(db))
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Per-request memo (owner feedback 2026-11-23, stage 7: "the site is slow").
+# The slow pages built the same per-student picture many times in one request: the Research Gate board asked for a
+# student's course audit and exam eligibility once per requirement row, Reports "Needs attention" rebuilt each
+# audit 3-4 times, the Dean's approvals re-read the latest leave case per field. Within ONE read-only (GET) request
+# the answer cannot change, so these functions remember it - keyed by the row ids and arguments. Anything the
+# request writes clears the memo (after_flush), and POST/PUT/DELETE requests never use it. Each hit returns a
+# shallow copy of a dict or list answer (a deep copy cost more than the queries it saved): a caller may set its own
+# top-level keys; no caller edits the nested rows (checked across app.py when this was added).
+# ---------------------------------------------------------------------------------------------------------------
+import copy as _copy  # noqa: E402
+
+_REQUEST_MEMO_ATTR = "_request_memo"
+
+
+_REQUEST_MEMO_ON = os.getenv("USLS_REQUEST_MEMO", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _request_memo_store() -> dict | None:
+    """The memo of this request, or None: outside a request, on a request that may write, or with
+    USLS_REQUEST_MEMO=0 (the switch to turn it off if a page ever shows an out-of-date value)."""
+    if not _REQUEST_MEMO_ON or not has_request_context() or request.method not in ("GET", "HEAD"):
+        return None
+    store = getattr(flask_g, _REQUEST_MEMO_ATTR, None)
+    if store is None:
+        store = {}
+        setattr(flask_g, _REQUEST_MEMO_ATTR, store)
+    return store
+
+
+def _request_memo_key_part(value):
+    if isinstance(value, db.Model):
+        ident = inspect(value).identity
+        if not ident:
+            raise TypeError("unsaved row")
+        return (type(value).__name__,) + tuple(ident)
+    if isinstance(value, (list, set, frozenset)):
+        return tuple(sorted(_request_memo_key_part(item) for item in value))
+    hash(value)
+    return value
+
+
+def request_memo(fn, *, copy_result: bool = True, unless=()):
+    """Wrap `fn` so a GET request computes it once per distinct arguments. `unless` names keyword arguments that,
+    when given (not None), make the call bypass the memo (a caller passing its own preloaded data)."""
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        store = _request_memo_store()
+        if store is None or any(kwargs.get(name) is not None for name in unless):
+            return fn(*args, **kwargs)
+        try:
+            key = (fn.__name__,) + tuple(_request_memo_key_part(arg) for arg in args) + tuple(
+                (name, _request_memo_key_part(value)) for name, value in sorted(kwargs.items())
+            )
+        except TypeError:
+            return fn(*args, **kwargs)
+        if key not in store:
+            store[key] = fn(*args, **kwargs)
+        result = store[key]
+        return _copy.copy(result) if copy_result and isinstance(result, (dict, list)) else result
+
+    wrapper.__wrapped__ = fn
+    return wrapper
+
+
+@_sa_event.listens_for(Session, "after_flush")
+def _clear_request_memo_after_write(session, flush_context):
+    if has_request_context() and getattr(flask_g, _REQUEST_MEMO_ATTR, None):
+        setattr(flask_g, _REQUEST_MEMO_ATTR, {})
+
+
+compute_course_audit = request_memo(compute_course_audit, unless=("records", "required_courses"))
+comprehensive_exam_eligibility = request_memo(comprehensive_exam_eligibility, unless=("audit",))
+monitoring_curriculum_courses = request_memo(monitoring_curriculum_courses, copy_result=False, unless=("program_courses",))
+latest_defense_outcome = request_memo(latest_defense_outcome)
+active_schedule_for_gate = request_memo(active_schedule_for_gate, copy_result=False)
+# Not memoized (stage 8): graduation_eligibility, latest_leave_case, record_edit_marks and get_active_term were in the first
+# version; with them the full e2e run's Dean Activity Log missed a returned graduation endorsement (p33:320), with the memo
+# off it did not. Until that is explained they are computed every time.
+verified_demo_research_case = request_memo(verified_demo_research_case, copy_result=False)
 
 app = create_app()
 
@@ -44723,6 +45151,59 @@ def demo_data_stale_warning() -> str:
     return STALE_DEMO_DATA_WARNING if demo_data_stale() else ""
 
 
+SEED_UNDATED_COURSE_SOURCES = ("Demo seed: coursework complete", "AC Student Monitoring import")
+SEED_COURSE_GRADES = ("1.25", "1.50", "1.50", "1.75", "2.00")
+_SEMESTER_INDEX = {"1st": 1, "2nd": 2, "summer": 3}
+
+
+def _term_position(label: str) -> tuple[int, int] | None:
+    """("AY 2025-2026 2nd Semester") -> (2025, 2); None when the label is not a semester."""
+    match = re.search(r"AY\s*(\d{4})\s*-\s*\d{4}\s+(1st|2nd|Summer)", label or "", re.I)
+    return (int(match.group(1)), _SEMESTER_INDEX[match.group(2).lower()]) if match else None
+
+
+def fill_seed_course_terms() -> int:
+    """Owner 2026-11-25: the demo seed's completed subjects carried no semester and no grade, so the student record's
+    Curriculum tab said "Semester not recorded" for 21 demo students. Seed only: a record whose evidence is one of
+    SEED_UNDATED_COURSE_SOURCES gets the semester its curriculum slot falls in for the student's entry year (never
+    the current semester or later) and a passing grade. A real monitoring upload ("AC Student Monitoring upload #n")
+    is not touched - the sheet has no semester, and the portal does not invent one."""
+    active = _term_position(getattr(get_active_term(), "label", "") or "")
+    changed = 0
+    records = (
+        CourseRecord.query.filter(
+            CourseRecord.status == "Completed",
+            or_(CourseRecord.term_label.is_(None), CourseRecord.term_label == ""),
+            CourseRecord.evidence_reference.in_(SEED_UNDATED_COURSE_SOURCES),
+        )
+        .order_by(CourseRecord.id)
+        .all()
+    )
+    students = {student.id: student for student in Student.query.filter(Student.id.in_({record.student_id for record in records})).all()}
+    for record in records:
+        student, course = students.get(record.student_id), record.course
+        if not student or not course:
+            continue
+        entry = student.entry_year
+        if not entry:
+            match = re.match(r"(\d{2})", student.academic_year_entry or "")
+            entry = 2000 + int(match.group(1)) if match else None
+        if not entry:
+            continue
+        slot = re.search(r"Year\s*(\d)\D*?(1st|2nd)?\s*Sem", course.recommended_term or "", re.I)
+        year = int(slot.group(1)) if slot else 1
+        semester = 1 if slot and (slot.group(2) or "").lower() == "1st" else 2
+        position = (entry + year - 1, semester)
+        if active and position >= active:  # a finished subject was taken before the current semester
+            position = (active[0], active[1] - 1) if active[1] > 1 else (active[0] - 1, 2)
+        record.term_label = f"AY {position[0]}-{position[0] + 1} {'1st' if position[1] == 1 else '2nd'} Semester"
+        record.grade_value = SEED_COURSE_GRADES[(student.id * 31 + course.id) % len(SEED_COURSE_GRADES)]
+        record.grade_status = "Passed"
+        changed += 1
+    db.session.flush()
+    return changed
+
+
 def build_demo_database() -> dict:
     """Reset the database and build the one complete demo dataset (owner decisions IM2, IM4, IM16).
 
@@ -44739,7 +45220,8 @@ def build_demo_database() -> dict:
         seed_database()
         # 2. Accounts, and the links between people and their subjects.
         ensure_demo_accounts()
-        link_faculty_accounts()
+        from panel_demo_data import DEMO_FACULTY_LOGINS
+        link_faculty_accounts(login_names=DEMO_FACULTY_LOGINS)  # IM54: the three faculty the tours sign in as
         backfill_workflow_activity()
         backfill_subject_enrollments()
         db.session.commit()
@@ -44761,6 +45243,7 @@ def build_demo_database() -> dict:
         sync_automatic_awol_statuses(commit=False)
         db.session.commit()
         sync_leave_cases(commit=True)  # dates move leave cases along
+        ensure_adviser_application_students()  # IM57: the four research students the adviser walkthrough applies for
         seed_roster_advisers()  # a research student has a research adviser, a few still need one (F-25)
         seed_roster_research_papers()  # every research-stage student has a paper of their own (I-145)
         ensure_onboarding_reviews()
@@ -44774,7 +45257,9 @@ def build_demo_database() -> dict:
         seed_stage_ready_cases()  # a Withdrawal, Practicum and Graduation record waiting at every step (panel demo)
         seed_registrar_export_history()  # the already-exported Withdrawal and Graduation lists have history rows
         seed_exportable_graduation_batch()  # one Dean-approved batch the Dean can export on a fresh seed
+        ensure_quiet_demo_student()  # IM57: the student home's "nothing waiting" student (p70), after every case seeder
         keep_endorsed_candidates_out_of_completed()  # not Completed while the Dean has not approved (F-25)
+        fill_seed_course_terms()  # owner 2026-11-25: a seeded completed subject says the semester it was taken, and a grade
         seed_stage_events()  # last: the stage clock, and the risk levels that read it
         seed_comprehensive_exam_results()
         accept_privacy_notice_for_seeded_accounts()

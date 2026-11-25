@@ -211,8 +211,8 @@ test.describe("P4.2 student request forms", () => {
       await page.goto("/student/requests/leave-of-absence");
       const form = page.getByRole("region", { name: "Ask for a leave of absence" });
       await expect(form.getByRole("heading", { level: 3, name: "Ask for a leave of absence" })).toBeVisible();
-      await expect(form).toContainText("Choose the semesters you want to be away and tell us why. Graduate School staff check your request first, then the Dean decides.");
-      await expect(form).toContainText("A leave can last up to 2 semesters at a time. It can be renewed once. All your leave together can never be more than 4 semesters.");
+      await expect(form).not.toContainText("Choose the semesters you want to be away and tell us why. Graduate School staff check your request first, then the Dean decides."); // CHANGED BY owner feedback 2026-11-23: this line is removed
+      await expect(form).not.toContainText("It can be renewed once."); // CHANGED BY owner feedback 2026-11-23 (IM58): the limits are on the Business Rules page
       for (const [label, required] of [["Leave starts", true], ["Leave ends", true], ["Reason", true], ["Tell us what is happening", true]]) await expectRequired(page, label, required);
 
       // nothing chosen: Submit stays usable and, when pressed, lists what is missing (P82); the end select waits for the start
@@ -294,7 +294,7 @@ test.describe("P4.2 student request forms", () => {
       await page.goto("/student/requests/leave-of-absence");
       const form = page.getByRole("region", { name: "Ask for more time" });
       await expect(form.getByRole("heading", { level: 3, name: "Ask for more time" })).toBeVisible();
-      await expect(form).toContainText("Your leave can be renewed once, and never beyond 4 semesters in all. The extra time starts in the semester after your current leave ends (Nov 29, 2026).");
+      await expect(form).toContainText("The extra time starts in the semester after your current leave ends (Nov 29, 2026)."); // CHANGED BY owner feedback 2026-11-23 (IM58): no limits line
       await expect(form).toContainText("You can ask for up to 1 more semester now.");
       await expect(form).not.toContainText("It can be renewed once.");
       // I-254: the extra time can only start the semester after the leave ends, so it is shown, not picked.
@@ -332,7 +332,7 @@ test.describe("P4.2 student request forms", () => {
     try {
       await page.goto("/student/requests/leave-of-absence");
       const form = page.getByRole("region", { name: "Correct your request and send it again" });
-      await expect(form).toContainText("Change what the comment above asks for, then send your request again.");
+      await expect(form).not.toContainText("Change what the comment above asks for, then send your request again."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(ctl(page, "Leave starts")).toHaveValue("AY 2026-2027 2nd Semester");
       await expect(ctl(page, "Leave ends")).toHaveValue("AY 2026-2027 2nd Semester");
       await expect(ctl(page, "Reason")).toHaveValue("Medical / health");
@@ -366,7 +366,7 @@ test.describe("P4.2 student request forms", () => {
     try {
       await page.goto("/student/requests/readmission");
       const form = page.getByRole("region", { name: "Ask to come back" });
-      await expect(form).toContainText("Graduate School staff check your request first, then the Dean decides.");
+      await expect(form).not.toContainText("Graduate School staff check your request first, then the Dean decides."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       for (const label of ["Your leave started in", "Your leave ended in", "Semester you want to return in", "Why you are ready to come back"]) await expectRequired(page, label, true);
       await expect(fieldOf(page, "Semester you want to return in")).toContainText("You can ask to return before your leave ends, but the Dean decides whether that is allowed.");
       // Owner rule 2026-11-04: the student ticks nothing; the form shows what is checked for her.
@@ -524,7 +524,7 @@ test.describe("P4.2 student request forms", () => {
       await expect(main).toContainText("When you can withdraw a subject");
       await expect(main).toContainText("Spec policy: withdraw before the deadline.");
       await expect(main.getByRole("heading", { level: 3, name: "Ask to withdraw from a subject" })).toBeVisible();
-      await expect(main).toContainText("Choose one eligible enrolled subject and state the reason for withdrawing.");
+      await expect(main).not.toContainText("Choose one eligible enrolled subject and state the reason for withdrawing."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(main.getByText("Current stage", { exact: true })).toHaveCount(0);
       await expect(fieldOf(page, "Enrolled subject").locator(".field-label span.text-red-500")).toHaveCount(1);
       await expectRequired(page, "Reason for withdrawing from this subject", true);
@@ -604,7 +604,7 @@ test.describe("P4.2 student request forms", () => {
       await page.goto("/student/requests/withdrawal");
       const main = page.locator("main");
       await expect(main.getByRole("heading", { level: 3, name: "Your withdrawal request" })).toBeVisible();
-      await expect(main).toContainText("Your selected subject and reason are saved and read-only.");
+      await expect(main).not.toContainText("Your selected subject and reason are saved and read-only."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(main).toContainText("SPEC-101 — Spec SPEC-101");
       await expect(main).toContainText("AY 2026-2027 1st Semester · submitted Oct 1, 2026");
       await expect(main).toContainText("Eligibility recorded at submission");
@@ -650,14 +650,14 @@ test.describe("P4.2 student request forms", () => {
       await expect(ctl(page, "Research title from uploaded Form 1")).toHaveValue(""); // no title on record: the box is asked
       await expect(ctl(page, "Research title from uploaded Form 1")).toHaveAttribute("placeholder", "Upload Form 1 below to auto-fill");
       await expect(main).toContainText("Files you upload");
-      await expect(main).toContainText("Only these items require action from you for this milestone.");
+      await expect(main).not.toContainText("Only these items require action from you for this milestone."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(main).toContainText("Form 1 application");
       await expect(main).toContainText("1 of 1 file uploaded");
       await expect(main).toContainText("1 of 3 files uploaded");
       await expect(main).toContainText("Completed by staff or the system");
-      await expect(main).toContainText("These update automatically after review, panel matching, or scheduling.");
-      await expect(main).toContainText("Pending Staff Action");
-      await expect(fieldOf(page, "Message to the Research Coordinator")).toContainText("Optional context for this submission.");
+      await expect(main).not.toContainText("These update automatically after review, panel matching, or scheduling."); // CHANGED BY owner feedback 2026-11-23: this line is removed
+      await expect(main).toContainText("In staff review"); // UX-18: "Pending Staff Action" reads "In staff review"
+      await expect(fieldOf(page, "Message to the Research Coordinator")).not.toContainText("Optional context for this submission."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expectRequired(page, "Message to the Research Coordinator", false);
       await expect(main.locator('input[type="file"]')).toHaveCount(2);
       await expect(main.locator('input[type="file"]').first()).toHaveAttribute("accept", "application/pdf,.pdf");
@@ -1026,7 +1026,7 @@ test.describe("P4.2 student request forms", () => {
       await page.goto("/student/graduation");
       const main = page.locator("main");
       await expect(main).toContainText("Current graduation stage");
-      await expect(main).toContainText("Your application stays visible while each reviewing office completes its part.");
+      await expect(main).not.toContainText("Your application stays visible while each reviewing office completes its part."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(main).toContainText("Not submitted");
       await expect(main).toContainText("What you need to submit now: the review window and signed graduation application / review-window PDF.");
       const year = main.locator("#graduation-year"); // read-only text, not a select
@@ -1044,7 +1044,7 @@ test.describe("P4.2 student request forms", () => {
       expect(lastWrite(writes, "requests/graduation")).toBeUndefined();
       for (const title of ["Staff and Coursework Review", "Requirements Validation", "Dean Endorsement", "The list is saved as a file", "The Dean sends the list to the Registrar"]) await expect(main.getByRole("heading", { level: 3, name: title })).toBeVisible();
       await expect(main).toContainText("Monitoring eligibility recommendation");
-      await expect(main).toContainText("No missing requirements are currently flagged by the monitoring layer.");
+      await expect(main).toContainText("No missing requirements are flagged."); // CHANGED BY owner feedback 2026-11-23
       await snap(page, "graduation-form");
       await main.locator('input[type="file"]').setInputFiles(TXT);
       await expect(fieldOf(page, "Signed graduation application / review-window PDF").getByRole("alert")).toHaveText("Please choose a PDF file.");
@@ -1075,7 +1075,7 @@ test.describe("P4.2 student request forms", () => {
       await page.goto("/student/graduation");
       const main = page.locator("main");
       await expect(main).toContainText("This step opens only after coursework, research, completion documents, and any required practicum are complete.");
-      await expect(main).toContainText("Finish what is left (see the list at the top of this page) before you apply for graduation.");
+      await expect(main).not.toContainText("Finish what is left (see the list at the top of this page) before you apply for graduation."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(main).toContainText("Not eligible");
       for (const line of ["Coursework: Spec course A", "Research: Spec research B", "Practicum: Spec practicum C"]) await expect(main).toContainText(line);
       await expect(page.getByRole("button", { name: /graduation application/ })).toHaveCount(0);

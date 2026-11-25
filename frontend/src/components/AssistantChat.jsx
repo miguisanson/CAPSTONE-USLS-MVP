@@ -56,8 +56,8 @@ export default function AssistantChat({ ask, greeting, suggestions = [], scope, 
           <Bot className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0">
-          <h2 className="card-title">Assistant</h2>
-          {scope && <p className="meta">{scope}</p>}
+          {/* CHANGED BY owner feedback 2026-11-23: the page title already says Policy Assistant; the card names its scope */}
+          <h2 className="card-title">{scope || "Conversation"}</h2>
         </div>
       </div>
 
@@ -115,7 +115,6 @@ export default function AssistantChat({ ask, greeting, suggestions = [], scope, 
           />
           <Button type="submit" icon={Send} loading={busy} disabled={!input.trim()} aria-label="Send question" className="shrink-0" />
         </div>
-        <p className="meta">Enter to send · Shift+Enter for a new line</p>
       </form>
     </Card>
   );

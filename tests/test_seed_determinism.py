@@ -110,7 +110,7 @@ class SeedDeterminismTests(unittest.TestCase):
 
     def test_seed_is_not_empty(self):
         students = self.first_seeded.get("student", "0:")
-        self.assertGreater(int(students.split(":")[0]), 100, "the seed should build the demo cohort")
+        self.assertGreater(int(students.split(":")[0]), 60, "the seed should build the demo cohort")  # CHANGED BY data cleanup (IM54-IM57, 2026-11-22): the smaller demo data
 
 
 if __name__ == "__main__":

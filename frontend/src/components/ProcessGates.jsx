@@ -92,13 +92,12 @@ export function OnboardingGatePanel({ role }) {
       icon={GraduationCap}
       action={<Button variant="secondary" icon={RefreshCw} onClick={load}>Refresh</Button>}
     >
-      <p className="text-sm text-slate-500">Each import batch is checked, reported to the Dean, and only then recorded as an admission completion. The checklist is derived from the import — it is not ticked by hand.</p>
       <Notice msg={msg} />
       {!items.length ? (
         role === "dean" ? (
-          <EmptyState icon={FileSpreadsheet} title="No onboarding reports have been sent to you yet." hint="When Graduate School staff report an import batch, it appears here for your approval." />
+          <EmptyState icon={FileSpreadsheet} title="No onboarding reports have been sent to you yet." />
         ) : (
-          <EmptyState icon={FileSpreadsheet} title="No import batches yet" hint="Import a monitoring sheet to open an onboarding report." />
+          <EmptyState icon={FileSpreadsheet} title="No import batches yet" />
         )
       ) : (
         <div className="space-y-3">
@@ -289,7 +288,6 @@ export function StudyPlanPanel({ students = [], studentId: fixedStudentId, stude
       title="Curriculum version & study plan draft"
       icon={ClipboardList}
     >
-      <p className="text-sm text-slate-500">Tag the curriculum version the student is tracked against, then generate the study plan from the curriculum audit and send it to the Academic Coordinator. The plan is derived, never typed.</p>
       <Notice msg={msg} />
 
       {fixed ? (
@@ -430,13 +428,12 @@ export function CourseworkReportPanel({ role }) {
         </Button>
       ) : null}
     >
-      <p className="text-sm text-slate-500">Completion issues and missing subjects for the active term, compiled for the Dean's review.</p>
       <Notice msg={msg} />
       {!items.length ? (
         role === "dean" ? (
-          <EmptyState icon={FileSpreadsheet} title="No coursework reports have been sent to you yet." hint="When Graduate School staff send a coursework status report, it appears here for your review." />
+          <EmptyState icon={FileSpreadsheet} title="No coursework reports have been sent to you yet." />
         ) : (
-          <EmptyState icon={FileSpreadsheet} title="No coursework reports yet" hint="Generate one to send to the Dean." />
+          <EmptyState icon={FileSpreadsheet} title="No coursework reports yet" />
         )
       ) : (
         <div className="space-y-3">

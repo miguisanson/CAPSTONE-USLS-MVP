@@ -8,6 +8,7 @@
 //   F5-11  an AWOL card's first line is the kind, not the residence check result.
 //   I-348  ?student_id= opens that student's request window on the four request boards.
 import { test, expect } from "@playwright/test";
+import { openClosed } from "./support/board.js";
 import { join } from "node:path";
 import { AUTH_DIR } from "./support/paths.mjs";
 
@@ -105,6 +106,7 @@ test.describe("F5-07 and F5-11 card text (Dean, 1366)", () => {
     await page.goto("/dean/approvals/leave-of-absence");
     const board = page.getByRole("region", { name: "Leave of absence board" });
     await expect(board).toBeVisible();
+    await openClosed(board); // CHANGED BY UX phase 5b (UX-29): "Not approved" is behind "Closed"
     const denied = probe.cases.find((c) => c.status === "Denied");
     const card = board.locator("div[draggable]").filter({ hasText: denied.student.name }).filter({ hasText: "Denied" }).first();
     await expect(card).toContainText("Finished - nothing more to do");

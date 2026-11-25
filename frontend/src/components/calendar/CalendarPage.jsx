@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, CalendarDays, CalendarPlus, ExternalLink, Flag, Printer } from "lucide-react";
 import { api } from "../../api";
-import { Button, Card, Field, InlineNotice, Input, PageHeader, SectionTitle, Select, StatusChip, Textarea } from "../ui/index.js";
+import { Button, Card, Field, FilterBar, FilterSelect, InlineNotice, Input, PageHeader, SectionTitle, StatusChip, Textarea } from "../ui/index.js";
 import CalendarView, { CalendarLegend, isoDay, visibleRange } from "./CalendarView";
 import CalendarFeedCard from "./CalendarFeedCard";
 import { formatDate, formatDay, formatTimeRange } from "../../lib/format";
@@ -15,39 +15,27 @@ import { formatDate, formatDay, formatTimeRange } from "../../lib/format";
 
 const EMPTY_FILTERS = { program_id: "", defense_type: "", status: "", faculty_id: "", venue: "", q: "" };
 
-function FilterBar({ filters, options, onChange }) {
+// The defense calendar's filters on the shared FilterBar (owner feedback 2026-11-23, stage 4): student search first.
+function CalendarFilters({ filters, options, onChange }) {
   const set = (key) => (event) => onChange({ ...filters, [key]: event.target.value });
-  const clear = () => onChange(EMPTY_FILTERS);
-  const active = Object.values(filters).some(Boolean);
+  const active = Object.values(filters).filter(Boolean).length;
   const programs = (options.programs || []).map((item) => ({ value: String(item.id), label: `${item.code} · ${item.name}` }));
   const faculty = (options.faculty || []).map((item) => ({ value: String(item.id), label: item.name }));
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <Field label="Program">
-        <Select placeholder="All programs" options={programs} value={filters.program_id} onChange={set("program_id")} />
-      </Field>
-      <Field label="Stage">
-        <Select placeholder="All stages" options={options.defense_types || []} value={filters.defense_type} onChange={set("defense_type")} />
-      </Field>
-      <Field label="Status">
-        <Select placeholder="Booked and held" options={[...(options.statuses || []), { value: "all", label: "Everything" }]} value={filters.status} onChange={set("status")} />
-      </Field>
-      <Field label="Panelist or adviser">
-        <Select placeholder="Anyone" options={faculty} value={filters.faculty_id} onChange={set("faculty_id")} />
-      </Field>
+    <FilterBar
+      search={{ value: filters.q, onChange: (q) => onChange({ ...filters, q }), placeholder: "Name or ID", label: "Student", shownLabel: "Student" }}
+      active={active}
+      onClear={() => onChange(EMPTY_FILTERS)}
+    >
+      <FilterSelect label="Program" placeholder="All programs" options={programs} value={filters.program_id} onChange={set("program_id")} />
+      <FilterSelect label="Stage" placeholder="All stages" options={options.defense_types || []} value={filters.defense_type} onChange={set("defense_type")} />
+      <FilterSelect label="Status" placeholder="Booked and held" options={[...(options.statuses || []), { value: "all", label: "Everything" }]} value={filters.status} onChange={set("status")} />
+      <FilterSelect label="Panelist or adviser" placeholder="Anyone" options={faculty} value={filters.faculty_id} onChange={set("faculty_id")} />
       <Field label="Venue">
         <Input value={filters.venue} onChange={set("venue")} placeholder="Room or Zoom" list="calendar-venues" />
         <datalist id="calendar-venues">{(options.venues || []).map((item) => <option key={item} value={item} />)}</datalist>
       </Field>
-      <div className="flex items-end gap-2">
-        <div className="min-w-0 flex-1">
-          <Field label="Student">
-            <Input value={filters.q} onChange={set("q")} placeholder="Name or ID" />
-          </Field>
-        </div>
-        {active && <Button variant="secondary" className="shrink-0" onClick={clear}>Clear</Button>}
-      </div>
-    </div>
+    </FilterBar>
   );
 }
 
@@ -100,7 +88,6 @@ function DetailPanel({ selected, scope, onClose, onChanged }) {
   if (!selected) {
     return (
       <Card>
-        <p className="text-sm font-semibold text-slate-600">Select a defense or a deadline to see the details.</p>
         <p className="meta mt-1">Flagged items (amber or red outline) need someone to act.</p>
       </Card>
     );
@@ -235,7 +222,7 @@ export default function CalendarPage({ scope = "staff", title, description, embe
         />
       )}
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
-      {!isFaculty && <Card><FilterBar filters={filters} options={payload?.filters || {}} onChange={setFilters} /></Card>}
+      {!isFaculty && <CalendarFilters filters={filters} options={payload?.filters || {}} onChange={setFilters} />}
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
         <div className="order-2 min-w-0 space-y-3 xl:order-1 xl:col-span-8">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-600">

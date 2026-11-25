@@ -51,7 +51,8 @@ test.describe("I-362: the Research Gate board (staff)", () => {
       await expect(section.getByLabel(`${count} in ${name}`)).toBeVisible();
       await expect(section.locator("article")).toHaveCount(count); // every card; the column scrolls (merge M5)
     }
-    await expect(page.getByTestId("research-gate-summary")).toContainText(`${overview.items.length} students`);
+    // UX-17 (2026-11-20): no count sentence; the filter box says how many are shown
+    await expect(page.getByText(`Showing ${overview.items.length} of ${overview.items.length} students`)).toBeVisible();
     expect(await noOverflow(page)).toBe(true);
     await shot(page, "board-1366.png");
   });
@@ -62,7 +63,7 @@ test.describe("I-362: the Research Gate board (staff)", () => {
     const nico = proposal.locator("article").filter({ hasText: NICO });
     await expect(nico).toBeVisible();
     await expect(nico).toContainText("2691201");
-    await expect(nico).toContainText("MBA");
+    await expect(nico).toContainText("MAED"); // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): Nico Barrientos is MAED now
     await expect(nico).toContainText("Adviser:");
     await expect(nico).toContainText(/\d+ of \d+ done · (Still to do:|Nothing left)/); // F5-03: one line, tiles live in View
     await expect(nico).toContainText("Next:");
@@ -74,8 +75,8 @@ test.describe("I-362: the Research Gate board (staff)", () => {
   test("the program filter narrows every column, and View opens the record", async ({ page }) => {
     const overview = await (await page.request.get("/api/research-gate/overview")).json();
     await openGate(page);
-    await page.locator("#research-gate-overview").getByLabel("Filter by program").selectOption("MBA");
-    const perColumn = [1, 2, 3].map((n) => overview.items.filter((row) => row.student.program_code === "MBA" && row.column === n).length);
+    await page.locator("#research-gate-overview").getByLabel("Filter by program").selectOption("MAED");
+    const perColumn = [1, 2, 3].map((n) => overview.items.filter((row) => row.student.program_code === "MAED" && row.column === n).length);
     const shown = perColumn.reduce((sum, n) => sum + n, 0);
     await expect(page.getByRole("region", { name: BOARD }).locator("article")).toHaveCount(shown);
     await page.locator("#research-gate-overview").getByLabel("Filter by program").selectOption("");

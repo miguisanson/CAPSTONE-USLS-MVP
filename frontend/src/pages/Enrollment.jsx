@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { BookOpenCheck, Check, CheckCircle2, ClipboardCheck, Lock, Plus, ShieldCheck, UserRound, X } from "lucide-react";
 import { api } from "../api";
@@ -20,7 +20,6 @@ import {
   StatusChip,
   useEnrollmentPeriod,
 } from "../components/ui/index.js";
-import PolicyRules from "../components/PolicyRules";
 import { StudyPlanPanel } from "../components/ProcessGates";
 import { PAGE } from "../lib/labels.js";
 import { toneOf } from "../lib/tone";
@@ -61,8 +60,12 @@ export default function Enrollment() {
   const programId = searchParams.get("program_id") || "";
   const termId = searchParams.get("term_id") || "";
   const studentId = searchParams.get("student_id") || "";
+  // Only the newest answer may write the page and the address: an older one that arrives late (the first load, before
+  // the user picked a student) must not put its default student back (data cleanup 2026-11-22, section-j I-001).
+  const loadSeq = useRef(0);
 
   async function load() {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setError("");
     try {
@@ -71,6 +74,7 @@ export default function Enrollment() {
         term_id: termId || undefined,
         student_id: studentId || undefined,
       });
+      if (seq !== loadSeq.current) return;
       setData(response);
       setSelected(new Set(response.current_course_ids || []));
       setPreview(null);
@@ -86,9 +90,9 @@ export default function Enrollment() {
         (canonical.student_id || "") !== studentId;
       if (changed) setSearchParams(canonical, { replace: true });
     } catch (err) {
-      setError(err.message || "Could not load enrollment.");
+      if (seq === loadSeq.current) setError(err.message || "Could not load enrollment.");
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }
 
@@ -405,14 +409,8 @@ export default function Enrollment() {
         icon={ClipboardCheck}
         title={PAGE.enrollment}
         forms="enrollment"
-        description={
-          <>
-            Assign official semester offerings to an individual student. Confirming runs all checks and synchronizes the class list, monitoring sheet, student profile, and portal in one action.
-            <span className="meta mt-1 block">
-              A class list row marked Dropped is accepted only with an "Unexcused Absence Percent" column above the handbook limit (20%), or a "Drop Exception Reason" that explains the approved exception.
-            </span>
-          </>
-        }
+        // UX-22 (IM50): one line here; the import rule for Dropped rows is in the Help panel.
+        helpNote='Assign official semester offerings to an individual student. A class list row marked Dropped is accepted only with an "Unexcused Absence Percent" column above the handbook limit (20%), or a "Drop Exception Reason" that explains the approved exception.'
         actions={
           <>
             <Button
@@ -434,10 +432,7 @@ export default function Enrollment() {
 
       <EnrollmentBanner term={data?.term} />
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <PolicyRules process="enrollment" title="Enrollment and academic load: rules applied" />
-        <PolicyRules process="course_adjustment" title="Adding or changing a subject: rules applied" />
-      </div>
+      {/* CHANGED BY owner feedback 2026-11-23 (IM58): the rules show on the Business Rules page only */}
 
       <Card>
         <div className="grid gap-4 md:grid-cols-3">
@@ -497,7 +492,6 @@ export default function Enrollment() {
             <div className="space-y-5">
               <SectionCard
                 title="Official offered subjects"
-                subtitle="Status comes from the monitoring sheet. Completed and already-enrolled subjects are shown but locked; only Not taken subjects can be added."
                 action={<StatusChip status={`${data.offered_subjects.length} offered`} tone="neutral" dot={false} />}
               >
                 {notes.general.map((note) => (
@@ -582,7 +576,6 @@ export default function Enrollment() {
                       size="sm"
                       icon={ClipboardCheck}
                       title="No subjects selected yet"
-                      hint="Choose Add on a subject in the list to start this semester's draft."
                     />
                   )}
                 </div>
@@ -603,8 +596,7 @@ export default function Enrollment() {
                 >
                   {busy === "save" ? "Checking and saving…" : "Confirm enrollment"}
                 </Button>
-                {!dirty && <p className="meta">The draft already matches the saved enrollment. Add or remove a subject to change it.</p>}
-                <p className="meta">Conflict checks run automatically. Safe warnings follow the authoritative record; blocking conflicts are reported without changing enrollment.</p>
+                {/* CHANGED BY owner feedback 2026-11-23: the disabled Save says it */}
               </SectionCard>
 
               <EnrollmentHistory rows={data.history || []} />

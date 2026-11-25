@@ -25,7 +25,7 @@ export default {
         { type: { label: "Sections for MAED-MAJ1" }, text: "2" },
         { click: { role: "button", name: "Offer MAED-COG10", exact: true }, optional: true },
         { click: { role: "button", name: "draft (" } },
-        { wait: { text: "Draft saved" } },
+        { wait: { text: "Draft offering plan saved" } }, // CHANGED BY owner feedback 2026-11-23: the draft note under the plan is gone; the save notice says it
       ],
       doneWhen: { apiWrite: "POST /course-adjustments/plan" },
       rule: "The numbers are decision support: nothing is offered, assigned or published until the Academic Coordinator saves, the Dean approves and the plan is published.",

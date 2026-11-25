@@ -51,9 +51,6 @@ export default function AwolRegistrar({ ctx }) {
       {residency.length > 0 && (
         <section aria-labelledby="residency-reports-heading" className="rounded-xl border border-slate-200 bg-white p-4">
           <h3 id="residency-reports-heading" className="card-title">Residency reports</h3>
-          <p className="mt-0.5 text-sm text-slate-600">
-            Recorded residency semesters go to the Registrar. Download the report and email it through the official channel.
-          </p>
           <p className="meta mt-3">{plural(residency.length, "report")} available.</p>
           <DataTable className="mt-2" caption="Residency reports for the Registrar" columns={COLUMNS} rows={residency} minWidth="sm" pageSize={0} />
         </section>

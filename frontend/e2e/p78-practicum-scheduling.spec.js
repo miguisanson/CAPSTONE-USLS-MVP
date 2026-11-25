@@ -1,11 +1,13 @@
 // e2e-writes: none
+// CHANGED BY data cleanup (IM54-IM57, 2026-11-22): student ids re-pointed (Miko Almario 125 -> 18, Nico Barrientos 146 -> 39).
 // Packet wf4 (Phase 5 P7.5, I-063 / I-089 / I-102): pins what the Practicum board, Defense scheduling and the availability
 // workspace show and do BEFORE they are moved onto the component library. Written first and green on the old markup; it
 // must stay green after the restyle, except the lines marked CHANGED BY WF4 (listed in the commit that changes them).
 // Read-only: nothing is saved (the afterEach fails on any non-GET API call). The practicum roster of the seed has no
 // record yet, so one case (Andrea Villanueva, "MOA Submitted", 0/200 hours) is added to the roster answer with page.route.
-// Demo data read only: Nico Barrientos (id 146, proposal defense booked, panel assigned), Miko Almario (id 125, no panel).
+// Demo data read only: Nico Barrientos (id 39, proposal defense booked, panel assigned), Miko Almario (id 18, no panel).
 import { test, expect } from "@playwright/test";
+import { openClosed } from "./support/board.js";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { AUTH_DIR, SCREENS_DIR } from "./support/paths.mjs";
@@ -119,16 +121,18 @@ test.describe("Practicum (staff)", () => {
     await withPristineRoster(page);
     await page.goto("/workflow/practicum");
     await expect(main(page).getByRole("heading", { level: 1, name: "Practicum" })).toBeVisible();
-    await expect(main(page).getByText("Track practicum MOA receipt, hours, certificates, completion report, and Dean review")).toBeVisible();
-    await expect(main(page).getByRole("button", { name: "How this works" })).toBeVisible();
-    await expect(main(page).getByRole("button", { name: "View recent activity" })).toBeVisible();
-    await expect(main(page).getByText(/Psychology and MSGC/).first()).toBeVisible();
-    await expect(main(page).getByText(/5 rules from the Graduate School policies/)).toBeVisible();
+    await expect(main(page).getByText("MOA, hours, certificates and the completion report, for Psychology and MSGC students.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
+    await expect(main(page).getByText(/Psychology and MSGC/)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23 (IM58): the scope is in Help
+    // UX-14: the rules are in the Help panel
+    await page.locator("main header").first().getByRole("button", { name: "Help" }).click();
+    await expect(page.getByRole("dialog").getByText(/rules from the Graduate School policies/)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23 (IM58)
+    await page.keyboard.press("Escape");
     await expect(main(page).getByPlaceholder(/Search students/)).toBeVisible();
     await expect(main(page).getByRole("combobox", { name: "Filter by program" })).toBeVisible();
     await expect(main(page).getByText(/Showing 2 of 2/)).toBeVisible();
     const board = main(page).getByRole("region", { name: "Practicum workflow board" });
     await expect(board).toBeVisible();
+    await openClosed(board); // CHANGED BY UX phase 5b (UX-28/29): "Completed" is behind "Closed"
     for (const column of ["Awaiting Submission", "Submitted", "Eligibility Review", "Documents Review", "In Progress", "Completion Review", "Completed", "Returned"]) {
       await expect(board.getByRole("heading", { name: column }), column).toBeVisible();
     }
@@ -153,7 +157,7 @@ test.describe("Practicum (staff)", () => {
     await main(page).getByPlaceholder(/Search students/).fill("zzzz-nobody");
     // CHANGED BY p98 (I-155): a search that matches nothing keeps the columns (each says "No practicum students here") instead of replacing the board with an empty-state box.
     await expect(board.getByRole("heading", { name: "Awaiting Submission" })).toBeVisible();
-    await expect(board.getByText("No practicum students here")).toHaveCount(8);
+    await expect(board.locator("[data-empty-strip]")).toHaveCount(7); // CHANGED BY UX phase 5b (UX-28/29): every live column is an empty strip; "Completed" is behind "Closed"
     await expect(board.getByText("Paolo Ramirez", { exact: true })).toHaveCount(0);
     await main(page).getByRole("button", { name: /Clear 1 filter/ }).click();
     await expect(board.getByText("Paolo Ramirez", { exact: true })).toBeVisible();
@@ -217,7 +221,8 @@ test.describe("Practicum (staff)", () => {
   test("the two header buttons open the guide and the activity window", async ({ page }) => {
     await withPristineRoster(page);
     await page.goto("/workflow/practicum");
-    await main(page).getByRole("button", { name: "How this works" }).click();
+    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
+    await page.getByRole("dialog").getByRole("button", { name: "How this works" }).click();
     const guide = page.getByRole("dialog");
     await expect(guide.getByRole("heading", { name: "How practicum works" })).toBeVisible();
     for (const label of ["Purpose", "Who submits", "Who reviews", "When something is incomplete", "Main stages"]) {
@@ -227,7 +232,8 @@ test.describe("Practicum (staff)", () => {
     await shotsAt(page, "practicum-guide");
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await main(page).getByRole("button", { name: "View recent activity" }).click();
+    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
+    await page.getByRole("dialog").getByRole("button", { name: "Recent activity" }).click();
     await expect(page.getByRole("dialog").getByRole("heading", { name: "Recent workflow activity" })).toBeVisible();
     await expect(page.getByRole("dialog").getByText("No activity yet")).toBeVisible();
     await page.keyboard.press("Escape");
@@ -238,7 +244,7 @@ test.describe("Defense scheduling and the availability workspace", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
 
   test("availability workspace: window, overlap grid, panel table, shared options, a chosen option", async ({ page }) => {
-    await page.goto("/workflow/defense-scheduling?student_id=146");
+    await page.goto("/workflow/defense-scheduling?student_id=39");
     await expect(main(page).getByRole("heading", { level: 1, name: "Defense Scheduling" })).toBeVisible();
     await expect(main(page).getByText("Preferred date window")).toBeVisible();
     await expect(main(page).getByText(/The system searches for a 120-minute overlap/)).toBeVisible();
@@ -276,10 +282,10 @@ test.describe("Defense scheduling and the availability workspace", () => {
   });
 
   test("a student with no panel: the notice, no options, the book button stays disabled", async ({ page }) => {
-    await page.goto("/workflow/defense-scheduling?student_id=125");
+    await page.goto("/workflow/defense-scheduling?student_id=18");
     // I-387: the notice names the next step and links to Panel Matching
     await expect(main(page).getByText("No final panel yet")).toBeVisible();
-    await expect(main(page).getByRole("link", { name: /Open Panel Matching for/ })).toHaveAttribute("href", /\/workflow\/panel-matching\?student_id=125/);
+    await expect(main(page).getByRole("link", { name: /Open Panel Matching for/ })).toHaveAttribute("href", /\/workflow\/panel-matching\?student_id=18/);
     await expect(main(page).getByText("0 conflict-free found")).toBeVisible();
     await expect(main(page).getByText(/No conflict-free overlap appears in this window/)).toBeVisible();
     await expect(main(page).getByRole("button", { name: "Set defense schedule" })).toBeDisabled();
@@ -289,7 +295,7 @@ test.describe("Defense scheduling and the availability workspace", () => {
   });
 
   test("change panel opens the picker; the final-schedule form and the history", async ({ page }) => {
-    await page.goto("/workflow/defense-scheduling?student_id=146");
+    await page.goto("/workflow/defense-scheduling?student_id=39");
     await main(page).getByRole("button", { name: "Change panel" }).click();
     await expect(main(page).getByText(/Reassign the defense panel/)).toBeVisible();
     await expect(main(page).getByRole("button", { name: "Update panel" })).toBeEnabled(); // not clicked: the four current members are already chosen
@@ -314,7 +320,7 @@ test.describe("Defense scheduling and the Research Gate header (research coordin
   test.use({ storageState: authFile("research-coordinator"), viewport: { width: 1366, height: 768 } });
 
   test("the research coordinator sees the same scheduling page", async ({ page }) => {
-    await page.goto("/workflow/defense-scheduling?student_id=146");
+    await page.goto("/workflow/defense-scheduling?student_id=39");
     await expect(main(page).getByRole("heading", { level: 1, name: "Defense Scheduling" })).toBeVisible();
     await expect(main(page).getByRole("tab", { name: "Scheduling" })).toBeVisible();
     await expect(main(page).getByRole("tab", { name: "Calendar" })).toBeVisible();
@@ -325,7 +331,7 @@ test.describe("Defense scheduling and the Research Gate header (research coordin
   });
 
   test("Research Gate header at the three widths", async ({ page }) => {
-    await page.goto("/workflow/research-gate?student_id=146");
+    await page.goto("/workflow/research-gate?student_id=39");
     await expect(main(page).getByRole("heading", { level: 1, name: "Research Gate" })).toBeVisible();
     await expect(main(page).getByRole("heading", { level: 2, name: "Research Gate record" })).toBeVisible();
     await page.waitForLoadState("networkidle");
@@ -373,7 +379,8 @@ test.describe("Lifecycle workflow pages open with the shared header (I-063)", ()
 
   test("the who-uses / data-captured text is kept in the How this works guide", async ({ page }) => {
     await page.goto("/workflow/practicum");
-    await main(page).getByRole("button", { name: "How this works" }).click();
+    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
+    await page.getByRole("dialog").getByRole("button", { name: "How this works" }).click();
     const guide = page.getByRole("dialog");
     await expect(guide.getByText("Used by", { exact: true })).toBeVisible();
     await expect(guide).toContainText("Student / GS Staff / Academic Coordinator / Dean");
@@ -382,8 +389,9 @@ test.describe("Lifecycle workflow pages open with the shared header (I-063)", ()
     await page.keyboard.press("Escape");
 
     // CHANGED BY conC (I-123): the same text sits in the guide window on a page that used to have a side rail.
-    await page.goto("/workflow/research-gate?student_id=146");
-    await main(page).getByRole("button", { name: "How this works" }).click();
+    await page.goto("/workflow/research-gate?student_id=39");
+    await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the guide and the activity are in Help
+    await page.getByRole("dialog").getByRole("button", { name: "How this works" }).click();
     const railGuide = page.getByRole("dialog");
     await expect(railGuide.getByText("Used by", { exact: true })).toBeVisible();
     await expect(railGuide.getByText("What it records", { exact: true })).toBeVisible();
@@ -393,8 +401,8 @@ test.describe("Lifecycle workflow pages open with the shared header (I-063)", ()
   test("header buttons exist on the pages that have no side guide", async ({ page }) => {
     for (const slug of ["practicum", "graduation", "course-audit"]) {
       await page.goto(`/workflow/${slug}`);
-      await expect(main(page).getByRole("button", { name: "How this works" }), slug).toBeVisible();
-      await expect(main(page).getByRole("button", { name: "View recent activity" }), slug).toBeVisible();
+      await expect(page.locator("main header").first().getByRole("button", { name: "Help" }), slug).toBeVisible(); // UX-14
+      await expect(page.locator("main header").first().getByRole("button", { name: "Help" }), slug).toBeVisible(); // UX-14
     }
   });
 });
@@ -407,11 +415,8 @@ test.describe("Practicum board matches the other boards (I-089)", () => {
     await page.goto("/workflow/practicum");
     await expect(main(page).getByRole("heading", { level: 1, name: "Practicum" })).toBeVisible();
     await expect(main(page).getByText("Program scope:")).toHaveCount(0);
-    const note = main(page).getByText(/Practicum applies to Psychology and MSGC students only/);
-    await expect(note).toBeVisible();
-    await expect(note, "it shares the paragraph with the page description").toContainText("Track practicum MOA receipt");
-    const banner = await note.evaluate((node) => getComputedStyle(node.closest("div,p")).backgroundColor);
-    expect(banner, "no green banner behind the note").not.toMatch(/rgb\((2[0-4]\d|[0-9]{1,2}), 2[0-5]\d, /);
+    // CHANGED BY owner feedback 2026-11-23 (IM58): no page line and no scope note; the scope is in Help
+    await expect(main(page).getByText(/for Psychology and MSGC students/)).toHaveCount(0);
   });
 
   test("columns are as wide as on the Withdrawal board", async ({ page }) => {
@@ -419,7 +424,7 @@ test.describe("Practicum board matches the other boards (I-089)", () => {
       await page.goto(`/workflow/${slug}`);
       const board = page.getByRole("region", { name: label });
       await expect(board).toBeVisible();
-      return board.locator(":scope section[aria-label]").first().evaluate((node) => Math.round(node.getBoundingClientRect().width));
+      return board.locator(":scope section[aria-label]:not([data-empty-strip])").first().evaluate((node) => Math.round(node.getBoundingClientRect().width)); // UX-28: a column with cards
     };
     const practicum = await widthOf("practicum", "Practicum workflow board");
     const withdrawal = await widthOf("withdrawal", "Subject withdrawal board");

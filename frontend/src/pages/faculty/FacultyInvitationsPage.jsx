@@ -196,7 +196,6 @@ export default function FacultyInvitationsPage() {
     <PageHeader
       title="Panel Invitations"
       forms="panel-matching"
-      description="Research defense panels you have been asked to join. Accept or decline, and tell the Graduate School early if you cannot attend a booked defense."
       icon={CalendarDays}
     />
   );
@@ -230,7 +229,7 @@ export default function FacultyInvitationsPage() {
       {waiting.length > 0 && <InlineNotice tone="warning">{waiting.length} invitation{waiting.length === 1 ? " is" : "s are"} waiting for your answer.</InlineNotice>}
       {invitations.length === 0 ? (
         <Card>
-          <EmptyState icon={MailCheck} title="No panel invitations" hint="When the Research Coordinator puts you on a defense panel, the invitation shows up here." />
+          <EmptyState icon={MailCheck} title="No panel invitations" />
         </Card>
       ) : (
         <>

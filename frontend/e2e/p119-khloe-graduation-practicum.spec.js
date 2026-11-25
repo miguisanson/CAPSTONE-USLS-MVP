@@ -87,18 +87,17 @@ for (const [role, path] of [["staff", "/workflow/graduation"], ["dean", "/dean/a
       const first = column(board, "Academically eligible");
       await expect(first.getByTestId("stage-number")).toHaveText("1");
       await expect(column(board, "Application submitted").getByTestId("stage-number")).toHaveText("2");
-      await expect(first.locator("header p")).toContainText(/signed application/i);
+      await expect(first.locator("header p.meta")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: no description line under a column title
       const bianca = first.locator("article").filter({ hasText: "Bianca Santos" });
       await expect(bianca).toHaveCount(1);
+      // CHANGED BY owner feedback 2026-11-23 (stage 5): the Research Gate card - one requirement line ("3 of 4 done · Still to do: ..."), no tiles
       const boxes = bianca.locator('[aria-label="Completed graduation requirements"]');
       await expect(boxes).toBeVisible();
-      for (const label of ["Coursework completed", "Thesis / research completed", "Eligible for graduation"]) {
-        await expect(boxes.getByText(label, { exact: true }), label).toBeVisible();
-      }
-      await expect(boxes.getByText(/^Practicum (completed|not required)$/)).toBeVisible();
+      await expect(boxes).toHaveText(/^\d+ of \d+ done · (Nothing left|Still to do: .+)$/);
+      await expect(boxes).toContainText(/ of 4 done/);
       await expect(bianca.getByText("Completed courses:")).toBeVisible();
-      // the later columns carry no number
-      await expect(column(board, "Batch created").getByTestId("stage-number")).toHaveCount(0);
+      // CHANGED BY owner feedback 2026-11-23 (stage 5): every column carries its number, as on the Research Gate board
+      await expect(column(board, "Batch created").getByTestId("stage-number")).toHaveText("3");
     });
 
     test("a batch card: students, next, stage strip, View students, Select batch and the step; the list opens in place", async ({ page }) => {
@@ -201,7 +200,7 @@ test.describe("Khloe practicum as staff", () => {
     await mockPracticum(page);
     await page.goto("/workflow/practicum");
     const main = page.locator("main");
-    await expect(main.getByText("Program scope: Psychology and MSGC only")).toBeVisible();
+    await expect(main.getByText("Program scope: Psychology and MSGC only")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     const board = main.getByRole("region", { name: "Practicum workflow board" });
     const card = board.getByRole("article").filter({ hasText: "Andrea Villanueva" });
     await expect(card).toContainText("Community Counselling Center");

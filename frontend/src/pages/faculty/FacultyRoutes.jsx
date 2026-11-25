@@ -27,7 +27,6 @@ function FacultyCalendarScreen() {
         scope="faculty"
         panelCount={(data?.panels || []).length}
         title="My Calendar"
-        description="Defenses you sit on or advise, your advisees' deadlines, your availability and (when connected) your Google busy times."
         connectionPanel={<FacultyCalendarConnection calendar={data?.faculty?.calendar} onChanged={refetch} />}
       />
     </div>

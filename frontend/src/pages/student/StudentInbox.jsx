@@ -6,7 +6,7 @@ import {
   Send,
 } from "lucide-react";
 import { api } from "../../api";
-import { Button, EmptyState, Field, InlineNotice, SectionCard, Select, StatusChip, Textarea } from "../../components/ui/index.js";
+import { Button, Card, EmptyState, Field, InlineNotice, Select, StatusChip, Textarea } from "../../components/ui/index.js";
 import WorkflowDiscussion from "../../components/WorkflowDiscussion";
 import { STUDENT_REQUEST_VIEW_BY_SLUG } from "./shared";
 import { PAGE } from "../../lib/labels.js";
@@ -150,7 +150,7 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
   }
 
   return (
-    <SectionCard pad="lg" title="Inbox / Messages" subtitle="Clarifications and staff replies for your requests" icon={Mail}>
+    <Card pad="lg" className="space-y-4">{/* CHANGED BY owner feedback 2026-11-23: the page title already names it */}
       {error && <InlineNotice tone="danger">{error}</InlineNotice>}
       {notice && <InlineNotice tone="success" aria-live="polite">{notice}</InlineNotice>}
       {activeWorkflows.length > 0 && (
@@ -189,7 +189,7 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
         <Select id="student-inbox-workflow-filter" value={workflowFilter} onChange={(event) => setWorkflowFilter(event.target.value)} placeholder="" options={FILTER_OPTIONS} className="!w-auto min-w-44" />
       </div>
       {!threads.length ? (
-        <EmptyState icon={Mail} title="No messages in this view" hint="Clarification requests, sent questions, and staff replies will appear here." />
+        <EmptyState icon={Mail} title="No messages in this view" />
       ) : (
         <div className="space-y-3">
           {threads.map((thread) => {
@@ -239,6 +239,6 @@ export function StudentInbox({ data, onSaved, onOpenRequest }) {
           })}
         </div>
       )}
-    </SectionCard>
+    </Card>
   );
 }

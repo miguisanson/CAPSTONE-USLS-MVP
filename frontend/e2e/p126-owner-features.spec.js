@@ -3,7 +3,7 @@
 //   - after an export the portal opens a pre-filled Gmail draft (To: the Registrar) and the export window keeps
 //     "Open Gmail" / "Use my mail app instead" buttons;
 //   - Graduation and Withdrawal show the history of exported lists;
-//   - a "Needs your action" row not opened yet is green with "New" until it is opened;
+//   - a "Needs your action" row not opened yet carries a "Not opened yet" dot until it is opened (UX-12);
 //   - a board card that moved by itself is green ("Moved here · new") until it is touched.
 // Read-only against the data: the export answer is mocked, the rest only reads and clicks.
 import { test, expect } from "@playwright/test";
@@ -79,14 +79,16 @@ test.describe("Export history", () => {
 test.describe("New and moved items are green until opened (staff)", () => {
   test.use({ storageState: authFile("staff") });
 
-  test("a Needs your action row is New until it is opened", async ({ page }) => {
+  test("a Needs your action row has the 'Not opened yet' dot until it is opened", async ({ page }) => {
     await page.goto("/");
     const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "Needs your action" }) }).first();
     const rows = section.locator("li");
     test.skip((await rows.count()) === 0, "nothing waits on staff in this data");
     const first = rows.first();
     await expect(first).toHaveAttribute("data-fresh", "true");
-    await expect(first.getByText("New", { exact: true })).toBeVisible();
+    // UX-12 (owner 2026-11-20): a small dot, no "New" badge
+    await expect(first.getByRole("img", { name: "Not opened yet" })).toBeVisible();
+    await expect(first.getByText("New", { exact: true })).toHaveCount(0);
     await first.getByRole("link").first().click();
     await page.goto("/");
     await expect(section.locator("li").first()).not.toHaveAttribute("data-fresh", "true");

@@ -163,7 +163,9 @@ for (const viewport of VIEWPORTS) {
       const prev = table.getByRole("button", { name: "Previous" });
       const next = table.getByRole("button", { name: "Next" });
       await expect(prev).toBeDisabled();
-      await expect(table.getByText("Page 1 of 3")).toBeVisible();
+      // CHANGED BY owner feedback 2026-11-23 (stage 4): page numbers; a phone shows "Page n of m" instead
+      if (await table.getByRole("button", { name: "Page 1" }).isVisible()) await expect(table.getByRole("button", { name: "Page 1" })).toHaveAttribute("aria-current", "page");
+      else await expect(table.getByText("Page 1 of 3")).toBeVisible();
       const first = await cells(table, 1);
       expect(first).toHaveLength(10);
       expect(first[0]).toBe("Student 01");
@@ -312,7 +314,9 @@ for (const viewport of VIEWPORTS) {
 
       const pagination = one("pagination");
       await expect(pagination.getByText("Showing 21–30 of 95")).toBeVisible();
-      await expect(pagination.getByText("Page 3 of 10")).toBeVisible();
+      // CHANGED BY owner feedback 2026-11-23 (stage 4): page numbers; a phone shows "Page n of m" instead
+      if (await pagination.getByRole("button", { name: "Page 3" }).isVisible()) await expect(pagination.getByRole("button", { name: "Page 3" })).toHaveAttribute("aria-current", "page");
+      else await expect(pagination.getByText("Page 3 of 10")).toBeVisible();
       await pagination.getByRole("button", { name: "Next" }).click();
       await expect(pagination.getByText("Showing 31–40 of 95")).toBeVisible();
     });

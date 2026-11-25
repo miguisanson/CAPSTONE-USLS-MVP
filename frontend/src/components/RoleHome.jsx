@@ -8,8 +8,7 @@
 // activity. Built only from the component library; nothing here knows about a role.
 import { Link } from "react-router-dom";
 import { Activity, ArrowRight, CheckCircle2, Hourglass, ListChecks } from "lucide-react";
-import { Button, EmptyState, PageHeader, SectionCard, StatCard } from "./ui/index.js";
-import { toneOf } from "../lib/tone";
+import { EmptyState, PageHeader, SectionCard, StatCard } from "./ui/index.js";
 import { useAuth } from "../auth";
 import { useSeenMarks } from "../lib/seenMarks";
 
@@ -22,7 +21,7 @@ export const MAX_WAITING = 3;
  * @param header         PageHeader props: { title, description, icon, badge, actions }
  * @param actions        [{ key, title, detail, meta, tone, chip, to, linkLabel }] - what waits on the viewer.
  *                       `title` names the item, `detail` is one line under it, `meta` is the due date / age (string),
- *                       `tone` is success | warning | danger | info | neutral (the dot before the title),
+ *                       `overdue` paints the meta red (it already says "Overdue"),
  *                       `chip` is a StatusChip (or any node), `to` + `linkLabel` is the button that opens it.
  * @param actionsTitle   heading of the list (default "Needs your action")
  * @param actionsSubtitle one short line under the heading
@@ -38,6 +37,8 @@ export const MAX_WAITING = 3;
  * @param activityAll    { to, label } the "View all" link
  * @param activityEmpty  { title, hint } shown when `activity` is empty
  * @param extra          a node shown under the actions (before the activity on a phone)
+ * @param activityWide   true puts the activity card in the wide column under the actions (UX-33: the faculty home's
+ *                       "Upcoming defenses" is a work list, not a side note); default false keeps it in the narrow one
  * @param notice         an optional node (an InlineNotice) shown between the header and the columns
  */
 export default function RoleHome({
@@ -55,12 +56,41 @@ export default function RoleHome({
   activityEmpty = {},
   extra = null,
   notice = null,
+  activityWide = false,
 }) {
   const shownActivity = (activity || []).slice(0, MAX_ACTIVITY);
   // Owner 2026-11-08: a "Needs your action" row the person has not opened yet is green with a "New" mark.
   const { user } = useAuth();
   const seen = useSeenMarks(`actions:${user?.id || "guest"}`);
   const waitingItems = waiting?.items || [];
+  const activityCard = activity !== null && (
+    <SectionCard
+      as="section"
+      title={activityTitle}
+      icon={Activity}
+      action={
+        activityAll && (
+          <Link
+            to={activityAll.to}
+            className="inline-flex shrink-0 items-center text-sm font-semibold text-brand-700 hover:underline max-sm:min-h-11"
+          >
+            {activityAll.label || "View all"}
+          </Link>
+        )
+      }
+      className="order-4 lg:order-none"
+    >
+      {shownActivity.length ? (
+        <ul className="space-y-3">
+          {shownActivity.map((entry) => (
+            <ActivityRow key={entry.key ?? entry.title} entry={entry} />
+          ))}
+        </ul>
+      ) : (
+        <EmptyState size="sm" title={activityEmpty.title || "No activity yet"} hint={activityEmpty.hint} />
+      )}
+    </SectionCard>
+  );
   return (
     <div className="space-y-5 animate-fade-up">
       <PageHeader {...header} />
@@ -126,6 +156,7 @@ export default function RoleHome({
               </ul>
             </SectionCard>
           )}
+          {activityWide && activityCard}
           {extra && <div className="order-3 space-y-5 lg:order-none">{extra}</div>}
         </div>
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
@@ -139,70 +170,57 @@ export default function RoleHome({
               ))}
             </div>
           )}
-          {activity !== null && (
-            <SectionCard
-              as="section"
-              title={activityTitle}
-              icon={Activity}
-              action={
-                activityAll && (
-                  <Link
-                    to={activityAll.to}
-                    className="inline-flex shrink-0 items-center text-sm font-semibold text-brand-700 hover:underline max-sm:min-h-11"
-                  >
-                    {activityAll.label || "View all"}
-                  </Link>
-                )
-              }
-              className="order-4 lg:order-none"
-            >
-              {shownActivity.length ? (
-                <ul className="space-y-3">
-                  {shownActivity.map((entry) => (
-                    <ActivityRow key={entry.key ?? entry.title} entry={entry} />
-                  ))}
-                </ul>
-              ) : (
-                <EmptyState size="sm" title={activityEmpty.title || "No activity yet"} hint={activityEmpty.hint} />
-              )}
-            </SectionCard>
-          )}
+          {!activityWide && activityCard}
         </div>
       </div>
     </div>
   );
 }
 
+// The arrow's name for a screen reader and its tooltip: a lone verb ("Review") names the row; a page name ("Defense
+// Schedule") becomes "Open Defense Schedule"; a full phrase ("Open Leave of Absence") is kept.
+const VERB = /^(Open|Review|Answer|Reply|View|Go|Sign|Decide|Request|Upload|File)\b/;
+export function arrowLabel(linkLabel, title) {
+  const label = String(linkLabel || "").trim();
+  if (!label) return `Open ${title}`;
+  if (VERB.test(label)) return label.split(/\s+/).length === 1 ? `${label} ${title}` : label;
+  return `Open ${label}`;
+}
+
 function ActionRow({ item, fresh = false, onOpen }) {
-  const { title, detail, meta, tone = "neutral", chip, to, linkLabel } = item;
+  const { title, detail, meta, overdue = false, chip, to, linkLabel } = item;
+  // UX-12 (owner 2026-11-20): a row not opened yet has a small dot - no "New" badge, no green row; the link is an arrow.
+  // UX-13: the due line says "Overdue" itself (in red), so the row carries no second Overdue chip.
   return (
     <li
       data-fresh={fresh ? "true" : undefined}
-      className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border px-3 py-2.5 ${
-        fresh ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"
-      }`}
+      className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5"
     >
-      <div className="flex min-w-0 flex-1 basis-56 items-start gap-2.5">
-        <span aria-hidden="true" className={`mt-2 h-2 w-2 shrink-0 rounded-full ${toneOf(tone).dot}`} />
+      <div className="flex min-w-0 flex-1 items-start gap-2.5">
+        <span className="mt-1.5 flex h-2 w-2 shrink-0">
+          {fresh && <span role="img" aria-label="Not opened yet" title="Not opened yet" className="h-2 w-2 rounded-full bg-brand-600" />}
+        </span>
         <div className="min-w-0">
-          <p className="break-words text-sm font-semibold text-ink">
-            {fresh && <span className="mr-2 inline-block rounded-full bg-emerald-800 px-2 py-0.5 align-middle text-xs font-bold uppercase tracking-wide text-white">New</span>}
-            {title}
-          </p>
+          <p className={`break-words text-sm text-ink ${fresh ? "font-bold" : "font-semibold"}`}>{title}</p>
           {detail && <p className="meta mt-0.5 break-words">{detail}</p>}
           {(meta || chip) && (
             <p className="meta mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               {chip}
-              {meta && <span>{meta}</span>}
+              {meta && <span className={overdue ? "font-semibold text-red-700" : undefined}>{meta}</span>}
             </p>
           )}
         </div>
       </div>
       {to && (
-        <Button as={Link} to={to} onClick={onOpen} variant="secondary" size="sm" className="shrink-0 gap-1.5 max-sm:w-full max-sm:justify-center">
-          {linkLabel || "Open"}
-          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-        </Button>
+        <Link
+          to={to}
+          onClick={onOpen}
+          aria-label={arrowLabel(linkLabel, title)}
+          title={arrowLabel(linkLabel, title)}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-600 transition-colors duration-200 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 max-sm:h-11 max-sm:w-11"
+        >
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
       )}
     </li>
   );

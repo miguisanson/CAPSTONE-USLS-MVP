@@ -9,7 +9,6 @@ import SignaturePad from "../components/SignaturePad";
 import { PAGE } from "../lib/labels.js";
 
 const INTRO = "Review the student's uploaded Form 1 and details before endorsing. The endorsement immediately updates Research Gate progress.";
-const SUBTITLE = "Academic Coordinator review and in-system signature queue";
 
 function Fact({ label, value }) {
   return (
@@ -73,12 +72,12 @@ export function Form1EndorsementQueue({ embedded = false }) {
     <div className={embedded ? "page-stack" : "page-stack animate-fade-up"}>
       {embedded ? (
         <div>
-          <SectionTitle title={PAGE.form1Endorsements} subtitle={SUBTITLE} icon={FileSignature} />
+          <SectionTitle title={PAGE.form1Endorsements} icon={FileSignature} />
           <p className="text-sm text-slate-600">{INTRO}</p>
         </div>
       ) : (
         <>
-          <PageHeader title="Form 1 Endorsements" description={SUBTITLE} forms="title-defense" icon={FileSignature} />
+          <PageHeader title="Form 1 Endorsements" forms="title-defense" icon={FileSignature} />
           <p className="text-sm text-slate-600">{INTRO}</p>
         </>
       )}

@@ -3,6 +3,7 @@
 // 200 hours reported, nothing verified), and every student with a practicum case is on the coordinator's Practicum board
 // (Isabel Mendoza's report to the Dean is on the home, so the board must list her too). Read only.
 import { test, expect } from "@playwright/test";
+import { openClosed } from "./support/board.js";
 import { join } from "node:path";
 import { AUTH_DIR } from "./support/paths.mjs";
 
@@ -15,6 +16,7 @@ test.describe("I-383: the coordinator's Practicum board", () => {
     await page.goto("/workflow/practicum");
     const board = page.getByRole("region", { name: "Practicum workflow board" });
     await expect(board).toBeVisible();
+    await openClosed(board); // CHANGED BY UX phase 5b (UX-28/29): a report with the Dean ("Completed") is behind "Closed"
     await expect(board.getByRole("article").filter({ hasText: "Isabel Mendoza" })).toHaveCount(1);
     const waiting = board.getByRole("article").filter({ hasText: "Nicole Alvarez" });
     await expect(waiting).toHaveCount(1);

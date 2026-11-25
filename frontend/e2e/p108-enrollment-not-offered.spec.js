@@ -10,17 +10,24 @@ import { AUTH_DIR } from "./support/paths.mjs";
 test.use({ storageState: join(AUTH_DIR, "academic-coordinator.json") });
 
 test("Enrollment: when nothing offered can be added, the page names the not-taken subjects that are not offered", async ({ page }) => {
+  // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): Camille Bernardo (DBA) is gone, so the spec finds a student in the
+  // same situation (nothing offered can be added, some not-taken subjects are not offered) instead of naming one.
   const first = await (await page.request.get("/api/enrollment")).json();
-  const dba = first.programs.find((p) => p.code === "DBA");
-  const program = await (await page.request.get(`/api/enrollment?program_id=${dba.id}`)).json();
-  const camille = program.students.find((s) => s.name === "Camille Bernardo");
-  const data = await (await page.request.get(`/api/enrollment?program_id=${dba.id}&student_id=${camille.id}`)).json();
-  const addable = data.offered_subjects.filter((s) => s.enrollment_state === "available");
-  const notOffered = data.curriculum_subjects.filter((s) => !s.is_offered && s.enrollment_state === "available");
-  expect(addable, "premise: nothing on the offering list can be added for her").toHaveLength(0);
-  expect(notOffered.length, "premise: she has not-taken subjects that are not offered").toBeGreaterThan(0);
+  let found = null;
+  for (const prog of first.programs) {
+    const program = await (await page.request.get(`/api/enrollment?program_id=${prog.id}`)).json();
+    for (const student of program.students || []) {
+      const data = await (await page.request.get(`/api/enrollment?program_id=${prog.id}&student_id=${student.id}`)).json();
+      const addable = (data.offered_subjects || []).filter((s) => s.enrollment_state === "available");
+      const notOffered = (data.curriculum_subjects || []).filter((s) => !s.is_offered && s.enrollment_state === "available");
+      if (addable.length === 0 && notOffered.length > 0) { found = { prog, student, notOffered }; break; }
+    }
+    if (found) break;
+  }
+  expect(found, "premise: a student has nothing offered to add and not-taken subjects that are not offered").toBeTruthy();
+  const { prog, student, notOffered } = found;
 
-  await page.goto(`/enrollment?program_id=${dba.id}&student_id=${camille.id}`);
+  await page.goto(`/enrollment?program_id=${prog.id}&student_id=${student.id}`);
   await expect(page.getByText("Official offered subjects", { exact: true })).toBeVisible();
   const note = page.locator("main").getByText(/not on this semester's offering list/);
   await expect(note).toBeVisible();

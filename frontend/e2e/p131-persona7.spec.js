@@ -1,4 +1,5 @@
 // e2e-writes: none
+// CHANGED BY data cleanup (IM54-IM57, 2026-11-22): student ids re-pointed (Miko Almario 125 -> 18, Nico Barrientos 146 -> 39).
 // Packet persona7 (I-385, I-386, I-387 frontend parts). Red first.
 //   - the student dashboard words an office-held task as "The Graduate School is reviewing ..." with no due date;
 //   - the student Return from AWOL page has no office codes, plain words, the form before the case card, no Edit before filing;
@@ -7,6 +8,7 @@ import { test, expect } from "@playwright/test";
 import { join } from "node:path";
 import { AUTH_DIR, BASE_URL } from "./support/paths.mjs";
 import { PASSWORD } from "./support/accounts.js";
+import { openSidebarGroups } from "./support/sidebar.js";
 
 const authFile = (key) => join(AUTH_DIR, `${key}.json`);
 
@@ -73,6 +75,7 @@ test.describe("persona7", () => {
       const form = await main.getByRole("button", { name: "Submit return declaration" }).boundingBox();
       const facts = await main.getByText("AWOL effective date").boundingBox();
       expect(form.y, "the form comes before the facts").toBeLessThan(facts.y);
+      await openSidebarGroups(page); // UX-27 (Phase 5a): the sidebar groups fold; open them first, as a person would
       await expect(page.locator("aside nav").getByRole("link", { name: "Messages" })).toBeVisible();
     } finally { await context.close(); }
   });
@@ -94,10 +97,10 @@ test.describe("persona7", () => {
     });
     const page = await context.newPage();
     try {
-      await page.goto("/workflow/defense-scheduling?student_id=146");
+      await page.goto("/workflow/defense-scheduling?student_id=39");
       const link = page.locator("main").getByRole("link", { name: /^Open Panel Matching for / });
       await expect(link).toBeVisible();
-      await expect(link).toHaveAttribute("href", "/workflow/panel-matching?student_id=146");
+      await expect(link).toHaveAttribute("href", "/workflow/panel-matching?student_id=39");
     } finally { await context.close(); }
   });
 
@@ -105,7 +108,7 @@ test.describe("persona7", () => {
     const context = await browser.newContext({ storageState: authFile("research-coordinator"), viewport: { width: 1366, height: 800 } });
     const page = await context.newPage();
     try {
-      await page.goto("/workflow/panel-matching?student_id=125");
+      await page.goto("/workflow/panel-matching?student_id=18");
       const note = page.locator("#finalize-panel-note");
       await expect(note).toContainText("Finalizing makes this the final panel");
       await expect(note).toContainText("Defense Scheduling");

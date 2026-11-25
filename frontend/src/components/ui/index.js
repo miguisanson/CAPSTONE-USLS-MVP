@@ -20,4 +20,5 @@ export * from "./ProgressBar.jsx";
 export * from "./Pill.jsx";
 export * from "./RadioRow.jsx";
 export * from "./Tabs.jsx";
+export * from "./FilterBar.jsx";
 export * from "./EditableText.jsx";

@@ -240,7 +240,6 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
     <form onSubmit={onSubmit} className="page-stack">
       <SectionCard
         title="Coordinate the defense schedule"
-        subtitle="Review readiness and the matched panel, compare overlap, then make the final staff decision"
         icon={CalendarCheck}
       >
         <section aria-labelledby="student-readiness-heading" className={`rounded-xl border p-4 ${readiness.ready ? "border-brand-200 bg-brand-50/60" : "border-amber-200 bg-amber-50/60"}`}>
@@ -288,7 +287,6 @@ export function DefenseSchedulingForm({ context, studentId, submit, submitting, 
 
       <SectionCard
         title="Panel members"
-        subtitle="Matched panel is the default — you can reassign from the full faculty list"
         icon={Users}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">

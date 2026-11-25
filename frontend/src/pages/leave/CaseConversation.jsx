@@ -82,7 +82,7 @@ function NoteForm({ slug, detail, onSent }) {
 // step dialog (StepDialog); this block only holds the conversation and the note box (I-152).
 export default function CaseConversation({ slug, detail, onNoteSent, onEdited }) {
   return (
-    <Block title="Messages" hint="Notes and returns about this request, newest at the bottom.">
+    <Block title="Messages">
       <WorkflowDiscussion
         messages={detail.messages || []}
         embedded

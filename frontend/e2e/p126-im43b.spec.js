@@ -38,7 +38,9 @@ test.describe("I-248: the verdict picks one of the three concept-paper titles", 
     });
     await page.goto("/workflow/research-gate");
     await expect(page.getByRole("region", { name: "Research Gate board" })).toBeVisible();
-    const button = page.getByRole("button", { name: /^Record the verdict for the panel for / }).first();
+    // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): the button of the student whose row the spec changed (the first button can be another student's)
+    await expect.poll(() => student).toBeTruthy();
+    const button = page.getByRole("button", { name: `Record the verdict for the panel for ${student}` }).first();
     await expect(button).toBeVisible();
     await button.click();
     const dialog = page.getByRole("dialog", { name: "Record the verdict for the panel" });

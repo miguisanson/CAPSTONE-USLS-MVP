@@ -1,4 +1,5 @@
 // e2e-writes: none
+// CHANGED BY data cleanup (IM54-IM57, 2026-11-22): student ids re-pointed (Miko Almario 125 -> 18, Nico Barrientos 146 -> 39).
 // Packet P7.5 (Phase 5, UI-SPEC section 8, WorkflowPage restyle): pins what the Student Handoff, Course Audit, Research Gate,
 // Panel Matching and Defense Scheduling workflow pages show and do BEFORE they are moved onto the component library.
 // Written first and green on the old markup; it must stay green after the restyle. Read-only: the sidebar and links are
@@ -14,7 +15,7 @@
 //   - Panel Matching (research coordinator): ranked table with the suggested seats, the expandable "Why this score",
 //     the four seat selectors preselected, the excluded-adviser note, Finalize enabled;
 //   - Defense Scheduling (staff): tabs, readiness, the matched panel, Reschedule / Cancel for a booked defense.
-// Demo data read only: Nico Barrientos (id 146, proposal defense booked, panel assigned), Miko Almario (id 125, panel ready).
+// Demo data read only: Nico Barrientos (id 39, proposal defense booked, panel assigned), Miko Almario (id 18, panel ready).
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -139,8 +140,8 @@ test.describe("Student Handoff (staff)", () => {
     await expect(main(page).getByText("No monitoring-sheet backups yet.")).toBeVisible();
     await expect(main(page).getByRole("heading", { level: 2, name: /Onboarding report/ })).toBeVisible();
     // CHANGED BY conC (I-123): the guide and the activity are the two header buttons, not cards in a side rail.
-    await expect(main(page).getByRole("button", { name: "How this works", exact: true })).toBeVisible();
-    await expect(main(page).getByRole("button", { name: "View recent activity", exact: true })).toBeVisible();
+    await expect(page.locator("main header").first().getByRole("button", { name: "Help" })).toBeVisible(); // UX-14
+    await expect(page.locator("main header").first().getByRole("button", { name: "Help" })).toBeVisible(); // UX-14
     await expect(main(page).getByRole("heading", { level: 2, name: "How this works" })).toHaveCount(0);
     await expect(main(page).getByRole("heading", { level: 2, name: "Recent in this workflow" })).toHaveCount(0);
     await shotsAt(page, "handoff");
@@ -220,10 +221,11 @@ test.describe("Research Gate (research coordinator)", () => {
   test.use({ storageState: authFile("research-coordinator"), viewport: { width: 1366, height: 768 } });
 
   test("record, progress, requirement rows and the coordinator's own buttons", async ({ page }) => {
-    await openFromSidebar(page, /5 · Research Gate/, "/workflow/research-gate?student_id=146");
+    await openFromSidebar(page, /5 · Research Gate/, "/workflow/research-gate?student_id=39");
     await expect(main(page).getByRole("heading", { level: 1, name: "Research Gate" })).toBeVisible();
     await expect(main(page).getByRole("heading", { level: 2, name: "Research Gate record" })).toBeVisible();
-    for (const text of ["Nico Barrientos", "2691201", "Dr. Paolo Navarro", "Reorder Point Policies and Service Levels for a Regional Hardware Distributor"]) {
+    // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): Nico Barrientos is MAED, adviser Dr. Benjamin Reyes, with an education thesis
+    for (const text of ["Nico Barrientos", "2691201", "Dr. Benjamin Reyes", "Budget Planning and Resource Allocation in Small Private Schools"]) {
       await expect(main(page).getByText(text).first(), text).toBeVisible();
     }
     await expect(main(page).getByText("Automatic research progress")).toBeVisible();
@@ -242,7 +244,7 @@ test.describe("Research Gate (research coordinator)", () => {
     await expect(main(page).getByRole("button", { name: /Record clearance/ })).toBeVisible();
     await expect(main(page).getByRole("button", { name: /Record ethics clearance/ })).toBeVisible();
     await expect(main(page).locator("#ethics-clearance-record").getByText("Research Protocol Form 5.2 ethics clearance")).toBeVisible();
-    await expect(main(page).getByRole("link", { name: /Open matching/ })).toHaveAttribute("href", /\/workflow\/panel-matching\?student_id=146/);
+    await expect(main(page).getByRole("link", { name: /Open matching/ })).toHaveAttribute("href", /\/workflow\/panel-matching\?student_id=39/);
     await expect(main(page).getByRole("heading", { level: 3, name: "Proposal defense result" })).toBeVisible();
     await expect(main(page).getByRole("button", { name: "Verify submitted requirements" })).toBeEnabled(); // not clicked
     await shotsAt(page, "research-gate");
@@ -261,7 +263,7 @@ test.describe("Panel Matching (research coordinator)", () => {
   test.use({ storageState: authFile("research-coordinator"), viewport: { width: 1366, height: 768 } });
 
   test("ranked candidates, suggested seats, the evidence row, the seat selectors", async ({ page }) => {
-    await openFromSidebar(page, /6 · Panel Matching/, "/workflow/panel-matching?student_id=125");
+    await openFromSidebar(page, /6 · Panel Matching/, "/workflow/panel-matching?student_id=18");
     await expect(main(page).getByRole("heading", { level: 1, name: "Panel Matching" })).toBeVisible();
     await expect(main(page).getByRole("heading", { level: 2, name: "Panel recommendation workspace" })).toBeVisible();
     await expect(main(page).getByRole("link", { name: /Faculty profiles/ })).toHaveAttribute("href", "/faculty");
@@ -271,17 +273,18 @@ test.describe("Panel Matching (research coordinator)", () => {
     await expect(main(page).getByText("25 pts")).toBeVisible();
     await expect(main(page).getByText("15 pts")).toBeVisible();
     await expect(main(page).getByText("Not eligible for this student's panel")).toBeVisible();
-    await expect(main(page).getByText(/Dr\. Paolo Navarro.*adviser of this student/i)).toBeVisible();
+    // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): Miko Almario's adviser is Dr. Marlon Geronimo; seven faculty, so six ranked
+    await expect(main(page).getByText(/Dr\. Marlon Geronimo.*adviser of this student/i)).toBeVisible();
 
     const table = main(page).getByRole("table", { name: "Ranked panel candidates" });
     await expect(table).toBeVisible();
     await expect(table.getByRole("columnheader")).toHaveCount(4);
     const rows = table.getByRole("row");
-    expect(await rows.count()).toBeGreaterThanOrEqual(12); // header + 11 ranked faculty
-    const first = rows.filter({ hasText: "Dr. Marco Villanueva" });
+    expect(await rows.count()).toBeGreaterThanOrEqual(7); // header + 6 ranked faculty
+    const first = rows.filter({ hasText: "Dr. Teodoro Ramos" });
     await expect(first).toContainText("Suggested: Method Specialist");
     await expect(first).toContainText("/100");
-    await expect(table.getByRole("link", { name: "Dr. Marco Villanueva" })).toHaveAttribute("href", /\/faculty\?faculty=\d+/);
+    await expect(table.getByRole("link", { name: "Dr. Teodoro Ramos" })).toHaveAttribute("href", /\/faculty\?faculty=\d+/);
     await expect(table.getByText("Suggested: Panel Chair")).toBeVisible();
     await expect(table.getByText("Overloaded").first()).toBeVisible();
 
@@ -297,7 +300,7 @@ test.describe("Panel Matching (research coordinator)", () => {
     for (const role of ["Panel Chair", "Content Specialist", "Method Specialist", "External Panel"]) {
       await expect(main(page).locator("label", { hasText: role }).locator("select"), role).toHaveValue(/\d+/);
     }
-    await expect(main(page).locator("label", { hasText: "Panel Chair" }).locator("select option:checked")).toContainText("Dr. Daniel Uy");
+    await expect(main(page).locator("label", { hasText: "Panel Chair" }).locator("select option:checked")).toContainText("Dr. Benjamin Reyes");
     await expect(main(page).getByText("Panel composition rules")).toBeVisible();
     await expect(main(page).getByText("Suggested panel satisfies the protocol")).toBeVisible();
     await expect(main(page).getByRole("button", { name: "Finalize selected panel" })).toBeEnabled(); // not clicked
@@ -305,12 +308,12 @@ test.describe("Panel Matching (research coordinator)", () => {
     await main(page).getByLabel("Search faculty").fill("zzzz-nobody");
     await expect(main(page).getByText(/No faculty match the current search/)).toBeVisible();
     await main(page).getByLabel("Search faculty").fill("");
-    await expect(main(page).getByText(/Showing the top 11 ranked candidates/)).toBeVisible();
+    await expect(main(page).getByText(/Showing the top \d+ ranked candidates/)).toBeVisible();
     await shotsAt(page, "panel-matching");
   });
 
   test("a panel already recorded is shown as final", async ({ page }) => {
-    await openFromSidebar(page, /6 · Panel Matching/, "/workflow/panel-matching?student_id=146");
+    await openFromSidebar(page, /6 · Panel Matching/, "/workflow/panel-matching?student_id=39");
     await expect(main(page).getByText("Final panel selected")).toBeVisible();
     await expect(main(page).getByRole("button", { name: "Update final panel" })).toBeEnabled();
   });
@@ -320,7 +323,7 @@ test.describe("Defense Scheduling (staff)", () => {
   test.use({ storageState: authFile("staff"), viewport: { width: 1366, height: 768 } });
 
   test("tabs, readiness, matched panel, and the controls for a booked defense", async ({ page }) => {
-    await openFromSidebar(page, /7 · Defense Scheduling/, "/workflow/defense-scheduling?student_id=146");
+    await openFromSidebar(page, /7 · Defense Scheduling/, "/workflow/defense-scheduling?student_id=39");
     await expect(main(page).getByRole("heading", { level: 1, name: "Defense Scheduling" })).toBeVisible();
     await expect(main(page).getByRole("tab", { name: "Scheduling" })).toBeVisible();
     await expect(main(page).getByRole("tab", { name: "Calendar" })).toBeVisible();
@@ -329,7 +332,7 @@ test.describe("Defense Scheduling (staff)", () => {
     await expect(main(page).getByText("Student readiness", { exact: false }).first()).toBeVisible();
     await expect(main(page).getByText("Missing Requirements").first()).toBeVisible();
     await expect(main(page).getByText("Panel members", { exact: true })).toBeVisible();
-    await expect(main(page).getByText("Dr. Marco Villanueva").first()).toBeVisible();
+    await expect(main(page).getByText("Dr. Angela Cruz").first()).toBeVisible(); // data cleanup: the panel chair
     await expect(main(page).getByRole("button", { name: "Change panel" })).toBeVisible();
     await expect(main(page).getByRole("button", { name: "Ask for availability" })).toBeVisible();
     await expect(main(page).getByRole("button", { name: "Reschedule defense" })).toBeVisible();

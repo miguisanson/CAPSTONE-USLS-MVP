@@ -50,7 +50,7 @@ class AlumniTests(unittest.TestCase):
             rows = GraduationEndorsement.query.filter(
                 GraduationEndorsement.endorsement_status == "Registrar Received").all()
             rows += GraduationEndorsement.query.filter(GraduationEndorsement.registrar_status == "Acknowledged").all()
-            self.assertGreaterEqual(len(rows), 4)
+            self.assertGreaterEqual(len(rows), 2)  # CHANGED BY data cleanup (IM54-IM57, 2026-11-22): the smaller demo data
             for row in rows:
                 self.assertEqual(row.student.current_stage, "Completed", row.student.name)
 
@@ -63,7 +63,7 @@ class AlumniTests(unittest.TestCase):
     def test_past_graduates_are_not_active(self):
         with app.app_context():
             completed = Student.query.filter_by(current_stage="Completed").count()
-            self.assertGreaterEqual(completed, 8)
+            self.assertGreaterEqual(completed, 5)  # CHANGED BY data cleanup (IM54-IM57, 2026-11-22): the smaller demo data
             self.assertEqual(Student.query.filter(active_student_clause(), Student.current_stage == "Completed").count(), 0)
             self.assertEqual(
                 Student.query.filter(active_student_clause()).count(),
@@ -83,7 +83,7 @@ class AlumniTests(unittest.TestCase):
                 checked += 1
                 self.assertIn("panel has not been matched", row["reason"])
                 self.assertNotEqual(row["status"], "Ready to Schedule")
-            ana = Student.query.filter_by(student_number="2260043").one()
+            ana = Student.query.filter_by(student_number="2691101").one()  # CHANGED BY data cleanup (IM54): Nicolas Valdez, MAED (was Ana Abad, MBA)
             row = research_gate_overview_row(ana, ResearchCase.query.filter_by(student_id=ana.id).first())
             self.assertEqual((row["state"], row["next_step"]), ("ready", "panel"), row)
             self.assertIn("panel has not been matched", row["reason"])

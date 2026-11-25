@@ -576,6 +576,27 @@ class OwnerVocabularyTests(CrossCutBase):
             self.assertEqual(workload["open_tasks"], 3)
 
 
+    def test_not_owner_lists_every_other_office(self):
+        """UX-23 (Phase 4): the Work Queue's "Waiting on others" tab asks for every task this office does not own."""
+        with app.app_context():
+            db.session.add(Task(student_id=self.student_id, title="Legacy staff", owner_role="GS Staff",
+                                due_at=date.today(), status="Pending", priority=1))
+            add_task(self.student_id, "Staff task", "Graduate School Staff", 3)
+            add_task(self.student_id, "Coursework check", "Academic Coordinator", 5)
+            add_task(self.student_id, "Dean decision", "Dean", 2)
+            db.session.commit()
+            staff = self.staff()
+            others = staff.get("/api/tasks", query_string={"not_owner": "Graduate School Staff"}).get_json()
+            self.assertEqual(sorted(t["title"] for t in others["items"]), ["Coursework check", "Dean decision"])
+            self.assertEqual(others["total"], 2)
+            # an old spelling of the office is the same office
+            legacy = staff.get("/api/tasks", query_string={"not_owner": "GS Staff"}).get_json()
+            self.assertEqual(legacy["total"], 2)
+            # owner and not_owner together: the owner wins only if it is not the excluded office
+            both = staff.get("/api/tasks", query_string={"owner": "Dean", "not_owner": "Graduate School Staff"}).get_json()
+            self.assertEqual([t["title"] for t in both["items"]], ["Dean decision"])
+
+
 class SmallFixesTests(CrossCutBase):
     """L07 (long log text), L11 (faculty details), L09 (no database file tracked in git), uploads root."""
 

@@ -112,7 +112,8 @@ test.describe("Students page", () => {
     await expect(page).not.toHaveURL(/[?&](q|stage|risk)=/);
 
     // ---- the other filter controls exist with their "All ..." first option
-    for (const [name, label] of [["Student status", "All student status"], ["Standing", "All standing"], ["Program", "All program"]]) {
+    // CHANGED BY owner feedback 2026-11-23 (stage 4): each filter has a visible label, which is its name
+    for (const [name, label] of [["Student status", "All statuses"], ["Standing", "All standings"], ["Program", "All programs"]]) {
       const sel = page.getByRole("combobox", { name: new RegExp(`^(All )?${name}$`, "i") });
       await expect(sel, name).toBeVisible();
       await expect(sel.locator("option").first(), name).toHaveText(label);
@@ -165,7 +166,8 @@ test.describe("Dashboard page", () => {
     await expect(link("/students?risk=At Risk of Delay/Delayed&standing=Active").or(link("/students?risk=At%20Risk%20of%20Delay/Delayed&standing=Active")).first()).toBeVisible();
     await expect(link("/work-queue?owner=Graduate%20School%20Staff").or(link("/work-queue?owner=Graduate School Staff")).first()).toBeVisible();
     await expect(link("/workflow/defense-scheduling").first()).toBeVisible();
-    await expect(link("/reports").first()).toBeVisible();
+    // CHANGED BY UX phase 2 (UX-11): the Reports button left the home; Reports is in the sidebar.
+    await expect(page.locator("nav a[href=\"/reports\"]").first()).toBeVisible();
     // the KPI labels and sublines are still on the page
     for (const t of ["Students monitored", "Active students at risk or delayed", "Your open tasks", "Confirmed defenses"]) {
       await expect(page.locator("main a", { hasText: t }).first(), t).toBeVisible();
@@ -177,8 +179,8 @@ test.describe("Dashboard page", () => {
     await expect(page).toHaveURL(/\/students$/);
     await page.goBack();
     await expect(page.getByRole("heading", { level: 1, name: /^Welcome, / })).toBeVisible();
-    // the Reports button navigates
-    await page.getByRole("link", { name: "Reports", exact: true }).first().click();
+    // the Reports link navigates (CHANGED BY UX phase 2, UX-11: it is the sidebar link now, not a button on the home)
+    await page.locator('nav a[href="/reports"]').first().click();
     await expect(page).toHaveURL(/\/reports$/);
     await page.goBack();
 
@@ -214,7 +216,7 @@ test.describe("Dashboard page", () => {
     await expect(page.getByRole("link", { name: "View all" }).last()).toHaveAttribute("href", "/activity");
     // Waiting on others (when another office holds tasks) leads to the work queue
     const waiting = page.locator("main section", { has: page.getByRole("heading", { name: "Waiting on others", exact: true }) });
-    if (await waiting.count()) await expect(waiting.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/work-queue");
+    if (await waiting.count()) await expect(waiting.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/work-queue?view=others"); // UX-23
     // the list behind a number on Reports (CHANGED BY p101: was the Analytics drill-down) links students to their record
     await page.goto("/reports");
     await page.getByRole("group", { name: "Summary numbers" }).getByRole("button").first().click();
@@ -231,22 +233,25 @@ test.describe("Dashboard page", () => {
 
 test.describe("Work Queue page", () => {
   test("Tasks: owner and Overdue chips send owner/status, the URL follows, the search narrows the page, the count line matches", async ({ page }) => {
-    const first = apiGet(page, "/api/tasks");
-    await page.goto("/work-queue");
+    // UX-02 (2026-11-20): staff open on their own tasks; this test starts from every owner's list.
+    // CHANGED BY UX phase 4 (UX-23): ?owner= opens the All tab; 200 rows a page, sorted like the home; the office is a select.
+    const first = apiGet(page, "/api/tasks", (p) => !p.get("owner"));
+    await page.goto("/work-queue?owner=");
     const { params: p0, json: tasks } = await first;
-    expect(p0.get("page_size")).toBe("50");
+    expect(p0.get("page_size")).toBe("200");
     expect(q(p0, "page")).toBe("1");
     expect(tasks.total).toBeGreaterThan(0);
+    await expect(page.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "true");
     await expect(rows(page)).toHaveCount(tasks.items.length);
-    for (const h of ["Task", "Owner", "Student", "Due", "Status", "Action"]) {
+    for (const h of ["Task", "Owner", "Student", "Due"]) {
       await expect(page.getByRole("columnheader", { name: h }), `column ${h}`).toBeVisible();
     }
     await expect(page.getByText(new RegExp(`Showing\\s+1\\s*[-–]\\s*${tasks.items.length}\\s+of\\s+${tasks.total}\\b`))).toBeVisible();
-    await expect(rows(page).first()).toContainText(tasks.items[0].title);
+    await expect(rows(page).filter({ hasText: tasks.items[0].title }).first()).toBeVisible();
 
-    // ---- owner chip
+    // ---- the office select
     const owned = apiGet(page, "/api/tasks", (p) => p.get("owner") === "Dean");
-    await page.getByRole("button", { name: "Dean", exact: true }).click();
+    await page.getByLabel("Filter by office").selectOption("Dean");
     const { params: po, json: byOwner } = await owned;
     expect(q(po, "status")).toBe("");
     expect(q(po, "page")).toBe("1");
@@ -270,9 +275,9 @@ test.describe("Work Queue page", () => {
     await lifted;
     await expect(page).not.toHaveURL(/status=/);
 
-    // ---- All owners resets the owner
+    // ---- Every office resets the office
     const allOwners = apiGet(page, "/api/tasks", (p) => !p.get("owner") && !p.get("status"));
-    await page.getByRole("button", { name: "All owners" }).click();
+    await page.getByLabel("Filter by office").selectOption("");
     const { json: everything } = await allOwners;
     expect(everything.total).toBe(tasks.total);
     await expect(page).not.toHaveURL(/owner=|status=/);

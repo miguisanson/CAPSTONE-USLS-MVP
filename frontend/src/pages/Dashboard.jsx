@@ -1,18 +1,17 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { FileText, LayoutDashboard, RefreshCw } from "lucide-react";
+import { LayoutDashboard, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { useApi } from "../hooks";
 import { Button, InlineNotice, Spinner, StatusChip } from "../components/ui/index.js";
 import RoleHome from "../components/RoleHome.jsx";
 import { formatDate, relativeDays } from "../lib/format";
-import { canOpen, firstNameOf, officeActions, officeActivity, officeOf, officeStats, officeWaiting } from "../lib/staffHome.js";
+import { firstNameOf, officeActions, officeActivity, officeOf, officeStats, officeWaiting } from "../lib/staffHome.js";
 
 // IM19 + AD7: the back-office home is action first - what waits on this office, what other offices hold, four key
 // numbers, recent activity. The charts and the filter bar that used to fill this page are on Reports > Analytics
 // (IM20). It serves the Graduate School office and the administrator (who also get the dashboard figures and the
-// activity feed, the analytics and the "Refresh data" button) and, since I-066, the two coordinators too: the same
+// activity feed and the analytics) and, since I-066, the two coordinators too: the same
 // layout with the figures of their own caseload (the dashboard API answers them with that), their own tasks and the
 // recent activity of their own students - and no link to a page their role cannot open (the drill-down, the activity
 // log and the analytics are the Graduate School's).
@@ -26,10 +25,14 @@ const ROLE_NAMES = {
 const GS_ROLES = new Set(["staff", "admin"]);
 const TASK_PAGE = 200; // the most the tasks API returns in one page
 
+// UX-13: one line says when it is due, and says "Overdue" itself, so no status chip repeats it.
 function dueText(item) {
   if (!item.dueAt) return undefined;
-  return `${item.overdue ? "Overdue, was due" : "Due"} ${formatDate(item.dueAt)} (${relativeDays(item.dueAt)})`;
+  return item.overdue ? `Overdue since ${formatDate(item.dueAt)}` : `Due ${formatDate(item.dueAt)} (${relativeDays(item.dueAt)})`;
 }
+
+// A chip only when it says something the section heading and the due line do not (not Pending / Overdue / Waiting).
+const QUIET_STATUSES = new Set(["Pending", "Overdue", "Waiting", "Open"]);
 
 function toRow(item) {
   return {
@@ -37,8 +40,8 @@ function toRow(item) {
     title: item.title,
     detail: item.detail,
     meta: dueText(item),
-    tone: item.tone,
-    chip: <StatusChip status={item.status} dot={false} size="sm" />,
+    overdue: Boolean(item.overdue),
+    chip: item.status && !QUIET_STATUSES.has(item.status) ? <StatusChip status={item.status} dot={false} size="sm" /> : null,
     to: item.target.to,
     linkLabel: item.target.label,
   };
@@ -49,8 +52,8 @@ export default function Dashboard() {
   const role = user?.role;
   const office = officeOf(role);
   const isGraduateSchool = GS_ROLES.has(role);
-  const [refreshing, setRefreshing] = useState(false);
-  const [notice, setNotice] = useState(null); // { tone, text } after "Refresh data"
+  const [checking, setChecking] = useState(false);
+  const [notice, setNotice] = useState(null); // { tone, text } after "Run today's checks"
   const { data, loading, error, refetch } = useApi(
     () =>
       Promise.all([
@@ -61,18 +64,19 @@ export default function Dashboard() {
     [role]
   );
 
-  // I-071: the date-driven sweeps no longer run when a page is viewed. This runs them on request, then reads the home again.
-  async function refreshData() {
-    setRefreshing(true);
+  // UX-38 (owner 2026-11-22): the date checks (automatic AWOL, leave dates, risk levels, onboarding reviews, reminders) run
+  // by themselves on the first sign-in of each day; this runs them now, e.g. after an import, then reads the home again.
+  async function runChecks() {
+    setChecking(true);
     setNotice(null);
     try {
       const result = await api.maintenanceRefresh();
-      setNotice({ tone: "success", text: result.message || "Data refreshed." });
+      setNotice({ tone: "success", text: result.message || "Today's checks ran." });
       refetch();
     } catch (err) {
-      setNotice({ tone: "danger", text: err.message || "Could not refresh the data." });
+      setNotice({ tone: "danger", text: err.message || "Today's checks could not run." });
     } finally {
-      setRefreshing(false);
+      setChecking(false);
     }
   }
 
@@ -118,7 +122,8 @@ export default function Dashboard() {
   // the tasks API counts every open task; the page of 200 may hold fewer than the total
   const heldByOthers = Math.max((data.all.total ?? 0) - (data.own.total ?? 0), waiting.total);
   const stats = officeStats({ role, own: { ...actions, total: data.own.total ?? taskActions.total }, waiting: { total: heldByOthers }, kpis: data.dashboard?.kpis || null });
-  const queue = `/work-queue?owner=${encodeURIComponent(office)}`;
+  // UX-24 (Phase 4): "Needs your action" is the first rows of the Work Queue's Mine tab (same tasks, same order).
+  const queue = "/work-queue";
   const activity = data.dashboard
     ? officeActivity(data.dashboard.recent_logs, undefined, role).map((entry) => ({
         key: entry.key,
@@ -132,50 +137,41 @@ export default function Dashboard() {
 
   return (
     <RoleHome
+      notice={notice && <InlineNotice tone={notice.tone} onDismiss={() => setNotice(null)}>{notice.text}</InlineNotice>}
       header={{
+        // UX-11 (owner 2026-11-20): the role is in the top bar and the list says what needs you; no second line and no
+        // Reports button (it is in the sidebar). UX-38: "Run today's checks" replaces "Refresh data" (it was never a reload).
         title: `Welcome, ${firstName}`,
-        description: `${ROLE_NAMES[role] || office} · what needs you today`,
         icon: LayoutDashboard,
-        actions: (
-          <>
-            {isGraduateSchool && (
-              <Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={refreshData}>
-                Refresh data
-              </Button>
-            )}
-            {canOpen("/reports", role) && (
-              <Button as={Link} to="/reports" variant="secondary" icon={FileText}>
-                Reports
-              </Button>
-            )}
-          </>
+        actions: isGraduateSchool && (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
+            loading={checking}
+            onClick={runChecks}
+            title="Runs the daily date checks now: automatic AWOL, leave dates, risk levels, onboarding reviews and reminders"
+          >
+            Run today's checks
+          </Button>
         ),
       }}
       actions={actions.items.map(toRow)}
-      actionsSubtitle="Your office's open tasks, most urgent first"
       actionsEmpty={{ title: "Nothing is waiting on you", hint: `New tasks for the ${office} will appear here.` }}
       actionsAll={
         researchReady?.total > readyItems.length
           ? { to: researchReady.view_all, label: `View all ${researchReady.total} ready students` }
-          : taskActions.total > taskActions.items.length ? { to: queue, label: `View all ${taskActions.total}` } : undefined
+          : taskActions.total > 0 ? { to: queue, label: `View all ${taskActions.total}` } : undefined
       }
       waiting={{
         title: "Waiting on others",
-        subtitle: "Another office or the student holds these. Nothing to do here until that office or the student acts.",
         items: waitingItems.map(toRow),
-        all: { to: researchWaiting?.total ? researchWaiting.view_all : "/work-queue", label: "View all" },
+        all: { to: researchWaiting?.total ? researchWaiting.view_all : "/work-queue?view=others", label: "View all" }, // UX-23
       }}
       stats={stats}
       activity={activity}
       activityAll={activity && isGraduateSchool ? { to: "/activity", label: "View all" } : undefined}
-      activityEmpty={{ title: "No activity yet", hint: "Submissions, decisions and replies will appear here." }}
-      notice={
-        notice && (
-          <InlineNotice tone={notice.tone} onDismiss={() => setNotice(null)}>
-            {notice.text}
-          </InlineNotice>
-        )
-      }
+      activityEmpty={{ title: "No activity yet" }}
     />
   );
 }

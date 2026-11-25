@@ -109,7 +109,7 @@ test.describe("pins: the five set-up pages keep their behaviour (staff)", () => 
     test.setTimeout(120_000);
     const data = await openCourseAdjustments(page);
 
-    await expect(main(page).getByText("Review subject demand, decide what to offer, then complete the semester schedule and faculty assignments in one workspace.")).toBeVisible();
+    await expect(main(page).getByText("Decide which subjects to offer, then set the schedule and faculty.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
 
     // the two screens of the workspace
     const tabs = page.getByRole("tablist", { name: "Course adjustment screens" });
@@ -119,13 +119,13 @@ test.describe("pins: the five set-up pages keep their behaviour (staff)", () => 
     // filters
     await expect(page.getByLabel("Program", { exact: true })).toHaveValue(String(data.program.id));
     await expect(page.getByLabel("Academic year and semester")).toBeVisible();
-    await expect(main(page).getByText("Subject needs are calculated automatically")).toBeVisible();
+    await expect(main(page).getByText("Subject needs are calculated automatically")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
 
     // the plan card: the four steps, the status sentence, the actions (staff only read)
     for (const step of ["Draft", "Submitted", "Approved", "Published"]) {
       await expect(main(page).getByText(new RegExp(`(^|\\s|\\d)${step}$`)).first()).toBeVisible(); // "1Draft", "Draft", "Current: Draft"
     }
-    await expect(main(page).getByText("Graduate School Staff have read-only access.")).toBeVisible();
+    await expect(main(page).getByText("Read only. An Academic Coordinator changes, submits and publishes the plan.")).toBeVisible(); // CHANGED BY owner feedback 2026-11-23 (IM58)
     await expect(page.getByRole("button", { name: /^(Save|Update) draft/ })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Submit for approval" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Publish" })).toBeDisabled();
@@ -135,13 +135,15 @@ test.describe("pins: the five set-up pages keep their behaviour (staff)", () => 
       const status = row.offering_status || (row.demand_count > 0 ? "Suggested" : null);
       return status === "Offered" || status === "Suggested";
     }).length;
-    await expect(tileOf(page, "Curriculum subjects")).toContainText(String(data.summary.curriculum_subjects ?? data.demand.length));
-    await expect(tileOf(page, "Affected students")).toContainText(String(data.summary.affected_students ?? 0));
+    // the squares show the next-term numbers // CHANGED BY owner feedback 2026-11-23 (IM58)
+    const needs = await (await page.request.get(`/api/course-adjustments/subject-needs-report?program_id=${data.program.id}`)).json();
+    await expect(tileOf(page, "Subjects needed next term")).toContainText(String(needs.summary.subjects_with_need ?? 0));
+    await expect(tileOf(page, "Student seats needed")).toContainText(String(needs.summary.student_subject_needs ?? 0));
     await expect(tileOf(page, "Delayed if withheld")).toContainText(String(data.summary.students_delayed_if_not_offered ?? 0));
     await expect(tileOf(page, "Selected to offer")).toContainText(String(offered));
 
     // the subject-needs report and the decisions
-    await expect(main(page).getByText(/students? reviewed/)).toBeVisible(); // CHANGED BY I-117: was the "Subject-needs report" heading; its summary now sits in the one subjects card
+    await expect(main(page).getByText(/students? reviewed/)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23 (IM58): the summary line is gone
     await expect(main(page).getByText("Course offering decisions", { exact: true })).toBeVisible();
     await expect(main(page).locator('input[aria-label^="Sections for "]')).toHaveCount(data.demand.length);
     await expect(main(page).locator('select[aria-label^="Faculty assignment for "]')).toHaveCount(data.demand.length);
@@ -152,7 +154,7 @@ test.describe("pins: the five set-up pages keep their behaviour (staff)", () => 
 
     // the coursework report panel below
     await expect(main(page).getByRole("heading", { name: "Coursework status report to the Dean" })).toBeVisible();
-    await expect(main(page).getByText("Adding or changing a subject: rules applied")).toBeVisible();
+    await expect(main(page).getByText("Adding or changing a subject: rules applied")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     expect(await noOverflow(page)).toBe(true);
     await shotAll(page, "course-adjustments-staff");
   });
@@ -184,7 +186,7 @@ test.describe("pins: the five set-up pages keep their behaviour (staff)", () => 
     const data = await openOfferingSetup(page);
     await expect(page).toHaveURL(/view=offerings/);
     await expect(page.getByRole("tab", { name: "Offering setup" })).toHaveAttribute("aria-selected", "true");
-    await expect(main(page).getByText("Complete the official offering list, then choose the faculty, schedule, and section.")).toBeVisible();
+    await expect(main(page).getByText("Faculty suggestions are references only; every assignment can be changed.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByLabel("Program", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Semester", { exact: true })).toBeVisible();
 
@@ -212,7 +214,7 @@ test.describe("pins: the five set-up pages keep their behaviour (staff)", () => 
     await expect(page).toHaveURL(/\/term-settings$/);
     await expect(heading1(page, "Academic Semesters")).toBeVisible();
     const terms = (await loaded).items;
-    await expect(main(page).getByText("Maintain the list of academic semesters and mark the current planning term.")).toBeVisible();
+    await expect(main(page).getByText("Mark the current planning semester; enrollment and reports use it.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByRole("button", { name: "Add semester", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Add next semester" })).toBeVisible();
 
@@ -277,31 +279,38 @@ test.describe("pins: the five set-up pages keep their behaviour (staff)", () => 
     await expect(page).toHaveURL(/\/policy-documents$/);
     await expect(heading1(page, "Policy Documents")).toBeVisible();
     const data = await loaded;
-    await expect(main(page).getByText("Manage the PDF and Word documents the Policy Assistant searches.")).toBeVisible();
+    await expect(main(page).getByText("The documents the Policy Assistant searches; documents not yet validated are flagged.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(page.getByRole("button", { name: "Add document" })).toBeVisible();
 
-    // the four figures
-    await expect(tileOf(page, "All sources")).toContainText(String(data.summary.total || 0));
-    await expect(tileOf(page, "Staff uploads")).toContainText(String(data.summary.managed || 0));
-    await expect(tileOf(page, "Pending validation")).toContainText(String(data.summary.draft || 0));
-    await expect(tileOf(page, "Ready for assistant")).toContainText(String(data.summary.ready || 0));
+    // CHANGED BY owner feedback 2026-11-23 (stage 6): no count tiles (they repeated the list); the filter bar says how many
+    await expect(main(page).locator('[data-slot="label"]')).toHaveCount(0);
+    await expect(main(page).getByText(`Showing ${data.items.length} of ${data.items.length} documents`)).toBeVisible();
 
-    // test a question: the box, the sample questions, a run
+    // test a question: the box and a run (CHANGED BY owner feedback 2026-11-23 (stage 6): no sample questions)
     await expect(main(page).getByRole("heading", { name: "Test a question" })).toBeVisible();
     const question = page.getByLabel("Question to test");
     await expect(question).toBeVisible();
     await expect(page.getByRole("button", { name: "Find passages" })).toBeDisabled();
-    await main(page).getByRole("button", { name: "What is the maximum residence period for a master's program?" }).click();
+    await expect(main(page).getByRole("button", { name: "What is the maximum residence period for a master's program?" })).toHaveCount(0);
+    await question.fill("What is the maximum residence period for a master's program?");
+    await page.getByRole("button", { name: "Find passages" }).click();
     await expect(main(page).locator('[aria-live="polite"]')).not.toBeEmpty({ timeout: 30_000 });
-    await expect(question).toHaveValue("What is the maximum residence period for a master's program?");
 
-    // one card per document, each with its status
+    // one line per document, each with its status (CHANGED BY owner feedback 2026-11-23 (stage 6)); the details open in a window
+    await main(page).getByRole("button", { name: data.items[0].title, exact: true }).click();
+    const details = page.getByRole("dialog", { name: data.items[0].title });
+    await expect(details).toBeVisible();
+    await expect(details).toContainText(data.items[0].original_name);
+    if (data.items[0].versions?.length) await expect(details.getByRole("region", { name: "Version history" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(details).toHaveCount(0);
     await expect(main(page).getByRole("heading", { name: "Documents", exact: true })).toBeVisible();
     for (const item of data.items) {
       await expect(main(page).getByRole("heading", { level: 3, name: item.title })).toBeVisible();
     }
     for (const item of data.items.filter((entry) => entry.status === "draft")) {
-      await expect(main(page).getByText("pending validation", { exact: false }).first()).toBeVisible();
+      // CHANGED BY owner feedback 2026-11-23 (stage 6): the status chip on the document line (the Status filter has the same words in a hidden option)
+      await expect(main(page).locator("[data-status-tone]", { hasText: /pending validation/i }).first()).toBeVisible();
       expect(item.title).toBeTruthy();
     }
 
@@ -519,27 +528,64 @@ test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-1
     if (known.includes(status)) await expect(steps.locator('[aria-current="step"]')).toContainText(status);
   });
 
-  test("when every subject has the same suggested faculty member no row repeats it; one note above the table says so", async ({ page }) => {
+  // CHANGED BY owner feedback 2026-11-25: no "Suggested faculty for every subject" line; the suggestion is filled in.
+  test("when every subject has the same suggested faculty member no line or row repeats it; it is filled into each offered subject", async ({ page }) => {
     // the live data is the 18-subject case; force it so the test does not depend on the seed
+    let pick = null;
     await page.route("**/api/course-adjustments*", async (route) => {
       if (route.request().method() !== "GET") return route.continue();
       const response = await route.fetch();
       const body = await response.json();
-      for (const row of body.demand) row.faculty_candidates = [{ id: 1, name: "Dr. Same Everywhere", preferred: false, current_load: 0, projected_load: 3 }];
+      pick = body.faculty_profiles?.[0] || { id: 1, name: "Dr. Same Everywhere" };
+      for (const row of body.demand) {
+        row.faculty_candidates = [{ id: pick.id, name: pick.name, preferred: false, current_load: 0, projected_load: 3 }];
+        row.assigned_faculty_id = null;
+      }
       return route.fulfill({ response, json: body });
     });
     const data = await openCourseAdjustments(page);
     const table = main(page).getByRole("table", { name: "Course offering decisions" });
     await expect(table).toBeVisible();
     await expect(table.getByText(/Suggested:/)).toHaveCount(0);
-    await expect(table.getByText("Dr. Same Everywhere")).toHaveCount(0);
-    const note = main(page).getByText(/same suggested faculty member/);
-    await expect(note).toHaveCount(1);
-    await expect(note).toContainText("Dr. Same Everywhere");
-    const noteBox = await note.boundingBox();
-    const tableBox = await table.boundingBox();
-    expect(noteBox.y, "the note sits above the table").toBeLessThan(tableBox.y);
+    await expect(main(page).getByText(/Suggested faculty for every subject/)).toHaveCount(0);
     expect(data.demand.length).toBeGreaterThan(1);
+    const select = table.getByLabel(`Faculty assignment for ${data.demand[0].course.code}`);
+    if (await select.isEnabled()) await expect(select).toHaveValue(String(pick.id)); // only an editable plan is filled in
+  });
+
+  test("autofill keeps each faculty member within the teaching-load limit: the next suggestion takes the rest", async ({ page }) => {
+    let first = null;
+    let second = null;
+    await page.route("**/api/course-adjustments*", async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      const response = await route.fetch();
+      const body = await response.json();
+      [first, second] = body.faculty_profiles || [];
+      // an editable draft with every subject offered, whatever state the shared test data is in
+      body.permissions = { ...(body.permissions || {}), can_manage: true };
+      body.planning_window_open = true;
+      if (body.latest_plan) body.latest_plan.status = "Draft";
+      for (const row of body.demand) {
+        row.offering_status = "Offered";
+        row.section_count = 1;
+        row.course.units = 3;
+        row.faculty_candidates = [
+          { id: first.id, name: first.name, preferred: true, current_load: 18, projected_load: 21 },
+          { id: second.id, name: second.name, preferred: false, current_load: 0, projected_load: 3 },
+        ];
+        row.assigned_faculty_id = null;
+      }
+      return route.fulfill({ response, json: body });
+    });
+    await openCourseAdjustments(page);
+    const table = main(page).getByRole("table", { name: "Course offering decisions" });
+    await expect(table).toBeVisible();
+    const enabled = table.locator("select[aria-label^='Faculty assignment for']:not([disabled])");
+    test.skip((await enabled.count()) < 3, "the plan is not editable today, or fewer than three subjects are offered");
+    const values = await enabled.evaluateAll((els) => els.map((el) => el.value));
+    // 18 + 3 + 3 = 24: the first suggestion gets at most two one-section subjects; the rest go to the next one
+    expect(values.filter((v) => v === String(first.id)).length).toBeLessThanOrEqual(2);
+    expect(values.filter((v) => v === String(second.id)).length).toBeGreaterThan(0);
   });
 
   test("when the suggestions differ each row shows its own and there is no 'same for every subject' note", async ({ page }) => {
@@ -554,7 +600,7 @@ test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-1
     });
     const data = await openCourseAdjustments(page);
     const table = main(page).getByRole("table", { name: "Course offering decisions" });
-    await expect(main(page).getByText(/same suggested faculty member/)).toHaveCount(0);
+    await expect(main(page).getByText(/Suggested faculty for every subject/)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-25: the line is gone
     await expect(rowOf(page, table, data.demand[0].course.code)).toContainText("Suggested: Dr. Alpha Cruz");
     await expect(rowOf(page, table, data.demand[1].course.code)).toContainText("Suggested: Dr. Beta Reyes");
   });
@@ -569,7 +615,10 @@ test.describe("P6.5: Course Adjustments is one decision table (I-069, review F-1
     await table.getByRole("button", { name: `Details for ${code}` }).click();
     const drawer = page.getByRole("dialog", { name: new RegExp(code) });
     await expect(drawer).toBeVisible();
-    for (const student of withStudents.affected_students.slice(0, 3)) await expect(drawer.getByText(student.name).first()).toBeVisible();
+    // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): the drawer lists who needs the subject next term; a student who is
+    // affected because they are enrolled in it now is not in that list (Anton Bautista on the smaller MAED data)
+    const needing = withStudents.affected_students.filter((student) => student.impact_basis !== "Currently enrolled");
+    for (const student of needing.slice(0, 3)) await expect(drawer.getByText(student.name).first()).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(drawer).toHaveCount(0);
     await expect(table.getByRole("button", { name: `Details for ${code}` })).toBeFocused();
@@ -625,7 +674,7 @@ test.describe("I-117: Course Adjustments lists each subject once", () => {
       await expect(cells.nth(2), `${row.course.code} not taken yet`).toHaveText(new RegExp("^\\s*" + (mine ? mine.not_taken_count : 0) + "(\\D|$)"));
     }
     // the report's other parts: summary figures and the download
-    await expect(main(page).getByText(new RegExp(`${report.summary.students_reviewed} students? reviewed`))).toBeVisible();
+    await expect(main(page).getByText(new RegExp(`${report.summary.students_reviewed} students? reviewed`))).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23 (IM58)
     await expect(main(page).getByRole("button", { name: "Download CSV" })).toBeVisible();
   });
 
@@ -709,7 +758,7 @@ test.describe("P6.5: the library on the other pages", () => {
     await sidebarLink(page, "Policy Documents").click();
     await expect(heading1(page, "Policy Documents")).toBeVisible();
     const data = await loaded;
-    await expect(main(page).locator('[data-slot="label"]')).toHaveText(["All sources", "Staff uploads", "Pending validation", "Ready for assistant"]);
+    await expect(main(page).locator('[data-slot="label"]')).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23 (stage 6): no count tiles
     await expect(main(page).locator("[data-status-tone]").first()).toBeVisible();
     for (const item of data.items) {
       const card = main(page).locator("h3", { hasText: item.title }).locator("xpath=ancestor::*[contains(@class,'card')][1]");

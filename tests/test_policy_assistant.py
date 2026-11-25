@@ -105,6 +105,10 @@ class AssistantBase(unittest.TestCase):
             db.create_all()
             appmod.build_demo_database()
             db.session.commit()
+            for email in (STUDENT_A_EMAIL, STUDENT_B_EMAIL):  # CHANGED BY data cleanup (IM54): imported students sign in only in tests
+                student = appmod.Student.query.filter_by(email=email).first()
+                appmod.ensure_student_account(student, email, appmod.SIM_STUDENT_PASSWORD)
+            db.session.commit()
             cls.accounts = {}
             for account in appmod.UserAccount.query.all():
                 cls.accounts[account.email] = (account.id, account.role)

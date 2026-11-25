@@ -4812,7 +4812,9 @@ class BpmWorkflowSimulationTests(unittest.TestCase):
             }
             # The two Practicum demos now belong to MAPSY and MSGC, so they
             # are intentionally absent from the MAED student count.
-            self.assertEqual(len(all_students), 27)
+            # CHANGED BY data cleanup (IM54-IM57, 2026-11-22): 11 kept sheet students plus the MAED personas (more
+            # personas are MAED now: the Withdrawal step pair and the Dean cases)
+            self.assertEqual(len(all_students), 34)
             students = {
                 student_number: student
                 for student_number, student in all_students.items()

@@ -150,7 +150,7 @@ export default function CourseOfferings() {
       cell: (o) => (
         <>
           <p className="whitespace-nowrap font-semibold text-ink">{o.code}</p>
-          <p className="meta">{o.title} · {o.units}u</p>
+          <p className="meta">{o.title} · {o.units} {o.units === 1 ? "unit" : "units"}</p>
         </>
       ),
     },
@@ -227,7 +227,6 @@ export default function CourseOfferings() {
     <div className="page-stack">
       <SectionCard
         title="Course Offering Setup"
-        subtitle="Complete the official offering list, then choose the faculty, schedule, and section. Faculty suggestions are references only; the Academic Coordinator can change every assignment."
         icon={BookOpenCheck}
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

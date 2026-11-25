@@ -438,11 +438,11 @@ export function timeRange(start, end) {
 export { isLiveSchedule };
 
 const SCHEDULE_STATUS_NOTE = {
-  Held: "This defense took place.",
+  // CHANGED BY owner feedback 2026-11-23: a Held defense needs no second line ("This defense took place.")
   Deferred: "Waiting for the Research Coordinator to set a new date.",
   "Needs Re-confirmation": "Your panel changed. The Research Coordinator will confirm the date again.",
   Rescheduled: "Replaced by a newer schedule.",
-  Cancelled: "This booking was cancelled.",
+  // Cancelled: the status chip says it
 };
 
 // One card per defense schedule with the real facts (used on the dashboard and the Defense Schedule page).

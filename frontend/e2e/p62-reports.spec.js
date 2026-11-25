@@ -65,7 +65,7 @@ test.describe("Reports", () => {
     const { json } = await loaded;
     expect(json.items.length, "the demo data has changes recorded today").toBeGreaterThan(0);
     await expect(page.getByRole("heading", { level: 2, name: "Daily changes" })).toBeVisible();
-    await expect(page.getByText("Every change made in this system on the selected date. Export or print the list for the Registrar, then mark each change as sent.")).toBeVisible();
+    await expect(page.getByText("Export or print the day's changes for the Registrar, then mark each one sent.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     const date = page.getByLabel("Change report date");
     await expect(date).toHaveValue(json.date);
     expect(await headers(page)).toEqual(["Time", "Change type", "Student", "Change", "By", "Sent to Registrar"]);
@@ -115,7 +115,7 @@ test.describe("Reports", () => {
     await date.fill("2020-01-02");
     await other;
     await expect(page.getByText("No changes on this date")).toBeVisible();
-    await expect(page.getByText("Pick another date, or make changes in Enrollment, Withdrawal, or the standing-change workflows.")).toBeVisible();
+    await expect(page.getByText("Pick another date, or make changes in Enrollment, Withdrawal, or the standing-change workflows.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     await expect(button(page, "CSV")).toBeDisabled();
     await expect(page.getByRole("button", { name: "Print" })).toBeDisabled();
     expect(await figure("Changes today")).toBe(0);
@@ -142,10 +142,10 @@ test.describe("Activity Log", () => {
     const items = json.items;
     expect(items.length).toBeGreaterThan(5);
     await expect(page.getByRole("heading", { level: 1, name: "Activity Log" })).toBeVisible();
-    await expect(page.getByText("An append-style trail of recorded transactions — the audit basis for accountability and monitoring.")).toBeVisible();
+    await expect(page.getByText("Every recorded step, with who did it and when.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
     const shown = (n) => expect(page.getByText(`Showing ${n} of ${items.length} activities`)).toBeVisible();
     await shown(items.length);
-    await expect(page.getByRole("button", { name: /Clear filters/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Clear (\d+ )?filters?/ })).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23 (stage 4): "Clear n filters"
 
     // the controls
     const search = page.getByLabel("Search", { exact: true });
@@ -175,7 +175,7 @@ test.describe("Activity Log", () => {
     await workflow.selectOption(slug);
     await shown(bySlug);
     await expect(page.locator("main ol > li")).toHaveCount(bySlug);
-    await expect(page.getByRole("button", { name: /Clear filters/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Clear (\d+ )?filters?/ })).toBeVisible(); // CHANGED BY owner feedback 2026-11-23 (stage 4)
     // owner filter on top
     const who = owners[0];
     const both = items.filter((i) => i.transaction_slug === slug && i.next_owner === who).length;
@@ -186,7 +186,7 @@ test.describe("Activity Log", () => {
     await expect(page.getByText("No activity matches the selected filters")).toBeVisible();
     await expect(page.getByText("Clear a filter or use a broader search.")).toBeVisible();
     await shown(0);
-    await page.getByRole("button", { name: /Clear filters/ }).click();
+    await page.getByRole("button", { name: /Clear (\d+ )?filters?/ }).click(); // CHANGED BY owner feedback 2026-11-23 (stage 4)
     await shown(items.length);
     await expect(search).toHaveValue("");
     await expect(workflow).toHaveValue("");
@@ -226,7 +226,10 @@ test.describe("Business Rules", () => {
     const { json } = await first;
     expect(json.can_edit).toBe(true);
     await expect(page.getByRole("heading", { level: 1, name: "Business rules" })).toBeVisible();
-    await expect(page.getByText("Prototype rules awaiting Graduate School validation can be adjusted; every change is recorded with your reason.")).toBeVisible();
+    // CHANGED BY UX phase 3 (UX-22, IM50): how rules are locked and who adjusts them is in the Help panel.
+    await page.getByRole("main").getByRole("button", { name: "Help", exact: true }).click();
+    await expect(page.getByRole("dialog").locator('[data-slot="help-note"]')).toContainText("Prototype rules awaiting Graduate School validation can be adjusted; every change is recorded with your reason.");
+    await page.getByRole("dialog").getByRole("button", { name: "Close help" }).click();
     const main = page.locator("main");
     for (const [label, value] of [
       ["Rules in the register", json.summary.total], ["Enforced by the system", json.summary.enforced],
@@ -349,7 +352,10 @@ test.describe("Business Rules (read-only role)", () => {
     const { json } = await first;
     expect(json.can_edit).toBe(false);
     await expect(page.getByRole("heading", { level: 1, name: "Business rules" })).toBeVisible();
-    await expect(page.getByText("Only Graduate School staff and the administrator can adjust the prototype rules.")).toBeVisible();
+    // CHANGED BY UX phase 3 (UX-22, IM50): the Help panel says who adjusts the rules.
+    await page.getByRole("main").getByRole("button", { name: "Help", exact: true }).click();
+    await expect(page.getByRole("dialog").locator('[data-slot="help-note"]')).toContainText("Only Graduate School staff and the administrator can adjust the prototype rules.");
+    await page.getByRole("dialog").getByRole("button", { name: "Close help" }).click();
     await expect(page.locator("main").getByText(/^Source: /)).toHaveCount(json.items.length);
     await expect(page.getByRole("button", { name: /Adjust value|Confirm or adjust/ })).toHaveCount(0);
   });

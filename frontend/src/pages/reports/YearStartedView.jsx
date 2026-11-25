@@ -26,7 +26,7 @@ const STUDENT_COLUMNS = [
 function StudentsOf({ pick, programId, onClose }) {
   const title = `${pick.state.label}, started ${pick.year.label}`;
   const params = { entry: pick.year.entry, state: pick.state.key === "other" ? "away" : pick.state.key, ...(programId ? { program_id: programId } : {}) };
-  return <ListDialog title={title} subtitle="Students of the program and year you picked, in this state." endpoint="cohorts/students" params={params} columns={STUDENT_COLUMNS} onClose={onClose} />;
+  return <ListDialog title={title} endpoint="cohorts/students" params={params} columns={STUDENT_COLUMNS} onClose={onClose} />;
 }
 
 export default function YearStartedView({ params, setParam, clearFilters }) {
@@ -76,7 +76,6 @@ export default function YearStartedView({ params, setParam, clearFilters }) {
       ) : (
         <ChartCard
           question="Where are the students of each year started?"
-          hint="Each bar is one school year students started. Select a number to see those students."
           empty={years.length ? null : { title: "No students for these filters", hint: "Change the program or year started at the top of the page." }}
           chart={
             <>
@@ -98,7 +97,7 @@ export default function YearStartedView({ params, setParam, clearFilters }) {
         />
       )}
 
-      <SectionCard title="More detail" subtitle="The same students, looked at another way.">
+      <SectionCard title="More detail">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="More detail">
           {DETAIL_VIEWS.map((item) => {
             const on = item.key === detail.key;

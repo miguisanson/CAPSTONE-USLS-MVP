@@ -15,12 +15,13 @@ test.describe("admin", () => {
     await page.goto("/students");
     await expect(page.getByRole("heading", { level: 1, name: "Students" })).toBeVisible();
     await expect(main(page).getByText(/^Showing 1–\d+ of \d+ students$/).first()).toBeVisible();
-    for (const name of ["All risk", "All standing", "All stage", "All program", "All student status"]) {
+    // CHANGED BY owner feedback 2026-11-23 (stage 4): each filter has a visible label, which is its name
+    for (const name of ["Risk", "Standing", "Stage", "Program", "Student status"]) {
       await expect(page.getByRole("combobox", { name, exact: true }), name).toBeVisible();
     }
-    await expect(page.getByRole("combobox", { name: "All risk", exact: true }).locator("option")).toContainText(["Delayed"]);
+    await expect(page.getByRole("combobox", { name: "Risk", exact: true }).locator("option")).toContainText(["Delayed"]);
     const listed = page.waitForResponse((r) => r.url().includes("/api/students") && r.url().includes("standing=Active"));
-    await page.getByRole("combobox", { name: "All standing", exact: true }).selectOption("Active");
+    await page.getByRole("combobox", { name: "Standing", exact: true }).selectOption("Active");
     const json = await (await listed).json();
     expect(json.total, "Standing = Active is the dashboard's active students").toBe(dashboard.kpis.active_students);
   });
@@ -35,7 +36,8 @@ test.describe("admin", () => {
     await expect(main(page)).not.toContainText("approved PDF and Word");
     await expect(main(page)).not.toContainText("Drafts pending validation");
     await expect(main(page).getByText("Draft", { exact: true })).toHaveCount(0);
-    await expect(main(page).getByText("Pending validation", { exact: true }).first()).toBeVisible();
+    // CHANGED BY owner feedback 2026-11-23 (stage 6): the status chip on the document line (the Status filter has the same words in a hidden option)
+    await expect(main(page).locator("[data-status-tone]", { hasText: "Pending validation" }).first()).toBeVisible();
   });
 
   test("I-395: the Activity Log workflow filter writes AWOL in capitals", async ({ page }) => {

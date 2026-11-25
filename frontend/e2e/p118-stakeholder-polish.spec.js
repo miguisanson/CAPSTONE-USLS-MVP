@@ -64,7 +64,7 @@ test.describe("I-358 one colour vocabulary", () => {
     const look = (name) =>
       chip(name).evaluate((el) => ({ tone: el.dataset.statusTone, bg: getComputedStyle(el).backgroundColor, icon: el.querySelector("svg")?.innerHTML || "" }));
     const seen = {};
-    for (const name of ["Approved", "Passed", "Under Review", "Returned", "Failed", "Closed", "Submitted"]) seen[name] = await look(name);
+    for (const name of ["Approved", "Passed", "In review", "Returned", "Failed", "Closed", "Submitted"]) seen[name] = await look(name); // UX-18: "Under Review" reads "In review"
     expect(seen.Approved.tone, "Approved is a decision").not.toBe(seen.Passed.tone);
     expect(seen.Approved.bg, "Approved and Passed must not share a background colour").not.toBe(seen.Passed.bg);
     expect(seen.Approved.icon, "Approved and Passed must not share an icon").not.toBe(seen.Passed.icon);
@@ -74,8 +74,9 @@ test.describe("I-358 one colour vocabulary", () => {
     expect(distinct("icon"), "seven statuses, seven icons").toBe(7);
 
     const legend = page.locator("[data-status-legend]");
-    await expect(legend.getByText("What the colours mean")).toBeVisible();
-    await legend.getByText("What the colours mean").click();
+    // UX-15 (2026-11-20): a small "Colour key" button opens the list
+    await expect(legend.getByRole("button", { name: "Colour key" })).toBeVisible();
+    await legend.getByRole("button", { name: "Colour key" }).click();
     await expect(legend.locator("[data-legend-tone]")).toHaveCount(7);
     await expect(legend).toContainText("Approved or on track");
     await expect(legend).toContainText("Passed or completed");
@@ -88,11 +89,11 @@ test.describe("I-358 one colour vocabulary", () => {
       for (const slug of ["leave-of-absence", "readmission", "awol", "withdrawal"]) {
         await page.goto(`/workflow/${slug}`);
         const legend = page.locator('[data-testid="stage-board"] [data-status-legend]');
-        await expect(legend.getByText("What the colours mean"), `${slug} board`).toBeVisible();
+        await expect(legend.getByRole("button", { name: "Colour key" }), `${slug} board`).toBeVisible(); // UX-15
         expect(await noOverflow(page), `${slug}: no sideways scroll`).toBeLessThanOrEqual(1);
       }
       await page.goto("/workflow/leave-of-absence");
-      await page.locator("[data-status-legend] summary").click();
+      await page.locator("[data-status-legend] button").click(); // UX-15
       await expect(page.locator("[data-status-legend] [data-legend-tone]")).toHaveCount(7);
       await shot(page, `legend-board-${viewport.width}.png`);
     });

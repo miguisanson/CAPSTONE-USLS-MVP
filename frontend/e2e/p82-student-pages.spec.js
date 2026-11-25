@@ -16,6 +16,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { BASE_URL } from "./support/paths.mjs";
 import { PASSWORD } from "./support/accounts.js";
+import { openSidebarGroups } from "./support/sidebar.js";
 import { attachWatchers, formatProblems, stubExternal } from "./support/checker.js";
 
 const MIGUEL = "student@usls.edu.ph";
@@ -133,7 +134,9 @@ test.describe("P82 student pages (pinned)", () => {
       await expect(stat(page, "Coursework").locator('[data-slot="value"]')).toHaveText(`${audit.completion_rate}%`);
       await expect(stat(page, "Coursework").locator('[data-slot="sub"]')).toHaveText(`${audit.completed.length} completed. ${subjectsLeft(audit)}`);
       const own = (data.tasks || []).filter((t) => t.owner_role === "Student");
-      await expect(stat(page, "Your open tasks").locator('[data-slot="value"]')).toHaveText(String(own.length));
+      // UX-01 (2026-11-20): the figure counts the rows of "Needs your action" (own tasks plus replies, AWOL, defense date ...)
+      const actionRows = main(page).locator("section", { has: page.getByRole("heading", { name: "Needs your action", exact: true }) }).locator("li");
+      await expect(stat(page, "Your open tasks").locator('[data-slot="value"]')).toHaveText(String(await actionRows.count()));
       await expect(stat(page, "Your open tasks").locator('[data-slot="sub"]')).toHaveText(`${own.filter((t) => t.overdue).length} overdue`);
       const unread = (data.workflow_messages || []).filter((m) => m.is_unread).length;
       await expect(stat(page, "Unread messages").locator('[data-slot="value"]')).toHaveText(String(unread));
@@ -147,10 +150,11 @@ test.describe("P82 student pages (pinned)", () => {
       await expect(life).toContainText(`You are at: ${student.current_stage}`);
       await expect(life.locator("ol > li")).toHaveCount(Math.min(8, data.stages.length));
       await expect(life.locator('ol [aria-current="step"]')).toContainText(student.current_stage);
-      const elsewhere = main(page).locator("section", { has: page.getByRole("heading", { name: "Elsewhere in your portal", exact: true }) });
-      await expect(elsewhere.locator("li")).toHaveCount(4);
+      // UX-06 (2026-11-20): no "Elsewhere in your portal" card; the sidebar holds those links
+      await expect(main(page).getByRole("heading", { name: "Elsewhere in your portal", exact: true })).toHaveCount(0);
+      await openSidebarGroups(page); // UX-27 (Phase 5a): the sidebar groups fold; open them first, as a person would
       for (const [name, href] of [["Defense Schedule", "/student/defense-schedule"], ["Research Adviser", "/student/adviser"], ["Request Center", "/student/requests"], ["Leave of Absence", "/student/requests/leave-of-absence"]]) {
-        await expect(elsewhere.getByRole("link", { name }), name).toHaveAttribute("href", href);
+        await expect(page.locator("aside:visible nav").getByRole("link", { name, exact: true }), name).toHaveAttribute("href", href);
       }
       await expect(main(page).getByRole("heading", { name: "Recent activity", exact: true })).toBeVisible();
       await expect(main(page).getByRole("link", { name: "View all" }).last()).toHaveAttribute("href", "/student/activity");
@@ -165,7 +169,7 @@ test.describe("P82 student pages (pinned)", () => {
       const data = await portal();
       await open(page, "/student/progress", "progress");
       await expect(h1(page)).toHaveText("My Progress");
-      await expect(main(page)).toContainText("Your lifecycle stage, requirement status, and curriculum, read from the monitoring record.");
+      await expect(main(page)).not.toContainText("Your stage, requirements and curriculum, from the monitoring record."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(h2s(page)).toHaveText(["My Academic Status", "Workflow Status", "Curriculum progress"]);
 
       const status = cardOf(page, "My Academic Status");
@@ -218,7 +222,7 @@ test.describe("P82 student pages (pinned)", () => {
       const real = await portal();
       await open(page, "/student/enrollment", "courses");
       await expect(h1(page)).toHaveText("Enrollment");
-      await expect(main(page)).toContainText("Choose the published subjects you are taking this semester. Subjects already on your record stay locked.");
+      await expect(main(page)).not.toContainText("Subjects already on your record stay locked."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(page.getByRole("link", { name: "View my progress" })).toHaveAttribute("href", "/student/progress");
       await expect(h2s(page)).toHaveText(["My suggested curriculum"]);
       await expect(main(page)).toContainText(real.current_term?.label || "Current semester");
@@ -334,7 +338,7 @@ test.describe("P82 student pages (pinned)", () => {
       const data = await portal();
       await open(page, "/student/requests", "requests");
       await expect(h1(page)).toHaveText("Request Center");
-      await expect(main(page)).toContainText("Every request you can file, with its current status. Choose the one that matches your situation.");
+      await expect(main(page)).not.toContainText("Choose the request that matches your situation."); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(h2s(page)).toHaveText(["Research & Defense", "Requests", "Completion"]);
       const links = [
         ["Research Progress", "/student/research"], ["Defense Schedule", "/student/defense-schedule"], ["Leave of Absence", "/student/requests/leave-of-absence"],
@@ -356,17 +360,17 @@ test.describe("P82 student pages (pinned)", () => {
     const { page, finish } = await studentPage(browser);
     try {
       for (const [path, title, desc] of [
-        ["/student/research", "Research Progress", "Upload your milestone files, submit the files for review, and follow your title, proposal and final defense requirements."],
-        ["/student/defense-schedule", "Defense Schedule", "Request a defense date once your panel is matched."],
-        ["/student/requests/leave-of-absence", "Leave of Absence", "Ask for a leave of absence, or for more time on a leave you are already on."],
-        ["/student/requests/readmission", "Readmission", "Ask to come back to your studies when your leave of absence is ending."],
-        ["/student/requests/withdrawal", "Subject Withdrawal", "Withdraw from one enrolled subject until the end of the second week of classes"],
-        ["/student/practicum", "Practicum", "Submit your MOA and completion evidence for the practicum requirement"],
-        ["/student/graduation", "Graduation Endorsement", "Apply for the Graduate School graduation endorsement"],
+        ["/student/research", "Research Progress", "Upload milestone files and follow your title, proposal and final defense requirements."],
+        ["/student/defense-schedule", "Defense Schedule", "Request a date once your panel is matched"],
+        ["/student/requests/leave-of-absence", "Leave of Absence", "Ask for a leave, or more time on one"],
+        ["/student/requests/readmission", "Readmission", "Ask to return when your leave is ending"],
+        ["/student/requests/withdrawal", "Subject Withdrawal", "One subject, until the end of the second week of classes"],
+        ["/student/practicum", "Practicum", "Submit your MOA and completion evidence"],
+        ["/student/graduation", "Graduation Endorsement", "Apply once coursework, research and any practicum are complete."],
       ]) {
         await open(page, path);
         await expect(h1(page), path).toHaveText(title);
-        await expect(main(page), path).toContainText(desc);
+        await expect(main(page), path).not.toContainText(desc); // CHANGED BY owner feedback 2026-11-23: request pages have no description line
         await expect(h1(page).locator("xpath=.."), `${path}: a status chip beside the title`).toHaveText(new RegExp(`^${esc(title)}\\s*\\S+`));
         await expect(main(page).getByRole("link", { name: "All requests" }), path).toHaveAttribute("href", "/student/requests");
       }
@@ -416,8 +420,8 @@ test.describe("P82 student pages (pinned)", () => {
     try {
       await open(s.page, "/student/messages", "messages");
       await expect(h1(s.page)).toHaveText("Messages");
-      await expect(main(s.page)).toContainText("Clarification requests, staff replies and questions about your active requests.");
-      await expect(h2s(s.page)).toHaveText(["Inbox / Messages"]);
+      await expect(main(s.page)).not.toContainText("Questions and replies about your requests."); // CHANGED BY owner feedback 2026-11-23: this line is removed
+      await expect(h2s(s.page)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: no second "Messages" heading
       await expect(main(s.page)).toContainText("No messages in this view");
       await expect(main(s.page).getByLabel("Filter messages").locator("option")).toHaveText(["All workflows", "Leave of Absence", "Readmission", "Course Audit", "Return from AWOL", "Practicum", "Subject Withdrawal", "Graduation Endorsement"]);
     } finally {
@@ -474,15 +478,15 @@ test.describe("P82 student pages (pinned)", () => {
     try {
       await open(s.page, "/student/calendar", "calendar");
       await expect(h1(s.page)).toHaveText("Research Calendar");
-      await expect(main(s.page)).toContainText("Your defense date, the deadlines that lead to it");
+      await expect(main(s.page)).not.toContainText("Your defense date and the deadlines before it"); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(main(s.page)).toContainText("Research adviser:");
       await expect(main(s.page).getByRole("link", { name: /Adviser page|Apply for an adviser/ })).toHaveAttribute("href", "/student/adviser");
       for (const name of ["Your next defense", "Next deadlines", "Calendar"]) await expect(main(s.page).getByRole("heading", { level: 2, name, exact: true }), name).toBeVisible();
       await expect(main(s.page)).toContainText("No defense is booked yet");
       await expect(main(s.page).getByRole("link", { name: "Request a defense schedule" })).toHaveAttribute("href", "/student/defense-schedule");
       await expect(main(s.page)).toContainText("No deadlines right now");
-      await expect(main(s.page).getByRole("status").filter({ hasText: "If your defense is moved" })).toBeVisible();
-      await expect(main(s.page)).toContainText("Select a defense or a deadline in the calendar to see its details.");
+      await expect(main(s.page).getByRole("status").filter({ hasText: "If your defense is moved" })).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23
+      await expect(main(s.page)).not.toContainText("Select a defense or a deadline in the calendar to see its details."); // CHANGED BY owner feedback 2026-11-23
     } finally {
       await s.finish();
     }
@@ -529,18 +533,18 @@ test.describe("P82 student pages (pinned)", () => {
       await expect(h1(page)).toHaveText("Documents");
       await expect(main(page).getByRole("link", { name: "Research uploads" })).toHaveAttribute("href", "/student/research");
       const hasAdmin = Object.keys(data.documents_by_gate || {}).some((gate) => !["Form 1 - Title Defense", "Form 4 - Proposal Defense Readiness", "Final Defense", "Completion Evidence"].includes(gate));
-      if (hasAdmin) await expect(h2s(page)).toHaveText(["Administrative Documents"]);
+      if (hasAdmin) await expect(h2s(page)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: the page title names the list
       else await expect(main(page)).toContainText("No administrative documents on file");
 
       await open(page, "/student/activity", "activity");
       await expect(h1(page)).toHaveText("Activity Log");
-      await expect(h2s(page)).toHaveText(["Activity Log"]);
-      await expect(main(page)).toContainText("Submissions, decisions, and next owners");
+      await expect(h2s(page)).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: no second "Activity Log" heading
+      // CHANGED BY UX phase 3 (UX-22, IM50): the subtitle repeated the page line; removed.
 
       await open(page, "/student/assistant", "assistant");
       await expect(h1(page)).toHaveText("Policy Assistant");
-      await expect(main(page).getByText("Private and read-only")).toBeVisible();
-      await expect(main(page)).toContainText("It cannot see other students");
+      await expect(main(page).getByText("Private and read-only")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
+      await expect(main(page)).not.toContainText("It cannot see other students"); // CHANGED BY owner feedback 2026-11-23: no "How this works" card
 
       await open(page, "/student/profile", "profile");
       await expect(h1(page)).toHaveText("My Profile");
@@ -618,7 +622,7 @@ test.describe("P82 changes: the student home", () => {
       await expect(card.locator('[data-slot="value"]'), "the figure is the stage name").toHaveText("Proposal Defense");
       await expect(card.locator('[data-slot="value"] span.ring-1'), "no status chip in the figure").toHaveCount(0);
       const sub = card.locator('[data-slot="sub"]');
-      await expect(sub.locator("span.ring-1"), "the status is a chip in the sub-line").toHaveText("Pending Staff Action");
+      await expect(sub.locator("span.ring-1"), "the status is a chip in the sub-line").toHaveText("In staff review"); // UX-18
       // the other three cards still show a plain number
       for (const label of ["Coursework", "Your open tasks", "Unread messages"]) await expect(stat(page, label).locator('[data-slot="value"] span.ring-1'), label).toHaveCount(0);
     } finally {

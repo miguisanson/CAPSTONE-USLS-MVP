@@ -95,7 +95,10 @@ test("Graduate School staff can record one of the five verdicts for the panel", 
   const page = await context.newPage();
   try {
     await page.goto(`/workflow/research-gate?student_id=${student.id}`);
-    await expect(page.locator("main")).toContainText("panel chair or Graduate School staff");
+// CHANGED BY UX phase 3 (UX-22, IM50): the longer page text is in the Help panel.
+    await page.locator("main").getByRole("button", { name: "Help", exact: true }).click();
+    await expect(page.getByRole("dialog").locator('[data-slot="help-note"]')).toContainText("panel chair or Graduate School staff");
+    await page.getByRole("dialog").getByRole("button", { name: "Close help" }).click();
     await expect(page.getByText("Read-only for GS staff", { exact: false })).toHaveCount(0);
     const panel = page.getByRole("region", { name: "Panel verdict fallback" });
     await expect(panel).toBeVisible();

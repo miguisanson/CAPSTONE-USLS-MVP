@@ -1,4 +1,5 @@
 // e2e-writes: none
+// CHANGED BY data cleanup (IM54-IM57, 2026-11-22): student ids re-pointed (Miko Almario 125 -> 18, Nico Barrientos 146 -> 39).
 // Packet P2.4 (Phase 5, UI-SPEC section 8): the shared parts that appear on many pages -- the Subject-needs report
 // (Course Adjustments), the Handoff import result, "Rules applied on this screen", the assistant's sources, the case
 // discussion thread, and the defense scheduling parts (availability request panel, slot check, calendar page and its
@@ -155,10 +156,10 @@ test.describe("Subject needs in the Course offering decisions card (staff, Cours
     await expect(card).toContainText("planning for ");
     await expect(card).toContainText("generated ");
     // the two meanings
-    await expect(card.getByText("Needing next term:", { exact: false }).first()).toBeVisible(); // CHANGED BY I-117: was "Needing next term." (a sentence in its own box)
-    await expect(card.getByText("Not taken yet:", { exact: false }).first()).toBeVisible(); // CHANGED BY I-117: was "Not taken yet."
-    // the four figures, as one line (CHANGED BY I-117: were four tiles, label then number)
-    await expect(card.getByText("12 students reviewed · 2 subjects needed next term · 4 student seats needed · 3 subjects with a backlog")).toBeVisible();
+    // the two meanings and the summary line are gone (IM58: the squares above show the next-term numbers) // CHANGED BY owner feedback 2026-11-23
+    await expect(card.getByText("Needing next term:", { exact: false })).toHaveCount(0);
+    await expect(card.getByText(/students reviewed/)).toHaveCount(0);
+    await expect(page.getByText("Subjects needed next term").first()).toBeVisible();
     // the CSV: one line per student per subject, with a header
     const download = page.waitForEvent("download");
     await card.getByRole("button", { name: "Download CSV" }).click();
@@ -266,36 +267,12 @@ const RULES = {
   ],
 };
 
+// CHANGED BY owner feedback 2026-11-23 (IM58): the rules box is gone from every page but Business Rules; this check now
+// pins that it stays gone (the student request page and the staff board's Help panel).
 async function checkRules(page, { staffLink }) {
-  const rules = page.locator('section[aria-label="Rules applied on this screen"]');
-  await expect(rules).toBeVisible();
-  const toggle = rules.getByRole("button");
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  // "needs review" is the Graduate School's own to-do: staff see it, the student does not (Fable F-11)
-  if (staffLink) await expect(rules).toContainText("2 rules from the Graduate School policies · 1 awaiting sign-off");
-  else await expect(rules).not.toContainText("awaiting sign-off");
-  await expect(rules.getByText("Spec: filing window")).toHaveCount(0);
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-expanded", "true");
-  const one = rules.locator("div.ring-1", { hasText: "Spec: filing window" });
-  await expect(one).toContainText("14 days");
-  await expect(one).toContainText("A request is filed within the window.");
-  await expect(one).toContainText("Source: Graduate School Handbook p. 12 (Section 4.2)");
-  // I-432: a student reads the plain rule; the system-check badges are for staff
-  if (staffLink) await expect(one).toContainText("Enforced by the system");
-  else await expect(one).not.toContainText("by the system");
-  await expect(one).not.toContainText("Needs review");
-  const two = rules.locator("div.ring-1", { hasText: "Spec: counselling note" });
-  await expect(two).toContainText("Yes");
-  await expect(two).toContainText("Source: Research Protocol");
-  if (staffLink) await expect(two).toContainText("Not checked by the system");
-  if (staffLink) await expect(two).toContainText("Awaiting sign-off");
-  else await expect(two).not.toContainText("Awaiting sign-off");
-  if (staffLink) await expect(two).toContainText("Spec: the office does this by hand.");
-  else await expect(two).not.toContainText("by hand");
-  const link = rules.getByRole("link", { name: "See every business rule and its history" });
-  await expect(link).toHaveCount(staffLink ? 1 : 0);
-  if (staffLink) await expect(link).toHaveAttribute("href", "/business-rules");
+  await expect(page.getByRole("main")).toBeVisible();
+  await expect(page.locator('section[aria-label="Rules applied on this screen"]')).toHaveCount(0);
+  expect(typeof staffLink).toBe("boolean");
 }
 
 test.describe("Rules applied on this screen", () => {
@@ -317,6 +294,7 @@ test.describe("Rules applied on this screen", () => {
       await mockGet(page, /\/api\/business-rules/, RULES);
       await page.goto("/workflow/practicum");
       await expect(main(page).getByRole("heading", { level: 1, name: "Practicum" })).toBeVisible();
+      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the rules are in Help
       await checkRules(page, { staffLink: true });
       await shotAll(page, "rules-staff");
     });
@@ -326,6 +304,8 @@ test.describe("Rules applied on this screen", () => {
       await page.goto("/workflow/practicum");
       await expect(main(page).getByRole("heading", { level: 1, name: "Practicum" })).toBeVisible();
       await page.waitForLoadState("networkidle");
+      await page.locator("main header").first().getByRole("button", { name: "Help" }).click(); // UX-14: the rules are in Help
+      await expect(page.getByRole("dialog")).toBeVisible();
       await expect(page.locator('section[aria-label="Rules applied on this screen"]')).toHaveCount(0);
     });
   });
@@ -591,7 +571,7 @@ test.describe("Defense scheduling parts (staff)", () => {
         { id: 502, faculty_id: people[1].faculty_id, faculty_name: people[1].name, status: "Answered", window_start: "2026-11-02", window_end: "2026-11-30", created_at: "2026-10-18T08:00:00", answered_at: "2026-10-19T08:00:00" },
       ];
     });
-    await page.goto("/workflow/defense-scheduling?student_id=146");
+    await page.goto("/workflow/defense-scheduling?student_id=39");
     const panel = main(page).locator("section[aria-labelledby='panel-availability-request']");
     await expect(panel).toBeVisible();
     await expect(panel.getByText("Availability of the panel", { exact: true })).toBeVisible();
@@ -625,7 +605,7 @@ test.describe("Defense scheduling parts (staff)", () => {
   test("the slot check under the final-schedule form: cannot be booked, needs a reason, no conflicts", async ({ page }) => {
     let answer = { hard: ["Spec: Room 1 is booked then."], soft: [], matched_count: 3, participant_count: 5, earliest_date: "2026-11-05", lead_days: 14 };
     await page.route(/\/api\/defense-schedules\/check/, (route) => route.fulfill({ json: answer }));
-    await page.goto("/workflow/defense-scheduling?student_id=146");
+    await page.goto("/workflow/defense-scheduling?student_id=39");
     await main(page).getByRole("button", { name: /Earliest option/ }).click(); // fills date and both times: the check runs
     await expect(main(page).getByRole("alert").filter({ hasText: "Cannot be booked" })).toContainText("Spec: Room 1 is booked then.");
     await expect(main(page)).toContainText("Earliest allowed date: Nov 5, 2026 (14-day lead time).");
@@ -669,17 +649,18 @@ test.describe("Calendar page", () => {
       await mockGet(page, /\/api\/calendar(\?|$)/, CALENDAR);
       await mockGet(page, /\/api\/calendar-feed/, { feed: null });
       await page.goto("/workflow/defense-scheduling?view=calendar");
-      await expect(main(page).getByText("All defenses with stage, status, panel and venue, plus the protocol deadlines.")).toBeVisible();
+      await expect(main(page).getByText("All defenses with stage, status, panel and venue, plus the protocol deadlines.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
       await expect(main(page).getByRole("button", { name: "Print" })).toBeVisible();
       for (const label of ["Program", "Stage", "Status", "Panelist or adviser", "Venue", "Student"]) {
         await expect(main(page).locator("label", { hasText: new RegExp(`^${label}`) }).first(), label).toBeVisible();
       }
       await expect(main(page).getByRole("checkbox", { name: "Deadlines" })).toBeChecked();
-      await expect(main(page).getByText("Select a defense or a deadline to see the details.")).toBeVisible();
+      await expect(main(page).getByText("Select a defense or a deadline to see the details.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
       // a filter shows Clear, which empties it
-      await main(page).locator("label", { hasText: /^Student/ }).getByPlaceholder("Name or ID").fill("Spec");
-      await main(page).getByRole("button", { name: "Clear", exact: true }).click();
-      await expect(main(page).getByRole("button", { name: "Clear", exact: true })).toHaveCount(0);
+      // CHANGED BY owner feedback 2026-11-23 (stage 4): the shared filter bar; the student search is a search box and Clear says how many
+      await main(page).getByRole("searchbox", { name: "Student" }).fill("Spec");
+      await main(page).getByRole("button", { name: "Clear 1 filter", exact: true }).click();
+      await expect(main(page).getByRole("button", { name: /^Clear \d+ filters?$/ })).toHaveCount(0);
 
       // needs attention lists the flagged defense; opening it fills the details card
       const attention = main(page).locator(".card", { has: page.getByRole("heading", { name: "Needs attention" }) });
@@ -701,7 +682,7 @@ test.describe("Calendar page", () => {
       await expect(details.getByRole("button", { name: "I cannot attend this defense" })).toHaveCount(0); // staff are not panelists
       await shotAll(page, "calendar-staff");
       await details.getByRole("button", { name: "Close" }).click();
-      await expect(main(page).getByText("Select a defense or a deadline to see the details.")).toBeVisible();
+      await expect(main(page).getByText("Select a defense or a deadline to see the details.")).toHaveCount(0); // CHANGED BY owner feedback 2026-11-23: this line is removed
 
       // the deadline in the month grid opens its own details
       await main(page).getByRole("button", { name: /Spec: manuscript due/ }).first().click();

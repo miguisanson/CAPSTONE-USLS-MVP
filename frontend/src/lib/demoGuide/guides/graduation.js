@@ -34,13 +34,14 @@ export default {
     },
     {
       id: "gr-batch", title: "Staff create the batch", role: "staff", route: "/workflow/graduation", page: "Graduation Endorsement",
-      do: "Drag the card from Application submitted to Batch created. The batch name is given automatically (for example Batch 2 November 2026); select Create batch, then drag the batch to Coursework review.",
+      // UX-39 (2026-11-22): the Graduation board has no Move to since the owner's 11-19 design (cards move by themselves);
+      // a candidate is ticked and the batch's own step buttons move it on.
+      do: "Tick Carlo Mendoza in Application submitted and select Create graduation batch. The batch name is given automatically (for example Batch 2 November 2026). Then select Forward to Academic Coordinator on the batch.",
       actions: [
-        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
-        { click: { role: "menuitem", name: "Batch created", exact: true } },
-        { click: { role: "button", name: "Create batch", exact: true, in: "dialog" } },
-        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
-        { click: { role: "menuitem", name: "Coursework review", exact: true } },
+        { check: { role: "checkbox", name: "Select Carlo Mendoza for batch creation" } },
+        { click: { role: "button", name: "Create graduation batch" } },
+        { click: { role: "button", name: "Create batch", in: "dialog" } },
+        { click: { role: "button", name: "Forward to Academic Coordinator", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
         { click: { role: "button", name: "Forward to Academic Coordinator", exact: true, in: "dialog" } },
       ],
       doneWhen: { status: from(GRADUATION_ORDER, "Coursework Review") },
@@ -48,15 +49,14 @@ export default {
       ifAsked: [
         { q: "What if the PDF has the wrong name or number?", a: "Staff select Message / Return and return it for clarification with Have student resubmit document ticked; the original PDF stays in the file history." },
         { q: "Who picks the batch name?", a: "The system: the next free number for the month, such as Batch 2 November 2026, so two batches never share a name." },
-        { q: "Can any card be dragged anywhere?", a: "No. A card moves one column at a time, only to the column its next step leads to." },
+        { q: "Can a card be dragged to the next column?", a: "No. A card moves to the next column by itself when its step is done; dragging only reorders cards inside a column." },
       ],
     },
     {
       id: "gr-coursework", title: "The Academic Coordinator checks coursework", role: "academic_coordinator", route: "/workflow/graduation", page: "Graduation Endorsement",
-      do: "Drag the batch from Coursework review to Research and practicum check, open View coursework completed if asked, and confirm.",
+      do: "Select Check coursework completion on the batch, open View coursework completed if asked, and confirm.",
       actions: [
-        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
-        { click: { role: "menuitem", name: "Research and practicum check", exact: true } },
+        { click: { role: "button", name: "Check coursework completion", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
         { click: { role: "button", name: "Check coursework completion", exact: true, in: "dialog" } },
       ],
       doneWhen: { status: from(GRADUATION_ORDER, "Research Review") },
@@ -64,10 +64,9 @@ export default {
     },
     {
       id: "gr-research", title: "The Research Coordinator checks research", role: "research_coordinator", route: "/workflow/graduation", page: "Graduation Endorsement",
-      do: "Drag the batch to Endorsement prep or revision and validate the research and practicum requirements in the dialog.",
+      do: "Select Validate research and practicum requirements on the batch and confirm in the window.",
       actions: [
-        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
-        { click: { role: "menuitem", name: "Endorsement prep or revision", exact: true } },
+        { click: { role: "button", name: "Validate research and practicum requirements", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
         { click: { role: "button", name: "Validate research and practicum requirements", exact: true, in: "dialog" } },
       ],
       doneWhen: { status: from(GRADUATION_ORDER, "Eligibility Confirmed") },
@@ -75,13 +74,12 @@ export default {
     },
     {
       id: "gr-prepare", title: "Staff prepare the list and send it to the Dean", role: "staff", route: "/workflow/graduation", page: "Graduation Endorsement",
-      do: "Open View details on the batch and select Prepare endorsement list, then drag the batch to Dean review and send the endorsement list.",
+      do: "Open View details on the batch and select Prepare endorsement list, then select Send endorsement list to Dean.",
       actions: [
         { click: { role: "button", name: "View details for", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
         { click: { role: "button", name: "Prepare endorsement list", exact: true, in: "dialog" } },
         { click: { role: "button", name: "Prepare endorsement list", exact: true, in: "dialog" } },
-        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
-        { click: { role: "menuitem", name: "Dean review", exact: true } },
+        { click: { role: "button", name: "Send endorsement list to Dean", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
         { click: { role: "button", name: "Send endorsement list to Dean", exact: true, in: "dialog" } },
       ],
       doneWhen: { status: from(GRADUATION_ORDER, "Ready for Dean Review") },
@@ -89,11 +87,10 @@ export default {
     },
     {
       id: "gr-dean", title: "The Dean approves and exports", role: "dean", route: "/dean/approvals/graduation", page: "Graduation Endorsement (Dean)",
-      do: "Open the Endorsement batches tab, drag the batch to Approved, ready to export and approve; then select Export approved list. Gmail opens a draft to the Registrar; attach the downloaded CSV there.",
+      do: "Open the Endorsement batches tab, select Approve endorsement list on the batch and confirm; then select Export approved list. Gmail opens a draft to the Registrar; attach the downloaded CSV there.",
       actions: [
         { click: { role: "tab", name: "Endorsement batches" } },
-        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
-        { click: { role: "menuitem", name: "Approved, ready to export", exact: true } },
+        { click: { role: "button", name: "Approve endorsement list", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
         { click: { role: "button", name: "Approve endorsement list", exact: true, in: "dialog" } },
         { pause: 2500, caption: "Saving the Dean's decision" },
       { click: { role: "button", name: "Export approved list", exact: true } },
@@ -123,8 +120,7 @@ export default {
         { click: { role: "button", name: "View details for", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
         { click: { role: "button", name: "Prepare endorsement list", exact: true, in: "dialog" } },
         { click: { role: "button", name: "Prepare endorsement list", exact: true, in: "dialog" } },
-        { click: { role: "button", name: "Move to", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
-        { click: { role: "menuitem", name: "Dean review", exact: true } },
+        { click: { role: "button", name: "Send endorsement list to Dean", in: { css: "[data-card-id]", text: "Carlo Mendoza" } } },
         { click: { role: "button", name: "Send endorsement list to Dean", exact: true, in: "dialog" } },
       ],
       doneWhen: { status: from(GRADUATION_ORDER, "Ready for Dean Review") },

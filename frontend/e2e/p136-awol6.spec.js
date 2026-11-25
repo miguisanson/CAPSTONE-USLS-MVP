@@ -39,12 +39,9 @@ test.describe("awol6 student Return from AWOL", () => {
   test("I-416 the rules panel lists the student's own program first and folds the other programs", async ({ browser }) => {
     const { context, page } = await openAwol(browser);
     try {
-      await page.getByRole("button", { name: /Rules applied on this screen/ }).click();
-      const panel = page.getByRole("region", { name: "Rules applied on this screen" });
-      await expect(panel.getByText(/^Master's: all requirements within 5/)).toBeVisible();
-      await expect(panel.getByText(/^Doctorate: /)).toHaveCount(0);
-      // I-432: a student is not shown the other programs' rules at all
-      await expect(panel.getByRole("button", { name: /^Rules for other programs/ })).toHaveCount(0);
+      // CHANGED BY owner feedback 2026-11-23 (IM58): no rules panel on a student request page
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Rules applied on this screen" })).toHaveCount(0);
     } finally { await context.close(); }
   });
 

@@ -45,7 +45,6 @@ function CurriculumProgress({ data }) {
     <SectionCard
       pad="lg"
       title="Curriculum progress"
-      subtitle="Every subject in your program and where you stand on it"
       icon={BookOpenCheck}
       action={<Button as={Link} to="/student/enrollment" variant="secondary" size="sm">Enroll in subjects</Button>}
     >
@@ -89,7 +88,6 @@ export default function StudentProgress() {
     <div className="page-stack animate-fade-up">
       <PageHeader
         title={PAGE.myProgress}
-        description="Your lifecycle stage, requirement status, and curriculum, read from the monitoring record."
         icon={ListChecks}
       />
       <ProgressPanel data={data} />

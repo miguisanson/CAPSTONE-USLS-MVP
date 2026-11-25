@@ -4,10 +4,10 @@ import { api } from "../../api";
 import StageBoard, { BoardNotice, useBoardNotice } from "../../components/StageBoard";
 import { useApi } from "../../hooks";
 import { useAuth } from "../../auth";
-import { Button, Card, DataTable, InlineNotice, Modal, SectionTitle, Select, SkeletonBoard, StatusChip } from "../../components/ui/index.js";
+import { Button, Card, DataTable, FilterSelect, InlineNotice, Modal, SkeletonBoard, StatusChip } from "../../components/ui/index.js";
 import LeaveFilters, { BoardFilterRow, ViewToggle } from "../leave/LeaveFilters";
 import { EMPTY_FILTERS } from "../leave/leaveHelpers";
-import { CaseCardFacts, CaseCardShell, NextOwner, PanelStamp, StageColumnHeader } from "../../components/process";
+import { CaseCardFacts, CaseCardHead, CaseCardShell, NextOwner, PanelStamp, StageColumnHeader } from "../../components/process";
 import { formatClock, formatDate } from "../../lib/format";
 import ListExportButtons from "../../components/ListExportButtons";
 import RecordForPanelDialog from "./RecordForPanelDialog";
@@ -77,13 +77,11 @@ function GateCard({ row, canAct, onView, onAct }) {
   const ready = row.state === "ready";
   return (
     <CaseCardShell ready={ready}>
-      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
-        <div className="min-w-0">
-          <p className="break-words text-sm font-semibold text-ink">{row.student.name}</p>
-          <p className="text-xs text-slate-500">{row.student.student_number} · {row.student.program_code} · {row.stage}</p>
-        </div>
-        <span title={STATE_HELP[row.state]}><StatusChip status={STATE_LABEL[row.state]} size="sm" dot={false} /></span>
-      </div>
+      <CaseCardHead
+        name={row.student.name}
+        sub={`${row.student.student_number} · ${row.student.program_code} · ${row.stage}`}
+        chip={<span title={STATE_HELP[row.state]}><StatusChip status={STATE_LABEL[row.state]} size="sm" dot={false} /></span>}
+      />
       {(row.state === "blocked" || row.state === "waiting") && row.reason && (
         <p className="mt-2 truncate text-xs font-medium text-slate-700" title={row.reason} data-testid="gate-reason">{row.reason}</p>
       )}
@@ -214,35 +212,35 @@ export default function ResearchGateOverview({ onOpen, selectedId }) {
     refetch();
   }
 
-  const summary = COLUMNS.map((column) => `${totalOf(column.key)} in ${column.label}`).join(", ");
-
   return (
     <Card pad="lg" id="research-gate-overview" className="min-w-0 overflow-hidden">
-      <SectionTitle
-        title="Who is at the Research Gate"
-        subtitle={canAct
-          ? "Every active student with research records, in the column of the stage each is at. Graduate School staff and the Research Coordinator can record the panel's verdict from a card if the panel chair cannot."
-          : "Every active student with research records, in the column of the stage each one is at."}
-        icon={ClipboardList}
-      />
+      {/* UX-17 (2026-11-20): the page header names the page; the columns carry the counts, so no second heading or count line. */}
+      {/* UX-34 (Phase 7): the heading stays for screen readers, so the column headings (h3) do not skip a level. */}
+      <h2 className="sr-only">Who is at the Research Gate</h2>
       {error && !data ? (
         <InlineNotice tone="danger" className="mt-3">{error}</InlineNotice>
       ) : (
         <div className="mt-3 space-y-3">
-          {data && <p className="meta" data-testid="research-gate-summary">{allRows.length} students: {summary}.</p>}
           <BoardFilterRow toggle={<ViewToggle value={view} onChange={setView} />}>
-            <LeaveFilters filters={filters} setFilters={setFilters} programs={programs} statusOptions={statusOptions} kindOptions={[]} count={rows.length} total={data ? allRows.length : null} noun="students" />
-            <div className="w-full sm:w-56">
-              <Select aria-label="Year admitted" placeholder="All years admitted" value={entry} options={entryOptions} onChange={(e) => setEntry(e.target.value)} />
-            </div>
+            <LeaveFilters
+              filters={filters}
+              setFilters={setFilters}
+              programs={programs}
+              statusOptions={statusOptions}
+              kindOptions={[]}
+              count={rows.length}
+              total={data ? allRows.length : null}
+              noun="students"
+              moreFilters={<FilterSelect label="Year admitted" aria-label="Year admitted" placeholder="All years admitted" value={entry} options={entryOptions} onChange={(e) => setEntry(e.target.value)} />}
+              extra={<ListExportButtons
+                            title="Research Gate"
+                            subtitle={`${rows.length} of ${allRows.length} students`}
+                            filename="research-gate"
+                            columns={["Student ID", "Student name", "Program", "Stage", "Status", "Waiting on", "Why"]}
+                            rows={rows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.stage || "", STATE_LABEL[row.state] || "", row.waiting_on || "", row.reason || ""])}
+                />}
+            />
           </BoardFilterRow>
-          <ListExportButtons
-            title="Research Gate"
-            subtitle={`${rows.length} of ${allRows.length} students`}
-            filename="research-gate"
-            columns={["Student ID", "Student name", "Program", "Stage", "Status", "Waiting on", "Why"]}
-            rows={rows.map((row) => [row.student.student_number, row.student.name, row.student.program_code, row.stage || "", STATE_LABEL[row.state] || "", row.waiting_on || "", row.reason || ""])}
-          />
           {view === "board" ? (
             loading && !data ? <SkeletonBoard columns={COLUMNS.length} label="Loading the Research Gate board" /> : <StageBoard
               ariaLabel="Research Gate board"

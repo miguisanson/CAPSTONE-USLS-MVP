@@ -118,7 +118,6 @@ export default function EnrollmentClassList() {
       <PageHeader
         icon={BookOpenCheck}
         title={PAGE.enrollmentClassList}
-        description="Read-only class rosters synchronized automatically with confirmed Enrollment records."
       />
 
       <Card>
@@ -157,9 +156,7 @@ export default function EnrollmentClassList() {
         </div>
       </Card>
 
-      <InlineNotice tone="neutral" icon={Lock} title="Read-only roster.">
-        Confirm or change enrollment in the Enrollment workspace; this list updates automatically.
-      </InlineNotice>
+      <InlineNotice tone="neutral" icon={Lock}>Read only. Change enrollment on the Enrollment page.</InlineNotice>
 
       {loading ? (
         <Spinner label="Loading enrollment class list…" />

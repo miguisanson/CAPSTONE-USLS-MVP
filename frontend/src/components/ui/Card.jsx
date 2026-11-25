@@ -32,7 +32,7 @@ export function SectionTitle({ title, subtitle, icon: Icon, action }) {
         )}
         <div>
           <h2 className="section-title">{title}</h2>
-          {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+          {subtitle && <p data-slot="subtitle" className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
         </div>
       </div>
       {action}

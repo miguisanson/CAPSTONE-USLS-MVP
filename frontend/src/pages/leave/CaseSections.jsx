@@ -138,7 +138,7 @@ export function PolicyCheck({ detail }) {
   const snapshot = detail.policy_snapshot;
   if (!review) return null;
   return (
-    <Block title="Policy check" icon={ShieldCheck} hint="Advice for staff - the Dean decides.">
+    <Block title="Policy check" icon={ShieldCheck}>
       <div className="flex flex-wrap items-center gap-2">
         <StatusChip status={review.recommendation} dot={false} />
         {review.suggested_dean_action && (

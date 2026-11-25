@@ -18,7 +18,7 @@
 //     Withdrawal export window, and the residency dialog with the I-012 rule (Record stays off when the checker says
 //     "Needs Human Review", on when it says "Eligible for Residency").
 // Demo data read only: Benjamin Santos, Therese Lacson, Gabriel Domingo (Leave of Absence), Maria Dela Cruz
-// (Readmission), Clarisse Tan, Elena Mendoza (AWOL & Residency), Adrian Lim (Withdrawal, staff), Hazel Flores (Withdrawal, Dean).
+// (Readmission), Clarisse Tan, Elena Mendoza (AWOL & Residency), Adrian Lim (Withdrawal, staff), Enzo Araneta (Withdrawal, Dean).
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -519,8 +519,9 @@ test.describe("P5.3-P5.5 leave and process dialogs", () => {
     test("Withdrawal: the Dean's case window offers Return to student with a reason box; Escape returns the focus", async ({ page }) => {
       await page.goto("/dean/approvals/withdrawal");
       // AD9 (870ec52): the Dean returns a withdrawal only once staff forwarded it (Dean Review); Adrian Lim is still with staff.
-      // Hazel Flores is the seeded withdrawal waiting for the Dean (DEAN_DEMO_STUDENTS, I-062); nothing here decides it.
-      const { opener, dialog } = await open(page, "Hazel Flores");
+      // CHANGED BY data cleanup (IM54-IM57, 2026-11-22): Enzo Araneta replaces Hazel Flores.
+      // Enzo Araneta is the seeded withdrawal waiting for the Dean (DEAN_DEMO_STUDENTS, I-062); nothing here decides it.
+      const { opener, dialog } = await open(page, "Enzo Araneta");
       const button = footerAction(dialog, "Return to student");
       await button.click();
       await expect(page.getByRole("dialog")).toHaveCount(2);

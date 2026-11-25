@@ -20,6 +20,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_DB_FILE.name}"
 os.environ.setdefault("POLICY_DOCUMENT_UPLOAD_DIR", tempfile.mkdtemp(prefix="policy-uploads-"))
 os.environ.setdefault("RAG_INDEX_DIR", tempfile.mkdtemp(prefix="rag-index-"))
 
+from app import DEAN_DEMO_STUDENTS  # noqa: E402  (data cleanup IM56: the Dean cases moved to MAED demo students)
 from app import (  # noqa: E402
     AcademicTerm,
     AdviserAppointment,
@@ -81,7 +82,12 @@ def sign_in(email: str):
 
 def account_for_student_number(student_number: str) -> UserAccount:
     student = Student.query.filter_by(student_number=student_number).first()
-    return UserAccount.query.filter_by(student_id=student.id, role="student").order_by(UserAccount.id).first()
+    account = UserAccount.query.filter_by(student_id=student.id, role="student").order_by(UserAccount.id).first()
+    if account is None:  # CHANGED BY data cleanup (IM54): an imported student has no login in the demo seed; make one here
+        from app import SIM_STUDENT_PASSWORD, ensure_student_account
+        account = ensure_student_account(student, student.email, SIM_STUDENT_PASSWORD)
+        db.session.commit()
+    return account
 
 
 class V53Backend2Tests(unittest.TestCase):
@@ -127,12 +133,12 @@ class V53Backend2Tests(unittest.TestCase):
 
     # ------------------------------------------------------------------ I-059 (F-05)
     def test_dean_approving_a_leave_of_absence_notifies_the_student_and_the_next_owner(self):
-        student_client = self.student_client_for("2360074")  # Lorenzo Reyes: LOA with the Dean
+        student_client = self.student_client_for(DEAN_DEMO_STUDENTS["leave-of-absence"])  # Rowena Gatchalian: LOA with the Dean
         staff = sign_in(STAFF_EMAIL)
         staff_before = {item["id"] for item in self.notifications(staff)["items"]}
         before = self.notifications(student_client)
         with app.app_context():
-            case = LeaveCase.query.filter_by(student_id=Student.query.filter_by(student_number="2360074").first().id).first()
+            case = LeaveCase.query.filter_by(student_id=Student.query.filter_by(student_number=DEAN_DEMO_STUDENTS["leave-of-absence"]).first().id).first()
             case_id = case.id
         dean = sign_in(DEAN_EMAIL)
         response = dean.post(f"/api/approvals/workflow/leave-of-absence/{case_id}/decide", json={"decision": "approve"})
@@ -146,7 +152,7 @@ class V53Backend2Tests(unittest.TestCase):
         self.assertEqual(after["unread_count"], before["unread_count"] + 1)
         # the next owner (Graduate School Staff, who tags the leave for the Registrar) hears of it too
         staff_new = [item for item in self.notifications(staff)["items"] if item["id"] not in staff_before]
-        self.assertTrue(any("Lorenzo" in (item["title"] + (item["body"] or "")) for item in staff_new), staff_new)
+        self.assertTrue(any("Rowena" in (item["title"] + (item["body"] or "")) for item in staff_new), staff_new)
 
     def test_dean_decision_on_a_practicum_report_notifies_the_student(self):
         student_client = self.student_client_for("2360101")  # Isabel Mendoza: practicum report with the Dean
@@ -163,11 +169,11 @@ class V53Backend2Tests(unittest.TestCase):
         self.assertIn("practicum", (fresh[0]["title"] + " " + (fresh[0]["body"] or "")).lower())
 
     def test_dean_decision_on_the_standalone_board_notifies_the_student_exactly_once(self):
-        student_client = self.student_client_for("2360087")  # Hazel Flores: subject withdrawal with the Dean
+        student_client = self.student_client_for(DEAN_DEMO_STUDENTS["withdrawal"])  # Enzo Araneta: subject withdrawal with the Dean
         known = {item["id"] for item in self.notifications(student_client)["items"]}
         with app.app_context():
             application_id = WithdrawalApplication.query.filter_by(
-                student_id=Student.query.filter_by(student_number="2360087").first().id).first().id
+                student_id=Student.query.filter_by(student_number=DEAN_DEMO_STUDENTS["withdrawal"]).first().id).first().id
         dean = sign_in(DEAN_EMAIL)
         response = dean.post(f"/api/process-cases/withdrawal/{application_id}/transition", json={"action": "approve"})
         self.assertEqual(response.status_code, 200, response.get_json())
@@ -178,13 +184,13 @@ class V53Backend2Tests(unittest.TestCase):
     def test_staff_moving_a_standalone_case_notifies_the_student_and_the_dean(self):
         # Hazel Flores's withdrawal is with the Dean; send it back to staff first by using the Dean's own queue
         # is not possible, so use the AWOL return: staff forward is the first step for a fresh return.
-        student_client = self.student_client_for("2360087")
+        student_client = self.student_client_for(DEAN_DEMO_STUDENTS["withdrawal"])
         dean = sign_in(DEAN_EMAIL)
         dean_known = {item["id"] for item in self.notifications(dean)["items"]}
         known = {item["id"] for item in self.notifications(student_client)["items"]}
         with app.app_context():
             application = WithdrawalApplication.query.filter_by(
-                student_id=Student.query.filter_by(student_number="2360087").first().id).first()
+                student_id=Student.query.filter_by(student_number=DEAN_DEMO_STUDENTS["withdrawal"]).first().id).first()
             application.status, application.dean_decision = "Submitted to GS Staff", "Pending"
             application_id = application.id
             db.session.commit()
@@ -194,7 +200,7 @@ class V53Backend2Tests(unittest.TestCase):
         fresh = [item for item in self.notifications(student_client)["items"] if item["id"] not in known]
         self.assertEqual(len(fresh), 1, fresh)
         dean_fresh = [item for item in self.notifications(dean)["items"] if item["id"] not in dean_known]
-        self.assertTrue(any("Hazel" in (item["title"] + (item["body"] or "")) for item in dean_fresh), dean_fresh)
+        self.assertTrue(any("Enzo" in (item["title"] + (item["body"] or "")) for item in dean_fresh), dean_fresh)
 
     def test_graduation_batch_approval_notifies_the_student(self):
         student_client = self.student_client_for("2360008")  # Hector Ong: endorsement ready for the Dean
@@ -260,7 +266,7 @@ class V53Backend2Tests(unittest.TestCase):
             self.assertEqual(student.risk_level, student_priority(student)["level"])
             self.assertIsNotNone(AwolCase.query.filter_by(student_id=awol_student_id).first())
         # students cannot trigger it
-        student_client = self.student_client_for("2360074")
+        student_client = self.student_client_for(DEAN_DEMO_STUDENTS["leave-of-absence"])
         self.assertEqual(student_client.post("/api/maintenance/refresh", json={}).status_code, 403)
 
     def test_leave_board_get_changes_nothing_when_an_old_log_has_no_case_yet(self):

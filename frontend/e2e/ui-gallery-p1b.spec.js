@@ -68,7 +68,7 @@ for (const viewport of VIEWPORTS) {
     await expect(one("chip-approved")).toHaveText("Approved");
     await expect(one("chip-label")).toHaveText("Approved by Dean");
     expect((await style("chip-approved", ["font-size"]))["font-size"]).toBe(px(12));
-    expect((await style("chip-sm-approved", ["font-size"]))["font-size"]).toBe(px(11));
+    expect((await style("chip-sm-approved", ["font-size"]))["font-size"]).toBe(px(12)); // CHANGED BY UX-09 (2026-11-20): the micro step is 12px, the smallest size on screen
     await expect(one("chip-approved").locator("svg")).toHaveCount(1); // CHANGED BY p118 (I-358): the tone icon replaces the dot; every chip has one
     await expect(one("chip-nodot").locator("svg")).toHaveCount(1);
     const longBox = await one("chip-long").boundingBox();

@@ -48,11 +48,11 @@ RESEARCH_OPEN = ("Proposal Development", "Proposal Defense", "Data Collection", 
 PAST_TITLE_DEFENSE = ("Proposal Defense", "Data Collection", "Writing", "Final Defense")
 # p63-faculty-pages.spec.js applies for an adviser as these four students (Gian Reyes, Daniel Bernardo, Rafael Pang,
 # Marielle Navarro) and uploads Form 1 as Elena Mendoza: none of them may already have an adviser.
-DEMO_STUDENTS_WITHOUT_ADVISER = {
-    "2360053": "Gian Reyes",
-    "2460055": "Daniel Bernardo",
-    "2260063": "Rafael Pang",
-    "2360061": "Marielle Navarro",
+DEMO_STUDENTS_WITHOUT_ADVISER = {  # CHANGED BY data cleanup (IM57): the walkthrough students are MAED demo students now
+    "2691501": "Gian Reyes",
+    "2691502": "Daniel Bernardo",
+    "2691503": "Rafael Pang",
+    "2691504": "Marielle Navarro",
     "2260011": "Elena Mendoza",
 }
 GRADUATION_DECIDED = ("Dean Approved", "Sent to Registrar", "Registrar Received")
